@@ -79,6 +79,12 @@
   function getToken(fresh) {
     if (fresh) token = null;
     if (valid()) return Promise.resolve(token.value);
+    // Offline, Google can't be asked: the old token goes along (Drive won't
+    // be reached, and papers kept on this device answer instead).
+    if (!navigator.onLine) {
+      if (token || store.get('token', null)) return Promise.resolve((token || store.get('token', null)).value);
+      return Promise.reject(new Error('You\u2019re offline, and LibLande hasn\u2019t signed in to Google on this device yet.'));
+    }
     return new Promise(resolve => {
       waiters.push(resolve);
       bar(email ? 'Tap anywhere to reconnect to Google Drive' : 'Sign in with Google to open your library');
@@ -115,7 +121,13 @@
 
   /* ------------------------------------------------------------ Drive */
   async function drive(path, opts = {}, base = API) {
-    const go = async t => fetch(base + path, Object.assign({}, opts, { headers: Object.assign({}, opts.headers, { Authorization: 'Bearer ' + t }) }));
+    const go = async t => {
+      try {
+        return await fetch(base + path, Object.assign({}, opts, { headers: Object.assign({}, opts.headers, { Authorization: 'Bearer ' + t }) }));
+      } catch (e) {
+        throw new Error(navigator.onLine ? 'Google Drive can\u2019t be reached just now.' : 'You\u2019re offline.');
+      }
+    };
     let r = await go(await getToken());
     if (r.status === 401) r = await go(await getToken(true));
     if (!r.ok) {
@@ -278,6 +290,18 @@
     if (!window.google.script) window.google.script = scriptApi;
     makeClient();
   });
+  // Back online with something waiting for Google: ask for the tap now.
+  window.addEventListener('online', () => { if (waiters.length && !valid()) bar('Tap anywhere to reconnect to Google Drive'); });
+  window.addEventListener('offline', () => bar(null));
+
+  /* ------------------------------------------------------------ offline */
+  // sw.js keeps the app, PDF.js and recently opened papers on this device,
+  // so LibLande opens (and opens those papers) with no connection. Storage
+  // marked persistent isn't cleared by Safari to make room.
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+    navigator.serviceWorker.register('sw.js').catch(e => console.warn('Offline support didn\u2019t start:', e));
+    if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+  }
   document.addEventListener('DOMContentLoaded', () => {
     const gis = document.getElementById('gis');
     if (gis) gis.addEventListener('load', makeClient);
