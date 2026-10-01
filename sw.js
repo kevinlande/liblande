@@ -12,7 +12,7 @@
  *   with marks replaces the copy kept here, so it opens with them.
  *   (The library itself is kept by the page, in IndexedDB.)
  */
-const VERSION = '2026-10-01.03';
+const VERSION = '2026-10-01.04';
 const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/5.4.149/';
 const APP = 'liblande-app-' + VERSION, LIBS = 'liblande-libs', PAPERS = 'liblande-papers';
 const KEEP_PAPERS = 60;
@@ -88,7 +88,10 @@ self.addEventListener('fetch', ev => {
     if (!id) return;
     ev.respondWith((async () => {
       const body = await req.clone().arrayBuffer();
-      const res = await fetch(req);
+      // (Offline: a plain network error, which the page knows to keep the
+      // changes on the device for.)
+      let res;
+      try { res = await fetch(req); } catch (e) { return Response.error(); }
       if (res.ok) {
         const info = await res.clone().json().catch(() => ({}));
         ev.waitUntil(keepPaper(id, new Response(body, { headers: { 'Content-Type': 'application/pdf', 'Content-Length': String(body.byteLength) } }),

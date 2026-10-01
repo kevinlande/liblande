@@ -1459,7 +1459,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-01.03</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-01.04</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1474,7 +1474,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-01.03';
+      l.querySelector('small').textContent = 'Version 2026-10-01.04';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1486,7 +1486,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-01.03): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-01.04): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -1699,7 +1699,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-01.03`;
+    `<br>LibLande version 2026-10-01.04`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -3956,7 +3956,8 @@ async function openReader(entry, file, pos) {
         saveUI();
         autoSaveSoon(5000);
       });
-      toast('Your marks from ' + new Date(kept.at).toLocaleString() + ' that hadn\u2019t reached Google Drive are back, and are being saved to it.', 6000);
+      toast('Your marks from ' + new Date(kept.at).toLocaleString() + ' that hadn\u2019t reached Google Drive are back' +
+        (navigator.onLine ? ', and are being saved to it.' : ' (kept on this device until you\u2019re online).'), 6000);
     } else if (clash) {
       vStatus('Marks you made on this device (' + new Date(clash.at).toLocaleString() + ') never reached Google Drive, and the PDF there has changed since.', false,
         [['Use my marks', () => { JOURNAL_USE.add(file.id); openReader(entry, file, spot()); }],
@@ -3973,7 +3974,8 @@ async function openReader(entry, file, pos) {
 async function saveNow() {
   clearTimeout(AUTO.timer);
   for (let i = 0; i < 4 && (V.dirty || V.bmDirty || V.drawing || V.saving); i++) {
-    if (!(await saveMarkup())) return false;
+    const r = await saveMarkup();
+    if (!r || r === 'kept') return r;
   }
   return true;
 }
@@ -4015,7 +4017,9 @@ async function closeReader() {
   hidePanel();
   $('#viewer').hidden = true;
   renderPaperTabs();
-  if (!(await saveNow())) toast('Your marks on this paper aren\u2019t saved yet. Open it again to save them.', 6000);
+  const r = await saveNow();
+  if (!r) toast('Your marks on this paper aren\u2019t saved yet. Open it again to save them.', 6000);
+  else keptNote(r);
 }
 // Close the paper in the front tab (already saved, or given up).
 function shutReader() {
@@ -4109,7 +4113,7 @@ async function switchPaperTab(i) {
   if (!t) return;
   if (V.doc && V.file && V.file.id === t.fileId) { PTABS.active = i; showViewer(); return; }
   if (V.doc) {
-    if (!(await saveNow())) return;
+    if (!keptNote(await saveNow())) return;
     rememberTab();
     unloadDoc();
   }
@@ -4120,7 +4124,7 @@ async function closePaperTab(i) {
   const t = PTABS.list[i];
   if (!t) return;
   if (V.doc && V.file && V.file.id === t.fileId) {
-    if (!(await saveNow())) return;
+    if (!keptNote(await saveNow())) return;
     shutReader();
     return;
   }
@@ -4294,6 +4298,9 @@ async function saveMarkup(force, auto, now) {
   const doc = V.doc, file = V.file;
   // Changes made while this save is under way are saved by the next one.
   const seq = V.seq || 0, bmSnap = new Set(BM.pages);
+  // Offline (or Drive can't be reached), the changes are kept on this
+  // device instead, and uploaded once it's back online (see uploadKept).
+  let offline = false;
   V.saving = (async () => {
     AUTO.first = AUTO.last = 0;
     saveUI('saving');
@@ -4303,6 +4310,7 @@ async function saveMarkup(force, auto, now) {
       if (V.tool !== 'read' && doc === V.doc) setTool(V.tool);
     }
     if (!V.dirty && !V.bmDirty) { saveUI(); return true; }
+    if (!navigator.onLine) { offline = true; saveUI(); return false; }
     try {
       const md5 = await pdfMd5(file).catch(() => null);
       if (!force && V.md5 && md5 && md5 !== V.md5) {
@@ -4361,6 +4369,7 @@ async function saveMarkup(force, auto, now) {
       saveUI('saved');
       return true;
     } catch (err) {
+      if (netError(err)) { offline = true; saveUI(); return false; }
       // (Tried again two minutes on.)
       if (!AUTO.first) AUTO.first = AUTO.last = Date.now();
       saveUI();
@@ -4374,14 +4383,84 @@ async function saveMarkup(force, auto, now) {
       return false;
     }
   })();
-  try { return await V.saving; } finally { V.saving = null; }
+  let res;
+  try { res = await V.saving; } finally { V.saving = null; }
+  if (offline && doc === V.doc) return (await keepOnDevice()) ? 'kept' : false;
+  return res;
 }
+// A save that failed for want of a connection (rather than being refused).
+const netError = err => err instanceof TypeError ||
+  /offline|can\u2019t be reached|NetworkError|Load failed|Failed to fetch|respondWith|network connection/i.test(String(err && err.message));
+// The open paper's changes kept on this device now (not in a few
+// seconds): true once they are.
+async function keepOnDevice() {
+  for (let i = 0; i < 100 && LOCAL.busy; i++) await new Promise(r => setTimeout(r, 100));
+  clearTimeout(LOCAL.timer);
+  if (!V.file) return false;
+  const id = V.file.id, t0 = Date.now();
+  await localSave();
+  const j = await JOURNAL.get(id).catch(() => null);
+  return !!(j && (j.bytes || j.tail) && j.at >= t0);
+}
+const KEPT_NOTE = 'You\u2019re offline: your marks are kept on this device, and go to Google Drive when you\u2019re back online.';
+const keptNote = r => { if (r === 'kept') toast(KEPT_NOTE, 4500); return r; };
 // Combine: the PDF changed on Drive (another device, another app) while
 // marks were made here. The newer PDF is downloaded, and the marks made
 // here are written into it by PDF.js (out of sight), with the bookmarks
 // made or removed here; then it's uploaded, and shown. Marks that were
 // already in the PDF and were changed or deleted here aren't carried over
 // (the other version may have changed them too); you're told how many.
+// Papers with changes kept on this device (made offline, or left before
+// they could be uploaded) go to Drive when LibLande is online: on start,
+// and when the connection comes back. Each only if the PDF on Drive is
+// still the one the changes were made to; otherwise it's left, and
+// opening it offers Combine.
+const KEPT_UP = { busy: false, again: false };
+async function uploadKept() {
+  if (!gs || !navigator.onLine) return;
+  // (Asked again while under way: once more when it's done.)
+  if (KEPT_UP.busy) { KEPT_UP.again = true; return; }
+  KEPT_UP.busy = true;
+  KEPT_UP.again = false;
+  let done = 0;
+  try {
+    const keys = await JOURNAL.run('readonly', st => st.getAllKeys()).catch(() => []);
+    for (const id of keys || []) {
+      if (typeof id !== 'string' || id.startsWith('open:')) continue;
+      // (The paper that's loaded is saved the usual way: by auto-save if
+      // it's showing, now if it's been closed.)
+      if (V.file && V.file.id === id && V.doc) {
+        if (!(V.dirty || V.bmDirty || V.drawing)) continue;
+        if (!$('#viewer').hidden) autoSaveSoon(1000);
+        else if ((await saveMarkup(false, true, true)) === true) done++;
+        continue;
+      }
+      const j = await JOURNAL.load(id).catch(() => null);
+      if (!j || !j.bytes || !j.base) continue;
+      const file = { id };
+      const md5 = await pdfMd5(file).catch(() => null);
+      if (!md5 || md5 !== j.base) continue;
+      try {
+        await callServer('backupPdf', id);
+        const bytes = j.bm ? await withBookmarks(j.bytes, new Set(j.bm), true).catch(() => j.bytes) : j.bytes;
+        await uploadMarked(file, bytes);
+      } catch (err) {
+        if (netError(err)) break;
+        console.warn('Uploading kept changes failed:', err);
+        continue;
+      }
+      if (V.file && V.file.id === id && V.doc) continue;
+      await JOURNAL.drop(id).catch(() => {});
+      recentPdfs.delete(id); recentMd5.delete(id); THUMBS.delete(id);
+      done++;
+    }
+  } finally {
+    KEPT_UP.busy = false;
+    if (KEPT_UP.again) setTimeout(uploadKept, 500);
+  }
+  if (done) toast('Marks made offline on ' + done + ' paper' + (done === 1 ? '' : 's') + ' saved to Google Drive', 4000);
+}
+window.addEventListener('online', () => setTimeout(uploadKept, 1500));
 async function uploadMarked(file, bytes) {
   const up = token => fetch('https:\/\/www.googleapis.com/upload/drive/v3/files/' + encodeURIComponent(file.id) + '?uploadType=media&fields=md5Checksum',
     { method: 'PATCH', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/pdf' }, body: bytes });
@@ -4616,7 +4695,7 @@ window.addEventListener('keydown', ev => {
 // (Kept on the device first: quick, before iOS stops the app.)
 document.addEventListener('visibilitychange', () => { if (document.hidden && (V.dirty || V.bmDirty || V.drawing)) { localSave(); autoSave(true); } });
 window.addEventListener('pagehide', () => { if (V.dirty || V.bmDirty || V.drawing) { localSave(); autoSave(true); } });
-$('#vSave').addEventListener('click', () => saveMarkup());
+$('#vSave').addEventListener('click', () => saveMarkup().then(keptNote));
 window.addEventListener('beforeunload', ev => { if (V.dirty || V.bmDirty || V.drawing) { ev.preventDefault(); ev.returnValue = ''; } });
 
 /* ---- markup tools */
@@ -9548,7 +9627,7 @@ window.addEventListener('resize', () => requestAnimationFrame(paint));
 document.addEventListener('keydown', ev => {
   if (!$('#viewer').hidden) {
     const typing = /^(input|textarea|select)$/i.test(ev.target.tagName || '') || ev.target.isContentEditable;
-    if ((ev.metaKey || ev.ctrlKey) && ev.key === 's') { ev.preventDefault(); saveMarkup(); return; }
+    if ((ev.metaKey || ev.ctrlKey) && ev.key === 's') { ev.preventDefault(); saveMarkup().then(keptNote); return; }
     if ((ev.metaKey || ev.ctrlKey) && ev.key === 'f') { ev.preventDefault(); openFind(); return; }
     if ((ev.metaKey || ev.ctrlKey) && ev.key === 'g') { ev.preventDefault(); runFind('again', ev.shiftKey); return; }
     if (typing || ev.metaKey || ev.ctrlKey || ev.altKey) return;
@@ -9655,7 +9734,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-01.03</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-01.04</small>`;
 };
 
 function gunzipJSON(bytes) {
@@ -9798,7 +9877,7 @@ if (!gs) {
       await show(lib, false);
       cache.put(lib);
     }
-  })().then(seedReading).catch(err => {
+  })().then(seedReading).then(() => setTimeout(uploadKept, 3000)).catch(err => {
     if (ENTRIES.length) toast('Couldn\u2019t check for updates: ' + errText(err), 5000);
     else showError(err);
   });
