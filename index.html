@@ -1234,11 +1234,12 @@ details.d-sec[open] summary { margin-bottom: 8px; }
   .toolbar:not(.searching) .search { flex-basis: 100%; height: 0; margin-left: 0; margin-top: 0; }
   /* Sorting is in the bar under the list (the column headings do it on
      wider screens). */
-  /* (Clear of the iPhone's home indicator at the bottom.) */
-  .status { align-items: center; padding: 5px 8px calc(5px + env(safe-area-inset-bottom, 0px)) 12px; font-size: 12.5px; color: var(--muted); }
+  /* (Clear of the iPhone's home indicator at the bottom, but sharing some
+     of its room: the indicator is a thin line low in that space.) */
+  .status { align-items: center; padding: 2px 6px max(2px, calc(env(safe-area-inset-bottom, 0px) - 16px)) 12px; font-size: 12.5px; color: var(--muted); }
   .status .sortctl { display: flex; align-items: center; gap: 2px; margin-left: auto; }
-  .status .sortctl select { height: 32px; font-size: 14px; padding: 0 6px; line-height: normal; }
-  .status .sortctl .tb-btn { height: 32px; width: 32px; }
+  .status .sortctl select { height: 28px; font-size: 14px; padding: 0 6px; line-height: normal; }
+  .status .sortctl .tb-btn { height: 28px; width: 28px; }
   #statusR { display: none; }
   .colhead, .splitter { display: none; }
   .listwrap { flex: 1 1 0; }
@@ -1499,7 +1500,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-02.07</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-02.08</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1514,7 +1515,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-02.07';
+      l.querySelector('small').textContent = 'Version 2026-10-02.08';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1526,7 +1527,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-02.07): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-02.08): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -1772,7 +1773,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-02.07`;
+    `<br>LibLande version 2026-10-02.08`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -10257,7 +10258,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-02.07</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-02.08</small>`;
 };
 
 function gunzipJSON(bytes) {
