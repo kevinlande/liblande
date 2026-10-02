@@ -192,6 +192,12 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
   display: flex; flex-direction: column; min-height: 0; overflow: hidden;
 }
 :root { --top-room: 0px; }
+/* On GitHub Pages: a strip pinned across the top, the status bar's height,
+   in the bars' colour. Safari 26 (iPadOS 26) fills the status bar's area
+   with the colour of a full-width pinned element it finds just below the
+   top edge; without one, it draws a haze there instead, over the top bars.
+   (It looks for it as a tap would, so it can't be see-through to taps.) */
+.status-cap { position: fixed; top: 0; left: 0; right: 0; height: max(6px, env(safe-area-inset-top, 0px)); background: var(--panel); z-index: 2147483000; }
 :root.top-room { --top-room: 12px; }
 .side-head { padding: calc(12px + max(env(safe-area-inset-top, 0px), var(--top-room))) 8px 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .side-actions { display: flex; align-items: center; gap: 2px; }
@@ -1280,6 +1286,12 @@ try {
   var ipad = /iPad/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   var homeScreen = navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
   if (ipad && homeScreen && !window.LIBLANDE_PAGES) document.documentElement.classList.add('top-room');
+  if (window.LIBLANDE_PAGES) document.addEventListener('DOMContentLoaded', function () {
+    var cap = document.createElement('div');
+    cap.className = 'status-cap';
+    cap.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(cap);
+  });
 } catch (e) {}
 </script>
 <div class="app" id="app" data-view="list">
@@ -1484,7 +1496,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-02.02</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-02.03</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1499,7 +1511,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-02.02';
+      l.querySelector('small').textContent = 'Version 2026-10-02.03';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1511,7 +1523,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-02.02): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-02.03): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -1734,7 +1746,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-02.02`;
+    `<br>LibLande version 2026-10-02.03`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -10219,7 +10231,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-02.02</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-02.03</small>`;
 };
 
 function gunzipJSON(bytes) {
