@@ -293,8 +293,38 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .sheet-head .sheet-x { flex: none; width: 36px; height: 36px; justify-content: center; padding: 0; }
 .sheet-head .sheet-x .i { width: 18px; height: 18px; }
 .sheet-head .sheet-go { flex: none; }
+.btn.busy { display: inline-flex; align-items: center; gap: 8px; opacity: 1; cursor: progress; }
+.btn.busy::before { content: ''; flex: none; width: 13px; height: 13px; box-sizing: border-box; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .8s linear infinite; }
+.sheet.saving #sheetBody > :not(.sheet-head) { opacity: .5; pointer-events: none; transition: opacity .2s; }
 @media (max-width: 699px) { .setup-card .sheet-head h2 { font-size: 21px; } }
 .setup.head-mode .setup-actions { display: none; }
+/* Adding and editing, compact: each field's name to its left, and smaller
+   boxes, so most of the form fits without scrolling. (A row of short
+   fields, like Volume, Number and Pages, shares a line.) */
+.sheet.compact .setup-card { gap: 6px; }
+.sheet.compact .fields-grid { gap: 6px 14px; }
+.sheet.compact .fld { grid-template-columns: 84px minmax(0, 1fr); align-items: start; column-gap: 10px; }
+.sheet.compact .fld.short { grid-template-columns: auto minmax(0, 1fr); }
+.sheet.compact .fld.short.lead { grid-template-columns: 84px minmax(0, 1fr); }
+.sheet.compact .fld > label, .sheet.compact .fld > .lbl { margin: 0; padding-top: 7px; font-size: 12.5px; color: var(--muted); }
+.sheet.compact .setup-card input[type="text"], .sheet.compact .setup-card select { height: 32px; font-size: 14px; }
+.sheet.compact .setup-card select { padding-top: 0; padding-bottom: 0; }
+.sheet.compact #sheetBody > .check { margin-left: 94px; }
+.sheet.compact .setup-card textarea { padding: 5px 10px; font-size: 14px; }
+.sheet.compact .kw-edit { padding: 1px 4px; min-height: 32px; }
+.sheet.compact .setup-card .kw-edit input { height: 28px; font-size: 14px; }
+.sheet.compact .doi-row .btn { height: 32px; min-height: 32px; padding: 0 12px; }
+.sheet.compact .rate-row { margin-top: 2px; }
+.sheet.compact .grp-fieldset legend { margin-top: 4px; font-size: 12.5px; color: var(--muted); }
+.sheet.compact .grp-checks { gap: 4px 16px; }
+.sheet.compact .setup-card .sheet-head h2 { font-size: 20px; }
+/* Adding, on an iPad or a computer: a panel over the library (a phone's
+   screen is too small for one; there it fills the screen). */
+@media (min-width: 700px) {
+  .sheet.pop:not([hidden]) { background: rgba(0, 0, 0, .32); padding: max(16px, env(safe-area-inset-top, 0px)) 16px 16px; overflow: hidden; align-content: center; }
+  .sheet.pop .setup-card { width: min(760px, 100%); max-height: calc(100dvh - 32px - env(safe-area-inset-top, 0px)); overflow-y: auto; overscroll-behavior: contain; margin: 0; padding: 0 20px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); box-shadow: 0 18px 60px rgba(0, 0, 0, .3); }
+  .sheet.pop .sheet-head { padding-top: 12px; }
+}
 /* Settings: a list of rows (a switch or a tick box, each with a line of
    explanation), then the library's files. */
 .set-list { display: grid; margin-top: 4px; }
@@ -1188,6 +1218,10 @@ details.d-sec[open] summary { margin-bottom: 8px; }
   .search input, .kwfilter, .sortctl select, .setup-card input { font-size: 16px; }
   .pickbox { width: 22px; height: 22px; }
   .kw-add-input { height: 32px; font-size: 16px; }
+  /* (Below 16px, Safari zooms in on the box being typed in.) */
+  .sheet.compact .setup-card input[type="text"], .sheet.compact .setup-card select, .sheet.compact .setup-card textarea, .sheet.compact .setup-card .kw-edit input { font-size: 16px; }
+  .sheet.compact .setup-card input[type="text"], .sheet.compact .setup-card select, .sheet.compact .doi-row .btn, .sheet.compact .kw-edit { height: 36px; min-height: 36px; }
+  .sheet.compact .fld > label, .sheet.compact .fld > .lbl { padding-top: 9px; }
   .kw-sugg button { padding: 10px 12px; font-size: 16px; }
   .seg button { padding: 7px 6px; font-size: 13px; }
   .side-foot { padding: 10px 18px calc(36px + env(safe-area-inset-bottom, 0px)) 14px; }
@@ -1262,6 +1296,10 @@ details.d-sec[open] summary { margin-bottom: 8px; }
   .app[data-view="detail"] .listwrap, .app[data-view="detail"] .search, .app[data-view="detail"] .search-btn, .app[data-view="detail"] .select-btn, .app[data-view="detail"] .sortctl, .app[data-view="detail"] .tb-title { display: none; }
   .d-inner { padding: 16px 16px 48px; }
   .fields-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* (Names above the boxes: no room beside them.) */
+  .sheet.compact .fld, .sheet.compact .fld.short, .sheet.compact .fld.short.lead { grid-template-columns: minmax(0, 1fr); row-gap: 2px; }
+  .sheet.compact .fld > label, .sheet.compact .fld > .lbl { padding-top: 4px; }
+  .sheet.compact #sheetBody > .check { margin-left: 0; }
   .v-title, .v-zoom, .v-bar .btn span, .v-lib span { display: none; }
   /* Edit as just the pencil. */
   .d-edit span { display: none; }
@@ -1515,7 +1553,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-02.12</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-02.14</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1530,7 +1568,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-02.12';
+      l.querySelector('small').textContent = 'Version 2026-10-02.14';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1542,7 +1580,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-02.12): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-02.14): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -1788,7 +1826,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-02.12`;
+    `<br>LibLande version 2026-10-02.14`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -9127,14 +9165,17 @@ function formFieldNames(type, present) {
   Object.keys(FIELD_LABELS).forEach(n => { if (list.indexOf(n) < 0 && present(n) && !AREA_FIELDS.has(n)) list.push(n); });
   return list.concat(['abstract', 'annote'].filter(n => list.indexOf(n) < 0));
 }
-function fieldInput(n, value) {
+function fieldInput(n, value, lead) {
   const id = 'fld-' + n;
-  const hint = n === 'author' || n === 'editor' ? ' <span class="opt">Last, First and Last, First</span>' : '';
+  const hint = n === 'author' || n === 'editor' ? ' placeholder="Last, First and Last, First"' : '';
   const input = AREA_FIELDS.has(n) || n === 'title'
-    ? `<textarea id="${id}" data-field="${n}" rows="${n === 'abstract' ? 5 : n === 'title' ? 2 : 3}">${esc(value)}</textarea>`
-    : `<input id="${id}" data-field="${n}" type="text" value="${esc(value)}" autocomplete="off"${n === 'doi' || n === 'url' ? ' autocapitalize="off" spellcheck="false"' : ''}>`;
-  return `<div class="fld${SHORT_FIELDS.has(n) ? ' short' : ''}"><label for="${id}">${esc(FIELD_LABELS[n] || n)}${hint}</label>${input}</div>`;
+    ? `<textarea id="${id}" data-field="${n}" rows="${n === 'abstract' ? 4 : 2}">${esc(value)}</textarea>`
+    : `<input id="${id}" data-field="${n}" type="text" value="${esc(value)}" autocomplete="off"${hint}${n === 'doi' || n === 'url' ? ' autocapitalize="off" spellcheck="false"' : ''}>`;
+  return `<div class="fld${SHORT_FIELDS.has(n) ? ' short' + (lead ? ' lead' : '') : ''}"><label for="${id}">${esc(FIELD_LABELS[n] || n)}</label>${input}</div>`;
 }
+// The fields, in order; a short field that starts a row (its name lines
+// up with the names of the long fields) is the lead.
+const fieldsHtml = (names, get) => names.map((n, i) => fieldInput(n, get(n), !i || !SHORT_FIELDS.has(names[i - 1]))).join('');
 const kwChip = k => `<span class="kw-chip" data-kw="${esc(k)}">${esc(k)}<button type="button" aria-label="Remove ${esc(k)}">\u00d7</button></span>`;
 function keywordEditor(list) {
   return `<div class="fld"><label for="kwInput">Keywords</label><div class="kw-edit" id="kwEdit">${list.map(kwChip).join('')}` +
@@ -9214,7 +9255,7 @@ const starButtons = r => [1, 2, 3, 4, 5].map(i => `<button type="button" data-st
 
 function showSheet(html, saveLabel) {
   undockSheet();
-  $('#sheet').classList.remove('head-mode');
+  $('#sheet').classList.remove('head-mode', 'compact', 'pop');
   $('#sheetBody').innerHTML = html;
   $('#sheetSave').textContent = saveLabel;
   $('#sheetSave').hidden = false;
@@ -9231,12 +9272,23 @@ function sheetMsg(msg, isError) {
   const e = $('#sheetError'), s = $('#sheetStatus');
   e.hidden = !(isError && msg); e.textContent = isError ? msg : '';
   s.hidden = !(!isError && msg); s.textContent = isError ? '' : msg || '';
+  // (What's happening shows on the busy button too: the line here can be
+  // far down the form, and isn't scrolled to then.)
+  const busy = $('#sheet').querySelectorAll('.btn.busy');
+  if (msg && !isError) busy.forEach(b => { b.textContent = msg; });
   // (The form can be long, with Add at the top.)
-  if (msg) (isError ? e : s).scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  if (msg && (isError || !busy.length)) (isError ? e : s).scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
 function sheetBusy(on) {
   $('#sheetSave').disabled = $('#sheetCancel').disabled = on;
   $('#sheetBody').querySelectorAll('.sheet-go, .sheet-x').forEach(b => { b.disabled = on; });
+  // While saving, the Save (or Add) button says so, with a spinner, and
+  // the form fades.
+  $('#sheet').classList.toggle('saving', on);
+  [$('#sheetSave'), ...$('#sheetBody').querySelectorAll('.sheet-go')].forEach(b => {
+    if (on && !b.classList.contains('busy')) { b.dataset.label = b.textContent; b.classList.add('busy'); b.textContent = 'Saving\u2026'; }
+    else if (!on && b.classList.contains('busy')) { b.classList.remove('busy'); b.textContent = b.dataset.label; }
+  });
 }
 function closeSheet() { $('#sheet').hidden = true; sheet = null; undockSheet(); }
 // On a desktop, the Edit form goes in the details pane (under the list),
@@ -9276,7 +9328,7 @@ function openEdit(e) {
   let h = sheetHead('Edit publication', 'Save');
   h += `<div class="fld-row rate-row"><div class="rate"><span class="lbl">Rating</span><div class="stars-edit" id="starsEdit" data-rating="${rating}">${starButtons(rating)}</div></div>` +
     `<label class="check"><input type="checkbox" id="readBox"${e.f.read === '1' ? ' checked' : ''}> Read</label></div>`;
-  h += `<div class="fields-grid">${formFieldNames(e.t, n => rawOf(e, n)).map(n => fieldInput(n, rawOf(e, n))).join('')}</div>`;
+  h += `<div class="fields-grid">${fieldsHtml(formFieldNames(e.t, n => rawOf(e, n)), n => rawOf(e, n))}</div>`;
   h += keywordEditor(splitKw(rawOf(e, 'keywords')));
   if (!e.ib && GROUPS.length) {
     h += `<fieldset class="fld grp-fieldset"><legend>Static groups</legend><div class="grp-checks">` +
@@ -9284,7 +9336,7 @@ function openEdit(e) {
       `</div></fieldset>`;
   }
   showSheet(h, 'Save');
-  $('#sheet').classList.add('head-mode');
+  $('#sheet').classList.add('head-mode', 'compact');
   // Fill in, next to the DOI: what Crossref has for the empty fields.
   const doi = $('#fld-doi');
   if (doi) {
@@ -9337,22 +9389,22 @@ async function lookupIntoEdit() {
 
 function openAdd(pdf) {
   sheet = { mode: 'add', pdf: null };
-  const h = sheetHead('Add a publication', DIRECT ? 'Add' : 'Add to inbox') +
-    `<div class="fld"><label for="doiLookup">Fill in from a DOI</label><div class="doi-row">` +
+  const h = sheetHead('Add a publication', 'Add to library') +
+    `<div class="fld"><label for="doiLookup">From a DOI</label><div class="doi-row">` +
     `<input id="doiLookup" type="text" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="10.1111/phpr.70141">` +
     `<button type="button" class="btn" id="doiGo">Look up</button></div></div>` +
     `<div class="fld"><label for="addType">Type</label><select id="addType">${TYPE_CHOICES.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></div>` +
     `<div class="fields-grid" id="addFields"></div>` + keywordEditor([]) +
     `<div class="fld"><label for="addPdf">PDF <span class="opt">(optional)</span></label><input type="file" id="addPdf" accept="application/pdf,.pdf"><p class="add-pdf-name" id="addPdfName" hidden></p></div>` +
     `<label class="check"><input type="checkbox" id="addRL">Put it on my reading list</label>`;
-  showSheet(h, DIRECT ? 'Add' : 'Add to inbox');
-  $('#sheet').classList.add('head-mode');
+  showSheet(h, 'Add to library');
+  $('#sheet').classList.add('head-mode', 'compact', 'pop');
   renderAddFields({});
   if (pdf) setAddPdf(pdf);
 }
 function renderAddFields(values) {
   const type = $('#addType').value;
-  $('#addFields').innerHTML = formFieldNames(type, n => values[n]).map(n => fieldInput(n, values[n] || '')).join('');
+  $('#addFields').innerHTML = fieldsHtml(formFieldNames(type, n => values[n]), n => values[n] || '');
 }
 function sheetValues() {
   const vals = {};
@@ -9605,10 +9657,10 @@ async function saveAdd() {
     const now = bibdeskTime();
     let res = null;
     if (DIRECT) {
-      sheetMsg('Adding it to ' + DATA.source + '\u2026');
+      sheetMsg('Adding\u2026');
       res = await callServer('addToMain', { type, key, fields: vals, uploadId: upload && upload.id, prefix: papersPrefix(), now, backupName: fileTime() });
     } else {
-      sheetMsg('Adding it to your inbox\u2026');
+      sheetMsg('Adding\u2026');
       await callServer('addToInbox', { type, key, fields: vals, pdfName, now, backupName: fileTime() });
     }
     const e = DIRECT ? { k: key, t: type, f: {}, h: res.hash } : { k: key, t: type, f: {}, ib: 1 };
@@ -10386,7 +10438,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-02.12</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-02.14</small>`;
 };
 
 function gunzipJSON(bytes) {
