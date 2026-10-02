@@ -1065,6 +1065,10 @@ details.d-sec[open] summary { margin-bottom: 8px; }
 .annotationEditorLayer .editToolbar .buttons .ll-colours .dropdown button { width: 100%; height: auto; border: none; cursor: pointer; display: flex; justify-content: center; align-items: center; background: none; }
 .annotationEditorLayer .editToolbar .buttons .ll-colours .dropdown .swatch { flex: none; width: 16px; height: 16px; }
 .annotationEditorLayer .editToolbar .buttons .ll-colours .dropdown [aria-selected="true"] > .swatch { outline: 2px solid var(--selected-outline-color, #0060df); outline-offset: 2px; }
+/* With the Pencil, room to write by hand in a text box being typed in (the
+   iPad turns handwriting into text there). Only while it's being edited:
+   PDF.js sizes the finished box to its text. */
+.viewer.pencil .annotationEditorLayer .freeTextEditor .internal[contenteditable="true"] { min-width: 280px; min-height: 2.8em; }
 /* Underlines and strike-throughs: LibLande draws the line (see drawLines). */
 .ll-lines { position: absolute; inset: 0; pointer-events: none; }
 .ll-lines i { position: absolute; height: max(1px, calc(var(--scale-factor, 1) * var(--th, 1) * 1px)); transform: translateY(-50%); background: var(--c, #d92d20); border-radius: 1px; }
@@ -1477,7 +1481,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-01.14</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-02.01</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1492,7 +1496,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-01.14';
+      l.querySelector('small').textContent = 'Version 2026-10-02.01';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1504,7 +1508,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-01.14): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-02.01): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -1717,7 +1721,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-01.14`;
+    `<br>LibLande version 2026-10-02.01`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -4814,27 +4818,6 @@ function commitTextBox() {
   });
   if (document.activeElement && document.activeElement.closest && document.activeElement.closest('.freeTextEditor')) document.activeElement.blur();
 }
-// (For now: when a tap with the text tool makes no text box, say what the
-// tap met, to find out why on the iPad. Remove once found.)
-(() => {
-  let tap = null;
-  const name = el => (el && el.nodeType === 1 ? (el.id ? '#' + el.id : String(el.className || el.tagName).split(' ')[0]) : '?');
-  window.addEventListener('pointerdown', ev => {
-    if (V.tool !== 'text' || $('#viewer').hidden || !(ev.target.closest && ev.target.closest('#vScroll'))) { tap = null; return; }
-    tap = { down: name(ev.target), type: ev.pointerType, button: ev.button, n: document.querySelectorAll('#vPages .freeTextEditor').length, reached: false, up: null, cancel: false };
-  }, true);
-  $('#vPages').addEventListener('pointerdown', () => { if (tap) tap.reached = true; });
-  window.addEventListener('pointercancel', () => { if (tap) tap.cancel = true; }, true);
-  window.addEventListener('pointerup', ev => {
-    const t = tap;
-    if (!t) return;
-    t.up = name(ev.target);
-    setTimeout(() => {
-      if (tap !== t || V.tool !== 'text' || document.querySelectorAll('#vPages .freeTextEditor').length > t.n) return;
-      toast(`No text box: pressed on ${t.down} (${t.type}, button ${t.button}), lifted on ${t.up}` + (t.reached ? '' : ', press didn\u2019t reach the page') + (t.cancel ? ', cancelled' : ''), 8000);
-    }, 400);
-  }, true);
-})();
 // The text tool: the new box takes the keyboard during the tap itself, as
 // Safari on the iPad only shows the keyboard for a box focused then (PDF.js
 // focuses it a moment later, and the empty box is then dropped).
@@ -5064,10 +5047,15 @@ function applyToolPrefs(tools) {
   MARK.markKind = MARK.hlMode === 'free' ? 'free' : 'highlight';
   if (V.viewer) { paletteOptions(); applyMarkParams(); }
 }
+// (The Delete button comes only for a selection that lasts: a new mark is
+// selected for an instant as it's made, and the toolbar would flicker.)
+let DELETE_TIMER = 0;
 function paletteState() {
   $('#vpUndo').disabled = !V.canUndo;
   $('#vpRedo').disabled = !V.canRedo;
-  $('#vpDelete').hidden = !V.selected;
+  clearTimeout(DELETE_TIMER);
+  if (!V.selected) $('#vpDelete').hidden = true;
+  else if ($('#vpDelete').hidden) DELETE_TIMER = setTimeout(() => { $('#vpDelete').hidden = !V.selected; }, 250);
 }
 // Shows or hides the toolbar (or its pencil button) with a short fade;
 // what's going away stays in place until it has faded.
@@ -10218,7 +10206,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-01.14</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-02.01</small>`;
 };
 
 function gunzipJSON(bytes) {
