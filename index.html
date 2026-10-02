@@ -1553,7 +1553,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-02.14</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-02.15</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1568,7 +1568,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-02.14';
+      l.querySelector('small').textContent = 'Version 2026-10-02.15';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1580,7 +1580,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-02.14): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-02.15): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -1826,7 +1826,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-02.14`;
+    `<br>LibLande version 2026-10-02.15`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -9139,10 +9139,10 @@ function parseNamesLite(s) {
     return [last, w.join(' ')];
   });
 }
+// (Every brace counts, as for BibTeX, a backslash before it or not.)
 function balanced(v) {
   let depth = 0;
   for (let i = 0; i < v.length; i++) {
-    if (v[i] === '\\') { i++; continue; }
     if (v[i] === '{') depth++;
     else if (v[i] === '}' && --depth < 0) return false;
   }
@@ -10438,7 +10438,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-02.14</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-02.15</small>`;
 };
 
 function gunzipJSON(bytes) {
