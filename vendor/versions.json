@@ -1,0 +1,17 @@
+[
+  {
+    "cdnjs": "pdf.js",
+    "npm": "pdfjs-dist",
+    "version": "5.4.149"
+  },
+  {
+    "cdnjs": "pdf-lib",
+    "npm": "pdf-lib",
+    "version": "1.17.1"
+  },
+  {
+    "cdnjs": "jszip",
+    "npm": "jszip",
+    "version": "3.10.1"
+  }
+]

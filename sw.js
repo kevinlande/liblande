@@ -1,23 +1,25 @@
 /*
  * LibLande on GitHub Pages: what lets it open, and open papers, offline.
- * (build.py fills in VERSION and PDFJS.)
+ * (build.py fills in VERSION and VENDOR_FILES.)
  *
  * - The app (index.html, server.js, the icon): from the internet when it
  *   answers within a few seconds, so updates arrive; otherwise the copy
  *   kept here.
- * - PDF.js, its stylesheet and icons, the fonts, Google's sign-in script:
- *   kept here once fetched (their addresses change when they do).
+ * - The libraries (PDF.js with its stylesheet and icons, pdf-lib, JSZip),
+ *   served from the site's own vendor/ folder: all kept here at install
+ *   (their addresses change with their versions). The fonts and Google's
+ *   sign-in script: kept here once fetched.
  * - Papers: each one opened is kept here (the 60 most recent), with its
  *   checksum, and used when Google Drive can't be reached. A paper saved
  *   with marks replaces the copy kept here, so it opens with them.
  *   (The library itself is kept by the page, in IndexedDB.)
  */
 const VERSION = '2026-10-01.06';
-const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/5.4.149/';
-const APP = 'liblande-app-' + VERSION, LIBS = 'liblande-libs', PAPERS = 'liblande-papers';
+const VENDOR_FILES = ["vendor/jszip/3.10.1/jszip.min.js", "vendor/pdf-lib/1.17.1/pdf-lib.min.js", "vendor/pdf.js/5.4.149/images/altText_add.svg", "vendor/pdf.js/5.4.149/images/altText_disclaimer.svg", "vendor/pdf.js/5.4.149/images/altText_done.svg", "vendor/pdf.js/5.4.149/images/altText_spinner.svg", "vendor/pdf.js/5.4.149/images/altText_warning.svg", "vendor/pdf.js/5.4.149/images/annotation-check.svg", "vendor/pdf.js/5.4.149/images/annotation-comment.svg", "vendor/pdf.js/5.4.149/images/annotation-help.svg", "vendor/pdf.js/5.4.149/images/annotation-insert.svg", "vendor/pdf.js/5.4.149/images/annotation-key.svg", "vendor/pdf.js/5.4.149/images/annotation-newparagraph.svg", "vendor/pdf.js/5.4.149/images/annotation-noicon.svg", "vendor/pdf.js/5.4.149/images/annotation-note.svg", "vendor/pdf.js/5.4.149/images/annotation-paperclip.svg", "vendor/pdf.js/5.4.149/images/annotation-paragraph.svg", "vendor/pdf.js/5.4.149/images/annotation-pushpin.svg", "vendor/pdf.js/5.4.149/images/comment-actionsButton.svg", "vendor/pdf.js/5.4.149/images/comment-closeButton.svg", "vendor/pdf.js/5.4.149/images/comment-editButton.svg", "vendor/pdf.js/5.4.149/images/cursor-editorFreeHighlight.svg", "vendor/pdf.js/5.4.149/images/cursor-editorFreeText.svg", "vendor/pdf.js/5.4.149/images/cursor-editorInk.svg", "vendor/pdf.js/5.4.149/images/cursor-editorTextHighlight.svg", "vendor/pdf.js/5.4.149/images/editor-toolbar-delete.svg", "vendor/pdf.js/5.4.149/images/editor-toolbar-edit.svg", "vendor/pdf.js/5.4.149/images/loading-icon.gif", "vendor/pdf.js/5.4.149/images/messageBar_closingButton.svg", "vendor/pdf.js/5.4.149/images/messageBar_info.svg", "vendor/pdf.js/5.4.149/images/messageBar_warning.svg", "vendor/pdf.js/5.4.149/images/toolbarButton-editorHighlight.svg", "vendor/pdf.js/5.4.149/images/toolbarButton-menuArrow.svg", "vendor/pdf.js/5.4.149/pdf.min.mjs", "vendor/pdf.js/5.4.149/pdf.worker.min.mjs", "vendor/pdf.js/5.4.149/pdf_viewer.css", "vendor/pdf.js/5.4.149/pdf_viewer.mjs"];
+const VENDOR = new URL('vendor/', self.location).href;
+const APP = 'liblande-app-' + VERSION, LIBS = 'liblande-libs-2', PAPERS = 'liblande-papers';
 const KEEP_PAPERS = 60;
 const SHELL = ['./', 'server.js', 'icon.png'];
-const LIB_FILES = ['pdf.min.mjs', 'pdf.worker.min.mjs', 'pdf_viewer.mjs', 'pdf_viewer.css'].map(f => PDFJS + f);
 const DRIVE = 'https://www.googleapis.com/drive/v3/files/';
 const UPLOAD = 'https://www.googleapis.com/upload/drive/v3/files/';
 
@@ -25,16 +27,16 @@ self.addEventListener('install', ev => {
   ev.waitUntil((async () => {
     const app = await caches.open(APP);
     await app.addAll(SHELL);
-    // PDF.js now, so the first paper opened offline works; one that fails
-    // is fetched when it's first needed instead.
+    // The libraries now, so the first paper opened offline works; one that
+    // fails is fetched when it's first needed instead.
     const libs = await caches.open(LIBS);
-    await Promise.all(LIB_FILES.map(async u => { if (!(await libs.match(u))) await libs.add(u).catch(() => {}); }));
+    await Promise.all(VENDOR_FILES.map(async u => { if (!(await libs.match(u))) await libs.add(u).catch(() => {}); }));
     await self.skipWaiting();
   })());
 });
 self.addEventListener('activate', ev => {
   ev.waitUntil((async () => {
-    for (const k of await caches.keys()) if (k.startsWith('liblande-app-') && k !== APP) await caches.delete(k);
+    for (const k of await caches.keys()) if ((k.startsWith('liblande-app-') && k !== APP) || k === 'liblande-libs') await caches.delete(k);
     await self.clients.claim();
   })());
 });
@@ -103,6 +105,18 @@ self.addEventListener('fetch', ev => {
   }
   if (req.method !== 'GET') return;
   const u = new URL(url);
+  // The libraries: the copy kept here (a new version has a new address).
+  if (url.startsWith(VENDOR)) {
+    ev.respondWith((async () => {
+      const c = await caches.open(LIBS);
+      const kept = await c.match(req, { ignoreSearch: true });
+      if (kept) return kept;
+      const res = await fetch(req);
+      if (res.ok) c.put(req, res.clone());
+      return res;
+    })());
+    return;
+  }
   // The app itself: the internet if it answers in 3 seconds, else the copy.
   if (u.origin === self.location.origin) {
     ev.respondWith((async () => {
@@ -119,8 +133,8 @@ self.addEventListener('fetch', ev => {
     })());
     return;
   }
-  // PDF.js and friends, fonts, Google's sign-in script: kept once fetched.
-  const lib = url.startsWith(PDFJS) || u.hostname === 'fonts.googleapis.com' || u.hostname === 'fonts.gstatic.com';
+  // The fonts, Google's sign-in script: kept once fetched.
+  const lib = u.hostname === 'fonts.googleapis.com' || u.hostname === 'fonts.gstatic.com';
   const gis = url.startsWith('https://accounts.google.com/gsi/client');
   if (lib || gis) {
     ev.respondWith((async () => {

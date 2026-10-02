@@ -1,0 +1,38 @@
+# LibLande: once a month, look for newer versions of the libraries in
+# vendor/ and for security advisories about the versions in use, and open
+# an issue (or add to the open one) when there's news. GitHub emails the
+# repository's owner about new issues. Run it by hand from the Actions tab
+# ("Run workflow"). Copied here by build.py from the bibdesk-web project.
+name: Check libraries
+on:
+  schedule:
+    - cron: '17 9 1 * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check the libraries, and report any news in an issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          python3 .github/check_libraries.py vendor/versions.json --markdown > report.md
+          status=$?
+          set -e
+          if [ "$status" = 2 ]; then cat report.md; exit 1; fi
+          if [ "$status" = 0 ]; then echo "All libraries up to date, with no advisories."; exit 0; fi
+          cat report.md
+          title="LibLande's libraries: updates or security advisories"
+          open=$(gh issue list --state open --search "\"$title\" in:title" --json number --jq '.[0].number')
+          if [ -z "$open" ]; then
+            gh issue create --title "$title" --body-file report.md
+          elif ! gh issue view "$open" --json body,comments --jq '[.body] + [.comments[].body] | .[]' | grep -qF "$(grep -o 'liblande-report: [0-9a-f]*' report.md)"; then
+            gh issue comment "$open" --body-file report.md
+          else
+            echo "Nothing new since the open issue #$open."
+          fi

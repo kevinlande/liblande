@@ -3597,7 +3597,7 @@ function bibtex(e, extra) {
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
 // notes stored in the PDF and can add new ones. PDF.js loads the first time
 // a paper is opened.
-const PDFJS = 'https:\/\/cdnjs.cloudflare.com/ajax/libs/pdf.js/5.4.149/';
+const PDFJS = './vendor/pdf.js/5.4.149/';
 let pdfjsReady = null, viewerReady = null;
 function loadPdfJs() {
   if (!pdfjsReady) {
@@ -8315,7 +8315,7 @@ if (!('GestureEvent' in window)) {
 // Clean copies: the same PDF with markup annotations (highlights, pen
 // marks, notes, shapes) removed, using pdf-lib. Links and form fields stay.
 // Marks that an app has flattened into the page itself can't be removed.
-const PDFLIB = 'https:\/\/cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js';
+const PDFLIB = './vendor/pdf-lib/1.17.1/pdf-lib.min.js';
 const MARKUP = new Set(['Highlight', 'Underline', 'StrikeOut', 'Squiggly', 'Ink', 'Text', 'FreeText', 'Popup',
   'Square', 'Circle', 'Line', 'Polygon', 'PolyLine', 'Stamp', 'Caret', 'FileAttachment', 'Sound', 'Redact']);
 let pdfLibReady = null;
@@ -9357,7 +9357,7 @@ async function runExport() {
 
 // Export to this device: separate files through the share sheet on iPhone
 // and iPad, one .zip file elsewhere (or if the share sheet refuses them).
-const JSZIP = 'https:\/\/cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+const JSZIP = './vendor/jszip/3.10.1/jszip.min.js';
 let jszipReady = null;
 function loadJSZip() {
   if (!jszipReady) {
