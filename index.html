@@ -1179,7 +1179,10 @@ details.d-sec[open] summary { margin-bottom: 8px; }
   .pickbox { width: 22px; height: 22px; }
   .seg button { padding: 7px 6px; font-size: 13px; }
   .side-foot { padding: 10px 18px calc(36px + env(safe-area-inset-bottom, 0px)) 14px; }
-  .status { padding: 4px 18px calc(12px + env(safe-area-inset-bottom, 0px)) 12px; }
+  /* (On an iPad the list's footer sits above the publication's details, not
+     at the bottom of the screen: no room for the home indicator. A phone's,
+     at the bottom, has it below.) */
+  .status { padding: 4px 18px 12px 12px; }
   .splitter { height: 14px; }
   .col-grip { width: 20px; }
   .col-grip[data-dir="1"] { right: -10px; }
@@ -1496,7 +1499,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-02.04</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-02.05</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1511,7 +1514,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-02.04';
+      l.querySelector('small').textContent = 'Version 2026-10-02.05';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1523,7 +1526,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-02.04): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-02.05): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -1597,15 +1600,21 @@ function applyTheme(t) {
 // The strip behind the status bar (theme-color, on GitHub Pages) in the
 // top bars' colour, light or dark.
 // (Safari 26 reads the strip pinned across the top, .status-cap, rather
-// than theme-color, and seems to read it only when it first sees it: on a
-// change of theme, a new strip takes its place.)
+// than theme-color. It finds the strip once, so it stays the same element
+// (a new one in its place brings the haze back), and it reads its colour
+// again when the page scrolls: on a change of theme, the page is scrolled
+// by a pixel and back.)
 function barColour() {
   requestAnimationFrame(() => {
     const panel = getComputedStyle(document.documentElement).getPropertyValue('--panel').trim() || '#f7f9f8';
     const m = document.querySelector('meta[name="theme-color"]');
     if (m) m.content = panel;
-    const cap = document.querySelector('.status-cap');
-    if (cap) { const fresh = cap.cloneNode(false); cap.replaceWith(fresh); }
+    if (!document.querySelector('.status-cap')) return;
+    const room = document.createElement('div');
+    room.style.cssText = 'height:2px';
+    document.body.append(room);
+    window.scrollTo(0, 1);
+    requestAnimationFrame(() => requestAnimationFrame(() => { window.scrollTo(0, 0); room.remove(); }));
   });
 }
 try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', barColour); } catch (err) { /* older Safari */ }
@@ -1753,7 +1762,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-02.04`;
+    `<br>LibLande version 2026-10-02.05`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -10238,7 +10247,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-02.04</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-02.05</small>`;
 };
 
 function gunzipJSON(bytes) {
