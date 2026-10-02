@@ -1056,6 +1056,12 @@ details.d-sec[open] summary { margin-bottom: 8px; }
    not show mask images from another site inside Google's frame). */
 .annotationEditorLayer > :not(.bar-on) .editToolbar { display: none !important; }
 .v-scroll { -webkit-touch-callout: none; }
+/* The Pencil's hover preview (see hoverPreview). */
+.v-hover { position: fixed; left: 0; top: 0; z-index: 30; pointer-events: none; transform: translate(-50%, -50%); border-radius: 50%; }
+.v-hover.dot { border: 1.5px solid #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, .45); }
+.v-hover.ring { background: rgba(255, 255, 255, .25); border: 1.5px solid #222; box-shadow: 0 0 0 1.5px #fff; }
+.v-hover.bar { border-radius: 1px; box-shadow: 0 0 0 1px rgba(255, 255, 255, .8); }
+.v-hover.soft { opacity: .5; }
 .viewer.lp-hold .v-scroll, .viewer.lp-hold .v-scroll * { user-select: none !important; -webkit-user-select: none !important; }
 .viewer .v-scroll .editToolbar { --editor-toolbar-delete-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%207h16M9.5%207V4.5h5V7M6.5%207l1%2013h9l1-13M10%2011v6M14%2011v6%22%2F%3E%3C%2Fsvg%3E") !important; --comment-edit-button-icon: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M5%204.5h14A1.5%201.5%200%200%201%2020.5%206v9a1.5%201.5%200%200%201-1.5%201.5h-7l-4.5%203.5v-3.5H5A1.5%201.5%200%200%201%203.5%2015V6A1.5%201.5%200%200%201%205%204.5z%22%2F%3E%3Cpath%20d%3D%22M8%209h8M8%2012h5%22%2F%3E%3C%2Fsvg%3E") !important; }
 /* While highlighting, the Pencil reads the words under marks, not the marks. */
@@ -1459,7 +1465,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-01.08</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-01.09</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1474,7 +1480,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-01.08';
+      l.querySelector('small').textContent = 'Version 2026-10-01.09';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1486,7 +1492,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-01.08): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-01.09): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -1699,7 +1705,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-01.08`;
+    `<br>LibLande version 2026-10-01.09`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -4712,6 +4718,63 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && (V.
 window.addEventListener('pagehide', () => { if (V.dirty || V.bmDirty || V.drawing) { localSave(); autoSave(true); } });
 $('#vSave').addEventListener('click', () => saveMarkup().then(keptNote));
 window.addEventListener('beforeunload', ev => { if (V.dirty || V.bmDirty || V.drawing) { ev.preventDefault(); ev.returnValue = ''; } });
+
+/* ---- the Pencil's hover preview */
+// On iPads that sense the Pencil just above the screen, a preview of the
+// tool's mark follows the tip: the pen's dot (its colour, and its width at
+// this zoom), the eraser's circle, the highlighter's colour as a bar the
+// height of the line of text below, an underline or strike-through, or a
+// text cursor. It goes when the Pencil touches down or moves away. (A mouse
+// has the tools' cursors instead.)
+const HOVER = { el: null, raf: 0, x: 0, y: 0 };
+function hoverHide() {
+  cancelAnimationFrame(HOVER.raf);
+  HOVER.raf = 0;
+  if (HOVER.el) HOVER.el.hidden = true;
+}
+function hoverPreview() {
+  HOVER.raf = 0;
+  const t = V.tool, x = HOVER.x, y = HOVER.y;
+  if (!V.doc || $('#viewer').hidden || t === 'read' || t === 'select' || V.selected) { hoverHide(); return; }
+  if (!HOVER.el) {
+    HOVER.el = document.createElement('div');
+    HOVER.el.className = 'v-hover';
+    HOVER.el.setAttribute('aria-hidden', 'true');
+    $('#viewer').append(HOVER.el);
+  }
+  const el = HOVER.el, scale = (V.viewer && V.viewer.currentScale) || 1, css = scale * 96 / 72;
+  // The line of text under the tip, for the highlighter and the lines.
+  const span = () => document.elementsFromPoint(x, y).find(n => n.parentElement && n.parentElement.classList.contains('textLayer') && n.textContent.trim());
+  let kind = 'dot', w = 8, h = 8, color = toolColor(), cx = x, cy = y, soft = false;
+  if (t === 'pen') { w = h = Math.max(3, MARK.penSize * css); }
+  else if (t === 'eraser') { kind = 'ring'; w = h = MARK.eraserSize * 2; color = ''; }
+  else if (t === 'text') { kind = 'bar'; w = 2; h = Math.max(10, MARK.textSize * css); }
+  else if (t === 'comment') { w = h = 10; color = 'var(--accent)'; }
+  else if (t === 'highlight' && MARK.markKind === 'free') { w = h = Math.max(6, 12 * css); soft = true; }
+  else if (t === 'highlight' || t === 'underline' || t === 'strike') {
+    const sp = span(), r = sp && sp.getBoundingClientRect();
+    if (t === 'highlight') { kind = 'bar'; w = 3; h = r ? r.height : 14; if (r) cy = r.top + r.height / 2; }
+    else { kind = 'bar'; w = 14; h = 2; if (r) cy = t === 'underline' ? r.bottom - 1 : r.top + r.height * 0.55; }
+  } else { hoverHide(); return; }
+  el.className = 'v-hover ' + kind + (soft ? ' soft' : '');
+  el.style.width = w + 'px';
+  el.style.height = h + 'px';
+  el.style.background = color;
+  el.style.left = cx + 'px';
+  el.style.top = cy + 'px';
+  el.hidden = false;
+}
+(() => {
+  const sc = $('#vScroll');
+  sc.addEventListener('pointermove', ev => {
+    if (ev.pointerType !== 'pen' || ev.buttons) return;
+    HOVER.x = ev.clientX; HOVER.y = ev.clientY;
+    if (!HOVER.raf) HOVER.raf = requestAnimationFrame(hoverPreview);
+  }, { passive: true });
+  sc.addEventListener('pointerdown', hoverHide, true);
+  sc.addEventListener('pointerleave', hoverHide);
+  sc.addEventListener('scroll', () => { if (HOVER.el && !HOVER.el.hidden) hoverHide(); }, { passive: true });
+})();
 
 /* ---- markup tools */
 // A floating palette: read (select text), highlighter, pen; colours and
@@ -9757,7 +9820,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-01.08</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-01.09</small>`;
 };
 
 function gunzipJSON(bytes) {
@@ -10104,6 +10167,6 @@ if (!gs) {
 }
 // For the test suite (_test/suite.html) only: a few of the reader's
 // insides, when the test page asks for them.
-if (window.LIBLANDE_TEST) window.LL = { V, BM, JOURNAL, LOCAL, AUTO, saveMarkup, setTool, combineMarks, makeZip };
+if (window.LIBLANDE_TEST) window.LL = { V, BM, JOURNAL, LOCAL, AUTO, saveMarkup, setTool, combineMarks, makeZip, MARK_ERASER: () => MARK.eraserSize };
 })();
 </script>
