@@ -1477,7 +1477,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-01.13</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-01.14</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1492,7 +1492,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-01.13';
+      l.querySelector('small').textContent = 'Version 2026-10-01.14';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1504,7 +1504,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-01.13): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-01.14): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -1717,7 +1717,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-01.13`;
+    `<br>LibLande version 2026-10-01.14`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -4814,6 +4814,35 @@ function commitTextBox() {
   });
   if (document.activeElement && document.activeElement.closest && document.activeElement.closest('.freeTextEditor')) document.activeElement.blur();
 }
+// (For now: when a tap with the text tool makes no text box, say what the
+// tap met, to find out why on the iPad. Remove once found.)
+(() => {
+  let tap = null;
+  const name = el => (el && el.nodeType === 1 ? (el.id ? '#' + el.id : String(el.className || el.tagName).split(' ')[0]) : '?');
+  window.addEventListener('pointerdown', ev => {
+    if (V.tool !== 'text' || $('#viewer').hidden || !(ev.target.closest && ev.target.closest('#vScroll'))) { tap = null; return; }
+    tap = { down: name(ev.target), type: ev.pointerType, button: ev.button, n: document.querySelectorAll('#vPages .freeTextEditor').length, reached: false, up: null, cancel: false };
+  }, true);
+  $('#vPages').addEventListener('pointerdown', () => { if (tap) tap.reached = true; });
+  window.addEventListener('pointercancel', () => { if (tap) tap.cancel = true; }, true);
+  window.addEventListener('pointerup', ev => {
+    const t = tap;
+    if (!t) return;
+    t.up = name(ev.target);
+    setTimeout(() => {
+      if (tap !== t || V.tool !== 'text' || document.querySelectorAll('#vPages .freeTextEditor').length > t.n) return;
+      toast(`No text box: pressed on ${t.down} (${t.type}, button ${t.button}), lifted on ${t.up}` + (t.reached ? '' : ', press didn\u2019t reach the page') + (t.cancel ? ', cancelled' : ''), 8000);
+    }, 400);
+  }, true);
+})();
+// The text tool: the new box takes the keyboard during the tap itself, as
+// Safari on the iPad only shows the keyboard for a box focused then (PDF.js
+// focuses it a moment later, and the empty box is then dropped).
+$('#vScroll').addEventListener('pointerup', () => {
+  if (V.tool !== 'text') return;
+  const box = Array.from(document.querySelectorAll('#vPages .freeTextEditor [contenteditable="true"]')).pop();
+  if (box && document.activeElement !== box) box.focus({ preventScroll: true });
+});
 function setTool(tool) {
   if (tool === 'read') fingerMode(false);
   if (tool === 'markup') tool = markupTool();
@@ -5892,7 +5921,16 @@ $('#vCommentText').addEventListener('keydown', ev => {
   };
   // (Underlines take whole words, as highlights do; strike-throughs go
   // where they're drawn.)
-  const words = r => (V.tool === 'underline' ? snapWords(r) : r);
+  // (Never the spaces at either end: a Pencil's tap that slides a little
+  // is a short drag, and would take in the space after the word.)
+  const trimSpaces = r => {
+    const o = r.cloneRange(), one = o.startContainer === o.endContainer;
+    if (o.startContainer.nodeType === 3) { const t = o.startContainer.data; let i = o.startOffset; while (i < t.length && /\s/.test(t[i]) && !(one && i >= o.endOffset)) i++; o.setStart(o.startContainer, i); }
+    if (o.endContainer.nodeType === 3) { const t = o.endContainer.data; let j = o.endOffset; while (j > 0 && /\s/.test(t[j - 1]) && !(one && j <= o.startOffset)) j--; o.setEnd(o.endContainer, j); }
+    return o.collapsed ? r : o;
+  };
+  const lineRange = (tool, r) => (tool === 'underline' ? trimSpaces(snapWords(r)) : tool === 'strike' ? trimSpaces(r) : r);
+  const words = r => lineRange(V.tool, r);
   const draw = () => {
     frame = 0;
     const list = range && page ? bars(words(range)) : [];
@@ -5946,7 +5984,7 @@ $('#vCommentText').addEventListener('keydown', ev => {
     if (tap && mark) { clear(); hit = null; pickUpMark(mark, at.x, at.y, tool, true); return; }
     let r = range;
     if (!r && tap) r = wordAt(anchor);
-    const list = r && pg ? bars(tool === 'underline' ? snapWords(r) : r) : [];
+    const list = r && pg ? bars(lineRange(tool, r)) : [];
     clear();
     hit = null;
     if (!list.length) return;
@@ -7094,7 +7132,7 @@ function inkReadAt(x, y) {
 }
 
 // The eraser. "Part" rubs out just what it passes over: bits of pen
-// strokes, and letters of text highlights (freehand highlights go whole);
+// strokes and freehand highlights, and letters of text highlights;
 // "Whole" removes any mark it touches. Each drag is one step for Undo.
 // With the Pencil, fingers still scroll.
 const ERASER_SIZES = [6, 12, 24];
@@ -7184,13 +7222,44 @@ const ERASER_SIZES = [6, 12, 24];
     });
     if (piece) bringIn(layer, piece);
   };
+  // Freehand highlights: their stroke cut as a pen stroke's is (from its
+  // middle line, widened by its width), each piece left a highlight of its
+  // own.
+  const eraseFree = async (ed, page, x, y) => {
+    // (One from the PDF, unchanged, gives PDF.js nothing to write: it's
+    // read as if changed.)
+    let data = null;
+    const was = ed._initialData;
+    if (ed.annotationElementId) ed._initialData = { color: [-1, -1, -1] };
+    try { data = ed.serialize(); } catch (err) { data = null; } finally { if (ed.annotationElementId) ed._initialData = was; }
+    const pv = V.viewer.getPageView(ed.pageIndex), pts = data && data.outlines && data.outlines.points;
+    if (!pts || !pts.length || !pv) { takeAway(ed); return; }
+    const box = page.querySelector('.canvasWrapper').getBoundingClientRect();
+    const [cx, cy] = pv.viewport.convertToPdfPoint(x - box.left, y - box.top);
+    const th = data.thickness || 12, rad = R() / pv.viewport.scale + th / 2;
+    const left = cut(Array.from(pts, l => Array.from(l)), cx, cy, rad);
+    if (!left) return;
+    const layer = ed.parent;
+    takeAway(ed);
+    for (const run of left) {
+      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+      for (let i = 0; i < run.length; i += 2) { x0 = Math.min(x0, run[i]); x1 = Math.max(x1, run[i]); y0 = Math.min(y0, run[i + 1]); y1 = Math.max(y1, run[i + 1]); }
+      const piece = await layer.deserialize({
+        annotationType: V.lib.AnnotationEditorType.HIGHLIGHT, color: data.color, opacity: data.opacity, thickness: th,
+        inkLists: [Float32Array.from(run)], boxes: null, pageIndex: data.pageIndex,
+        rect: [x0 - th / 2, y0 - th / 2, x1 + th / 2, y1 + th / 2], rotation: data.rotation || 0,
+      });
+      if (piece) bringIn(layer, piece);
+    }
+  };
   // Text highlights: rebuilt from the letters still under them after the
   // eraser's circle, joined into boxes line by line.
   const eraseHighlight = async (ed, div, page, x, y) => {
     const r = div.getBoundingClientRect(), svg = svgFor(page, r);
+    if (svg && svg.classList.contains('free')) { await eraseFree(ed, page, x, y); return; }
     const path = svg && svg.querySelector('path');
     const pv = V.viewer.getPageView(ed.pageIndex);
-    if (!path || !path.isPointInFill || !pv || svg.classList.contains('free')) { takeAway(ed); return; }
+    if (!path || !path.isPointInFill || !pv) { takeAway(ed); return; }
     const vb = (svg.getAttribute('viewBox') || '0 0 1 1').split(/\s+/).map(Number);
     const inside = (px, py) => path.isPointInFill(new DOMPoint(vb[0] + (px - r.left) / r.width * vb[2], vb[1] + (py - r.top) / r.height * vb[3]));
     const rad = R(), rng = document.createRange(), kept = [];
@@ -10149,7 +10218,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-01.13</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-01.14</small>`;
 };
 
 function gunzipJSON(bytes) {
