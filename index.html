@@ -470,13 +470,18 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .row.drop-on, .card.drop-on { outline: 2px solid var(--accent); outline-offset: -2px; background: var(--accent-soft); }
 /* (An outline, drawn over the rows; an inset shadow is drawn under them,
    so rows with a background hid it, in stripes.) */
-.detail.drop-on, .list.drop-on, #sheetForm.drop-on { outline: 3px solid var(--accent); outline-offset: -3px; border-radius: 8px; }
+.detail.drop-on, #sheetForm.drop-on { outline: 3px solid var(--accent); outline-offset: -3px; border-radius: 8px; }
+/* (Around the list: a frame laid over it, since the list's own outline
+   was drawn under the rows, which cut it into stripes.) */
+.listwrap.drop-on::after { content: ''; position: absolute; inset: 0; z-index: 20; border: 3px solid var(--accent); border-radius: 8px; background: color-mix(in srgb, var(--accent) 6%, transparent); pointer-events: none; }
 .drop-hint { position: fixed; top: calc(12px + max(env(safe-area-inset-top, 0px), var(--top-room))); left: 50%; transform: translateX(-50%); z-index: 90; pointer-events: none; max-width: calc(100% - 32px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 7px 14px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-size: 13.5px; font-weight: 600; box-shadow: 0 4px 16px rgba(0,0,0,.18); }
 .attach-choice { display: grid; gap: 10px; margin-top: 10px; }
 .setup-card .attach-choice input[type="radio"] { width: 16px; height: 16px; accent-color: var(--accent); }
 .setup-edit { display: grid; gap: 4px; margin: 6px 0 4px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
 .setup-card .setup-edit .check { margin-top: 0; font-weight: 600; }
 .add-pdf-name { font-size: 13px; color: var(--muted); }
+/* (In the compact form, beside the PDF box, not under its name.) */
+.sheet.compact .fld > .add-pdf-name { grid-column: 2; margin: 0; overflow-wrap: anywhere; }
 .rl-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 12px 0 2px; font-size: 13px; }
 .rl-bar .btn { min-height: 28px; padding: 3px 10px; font-size: 12.5px; }
 .rl-bar.on { padding: 8px 10px; border-radius: 8px; background: var(--accent-soft); }
@@ -1300,6 +1305,7 @@ details.d-sec[open] summary { margin-bottom: 8px; }
   .sheet.compact .fld, .sheet.compact .fld.short, .sheet.compact .fld.short.lead { grid-template-columns: minmax(0, 1fr); row-gap: 2px; }
   .sheet.compact .fld > label, .sheet.compact .fld > .lbl { padding-top: 4px; }
   .sheet.compact #sheetBody > .check { margin-left: 0; }
+  .sheet.compact .fld > .add-pdf-name { grid-column: auto; }
   .v-title, .v-zoom, .v-bar .btn span, .v-lib span { display: none; }
   /* Edit as just the pencil. */
   .d-edit span { display: none; }
@@ -1553,7 +1559,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-02.15</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-02.16</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1568,7 +1574,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-02.15';
+      l.querySelector('small').textContent = 'Version 2026-10-02.16';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1580,7 +1586,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-02.15): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-02.16): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -1826,7 +1832,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-02.15`;
+    `<br>LibLande version 2026-10-02.16`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -2150,7 +2156,7 @@ function dropTarget(ev) {
   if (t.closest('#detail') && !state.picking && state.selKey && BYKEY.get(state.selKey)) {
     return { kind: 'entry', el: detailEl, e: BYKEY.get(state.selKey) };
   }
-  if (t.closest('#listwrap')) return { kind: 'new', el: listEl };
+  if (t.closest('#listwrap')) return { kind: 'new', el: $('#listwrap') };
   return null;
 }
 let dropEl = null;
@@ -10438,7 +10444,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-02.15</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-02.16</small>`;
 };
 
 function gunzipJSON(bytes) {
