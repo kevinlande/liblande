@@ -14,7 +14,7 @@
  *   with marks replaces the copy kept here, so it opens with them.
  *   (The library itself is kept by the page, in IndexedDB.)
  */
-const VERSION = '2026-10-02.08';
+const VERSION = '2026-10-02.09';
 const VENDOR_FILES = ["vendor/jszip/3.10.2/jszip.min.js", "vendor/pdf-lib/1.17.1/pdf-lib.min.js", "vendor/pdf.js/5.4.149/images/altText_add.svg", "vendor/pdf.js/5.4.149/images/altText_disclaimer.svg", "vendor/pdf.js/5.4.149/images/altText_done.svg", "vendor/pdf.js/5.4.149/images/altText_spinner.svg", "vendor/pdf.js/5.4.149/images/altText_warning.svg", "vendor/pdf.js/5.4.149/images/annotation-check.svg", "vendor/pdf.js/5.4.149/images/annotation-comment.svg", "vendor/pdf.js/5.4.149/images/annotation-help.svg", "vendor/pdf.js/5.4.149/images/annotation-insert.svg", "vendor/pdf.js/5.4.149/images/annotation-key.svg", "vendor/pdf.js/5.4.149/images/annotation-newparagraph.svg", "vendor/pdf.js/5.4.149/images/annotation-noicon.svg", "vendor/pdf.js/5.4.149/images/annotation-note.svg", "vendor/pdf.js/5.4.149/images/annotation-paperclip.svg", "vendor/pdf.js/5.4.149/images/annotation-paragraph.svg", "vendor/pdf.js/5.4.149/images/annotation-pushpin.svg", "vendor/pdf.js/5.4.149/images/comment-actionsButton.svg", "vendor/pdf.js/5.4.149/images/comment-closeButton.svg", "vendor/pdf.js/5.4.149/images/comment-editButton.svg", "vendor/pdf.js/5.4.149/images/cursor-editorFreeHighlight.svg", "vendor/pdf.js/5.4.149/images/cursor-editorFreeText.svg", "vendor/pdf.js/5.4.149/images/cursor-editorInk.svg", "vendor/pdf.js/5.4.149/images/cursor-editorTextHighlight.svg", "vendor/pdf.js/5.4.149/images/editor-toolbar-delete.svg", "vendor/pdf.js/5.4.149/images/editor-toolbar-edit.svg", "vendor/pdf.js/5.4.149/images/loading-icon.gif", "vendor/pdf.js/5.4.149/images/messageBar_closingButton.svg", "vendor/pdf.js/5.4.149/images/messageBar_info.svg", "vendor/pdf.js/5.4.149/images/messageBar_warning.svg", "vendor/pdf.js/5.4.149/images/toolbarButton-editorHighlight.svg", "vendor/pdf.js/5.4.149/images/toolbarButton-menuArrow.svg", "vendor/pdf.js/5.4.149/pdf.min.mjs", "vendor/pdf.js/5.4.149/pdf.worker.min.mjs", "vendor/pdf.js/5.4.149/pdf_viewer.css", "vendor/pdf.js/5.4.149/pdf_viewer.mjs"];
 const VENDOR = new URL('vendor/', self.location).href;
 const APP = 'liblande-app-' + VERSION, LIBS = 'liblande-libs-2', PAPERS = 'liblande-papers';
@@ -26,7 +26,9 @@ const UPLOAD = 'https://www.googleapis.com/upload/drive/v3/files/';
 self.addEventListener('install', ev => {
   ev.waitUntil((async () => {
     const app = await caches.open(APP);
-    await app.addAll(SHELL);
+    // (Past the browser's own cache, which GitHub Pages lets keep a page
+    // for 10 minutes: otherwise a new version could keep the old app.)
+    await app.addAll(SHELL.map(s => new Request(s, { cache: 'reload' })));
     // The libraries now, so the first paper opened offline works; one that
     // fails is fetched when it's first needed instead.
     const libs = await caches.open(LIBS);
@@ -122,7 +124,9 @@ self.addEventListener('fetch', ev => {
     ev.respondWith((async () => {
       const app = await caches.open(APP);
       const key = req.mode === 'navigate' ? './' : req;
-      const net = fetch(req).then(res => {
+      // (Checked with GitHub Pages each time, not taken from the browser's
+      // own cache, so a new version arrives the next time LibLande opens.)
+      const net = fetch(req, { cache: 'no-cache' }).then(res => {
         if (res.ok && (req.mode === 'navigate' || SHELL.some(s => u.pathname.endsWith('/' + s)))) app.put(key, res.clone());
         return res;
       });
