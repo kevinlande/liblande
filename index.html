@@ -7,7 +7,8 @@
 <link rel="icon" href="icon.png">
 <script src="server.js"></script>
 <script src="https://accounts.google.com/gsi/client" async id="gis"></script>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f7f9f8">
 <title>LibLande</title>
 <link rel="preconnect" href="https:&#47;&#47;fonts.googleapis.com">
 <link rel="preconnect" href="https:&#47;&#47;fonts.gstatic.com" crossorigin>
@@ -192,7 +193,7 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 }
 :root { --top-room: 0px; }
 :root.top-room { --top-room: 12px; }
-.side-head { padding: calc(12px + var(--top-room)) 8px 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.side-head { padding: calc(12px + max(env(safe-area-inset-top, 0px), var(--top-room))) 8px 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .side-actions { display: flex; align-items: center; gap: 2px; }
 .side-head h1 { margin: 0; font: 600 17px/1.2 var(--serif); letter-spacing: .005em; display: flex; align-items: center; gap: 8px; }
 .app-icon { width: 26px; height: 26px; flex: none; }
@@ -513,7 +514,7 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .toolbar {
   --tb-gap: 8px;
   display: flex; align-items: center; gap: var(--tb-gap); flex-wrap: wrap;
-  padding: calc(8px + var(--top-room)) 12px 8px; border-bottom: 1px solid var(--line); background: var(--panel);
+  padding: calc(8px + max(env(safe-area-inset-top, 0px), var(--top-room))) 12px 8px; border-bottom: 1px solid var(--line); background: var(--panel);
 }
 .tb-btn {
   display: inline-flex; align-items: center; gap: 4px;
@@ -1200,14 +1201,14 @@ details.d-sec[open] summary { margin-bottom: 8px; }
   .sidebar { position: static; transform: none; width: auto; box-shadow: none; border-right: 0; padding: 0; transition: none; }
   .app[data-view="groups"] .main { display: none; }
   .app:not([data-view="groups"]) .sidebar { display: none; }
-  .side-head { padding: calc(12px + var(--top-room)) 10px 8px 16px; }
+  .side-head { padding: calc(12px + max(env(safe-area-inset-top, 0px), var(--top-room))) 10px 8px 16px; }
   .side-head h1 { font-size: 26px; gap: 10px; }
   .app-icon { width: 34px; height: 34px; }
   .side-head .x { display: none; }
   .groups { padding: 0 10px 16px; }
   .grp { min-height: 42px; font-size: 16px; }
   .side-foot { padding: 10px 18px calc(36px + env(safe-area-inset-bottom, 0px)) 16px; }
-  .toolbar { padding: calc(8px + var(--top-room)) 12px 8px; }
+  .toolbar { padding: calc(8px + max(env(safe-area-inset-top, 0px), var(--top-room))) 12px 8px; }
   /* The list shows the sidebar icon (to the groups); a publication, a back
      button to the list. */
   .tb-side { display: none; }
@@ -1270,13 +1271,15 @@ try {
 // iPadOS draws a translucent haze under the status bar of Home Screen
 // apps, over the top of the page. LibLande (inside Google's frame) can't
 // turn it off, so it leaves a little room for it when it can tell it's a
-// Home Screen app on an iPad. (An iPhone needs none.)
+// Home Screen app on an iPad. (An iPhone needs none.) On GitHub Pages the
+// page reaches the top of the screen and the bars leave the status bar's
+// own height (safe-area-inset-top) instead.
 try {
   localStorage.removeItem('landelib.topRoom');
   localStorage.removeItem('landelib.paletteAway');
   var ipad = /iPad/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   var homeScreen = navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
-  if (ipad && homeScreen) document.documentElement.classList.add('top-room');
+  if (ipad && homeScreen && !window.LIBLANDE_PAGES) document.documentElement.classList.add('top-room');
 } catch (e) {}
 </script>
 <div class="app" id="app" data-view="list">
@@ -1481,7 +1484,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-02.01</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-02.02</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1496,7 +1499,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-02.01';
+      l.querySelector('small').textContent = 'Version 2026-10-02.02';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1508,7 +1511,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-02.01): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-02.02): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -1577,7 +1580,16 @@ function applyTheme(t) {
   if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
   else document.documentElement.removeAttribute('data-theme');
   document.querySelectorAll('[data-theme-set]').forEach(b => b.setAttribute('aria-checked', String(b.dataset.themeSet === (t || 'auto'))));
+  barColour();
 }
+// The strip behind the status bar (theme-color, on GitHub Pages) in the
+// top bars' colour, light or dark.
+function barColour() {
+  const m = document.querySelector('meta[name="theme-color"]');
+  if (!m) return;
+  requestAnimationFrame(() => { m.content = getComputedStyle(document.documentElement).getPropertyValue('--panel').trim() || '#f7f9f8'; });
+}
+try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', barColour); } catch (err) { /* older Safari */ }
 applyTheme(store.get('theme', 'auto'));
 // Themes (colours and type), chosen in Settings; each has light and dark.
 const THEMES = [
@@ -1590,6 +1602,7 @@ function applyStyle(id) {
   if (id && id !== 'liblande') document.documentElement.setAttribute('data-style', id);
   else document.documentElement.removeAttribute('data-style');
   document.querySelectorAll('[data-style-set]').forEach(b => b.setAttribute('aria-checked', String(b.dataset.styleSet === (id || 'liblande'))));
+  barColour();
 }
 applyStyle(store.get('style', 'liblande'));
 function renderThemePicks() {
@@ -1721,7 +1734,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-02.01`;
+    `<br>LibLande version 2026-10-02.02`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -10206,7 +10219,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-02.01</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-02.02</small>`;
 };
 
 function gunzipJSON(bytes) {
