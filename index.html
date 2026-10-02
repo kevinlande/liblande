@@ -342,6 +342,15 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .setup-card .kw-edit input { flex: 1 1 140px; height: 30px; border: 0; background: none; padding: 0 4px; }
 .kw-chip { display: inline-flex; align-items: center; padding: 2px 2px 2px 10px; border-radius: 999px; background: var(--accent-soft); font-size: 13px; }
 .kw-chip button { border: 0; background: none; padding: 0 7px; font-size: 16px; line-height: 1; color: var(--muted); }
+/* Keyword suggestions, under the box a keyword is typed in. */
+.kw-edit, .kw-add-wrap { position: relative; }
+.kw-add-wrap { display: inline-flex; }
+.chip.kw-add { border-style: dashed; color: var(--muted); }
+.kw-add-input { height: 24px; width: 200px; max-width: 70vw; border: 1px solid var(--accent); border-radius: 999px; padding: 0 10px; font: inherit; font-size: 12.5px; background: var(--bg); color: var(--text); outline: none; }
+.kw-sugg { position: absolute; z-index: 30; top: calc(100% + 4px); left: 0; min-width: 220px; max-width: min(420px, 90vw); max-height: 264px; overflow-y: auto; padding: 4px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); box-shadow: var(--shadow); display: grid; }
+.kw-sugg[hidden] { display: none; }
+.kw-sugg button { text-align: left; border: 0; background: none; color: var(--text); padding: 7px 10px; border-radius: 6px; font: inherit; font-size: 14px; }
+.kw-sugg button:hover, .kw-sugg button.on { background: var(--accent-soft); }
 .fld-row { display: flex; align-items: flex-end; gap: 24px; flex-wrap: wrap; }
 .stars-edit { display: flex; }
 .stars-edit button { border: 0; background: none; font-size: 24px; line-height: 1; padding: 0 2px; color: var(--star); }
@@ -1178,6 +1187,8 @@ details.d-sec[open] summary { margin-bottom: 8px; }
   .btn { min-height: 40px; }
   .search input, .kwfilter, .sortctl select, .setup-card input { font-size: 16px; }
   .pickbox { width: 22px; height: 22px; }
+  .kw-add-input { height: 32px; font-size: 16px; }
+  .kw-sugg button { padding: 10px 12px; font-size: 16px; }
   .seg button { padding: 7px 6px; font-size: 13px; }
   .side-foot { padding: 10px 18px calc(36px + env(safe-area-inset-bottom, 0px)) 14px; }
   /* (On an iPad the list's footer sits above the publication's details, not
@@ -1504,7 +1515,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-02.11</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-02.12</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1519,7 +1530,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-02.11';
+      l.querySelector('small').textContent = 'Version 2026-10-02.12';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1531,7 +1542,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-02.11): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-02.12): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -1777,7 +1788,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-02.11`;
+    `<br>LibLande version 2026-10-02.12`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -3278,10 +3289,11 @@ function renderDetail() {
     h += `<p class="inbox-note">Added in LibLande and waiting in your inbox. To move it into ${esc(DATA.source)}, open ` +
       `LibLande \u203a Inbox \u203a LibLande inbox.bib in BibDesk and drag it into your library. Once it\u2019s there, it leaves the inbox.</p>`;
   }
-  if (e.kw.length || (e.groups && e.groups.length)) {
+  const kwAdd = gs ? `<span class="kw-add-wrap"><button type="button" class="chip kw-add" data-kw-add title="Add a keyword">+ Keyword</button></span>` : '';
+  if (e.kw.length || (e.groups && e.groups.length) || kwAdd) {
     h += `<div class="chips">` +
       (e.groups || []).map(g => `<button class="chip grp-chip" data-goto="${esc('s:' + g)}">${esc(g)}</button>`).join('') +
-      e.kw.map(k => `<button class="chip" data-goto="${esc('k:' + k)}">${esc(k)}</button>`).join('') + `</div>`;
+      e.kw.map(k => `<button class="chip" data-goto="${esc('k:' + k)}">${esc(k)}</button>`).join('') + kwAdd + `</div>`;
   }
   if (f.abstract) h += `<section class="d-sec"><h3>Abstract</h3><p class="d-abstract">${esc(f.abstract)}</p></section>`;
   // Notes: click to write or change them, right here.
@@ -3347,6 +3359,33 @@ detailEl.addEventListener('change', ev => {
   const e = BYKEY.get(state.selKey);
   if (e && ev.target.matches('[data-qread]')) quickSet(e, { read: ev.target.checked ? '1' : '0' });
 });
+detailEl.addEventListener('input', ev => {
+  if (!ev.target.classList.contains('kw-add-input')) return;
+  const e = BYKEY.get(state.selKey);
+  kwSuggest(ev.target, e ? splitKw(rawOf(e, 'keywords')) : []);
+});
+detailEl.addEventListener('keydown', ev => {
+  const inp = ev.target;
+  if (!inp.classList.contains('kw-add-input')) return;
+  if (kwSuggKey(ev)) return;
+  if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); closeKwAdd(inp); return; }
+  if (ev.key === 'Enter' || ev.key === ',' || ev.key === ';') {
+    ev.preventDefault();
+    const e = BYKEY.get(state.selKey);
+    if (e) addDetailKeyword(e, kwSuggOn(inp) || inp.value, inp);
+  }
+});
+// Leaving the box: what's typed is added; an empty box closes.
+detailEl.addEventListener('focusout', ev => {
+  const inp = ev.target;
+  if (!inp.classList.contains('kw-add-input')) return;
+  setTimeout(() => {
+    if (!inp.isConnected || inp.disabled || document.activeElement === inp) return;
+    const e = BYKEY.get(state.selKey);
+    if (e && inp.value.trim()) addDetailKeyword(e, inp.value, inp);
+    else closeKwAdd(inp);
+  }, 250);
+});
 detailEl.addEventListener('click', ev => {
   if (ev.target.closest('[data-export]')) { openExport(); return; }
   if (ev.target.closest('[data-pick-clear]')) { state.picked.clear(); paint(); renderPickBar(); renderDetail(); return; }
@@ -3355,6 +3394,8 @@ detailEl.addEventListener('click', ev => {
   const c = ev.target.closest('[data-copy]');
   const e = BYKEY.get(state.selKey);
   if (e && ev.target.closest('[data-edit]')) { openEdit(e); return; }
+  const ka = ev.target.closest('[data-kw-add]');
+  if (gs && e && ka) { openKwAdd(ka); return; }
   const twin = ev.target.closest('[data-twin]');
   if (twin) { showTwin(twin.dataset.twin); return; }
   const notes = ev.target.closest('[data-notes]');
@@ -9097,8 +9138,77 @@ function fieldInput(n, value) {
 const kwChip = k => `<span class="kw-chip" data-kw="${esc(k)}">${esc(k)}<button type="button" aria-label="Remove ${esc(k)}">\u00d7</button></span>`;
 function keywordEditor(list) {
   return `<div class="fld"><label for="kwInput">Keywords</label><div class="kw-edit" id="kwEdit">${list.map(kwChip).join('')}` +
-    `<input id="kwInput" list="kwList" placeholder="Add a keyword" autocomplete="off" autocapitalize="off"></div>` +
-    `<datalist id="kwList">${[...KEYWORDS.keys()].sort((a, b) => a.localeCompare(b)).map(k => `<option value="${esc(k)}">`).join('')}</datalist></div>`;
+    `<input id="kwInput" placeholder="Add a keyword" autocomplete="off" autocapitalize="off" spellcheck="false"></div></div>`;
+}
+/* Keyword suggestions, under a box for adding keywords: the library's
+   keywords that contain what's typed, those that start with it first.
+   (Safari's own list, for an <input list=...>, came up blank.) */
+const kwWrap = el => el.closest('.kw-edit, .kw-add-wrap');
+function kwSuggest(input, have) {
+  const wrap = kwWrap(input);
+  let box = wrap.querySelector('.kw-sugg');
+  if (!box) { box = document.createElement('div'); box.className = 'kw-sugg'; box.setAttribute('role', 'listbox'); wrap.appendChild(box); }
+  const q = input.value.replace(/[;,]+$/, '').trim().toLowerCase(), hits = [];
+  if (q) for (const k of KEYWORDS.keys()) {
+    const i = k.toLowerCase().indexOf(q);
+    if (i >= 0 && have.indexOf(k) < 0) hits.push([i ? 1 : 0, k]);
+  }
+  hits.sort((a, b) => a[0] - b[0] || a[1].localeCompare(b[1]));
+  box.innerHTML = hits.slice(0, 8).map(x => `<button type="button" role="option" data-kw-pick="${esc(x[1])}">${esc(x[1])}</button>`).join('');
+  box.hidden = !hits.length;
+}
+function kwSuggHide(input) { const w = kwWrap(input), b = w && w.querySelector('.kw-sugg'); if (b) b.hidden = true; }
+// Up and down move through the suggestions, Escape puts them away: true
+// if the key was for them.
+function kwSuggKey(ev) {
+  const w = kwWrap(ev.target), box = w && w.querySelector('.kw-sugg');
+  if (!box || box.hidden) return false;
+  const opts = [...box.children], i = opts.findIndex(o => o.classList.contains('on'));
+  if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
+    ev.preventDefault();
+    const n = ev.key === 'ArrowDown' ? Math.min(opts.length - 1, i + 1) : Math.max(-1, i - 1);
+    opts.forEach((o, j) => o.classList.toggle('on', j === n));
+    if (n >= 0) opts[n].scrollIntoView({ block: 'nearest' });
+    return true;
+  }
+  if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); box.hidden = true; return true; }
+  return false;
+}
+// The suggestion picked with the arrow keys, if any.
+const kwSuggOn = input => { const w = kwWrap(input), o = w && w.querySelector('.kw-sugg:not([hidden]) .on'); return o ? o.dataset.kwPick : ''; };
+// (Pressed, the input keeps the focus, and the keyboard stays up.)
+document.addEventListener('mousedown', ev => { if (ev.target.closest('[data-kw-pick]')) ev.preventDefault(); });
+document.addEventListener('click', ev => {
+  const p = ev.target.closest('[data-kw-pick]');
+  if (!p) return;
+  const input = kwWrap(p).querySelector('input');
+  if (input.id === 'kwInput') { addKeyword(p.dataset.kwPick); input.focus(); return; }
+  const e = BYKEY.get(state.selKey);
+  if (e) addDetailKeyword(e, p.dataset.kwPick, input);
+});
+// Adding a keyword from the details: the + Keyword chip opens a box.
+function openKwAdd(btn) {
+  const wrap = btn.parentElement;
+  btn.hidden = true;
+  wrap.insertAdjacentHTML('beforeend', `<input class="kw-add-input" type="text" placeholder="Add a keyword" aria-label="Add a keyword" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done">`);
+  wrap.querySelector('.kw-add-input').focus();
+}
+function closeKwAdd(input) {
+  const wrap = kwWrap(input);
+  if (!wrap) return;
+  const b = wrap.querySelector('.kw-sugg');
+  if (b) b.remove();
+  input.remove();
+  wrap.querySelector('[data-kw-add]').hidden = false;
+}
+function addDetailKeyword(e, v, input) {
+  v = v.replace(/[;,]+$/, '').trim();
+  const raw = rawOf(e, 'keywords'), have = splitKw(raw);
+  if (!v || have.indexOf(v) >= 0) { closeKwAdd(input); return; }
+  input.disabled = true;
+  kwSuggHide(input);
+  have.push(v);
+  quickSet(e, { keywords: have.join(/,/.test(raw) && !/;/.test(raw) ? ', ' : '; ') }, 'Added the keyword \u201c' + v + '\u201d');
 }
 const starButtons = r => [1, 2, 3, 4, 5].map(i => `<button type="button" data-star="${i}" aria-label="${i} star${i > 1 ? 's' : ''}">${i <= r ? '\u2605' : '\u2606'}</button>`).join('');
 
@@ -9254,6 +9364,7 @@ function addKeyword(v) {
   const box = $('#kwEdit'), input = $('#kwInput');
   if (v && ![...box.querySelectorAll('.kw-chip')].some(c => c.dataset.kw === v)) input.insertAdjacentHTML('beforebegin', kwChip(v));
   input.value = '';
+  kwSuggHide(input);
 }
 function sheetKeywords() {
   const pending = $('#kwInput').value.trim();
@@ -9552,10 +9663,17 @@ $('#sheetBody').addEventListener('click', ev => {
 });
 $('#sheetBody').addEventListener('keydown', ev => {
   if (ev.target.id === 'kwInput') {
-    if (ev.key === 'Enter' || ev.key === ',' || ev.key === ';') { ev.preventDefault(); addKeyword(ev.target.value); }
+    if (kwSuggKey(ev)) return;
+    if (ev.key === 'Enter' || ev.key === ',' || ev.key === ';') { ev.preventDefault(); addKeyword(kwSuggOn(ev.target) || ev.target.value); }
     else if (ev.key === 'Backspace' && !ev.target.value) { const chips = $('#kwEdit').querySelectorAll('.kw-chip'); if (chips.length) chips[chips.length - 1].remove(); }
   }
   if (ev.target.id === 'doiLookup' && ev.key === 'Enter') { ev.preventDefault(); lookupIntoForm(); }
+});
+$('#sheetBody').addEventListener('input', ev => {
+  if (ev.target.id === 'kwInput') kwSuggest(ev.target, [...$('#kwEdit').querySelectorAll('.kw-chip')].map(c => c.dataset.kw));
+});
+$('#sheetBody').addEventListener('focusout', ev => {
+  if (ev.target.id === 'kwInput') setTimeout(() => { if (document.activeElement !== ev.target) kwSuggHide(ev.target); }, 250);
 });
 $('#sheetBody').addEventListener('change', ev => {
   if (ev.target.id === 'kwInput' && KEYWORDS.has(ev.target.value.trim())) addKeyword(ev.target.value);
@@ -10268,7 +10386,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-02.11</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-02.12</small>`;
 };
 
 function gunzipJSON(bytes) {
