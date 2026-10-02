@@ -1477,7 +1477,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-01.12</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-01.13</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1492,7 +1492,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-01.12';
+      l.querySelector('small').textContent = 'Version 2026-10-01.13';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1504,7 +1504,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-01.12): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-01.13): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -1717,7 +1717,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-01.12`;
+    `<br>LibLande version 2026-10-01.13`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -6244,8 +6244,17 @@ function colourList(tb) {
     const o = ev.target.closest('[data-color]');
     if (o) {
       const P = V.lib.AnnotationEditorParamsType;
-      ed.updateParams(text ? P.FREETEXT_COLOR : line ? P.HIGHLIGHT_COLOR : P.INK_COLOR, o.dataset.color);
-      if (line) decorateLine(ed);
+      if (line) {
+        // PDF.js gives a highlight a new colour at the usual highlight
+        // opacity, which would make an underline a highlight: for this
+        // change (and its Undo and Redo) the opacity it uses is the line's.
+        const HE = ed.constructor, was = HE._defaultOpacity;
+        HE._defaultOpacity = LINE_OPACITY[line];
+        try { ed.updateParams(P.HIGHLIGHT_COLOR, o.dataset.color); } finally { HE._defaultOpacity = was; }
+        decorateLine(ed);
+      } else {
+        ed.updateParams(text ? P.FREETEXT_COLOR : P.INK_COLOR, o.dataset.color);
+      }
       swatch.style.backgroundColor = o.dataset.color;
       dd.querySelectorAll('[data-color]').forEach(x => x.setAttribute('aria-selected', String(x === o)));
       markDrawing();
@@ -10140,7 +10149,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-01.12</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-01.13</small>`;
 };
 
 function gunzipJSON(bytes) {
