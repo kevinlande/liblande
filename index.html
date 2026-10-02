@@ -1459,7 +1459,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-01.04</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-01.05</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1474,7 +1474,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-01.04';
+      l.querySelector('small').textContent = 'Version 2026-10-01.05';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1486,7 +1486,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-01.04): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-01.05): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -1699,7 +1699,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-01.04`;
+    `<br>LibLande version 2026-10-01.05`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -4416,17 +4416,24 @@ const keptNote = r => { if (r === 'kept') toast(KEPT_NOTE, 4500); return r; };
 // still the one the changes were made to; otherwise it's left, and
 // opening it offers Combine.
 const KEPT_UP = { busy: false, again: false };
-async function uploadKept() {
+// A message floats while they go ("Back online: saving...") and says how
+// it went.
+async function uploadKept(back) {
   if (!gs || !navigator.onLine) return;
   // (Asked again while under way: once more when it's done.)
   if (KEPT_UP.busy) { KEPT_UP.again = true; return; }
   KEPT_UP.busy = true;
   KEPT_UP.again = false;
-  let done = 0;
+  let done = 0, others = 0;
+  const lead = back ? 'Back online: s' : 'S';
   try {
-    const keys = await JOURNAL.run('readonly', st => st.getAllKeys()).catch(() => []);
-    for (const id of keys || []) {
-      if (typeof id !== 'string' || id.startsWith('open:')) continue;
+    const keys = ((await JOURNAL.run('readonly', st => st.getAllKeys()).catch(() => [])) || [])
+      .filter(id => typeof id === 'string' && !id.startsWith('open:'));
+    const showing = id => V.file && V.file.id === id && V.doc && !$('#viewer').hidden;
+    others = keys.filter(id => !showing(id)).length;
+    if (others) toast(lead + 'aving marks made offline to Google Drive\u2026', 0);
+    else if (keys.length && (V.dirty || V.bmDirty || V.drawing)) toast(lead + 'aving your marks to Google Drive\u2026', 3000);
+    for (const id of keys) {
       // (The paper that's loaded is saved the usual way: by auto-save if
       // it's showing, now if it's been closed.)
       if (V.file && V.file.id === id && V.doc) {
@@ -4459,8 +4466,9 @@ async function uploadKept() {
     if (KEPT_UP.again) setTimeout(uploadKept, 500);
   }
   if (done) toast('Marks made offline on ' + done + ' paper' + (done === 1 ? '' : 's') + ' saved to Google Drive', 4000);
+  else if (others) toast('Marks made offline couldn\u2019t be saved to Google Drive yet. They\u2019re kept on this device; opening the paper saves them.', 6000);
 }
-window.addEventListener('online', () => setTimeout(uploadKept, 1500));
+window.addEventListener('online', () => setTimeout(() => uploadKept(true), 1500));
 async function uploadMarked(file, bytes) {
   const up = token => fetch('https:\/\/www.googleapis.com/upload/drive/v3/files/' + encodeURIComponent(file.id) + '?uploadType=media&fields=md5Checksum',
     { method: 'PATCH', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/pdf' }, body: bytes });
@@ -9734,7 +9742,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-01.04</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-01.05</small>`;
 };
 
 function gunzipJSON(bytes) {
