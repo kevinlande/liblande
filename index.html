@@ -1496,7 +1496,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-02.03</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-02.04</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1511,7 +1511,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-02.03';
+      l.querySelector('small').textContent = 'Version 2026-10-02.04';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1523,7 +1523,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-02.03): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-02.04): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -1596,10 +1596,17 @@ function applyTheme(t) {
 }
 // The strip behind the status bar (theme-color, on GitHub Pages) in the
 // top bars' colour, light or dark.
+// (Safari 26 reads the strip pinned across the top, .status-cap, rather
+// than theme-color, and seems to read it only when it first sees it: on a
+// change of theme, a new strip takes its place.)
 function barColour() {
-  const m = document.querySelector('meta[name="theme-color"]');
-  if (!m) return;
-  requestAnimationFrame(() => { m.content = getComputedStyle(document.documentElement).getPropertyValue('--panel').trim() || '#f7f9f8'; });
+  requestAnimationFrame(() => {
+    const panel = getComputedStyle(document.documentElement).getPropertyValue('--panel').trim() || '#f7f9f8';
+    const m = document.querySelector('meta[name="theme-color"]');
+    if (m) m.content = panel;
+    const cap = document.querySelector('.status-cap');
+    if (cap) { const fresh = cap.cloneNode(false); cap.replaceWith(fresh); }
+  });
 }
 try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', barColour); } catch (err) { /* older Safari */ }
 applyTheme(store.get('theme', 'auto'));
@@ -1746,7 +1753,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-02.03`;
+    `<br>LibLande version 2026-10-02.04`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -10231,7 +10238,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-02.03</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-02.04</small>`;
 };
 
 function gunzipJSON(bytes) {
