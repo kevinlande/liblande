@@ -1459,7 +1459,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-01.07</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-01.08</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1474,7 +1474,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-01.07';
+      l.querySelector('small').textContent = 'Version 2026-10-01.08';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1486,7 +1486,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-01.07): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-01.08): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -1699,7 +1699,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-01.07`;
+    `<br>LibLande version 2026-10-01.08`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -2093,7 +2093,7 @@ async function doiFromPdf(file) {
     }
     return null;
   } finally {
-    pdf.destroy();
+    closePdf(pdf);
   }
 }
 
@@ -3599,6 +3599,13 @@ function bibtex(e, extra) {
 // a paper is opened.
 const PDFJS = './vendor/pdf.js/5.4.149/';
 let pdfjsReady = null, viewerReady = null;
+// Whether a mark is selected (PDF.js 6 keeps this on the mark itself).
+const isPicked = ed => !!ed && (V.ui && V.ui.isSelected ? V.ui.isSelected(ed) : !!ed.isSelected);
+// A document closed: in PDF.js 6, through the task that opened it.
+function closePdf(d) {
+  if (!d) return undefined;
+  return d.loadingTask ? d.loadingTask.destroy() : d.destroy();
+}
 function loadPdfJs() {
   if (!pdfjsReady) {
     pdfjsReady = (async () => {
@@ -3935,7 +3942,7 @@ async function openReader(entry, file, pos) {
     vStatus('Opening\u2026');
     // PDF.js takes over the buffer it's given, so hand it a copy.
     const doc = await lib.getDocument({ data: data.slice(0), enableHWA: true }).promise;
-    if (my !== V.token) { doc.destroy(); return; }
+    if (my !== V.token) { closePdf(doc); return; }
     ensureViewer(lib, viewerLib);
     V.doc = doc;
     doc.annotationStorage.onSetModified = () => { if (doc === V.doc) { V.dirty = true; saveUI(); } };
@@ -4046,7 +4053,7 @@ function unloadDoc() {
     V.viewer.setDocument(null);
     V.link.setDocument(null);
     closeLinkMenu(); PEEK.token++; $('#vPeek').hidden = true; peekForget();
-    doc.destroy();
+    closePdf(doc);
   }
   V.dirty = V.drawing = false;
   V.file = null;
@@ -4508,7 +4515,7 @@ async function combineMarks() {
         removed.forEach(n => want.delete(n));
         out = await withBookmarks(out, want, true);
       }
-    } finally { await tmp.destroy(); }
+    } finally { await closePdf(tmp); }
     const now = await pdfMd5(file).catch(() => null);
     if (md5 && now && now !== md5) throw new Error('The PDF changed on Google Drive again meanwhile.');
     const newMd5 = await uploadMarked(file, out);
@@ -5417,8 +5424,16 @@ async function highlightMark(page, bars) {
 }
 
 // The comment box, for PDF.js's comment button on a selected mark too.
+// (PDF.js 5 calls open; PDF.js 6 calls showDialog, and the rest of its
+// comment interface, whose popups and sidebar LibLande doesn't use: its
+// own pins show comments.)
 const commentManager = {
   open(ui, editor) { openComment(editor, false); },
+  showDialog(ui, editor) { if (editor) openComment(editor, false); },
+  setSidebarUiManager() {}, updateComment() {}, updatePopupColor() {}, removeComments() {},
+  toggleCommentPopup() {}, makeCommentColor() { return null; }, destroyPopup() {},
+  // (What a mark's comment button opens: LibLande's comment box.)
+  get dialogElement() { return document.getElementById('vComment'); },
   destroy() {}, showSidebar() {}, hideSidebar() {},
 };
 function commentText(ed) {
@@ -5816,7 +5831,7 @@ $('#vRegionMarks').addEventListener('click', () => {
   const hits = REGION.hits;
   hideRegionMenu();
   V.ui.unselectAll();
-  hits.forEach((ed, i) => { if (i === 0) V.ui.setSelected(ed); else if (!V.ui.isSelected(ed)) V.ui.toggleSelected(ed); });
+  hits.forEach((ed, i) => { if (i === 0) V.ui.setSelected(ed); else if (!isPicked(ed)) V.ui.toggleSelected(ed); });
 });
 document.addEventListener('pointerdown', ev => {
   if ($('#vRegion').hidden || ev.target.closest('#vRegion')) return;
@@ -6027,8 +6042,8 @@ async function refreshPins(n) {
     if (taken.has(a.id)) continue;
     const sec = page.querySelector(`.annotationLayer [data-annotation-id="${CSS.escape(a.id)}"]`);
     if (sec && (sec.hidden || sec.style.display === 'none')) continue;
-    const r = pv.viewport.convertToViewportRectangle(a.rect);
-    pins.push({ top: Math.min(r[1], r[3]), text: a.contentsObj.str, annot: a });
+    const vp = pv.viewport, top = Math.min(vp.convertToViewportPoint(a.rect[0], a.rect[1])[1], vp.convertToViewportPoint(a.rect[2], a.rect[3])[1]);
+    pins.push({ top, text: a.contentsObj.str, annot: a });
   }
   if (!pins.length) { if (box) box.remove(); return; }
   if (!box) { box = document.createElement('div'); box.className = 'note-pins'; page.appendChild(box); }
@@ -6559,7 +6574,7 @@ function drawingAt(x, y, reach) {
     // Let go before it was picked up: put it straight down.
     if (g !== my) { if (V.tool === 'select' && V.fromRead) putDown(); return; }
     if (V.tool !== 'select') { g = null; return; }
-    lift(V.ui && [...(V.ui.getEditors(+g.hit.page.dataset.pageNumber - 1) || [])].find(e => V.ui.isSelected(e)));
+    lift(V.ui && [...(V.ui.getEditors(+g.hit.page.dataset.pageNumber - 1) || [])].find(e => isPicked(e)));
   };
   sc.addEventListener('pointerdown', ev => {
     if (replaying) return;
@@ -6666,7 +6681,7 @@ function drawingAt(x, y, reach) {
       if (!ed) return;
       // The mark whose toolbar was showing, tapped again: put it down.
       if (t.had && ed.div === t.had) { putDown(); return; }
-      if (!V.ui.isSelected(ed)) V.ui.setSelected(ed);
+      if (!isPicked(ed)) V.ui.setSelected(ed);
       showBar(ed);
     }, 30);
   }, true);
@@ -7277,7 +7292,7 @@ async function showMarks() {
       if (my === SIDE.token && SIDE.tab === 'marks') body.innerHTML = `<p class="v-side-note">Couldn\u2019t read the annotations: ${esc(errText(err))}</p>`;
       return;
     } finally {
-      if (temp) temp.destroy();
+      if (temp) closePdf(temp);
     }
   }
   if (my !== SIDE.token || SIDE.tab !== 'marks') return;
@@ -9742,7 +9757,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-01.07</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-01.08</small>`;
 };
 
 function gunzipJSON(bytes) {
