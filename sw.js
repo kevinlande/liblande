@@ -12,7 +12,7 @@
  *   with marks replaces the copy kept here, so it opens with them.
  *   (The library itself is kept by the page, in IndexedDB.)
  */
-const VERSION = '2026-10-01.05';
+const VERSION = '2026-10-01.06';
 const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/5.4.149/';
 const APP = 'liblande-app-' + VERSION, LIBS = 'liblande-libs', PAPERS = 'liblande-papers';
 const KEEP_PAPERS = 60;

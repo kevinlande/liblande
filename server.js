@@ -8,15 +8,20 @@
  * the Drive API directly. Apps Script keeps building the library in the
  * background (every 10 minutes), into the same LibLande folder in Drive.
  *
- * Stage 1: changes to the library itself (editing entries, adding papers,
- * the reading list, groups, exports, settings) aren't here yet; asking for
- * one says so, and the Apps Script version still does them.
+ * Everything else (adding and editing entries, the reading list, groups,
+ * exports, settings, refreshing) is passed to the Apps Script project
+ * itself, through Google's Apps Script API (scripts.run), with the same
+ * sign-in: the same code, and the same lock on the .bib, as the Apps
+ * Script version. (build.py fills in DEPLOYMENT, the deployment's ID.)
  */
 (() => {
   'use strict';
   window.LIBLANDE_PAGES = true;
   const CLIENT_ID = '789682218462-98mjugngb46ttd01ucp9dcj71ufspjgn.apps.googleusercontent.com';
-  const SCOPE = 'https://www.googleapis.com/auth/drive';
+  // Drive, plus what Apps Script's own code needs to run for you (fetching
+  // from the web, and the background-build triggers).
+  const SCOPE = ['drive', 'script.external_request', 'script.scriptapp'].map(s => 'https://www.googleapis.com/auth/' + s).join(' ');
+  const DEPLOYMENT = 'AKfycbxRSWbVU93pvk7_8uTUVqKc6OyxqzqNo2AUUDpSbKCcymCn23msaQwsljZCBLXC0xE6';
   const API = 'https://www.googleapis.com/drive/v3/';
   const FOLDER = 'application/vnd.google-apps.folder';
   // As in Code.gs.
@@ -34,7 +39,9 @@
   // Google only opens its sign-in window straight after a tap, so a token
   // that's missing or has run out waits for one: a bar asks for it, and any
   // tap will do. A token kept from last time is used while it lasts.
-  let token = store.get('token', null);   // {value, at, expiresIn}
+  let token = store.get('token', null);   // {value, at, expiresIn, scope}
+  // (One from before Apps Script was asked too lacks its permissions.)
+  if (token && token.scope !== SCOPE) token = null;
   let email = store.get('email', '');
   let client = null, asking = false, waiters = [];
   const age = () => (token ? Date.now() - token.at : Infinity);
@@ -48,7 +55,7 @@
       callback: resp => {
         asking = false;
         if (resp.error) { bar('Google didn’t sign you in (' + resp.error + '). Tap to try again.'); return; }
-        token = { value: resp.access_token, at: Date.now(), expiresIn: +resp.expires_in || 3600 };
+        token = { value: resp.access_token, at: Date.now(), expiresIn: +resp.expires_in || 3600, scope: SCOPE };
         store.set('token', token);
         bar(null);
         const w = waiters; waiters = [];
@@ -185,7 +192,15 @@
 
   /* ------------------------------------------------------------ the server */
   const SERVER = {
+    // Apps Script's own answer (it knows about builds under way, and keeps
+    // your settings); if it can't be had, what Drive says.
     async getStatus() {
+      if (navigator.onLine) {
+        try { return await apps('getStatus', []); } catch (e) { console.warn('Apps Script\u2019s status:', e.message); }
+      }
+      return SERVER.driveStatus();
+    },
+    async driveStatus() {
       const folder = await dataFolder();
       if (!folder) {
         return { configured: false, problem: 'LibLande’s folder (with the library Apps Script builds) isn’t in your Google Drive. Open LibLande on Apps Script first.' };
@@ -205,9 +220,11 @@
         prefs: {},
       };
     },
-    // Apps Script rebuilds the library within 10 minutes of a change to the
-    // .bib; this only looks for what it built last.
-    refreshNow() { return SERVER.getStatus(); },
+    // Apps Script looks at the .bib now and rebuilds; if it can't be
+    // asked, only what it built last is looked for.
+    async refreshNow() {
+      try { return await apps('refreshNow', []); } catch (e) { return SERVER.driveStatus(); }
+    },
     async getLibraryInfo() {
       const folder = await dataFolder();
       const lib = folder && await fileIn(folder, LIBRARY_FILE);
@@ -220,8 +237,8 @@
       const bytes = new Uint8Array(await (await drive('files/' + encodeURIComponent(info.id) + '?alt=media')).arrayBuffer());
       return { stamp: info.stamp, library: bytesToB64(bytes) };
     },
-    // Kept on this device (each device keeps its own settings for now).
-    savePrefs() { return {}; },
+    // With your account, as on Apps Script (and on this device meanwhile).
+    savePrefs(changes) { return apps('savePrefs', [changes]).catch(() => ({})); },
     // As in Code.gs: before the first save of the day to a PDF, a copy goes
     // to LibLande/Backups/PDFs; copies older than 60 days are removed.
     async backupPdf(fileId) {
@@ -261,8 +278,36 @@
       return out;
     },
   };
-  const notYet = name => () => Promise.reject(new Error('This isn’t in the GitHub Pages version of LibLande yet (' + name +
-    '). Use LibLande on Apps Script for it for now.'));
+  // The rest: Apps Script's own function, run for you. Until a call has
+  // worked, the page leaves the reading list alone at start
+  // (LIBLANDE_NO_EDITS), in case Apps Script can't be reached this way.
+  window.LIBLANDE_NO_EDITS = true;
+  async function apps(name, args) {
+    const go = async t => {
+      try {
+        return await fetch('https://script.googleapis.com/v1/scripts/' + DEPLOYMENT + ':run', { method: 'POST',
+          headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ function: name, parameters: args.map(a => (a === undefined ? null : a)), devMode: false }) });
+      } catch (e) {
+        throw new Error(navigator.onLine ? 'Apps Script can\u2019t be reached just now.' : 'You\u2019re offline.');
+      }
+    };
+    let r = await go(await getToken());
+    if (r.status === 401) r = await go(await getToken(true));
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      const msg = (j.error && j.error.message) || ('error ' + r.status);
+      throw new Error('LibLande on GitHub Pages couldn\u2019t ask Apps Script to do this (' + msg + ').');
+    }
+    // An error in Apps Script's code: its own message, as on Apps Script.
+    if (j.error) {
+      const d = (j.error.details || [])[0];
+      throw new Error((d && d.errorMessage) || j.error.message || 'Apps Script hit an error.');
+    }
+    window.LIBLANDE_NO_EDITS = false;
+    return j.response ? j.response.result : undefined;
+  }
+  const viaApps = name => (...args) => apps(name, args);
 
   // google.script.run, as the page uses it.
   const runner = (ok, fail) => new Proxy({}, {
@@ -271,7 +316,7 @@
       if (k === 'withFailureHandler') return f => runner(ok, f);
       if (k === 'withUserObject') return () => runner(ok, fail);
       if (typeof k !== 'string') return undefined;
-      const fn = SERVER[k] || notYet(k);
+      const fn = SERVER[k] || viaApps(k);
       return (...args) => {
         Promise.resolve().then(() => fn(...args)).then(v => ok && ok(v), e => {
           if (fail) fail(e instanceof Error ? e : new Error(String(e)));
