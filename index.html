@@ -1056,6 +1056,18 @@ details.d-sec[open] summary { margin-bottom: 8px; }
    not show mask images from another site inside Google's frame). */
 .annotationEditorLayer > :not(.bar-on) .editToolbar { display: none !important; }
 .v-scroll { -webkit-touch-callout: none; }
+/* LibLande's colours on the toolbar of a drawing, underline, strike-through
+   or text box (see colourList): laid out as PDF.js lays out a highlight's,
+   whose rules only reach highlights. */
+.annotationEditorLayer .editToolbar .buttons .ll-colours { position: relative; width: auto; min-width: 28px; display: flex; justify-content: center; align-items: center; gap: 4px; padding: 4px; }
+.annotationEditorLayer .editToolbar .buttons .ll-colours > .swatch { flex: none; width: 16px; height: 16px; }
+.annotationEditorLayer .editToolbar .buttons .ll-colours .dropdown { position: absolute; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 11px; padding-block: 8px; border-radius: 6px; background-color: var(--editor-toolbar-bg-color); border: 1px solid var(--editor-toolbar-border-color); box-shadow: var(--editor-toolbar-shadow); inset-block-start: calc(100% + 4px); width: calc(100% + 2 * var(--editor-toolbar-padding, 4px)); }
+.annotationEditorLayer .editToolbar .buttons .ll-colours .dropdown button { width: 100%; height: auto; border: none; cursor: pointer; display: flex; justify-content: center; align-items: center; background: none; }
+.annotationEditorLayer .editToolbar .buttons .ll-colours .dropdown .swatch { flex: none; width: 16px; height: 16px; }
+.annotationEditorLayer .editToolbar .buttons .ll-colours .dropdown [aria-selected="true"] > .swatch { outline: 2px solid var(--selected-outline-color, #0060df); outline-offset: 2px; }
+/* Underlines and strike-throughs: LibLande draws the line (see drawLines). */
+.ll-lines { position: absolute; inset: 0; pointer-events: none; }
+.ll-lines i { position: absolute; height: max(1px, calc(var(--scale-factor, 1) * var(--th, 1) * 1px)); transform: translateY(-50%); background: var(--c, #d92d20); border-radius: 1px; }
 /* The Pencil's hover preview (see hoverPreview). */
 .v-hover { position: fixed; left: 0; top: 0; z-index: 30; pointer-events: none; transform: translate(-50%, -50%); border-radius: 50%; }
 .v-hover.dot { border: 1.5px solid #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, .45); }
@@ -1465,7 +1477,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-01.10</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-01.12</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1480,7 +1492,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-01.10';
+      l.querySelector('small').textContent = 'Version 2026-10-01.12';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1492,7 +1504,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-01.10): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-01.12): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -1705,7 +1717,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-01.10`;
+    `<br>LibLande version 2026-10-01.12`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -3853,6 +3865,7 @@ function ensureViewer(lib, VL) {
   // When nothing is being drawn, draw the next few pages ahead too, so
   // they're ready before they scroll into view.
   bus.on('pagerendered', e => { clearTimeout(V.aheadTimer); V.aheadTimer = setTimeout(drawAhead, 150); refreshPins(e.pageNumber); ribbonFor(e.pageNumber); });
+  bus.on('annotationlayerrendered', e => { sectionLines(e.pageNumber); decorateLines(); });
   bus.on('annotationeditoruimanager', e => { V.ui = e.uiManager; watchChanges(V.ui); });
   // A jump to a page (a link, the outline, a bookmark) lands below the bars
   // at the top while they're showing.
@@ -3902,6 +3915,7 @@ $('#vScroll').addEventListener('scroll', () => { clearTimeout(V.aheadTimer); V.a
 
 async function openReader(entry, file, pos) {
   const my = ++V.token;
+  TAKEN.clear();
   $('#viewer').classList.remove('bars-hidden');
   V.restore = pos && pos.top != null ? pos : null;
   Object.assign(V, { entry, file, bytes: null, md5: null, dirty: false, drawing: false, selected: false, canUndo: false, canRedo: false });
@@ -4341,7 +4355,7 @@ async function saveMarkup(force, auto, now) {
         AUTO.backedUp = file.id + ' ' + day;
       }
       const saved = await doc.saveDocument();
-      const bytes = withBm ? await withBookmarks(saved, bmSnap) : saved;
+      const bytes = await realLines(withBm ? await withBookmarks(saved, bmSnap) : saved);
       const up = token => fetch('https:\/\/www.googleapis.com/upload/drive/v3/files/' + encodeURIComponent(file.id) + '?uploadType=media&fields=md5Checksum',
         { method: 'PATCH', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/pdf' }, body: bytes });
       let r = await up(await driveToken());
@@ -4462,7 +4476,7 @@ async function uploadKept(back) {
       if (!md5 || md5 !== j.base) continue;
       try {
         await callServer('backupPdf', id);
-        const bytes = j.bm ? await withBookmarks(j.bytes, new Set(j.bm), true).catch(() => j.bytes) : j.bytes;
+        const bytes = await realLines(j.bm ? await withBookmarks(j.bytes, new Set(j.bm), true).catch(() => j.bytes) : j.bytes);
         await uploadMarked(file, bytes);
       } catch (err) {
         if (netError(err)) break;
@@ -4522,6 +4536,7 @@ async function combineMarks() {
         out = await withBookmarks(out, want, true);
       }
     } finally { await closePdf(tmp); }
+    out = await realLines(out);
     const now = await pdfMd5(file).catch(() => null);
     if (md5 && now && now !== md5) throw new Error('The PDF changed on Google Drive again meanwhile.');
     const newMd5 = await uploadMarked(file, out);
@@ -4659,7 +4674,7 @@ function watchChanges(ui) {
   ui._watched = true;
   ['addCommands', 'undo', 'redo'].forEach(k => {
     const f = ui[k];
-    if (typeof f === 'function') ui[k] = function () { const r = f.apply(this, arguments); autoChanged(); return r; };
+    if (typeof f === 'function') ui[k] = function () { const r = f.apply(this, arguments); autoChanged(); decorateLines(); return r; };
   });
 }
 // Changes are uploaded to Drive on their own two minutes after the last
@@ -5476,20 +5491,199 @@ async function addMark(page, data) {
   markDrawing();
   return ed;
 }
+/* ---- underlines and strike-throughs */
+// PDF.js can make highlights, drawings, text and pictures, but not the
+// PDF Underline and StrikeOut marks other readers make. So LibLande makes
+// them as highlights of the words (they select, recolour, erase and take
+// comments as highlights do) with a fill too faint to see, whose opacity
+// says which they are, and draws the line over them itself (drawLines).
+// Every save to Google Drive turns them into real Underline and StrikeOut
+// marks (realLines), which any reader shows; on this device, until then,
+// they stay as they are. Real ones already in a PDF become LibLande's when
+// picked up (takeOverLine), and PDF.js removes the original at the save.
+// (PDF.js writes opacity to two decimal places.)
+const LINE_OPACITY = { underline: 0.01, strike: 0.02 };
+const lineKindOf = op => (op == null ? null : Math.abs(op - LINE_OPACITY.underline) < 0.004 ? 'underline' : Math.abs(op - LINE_OPACITY.strike) < 0.004 ? 'strike' : null);
+const LINE_KIND = new WeakMap();
+function lineKindOfEd(ed) {
+  if (!ed || !ed.div || !ed.div.classList.contains('highlightEditor')) return null;
+  if (LINE_KIND.has(ed)) return LINE_KIND.get(ed);
+  let k = null;
+  try { const d = ed.serialize(); k = d ? lineKindOf(d.opacity) : null; } catch (err) { k = null; }
+  LINE_KIND.set(ed, k);
+  return k;
+}
+// Where the line crosses a line of text (PDF units up from its bottom),
+// and how thick it is.
+const lineY = (kind, yb, yt) => (kind === 'underline' ? yb + (yt - yb) * 0.08 : yb + (yt - yb) * 0.42);
+const lineThickness = h => Math.max(0.6, Math.min(2, h * 0.07));
+const rgbHex = c => '#' + Array.from(c || [0, 0, 0]).slice(0, 3).map(v => Math.round(v).toString(16).padStart(2, '0')).join('');
+// The lines, in an element that covers rect (PDF units: x0 y0 x1 y1).
+function drawLines(host, rect, quads, color, kind) {
+  let box = host.querySelector(':scope > .ll-lines');
+  if (!box) { box = document.createElement('div'); box.className = 'll-lines'; box.setAttribute('aria-hidden', 'true'); host.append(box); }
+  const [x0, y0, x1, y1] = rect, w = (x1 - x0) || 1, h = (y1 - y0) || 1;
+  let html = '';
+  for (let i = 0; i + 7 < quads.length; i += 8) {
+    const xs = [quads[i], quads[i + 2], quads[i + 4], quads[i + 6]], ys = [quads[i + 1], quads[i + 3], quads[i + 5], quads[i + 7]];
+    const xl = Math.min(...xs), xr = Math.max(...xs), yb = Math.min(...ys), yt = Math.max(...ys);
+    html += `<i style="left:${(xl - x0) / w * 100}%;width:${(xr - xl) / w * 100}%;top:${(y1 - lineY(kind, yb, yt)) / h * 100}%;--th:${lineThickness(yt - yb).toFixed(2)}"></i>`;
+  }
+  if (box.innerHTML !== html) box.innerHTML = html;
+  box.style.setProperty('--c', color);
+}
+function decorateLine(ed) {
+  const kind = lineKindOfEd(ed);
+  if (!kind) return;
+  let d = null;
+  try { d = ed.serialize(); } catch (err) { d = null; }
+  if (!d || !d.quadPoints) return;
+  ed.div.classList.add('ll-line', 'll-' + kind);
+  drawLines(ed.div, d.rect, Array.from(d.quadPoints), rgbHex(d.color), kind);
+}
+// (After any change: a new mark, an undo, a new colour.)
+let LINE_DECOR = 0;
+function decorateLines() {
+  if (LINE_DECOR) return;
+  LINE_DECOR = requestAnimationFrame(() => {
+    LINE_DECOR = 0;
+    if (!V.ui) return;
+    document.querySelectorAll('#vPages .annotationEditorLayer > .highlightEditor').forEach(div => decorateLine(V.ui.getEditor(div.id)));
+  });
+}
 async function lineMarks(page, bars, kind) {
   const boxes = toPdfBoxes(page, bars);
-  if (!boxes.length) return;
-  const paths = [], th = Math.max(0.8, Math.min(2, (boxes[0].yt - boxes[0].yb) * 0.08));
+  if (!boxes.length) return null;
+  const quads = [];
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (const b of boxes) {
-    const h = b.yt - b.yb, y = kind === 'underline' ? b.yb + h * 0.1 : b.yb + h * 0.42;
-    paths.push(Float32Array.from([b.xl, y, b.xr, y]));
-    x0 = Math.min(x0, b.xl); x1 = Math.max(x1, b.xr); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+    quads.push(b.xl, b.yt, b.xr, b.yt, b.xl, b.yb, b.xr, b.yb);
+    x0 = Math.min(x0, b.xl); x1 = Math.max(x1, b.xr); y0 = Math.min(y0, b.yb); y1 = Math.max(y1, b.yt);
   }
-  await addMark(page, {
-    annotationType: V.lib.AnnotationEditorType.INK, color: hexRgb(MARK.lineColor), opacity: 1, thickness: th,
-    paths: { points: paths }, rect: [x0 - th, y0 - th, x1 + th, y1 + th],
+  const ed = await addMark(page, {
+    annotationType: V.lib.AnnotationEditorType.HIGHLIGHT, color: hexRgb(MARK.lineColor), opacity: LINE_OPACITY[kind],
+    quadPoints: Float32Array.from(quads), rect: [x0, y0, x1, y1],
   });
+  if (ed) { LINE_KIND.set(ed, kind); decorateLine(ed); setTimeout(() => { if (V.ui && isPicked(ed)) V.ui.unselectAll(); }, 0); }
+  return ed;
+}
+// Ones made on this device and not yet saved to Drive, opened again
+// (the faint highlights PDF.js shows when no tool is on): their lines.
+const PAGE_ANNOTS = new WeakMap();
+async function sectionLines(pageNumber) {
+  if (!V.doc) return;
+  const page = document.querySelector(`#vPages .page[data-page-number="${pageNumber}"]`);
+  if (!page) return;
+  const doc = V.doc;
+  let list = PAGE_ANNOTS.get(doc) && PAGE_ANNOTS.get(doc).get(pageNumber);
+  if (!list) {
+    try { list = await (await doc.getPage(pageNumber)).getAnnotations(); } catch (err) { return; }
+    if (!PAGE_ANNOTS.has(doc)) PAGE_ANNOTS.set(doc, new Map());
+    PAGE_ANNOTS.get(doc).set(pageNumber, list);
+  }
+  for (const a of list) {
+    const sec = page.querySelector(`.annotationLayer [data-annotation-id="${CSS.escape(a.id)}"]`);
+    if (!sec) continue;
+    if (TAKEN.has(a.id)) { sec.style.display = 'none'; continue; }
+    const kind = a.subtype === 'Highlight' ? lineKindOf(a.opacity) : null;
+    if (kind && a.quadPoints) drawLines(sec, a.rect, Array.from(a.quadPoints), rgbHex(a.color), kind);
+  }
+}
+// A real Underline or StrikeOut from the PDF, picked up: LibLande's own in
+// its place (same words, colour and comment), standing for the original
+// as PDF.js's edited marks do (annotationElementId): PDF.js leaves the
+// original out of the page it draws, writes this one in its place when
+// the PDF is saved, and removes it if this one is deleted. (Not a step
+// for Undo: nothing about it has changed yet.)
+const TAKEN = new Set();
+async function takeOverLine(hit) {
+  if (!V.doc || !V.ui || !hit || !hit.id) return null;
+  const idx = +hit.page.dataset.pageNumber - 1, layer = V.ui.getLayer(idx);
+  if (!layer) return null;
+  let a = null;
+  try { a = (await (await V.doc.getPage(idx + 1)).getAnnotations()).find(x => x.id === hit.id); } catch (err) { a = null; }
+  if (!a || !/^(Underline|StrikeOut)$/.test(a.subtype) || !a.quadPoints) return null;
+  const kind = a.subtype === 'Underline' ? 'underline' : 'strike';
+  const quads = [];
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (let i = 0; i + 7 < a.quadPoints.length; i += 8) {
+    const xs = [0, 2, 4, 6].map(k => a.quadPoints[i + k]), ys = [1, 3, 5, 7].map(k => a.quadPoints[i + k]);
+    const xl = Math.min(...xs), xr = Math.max(...xs), yb = Math.min(...ys), yt = Math.max(...ys);
+    quads.push(xl, yt, xr, yt, xl, yb, xr, yb);
+    x0 = Math.min(x0, xl); x1 = Math.max(x1, xr); y0 = Math.min(y0, yb); y1 = Math.max(y1, yt);
+  }
+  const ed = await layer.deserialize({
+    annotationType: V.lib.AnnotationEditorType.HIGHLIGHT, color: Array.from(a.color || [0, 0, 0]), opacity: LINE_OPACITY[kind],
+    quadPoints: Float32Array.from(quads), boxes: null, pageIndex: idx, rect: [x0, y0, x1, y1], rotation: 0,
+  });
+  if (!ed) return null;
+  LINE_KIND.set(ed, kind);
+  ed.annotationElementId = a.id;
+  // (PDF.js compares a mark like this with the one it stands for; this one
+  // always counts as changed: it becomes an Underline again when saved.)
+  ed._initialData = { color: [-1, -1, -1] };
+  // (The page is drawn again, without it, once PDF.js counts this one as
+  // standing for it; done when drawn.)
+  const hide = async () => {
+    const sec = hit.page.querySelector(`.annotationLayer [data-annotation-id="${CSS.escape(a.id)}"]`);
+    if (sec) sec.style.display = 'none';
+    for (let i = 0; i < 20 && !V.doc.annotationStorage.modifiedIds.ids.has(a.id); i++) await new Promise(r => requestAnimationFrame(r));
+    const pv = V.viewer.getPageView(idx);
+    if (!pv || !V.bus) return Promise.resolve();
+    const drawn = new Promise(res => {
+      const done = e => { if (e.pageNumber === idx + 1) { V.bus.off('pagerendered', done); res(); } };
+      V.bus.on('pagerendered', done);
+      setTimeout(() => { V.bus.off('pagerendered', done); res(); }, 3000);
+    });
+    pv.reset();
+    V.viewer.update();
+    return drawn;
+  };
+  putMark(layer, ed);
+  TAKEN.add(a.id);
+  const note = a.contentsObj && a.contentsObj.str;
+  if (note) { try { ed.comment = note; } catch (err) { /* without it */ } }
+  await hide();
+  markDrawing();
+  decorateLines();
+  return ed;
+}
+// For Google Drive (and sharing): LibLande's underlines and strike-throughs
+// as real Underline and StrikeOut marks, each with an appearance any PDF
+// reader can draw. A file without any comes back as it was.
+async function realLines(bytes) {
+  const text = new TextDecoder('latin1').decode(bytes);
+  if (!/\/CA 0\.0[12]\b/.test(text)) return bytes;
+  const { PDFDocument, PDFName, PDFDict, PDFArray, PDFNumber } = await loadPdfLib();
+  let pdf;
+  try { pdf = await PDFDocument.load(bytes, { updateMetadata: false, throwOnInvalidObject: false }); } catch (err) { return bytes; }
+  const N = PDFName.of, ctx = pdf.context;
+  const nums = a => (a ? a.asArray().map(v => (v instanceof PDFNumber ? v.asNumber() : 0)) : []);
+  let n = 0;
+  for (const page of pdf.getPages()) {
+    const annots = page.node.Annots();
+    if (!annots) continue;
+    for (let i = 0; i < annots.size(); i++) {
+      const d = annots.lookupMaybe(i, PDFDict);
+      if (!d || d.get(N('Subtype')) !== N('Highlight')) continue;
+      const ca = d.lookupMaybe(N('CA'), PDFNumber), kind = lineKindOf(ca && ca.asNumber());
+      if (!kind) continue;
+      const q = nums(d.lookupMaybe(N('QuadPoints'), PDFArray)), c = nums(d.lookupMaybe(N('C'), PDFArray)), rect = nums(d.lookupMaybe(N('Rect'), PDFArray));
+      const f = v => (+v).toFixed(2);
+      let ops = (c.length === 3 ? c.map(f).join(' ') : '0 0 0') + ' RG 0 J\n';
+      for (let k = 0; k + 7 < q.length; k += 8) {
+        const xs = [q[k], q[k + 2], q[k + 4], q[k + 6]], ys = [q[k + 1], q[k + 3], q[k + 5], q[k + 7]];
+        const xl = Math.min(...xs), xr = Math.max(...xs), yb = Math.min(...ys), yt = Math.max(...ys), y = lineY(kind, yb, yt);
+        ops += `${f(lineThickness(yt - yb))} w ${f(xl)} ${f(y)} m ${f(xr)} ${f(y)} l S\n`;
+      }
+      const ap = ctx.register(ctx.stream(ops, { Type: 'XObject', Subtype: 'Form', BBox: rect.length === 4 ? rect : [0, 0, 1, 1], Resources: {} }));
+      d.set(N('Subtype'), N(kind === 'underline' ? 'Underline' : 'StrikeOut'));
+      d.delete(N('CA'));
+      d.set(N('AP'), ctx.obj({ N: ap }));
+      n++;
+    }
+  }
+  return n ? pdf.save({ useObjectStreams: false }) : bytes;
 }
 async function highlightMark(page, bars) {
   const boxes = toPdfBoxes(page, bars);
@@ -6005,11 +6199,14 @@ const EDIT_ICONS = {
 // picker over the page (or nothing); they get LibLande's few colours
 // instead, as a list like the highlights' (the list for the pen and text).
 function colourList(tb) {
-  const input = tb.querySelector('input.basicColorPicker');
+  const input = tb.querySelector('input.basicColorPicker, .colorPicker:not(.ll-colours)');
   if (!input || tb.querySelector('.ll-colours')) return;
   const div = tb.closest('.annotationEditorLayer > [id]'), ed = div && V.ui && V.ui.getEditor(div.id);
   if (!ed) return;
-  const text = div.classList.contains('freeTextEditor');
+  const text = div.classList.contains('freeTextEditor'), line = lineKindOfEd(ed);
+  // (A highlight keeps PDF.js's list of highlight colours.)
+  if (input.matches('.colorPicker') && !line) return;
+  const now = input.matches('input') ? input.value : ed.color || '#000000';
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'colorPicker ll-colours';
@@ -6019,7 +6216,7 @@ function colourList(tb) {
   btn.setAttribute('aria-expanded', 'false');
   const swatch = document.createElement('span');
   swatch.className = 'swatch';
-  swatch.style.backgroundColor = input.value;
+  swatch.style.backgroundColor = now;
   const dd = document.createElement('div');
   dd.className = 'dropdown hidden';
   dd.setAttribute('role', 'listbox');
@@ -6030,7 +6227,7 @@ function colourList(tb) {
     o.dataset.color = c;
     o.title = name;
     o.setAttribute('aria-label', name);
-    o.setAttribute('aria-selected', String(c.toLowerCase() === String(input.value).toLowerCase()));
+    o.setAttribute('aria-selected', String(c.toLowerCase() === String(now).toLowerCase()));
     const sw = document.createElement('span');
     sw.className = 'swatch';
     sw.style.backgroundColor = c;
@@ -6047,7 +6244,8 @@ function colourList(tb) {
     const o = ev.target.closest('[data-color]');
     if (o) {
       const P = V.lib.AnnotationEditorParamsType;
-      ed.updateParams(text ? P.FREETEXT_COLOR : P.INK_COLOR, o.dataset.color);
+      ed.updateParams(text ? P.FREETEXT_COLOR : line ? P.HIGHLIGHT_COLOR : P.INK_COLOR, o.dataset.color);
+      if (line) decorateLine(ed);
       swatch.style.backgroundColor = o.dataset.color;
       dd.querySelectorAll('[data-color]').forEach(x => x.setAttribute('aria-selected', String(x === o)));
       markDrawing();
@@ -6074,7 +6272,11 @@ function iconEditToolbar(root) {
   }
 }
 new MutationObserver(list => {
-  for (const m of list) for (const n of m.addedNodes) if (n.nodeType === 1 && (n.matches('.editToolbar, .editToolbar *') || n.querySelector('.editToolbar'))) { iconEditToolbar(n.closest('.editToolbar') || n); toolbarAtTap(); }
+  for (const m of list) for (const n of m.addedNodes) {
+    if (n.nodeType !== 1) continue;
+    if (n.matches('.editToolbar, .editToolbar *') || n.querySelector('.editToolbar')) { iconEditToolbar(n.closest('.editToolbar') || n); toolbarAtTap(); }
+    if (n.matches('.annotationEditorLayer > .highlightEditor')) decorateLines();
+  }
 }).observe($('#vPages'), { childList: true, subtree: true });
 // A mark's toolbar (and its colours) comes up where the mark was tapped,
 // just below the tap, rather than at the mark's far corner (PDF.js's
@@ -6134,12 +6336,26 @@ function readMarkAt(x, y) {
   return null;
 }
 async function pickUpMark(hit, x, y, back, bar) {
+  // (PDF.js finishes switching tools a moment later, putting down whatever
+  // is picked up as it does: a mark made here waits for that.)
+  const switched = V.tool === 'select' || !V.bus ? Promise.resolve() : new Promise(res => {
+    const done = () => { V.bus.off('annotationeditormodechanged', done); res(); };
+    V.bus.on('annotationeditormodechanged', done);
+    setTimeout(done, 2500);
+  });
   setTool('select');
   V.fromRead = back || 'read';
   // (The select tool holds the mark, but no tool button lights up: you
   // didn't choose one.)
   if (V.fromRead === 'read') document.querySelectorAll('#vPalette [data-tool]').forEach(b => b.setAttribute('aria-pressed', 'false'));
   const idx = +hit.page.dataset.pageNumber - 1;
+  // A real underline or strike-through from the PDF: LibLande's in its place.
+  const sec = hit.id && hit.page.querySelector(`.annotationLayer [data-annotation-id="${CSS.escape(hit.id)}"]`);
+  if (sec && (sec.classList.contains('underlineAnnotation') || sec.classList.contains('strikeoutAnnotation'))) {
+    await switched;
+    const ed = V.tool === 'select' ? await takeOverLine(hit) : null;
+    if (ed && V.tool === 'select') { V.ui.setSelected(ed); if (!back || bar) showBar(ed); return; }
+  }
   for (let i = 0; i < 20; i++) {
     if (V.tool !== 'select') return;
     const ed = V.ui && ((hit.id && V.ui.getEditors(idx).find(e => e.annotationElementId === hit.id && !e.deleted)) || markAt(x, y));
@@ -6367,7 +6583,7 @@ $('#vPages').addEventListener('pointerdown', ev => { if (ev.target.closest('.not
       grew = false;
       for (const o of V.ui.getEditors(+page.dataset.pageNumber - 1)) {
         if (o === skip || out.includes(o) || o.deleted || !o.div || !o.div.isConnected) continue;
-        if (!o.div.classList.contains('highlightEditor') || o.div.classList.contains('free') || !sameColour(o.color, colour)) continue;
+        if (!o.div.classList.contains('highlightEditor') || o.div.classList.contains('free') || lineKindOfEd(o) || !sameColour(o.color, colour)) continue;
         const e = hlEnds(o.div, page);
         if (!e) continue;
         let a, b;
@@ -6832,6 +7048,8 @@ function drawingAt(x, y, reach) {
     if (!t || t.id !== ev.pointerId || LP.took || !V.ui || $('#viewer').hidden) return;
     if (Math.hypot(ev.clientX - t.x, ev.clientY - t.y) > 8 || Date.now() - t.t > LP.hold) return;
     if (V.tool === 'pen' || V.tool === 'eraser' || V.tool === 'read') return;
+    // (The underline, strike-through and comment tools see to their own taps.)
+    if (TEXT_TOOLS.has(V.tool)) return;
     const x = ev.clientX, y = ev.clientY;
     // A mark picked up from reading: a finger's tap on empty page puts it
     // down (the select tool leaves fingers to scroll once there's a Pencil).
@@ -8344,7 +8562,7 @@ $('#vShare').addEventListener('click', async ev => {
   if (!V.bytes) { toast('The paper is still downloading.', 2000); return; }
   if (V.drawing) { await commitDrawing(); V.drawing = false; if (V.tool !== 'read') setTool(V.tool); }
   try {
-    openIn((V.dirty || V.bmDirty) && V.doc ? await withBookmarks(await V.doc.saveDocument()) : V.bytes, V.file.n);
+    openIn((V.dirty || V.bmDirty) && V.doc ? await realLines(await withBookmarks(await V.doc.saveDocument())) : V.bytes, V.file.n);
   } catch (err) { toast(errText(err), 5000); }
 });
 window.addEventListener('resize', () => {
@@ -9922,7 +10140,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-01.10</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-01.12</small>`;
 };
 
 function gunzipJSON(bytes) {
