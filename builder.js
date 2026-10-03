@@ -31,6 +31,33 @@
   const q = s => "'" + String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
   const indexHash = files => fingerprint_(JSON.stringify(Object.keys(files).sort().map(k => [k, files[k]])));
   const b64ToBytes = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+  const gzip = async s => new Uint8Array(await new Response(new Blob([s]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer());
+
+  // Inbox entries join the library, except ones already in the main .bib
+  // (same cite key or DOI).
+  function mergeInbox(data, extra) {
+    const keys = new Set(data.entries.map(e => e.k));
+    const dois = new Set(data.entries.map(e => (e.f.doi || '').toLowerCase()).filter(Boolean));
+    const fresh = extra.entries.filter(e => !keys.has(e.k) && !(e.f.doi && dois.has(e.f.doi.toLowerCase())));
+    fresh.forEach(e => { e.ib = 1; });
+    data.entries = data.entries.concat(fresh);
+    data.inbox = { file: INBOX_FILE, folder: DATA_FOLDER + '/' + INBOX_FOLDER, count: fresh.length };
+  }
+  // The library from the .bib and the inbox, parsed, put together and
+  // gzipped: in the worker (build-worker.js), or here without one. When
+  // a linked file wasn't found, the parts come back instead, to be looked
+  // up in Drive first. job: {main, inbox} as {text, ids, opts}.
+  async function assemble(job) {
+    const one = j => buildLibrary_(j.text, j.ids, Object.assign({ base64Decode: b64ToBytes }, j.opts)).data;
+    const data = one(job.main), extra = job.inbox ? one(job.inbox) : null;
+    const out = { entries: data.entries.length, groups: data.groups || [] };
+    if (data.entries.some(e => (e.files || []).some(f => f.x))) return Object.assign(out, { data, extra });
+    if (extra) mergeInbox(data, extra);
+    out.entries = data.entries.length;
+    out.gz = await gzip(JSON.stringify(data));
+    return out;
+  }
+  root.liblandeAssemble = assemble;
 
   function makeBuilder(io) {
     const get = async path => (await io.drive(path)).json();
@@ -79,18 +106,20 @@
     /* -------------------------------------------- settings */
     // Which .bib and papers folder: LibLande/settings.json, made from Apps
     // Script's settings the first time (and again when they change there).
+    let known = null;
     async function settings(fresh) {
+      if (known && !fresh) return known;
       const folder = await dataFolder();
       if (!fresh && folder) {
         const f = await named(folder, SETTINGS_FILE, 'id');
         if (f) {
-          try { const s = JSON.parse(await text(f.id)); if (s && s.bibId) return s; } catch (e) { /* made again below */ }
+          try { const s = JSON.parse(await text(f.id)); if (s && s.bibId) return (known = s); } catch (e) { /* made again below */ }
         }
       }
       const s = await io.apps('exportSettings', []);
       if (!s || !s.bibId) return null;
       if (folder) await writeFile(folder, SETTINGS_FILE, JSON.stringify(s, null, 1), 'application/json');
-      return s;
+      return (known = s);
     }
 
     /* -------------------------------------------- the papers folder */
@@ -188,22 +217,21 @@
 
     /* -------------------------------------------- parsing */
     let worker = null;
-    function parse(jobs) {
+    function parse(job) {
       if (typeof Worker === 'function' && root.LIBLANDE_BUILD_WORKER !== false) {
         try {
           if (!worker) worker = new Worker('build-worker.js');
           return new Promise((resolve, reject) => {
-            const done = ev => { worker.removeEventListener('message', done); worker.removeEventListener('error', fail); ev.data.error ? reject(new Error(ev.data.error)) : resolve(ev.data.results); };
-            const fail = ev => { worker.removeEventListener('message', done); worker.removeEventListener('error', fail); worker = null; reject(new Error(ev.message || 'The library couldn’t be read.')); };
+            const done = ev => { worker.removeEventListener('message', done); worker.removeEventListener('error', fail); ev.data.error ? reject(new Error(ev.data.error)) : resolve(ev.data.result); };
+            const fail = ev => { worker.removeEventListener('message', done); worker.removeEventListener('error', fail); worker = null; reject(new Error(ev.message || 'The library couldn\u2019t be read.')); };
             worker.addEventListener('message', done);
             worker.addEventListener('error', fail);
-            worker.postMessage({ jobs });
+            worker.postMessage({ job });
           });
         } catch (e) { /* no worker: parse here */ }
       }
-      return Promise.resolve(jobs.map(j => buildLibrary_(j.text, j.ids, Object.assign({ base64Decode: b64ToBytes }, j.opts))));
+      return assemble(job);
     }
-    const gzip = async s => new Uint8Array(await new Response(new Blob([s]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer());
 
     /* -------------------------------------------- the build */
     // Whether the library needs building, and what from. o.force: build
@@ -212,11 +240,14 @@
       const s = await settings(false);
       if (!s) return { configured: false };
       const folder = await dataFolder();
-      const bib = await meta(s.bibId, 'id,name,modifiedTime,parents,trashed');
+      // (Asked together.)
+      const [bib, inboxFolder, lib] = await Promise.all([
+        meta(s.bibId, 'id,name,modifiedTime,parents,trashed'),
+        folder ? named(folder, INBOX_FOLDER, 'id', true) : null,
+        folder ? named(folder, LIBRARY_FILE, 'id,modifiedTime,properties') : null,
+      ]);
       if (bib.trashed) throw new Error('Your .bib file is in the Drive trash.');
-      const inboxFolder = folder && await named(folder, INBOX_FOLDER, 'id', true);
       const inbox = inboxFolder && await named(inboxFolder.id, INBOX_FILE, 'id,modifiedTime');
-      const lib = folder && await named(folder, LIBRARY_FILE, 'id,modifiedTime,properties');
       const lp = (lib && lib.properties) || {};
       const bibStamp = String(Date.parse(bib.modifiedTime));
       const inboxStamp = inbox ? String(Date.parse(inbox.modifiedTime)) : '';
@@ -233,6 +264,13 @@
       w = w || await look(o);
       if (!w.configured || !w.needed) return false;
       const { s, folder, bib, inboxFolder, inbox, lib, lp, bibStamp, inboxStamp, fullDue, current } = w;
+      // The .bib (11 MB, say) starts downloading now, alongside the rest,
+      // when it changed (not for the daily look at the papers folder,
+      // which may find nothing new).
+      const changed = !!o.force || !lib || !current || lp.bibStamp !== bibStamp || (lp.inboxStamp || '') !== inboxStamp;
+      let texts = null;
+      const readTexts = () => texts || (texts = Promise.all([text(bib.id), inbox ? text(inbox.id) : Promise.resolve(null)]));
+      if (changed) readTexts().catch(() => {});
       const papersId = s.papersId || (bib.parents && bib.parents[0]);
       if (!papersId) throw new Error('LibLande can’t see the folder that holds your .bib file. Choose your papers folder in Settings.');
       const prefix = await relativePath(bib.parents && bib.parents[0], papersId);
@@ -257,6 +295,7 @@
       }
       mark(fullListing ? 'listed papers folder' : 'read saved index');
       const inboxPaths = inbox ? (await listTree(inboxFolder.id, '')).files : {};
+      // (Listed while the .bib downloads: see readTexts.)
       const inboxHash = indexHash(inboxPaths);
       const signature = fingerprint_(bibStamp + ':' + inboxStamp + ':' + papersId + ':' + index.hash + ':' + inboxHash);
       const props = { bibStamp, inboxStamp, signature, buildVersion: String(BUILD_VERSION), lastFull };
@@ -268,40 +307,37 @@
         return false;
       }
 
-      const [bibText, inboxText] = await Promise.all([text(bib.id), inbox ? text(inbox.id) : Promise.resolve(null)]);
+      const [bibText, inboxText] = await readTexts();
       mark('read .bib');
-      const jobs = [{ text: bibText, ids: index.files, opts: { built: Date.parse(bib.modifiedTime), source: bib.name, papersPrefix: prefix } }];
-      if (inboxText != null) jobs.push({ text: inboxText, ids: inboxPaths, opts: { built: 0, source: INBOX_FILE, papersPrefix: '' } });
-      const [result, extra] = await parse(jobs);
+      const job = { main: { text: bibText, ids: index.files, opts: { built: Date.parse(bib.modifiedTime), source: bib.name, papersPrefix: prefix } } };
+      if (inboxText != null) job.inbox = { text: inboxText, ids: inboxPaths, opts: { built: 0, source: INBOX_FILE, papersPrefix: '' } };
+      const out = await parse(job);
       mark('parsed');
-      if (!result.data.entries.length && bibText.indexOf('@') >= 0) throw new Error('LibLande couldn’t read any publications in ' + bib.name + '.');
-      // Linked files the index doesn't have yet.
-      if (!fullListing) {
-        const found = await resolveMissing(result.data, index);
-        if (found.looked) {
-          index.hash = indexHash(index.files);
-          await writeFile(folder, INDEX_FILE, JSON.stringify(index), 'application/json');
-          props.signature = fingerprint_(bibStamp + ':' + inboxStamp + ':' + papersId + ':' + index.hash + ':' + inboxHash);
-          mark('looked up ' + found.looked + ' new file' + (found.looked === 1 ? '' : 's') + ' (' + found.found + ' found)');
+      if (!out.entries && bibText.indexOf('@') >= 0) throw new Error('LibLande couldn\u2019t read any publications in ' + bib.name + '.');
+      // Linked files the index doesn't have yet: looked up, then the
+      // library put together here.
+      if (out.data) {
+        if (!fullListing) {
+          const found = await resolveMissing(out.data, index);
+          if (found.looked) {
+            index.hash = indexHash(index.files);
+            await writeFile(folder, INDEX_FILE, JSON.stringify(index), 'application/json');
+            props.signature = fingerprint_(bibStamp + ':' + inboxStamp + ':' + papersId + ':' + index.hash + ':' + inboxHash);
+            mark('looked up ' + found.looked + ' new file' + (found.looked === 1 ? '' : 's') + ' (' + found.found + ' found)');
+          }
         }
+        if (out.extra) mergeInbox(out.data, out.extra);
+        out.entries = out.data.entries.length;
+        out.gz = await gzip(JSON.stringify(out.data));
       }
-      // Inbox entries, except ones already in the main .bib (same cite key
-      // or DOI).
-      if (extra) {
-        const keys = new Set(result.data.entries.map(e => e.k));
-        const dois = new Set(result.data.entries.map(e => (e.f.doi || '').toLowerCase()).filter(Boolean));
-        const fresh = extra.data.entries.filter(e => !keys.has(e.k) && !(e.f.doi && dois.has(e.f.doi.toLowerCase())));
-        fresh.forEach(e => { e.ib = 1; });
-        result.data.entries = result.data.entries.concat(fresh);
-        result.data.inbox = { file: INBOX_FILE, folder: DATA_FOLDER + '/' + INBOX_FOLDER, count: fresh.length };
-      }
-      // The reading list follows the "Reading List" group (Apps Script
-      // keeps the list, for now).
-      try { await io.apps('reconcileReading', [result.data.groups || []]); } catch (e) { console.warn('Reading list:', e.message); }
-      const saved = await writeFile(folder, LIBRARY_FILE, await gzip(JSON.stringify(result.data)), 'application/gzip', props);
+      const saved = await writeFile(folder, LIBRARY_FILE, out.gz, 'application/gzip', props);
       mark('saved');
+      // The reading list follows the "Reading List" group (Apps Script
+      // keeps the list, for now): not waited for.
+      io.apps('reconcileReading', [out.groups]).catch(e => console.warn('Reading list:', e.message));
       console.log('LibLande build (on this device): ' + times.join(', ') + '; total ' + ((Date.now() - started) / 1000).toFixed(1) + ' s');
-      return { built: true, id: saved.id, stamp: Date.parse(saved.modifiedTime), entries: result.data.entries.length };
+      // (gz: the library itself, so the page needn't download it again.)
+      return { built: true, id: saved.id, stamp: Date.parse(saved.modifiedTime), entries: out.entries, gz: out.gz };
     }
 
     return { look, build, settings, dataFolder };

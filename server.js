@@ -199,14 +199,20 @@
     // reading list); if it can't be had, what Drive says. Meanwhile, a
     // look at whether the library needs building, which starts here.
     async getStatus() {
+      // (Asked again while a build is under way, as the page does every
+      // few seconds: answered as soon as it's done.)
+      const running = buildRun;
       const looking = navigator.onLine ? checkBuild().catch(e => { console.warn('Checking the library:', e.message); return false; }) : Promise.resolve(false);
       let st = null;
       if (navigator.onLine) {
         try { st = await apps('getStatus', []); } catch (e) { console.warn('Apps Script\u2019s status:', e.message); }
       }
       if (!st) st = await SERVER.driveStatus();
-      if (await looking || buildRun) st.building = true;
+      if (running) await Promise.race([running, new Promise(r => setTimeout(r, 60 * 1000))]);
+      if ((await looking && !running) || buildRun) st.building = true;
       if (buildErr) { st.error = buildErr; buildErr = null; }
+      // The library just built here (newer than Apps Script knew of).
+      if (lastBuilt && !(st.stamp > lastBuilt.stamp)) { st.stamp = lastBuilt.stamp; st.libraryId = lastBuilt.id; }
       return st;
     },
     async driveStatus() {
@@ -328,13 +334,18 @@
   // build at a time. A failed build's reason is passed on once, with the
   // next status.
   const builder = window.makeLiblandeBuilder({ drive, apps });
-  let buildRun = null, buildErr = null;
+  let buildRun = null, buildErr = null, lastBuilt = null;
   async function checkBuild() {
     if (buildRun) return true;
     const w = await builder.look({ daily: true });
     if (!w.configured || !w.needed || buildRun) return !!buildRun;
     buildErr = null;
     buildRun = builder.build({ daily: true }, w)
+      .then(r => {
+        // Handed to the page (LIBLANDE_BUILT), which then needn't download
+        // the library it was just sent to Drive.
+        if (r && r.built) { lastBuilt = r; window.LIBLANDE_BUILT = { id: r.id, stamp: r.stamp, gz: r.gz }; }
+      })
       .catch(e => { buildErr = (e && e.message) || String(e); console.warn('LibLande build:', buildErr); })
       .finally(() => { buildRun = null; });
     return true;
