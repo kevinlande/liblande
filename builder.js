@@ -340,7 +340,13 @@
       return { built: true, id: saved.id, stamp: Date.parse(saved.modifiedTime), entries: out.entries, gz: out.gz };
     }
 
-    return { look, build, settings, dataFolder };
+    async function readJson(folderId, name) {
+      const f = await named(folderId, name, 'id');
+      if (!f) return null;
+      try { return JSON.parse(await text(f.id)); } catch (e) { return null; }
+    }
+
+    return { look, build, settings, dataFolder, named, meta, text, readJson, writeFile, listAll };
   }
 
   root.makeLiblandeBuilder = makeBuilder;

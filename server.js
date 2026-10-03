@@ -195,55 +195,77 @@
 
   /* ------------------------------------------------------------ the server */
   const SERVER = {
-    // Apps Script's own answer (it keeps your settings, pending edits and
-    // reading list); if it can't be had, what Drive says. Meanwhile, a
-    // look at whether the library needs building, which starts here.
+    // What the page needs to know, from Drive (as Code.gs's getStatus):
+    // the settings, the library, pending edits, the reading list and your
+    // preferences. Meanwhile, a look at whether the library needs
+    // building, which then starts here.
     async getStatus() {
       // (Asked again while a build is under way, as the page does every
       // few seconds: answered as soon as it's done.)
       const running = buildRun;
-      const looking = navigator.onLine ? checkBuild().catch(e => { console.warn('Checking the library:', e.message); return false; }) : Promise.resolve(false);
-      let st = null;
-      if (navigator.onLine) {
-        try { st = await apps('getStatus', []); } catch (e) { console.warn('Apps Script\u2019s status:', e.message); }
-      }
-      if (!st) st = await SERVER.driveStatus();
+      const w = await builder.look({ daily: true });
+      if (!w.configured) return { configured: false };
+      const started = startBuild(w);
+      const [pending, reading, prefs, papersName, token] = await Promise.all([
+        builder.readJson(w.folder, PENDING_FILE), builder.readJson(w.folder, READING_FILE), loadPrefs(w.s),
+        folderName(w.s.papersId || (w.bib.parents && w.bib.parents[0])), getToken()]);
       if (running) await Promise.race([running, new Promise(r => setTimeout(r, 60 * 1000))]);
-      if ((await looking && !running) || buildRun) st.building = true;
-      if (buildErr) { st.error = buildErr; buildErr = null; }
-      // The library just built here (newer than Apps Script knew of).
-      if (lastBuilt && !(st.stamp > lastBuilt.stamp)) { st.stamp = lastBuilt.stamp; st.libraryId = lastBuilt.id; }
-      return st;
-    },
-    async driveStatus() {
-      const folder = await dataFolder();
-      if (!folder) {
-        return { configured: false, problem: 'LibLande’s folder (with the library Apps Script builds) isn’t in your Google Drive. Open LibLande on Apps Script first.' };
-      }
-      const [lib, pending, reading] = await Promise.all([fileIn(folder, LIBRARY_FILE), readJson(folder, PENDING_FILE), readJson(folder, READING_FILE)]);
       const r = reading || {};
-      return {
+      const st = {
         configured: true,
-        stamp: lib ? Date.parse(lib.modifiedTime) : null,
-        libraryId: lib ? lib.id : null,
-        token: await getToken(),
-        building: false,
+        bibName: w.bib.name,
+        papersName,
+        stamp: w.lib ? Date.parse(w.lib.modifiedTime) : null,
+        libraryId: w.lib ? w.lib.id : null,
+        token,
+        building: (started && !running) || !!buildRun,
         error: null,
         pending: pending && Array.isArray(pending.edits) ? pending.edits : [],
         reading: { items: r.items || [], done: r.done || [], seeded: !!r.seeded, syncedKeys: r.syncedKeys || null },
-        direct: false,
-        prefs: {},
+        direct: !!w.s.directEdits,
+        prefs,
       };
+      if (buildErr) { st.error = buildErr; buildErr = null; }
+      // The library just built here.
+      if (lastBuilt && !(st.stamp > lastBuilt.stamp)) { st.stamp = lastBuilt.stamp; st.libraryId = lastBuilt.id; }
+      return st;
     },
     // Refresh: a look at the .bib and the inbox, and a build here if
     // either changed (the page waits for it, asking getStatus).
     refreshNow() { return SERVER.getStatus(); },
-    // New settings: Apps Script checks and keeps them, and the copy the
-    // build here uses is made again.
+    // New settings, and saving edits straight to the .bib on or off: Apps
+    // Script checks and keeps them (it still saves edits), and the copy
+    // kept here is made again from its.
     async saveSettings(bibLink, papersLink) {
-      const st = await apps('saveSettings', [bibLink, papersLink]);
-      try { await builder.settings(true); } catch (e) { console.warn('Settings:', e.message); }
-      return st;
+      await apps('saveSettings', [bibLink, papersLink]);
+      await builder.settings(true);
+      return SERVER.getStatus();
+    },
+    async setDirect(on) {
+      await apps('setDirect', [on]);
+      await builder.settings(true);
+      return SERVER.getStatus();
+    },
+    // Details for a DOI, from Crossref (as Code.gs's lookupDoi).
+    lookupDoi(input) { return lookupDoi(input); },
+    // An export's folder, LibLande/Exports/<name>, with references.bib and
+    // references.rtf; the page then adds the PDFs (as Code.gs's).
+    async createExport(req) {
+      const exportsFolder = await subFolder(await dataFolder(), 'Exports', true);
+      const base = String(req.name || '').replace(/[\/\\:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim() || 'LibLande export ' + day();
+      let name = base, n = 2;
+      while (await builder.named(exportsFolder.id, name, 'id', true)) name = base + ' (' + n++ + ')';
+      const folder = await (await drive('files?fields=id', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, mimeType: FOLDER, parents: [exportsFolder.id] }) })).json();
+      await builder.writeFile(folder.id, 'references.bib', req.bib || '', 'text/plain');
+      await builder.writeFile(folder.id, 'references.rtf', req.rtf || '', 'application/rtf');
+      return { folderId: folder.id, url: 'https://drive.google.com/drive/folders/' + folder.id, name, token: await getToken() };
+    },
+    // Where a new publication's PDF is uploaded: LibLande/Inbox/Papers.
+    async getInboxUploadInfo() {
+      const inbox = await subFolder(await dataFolder(), 'Inbox', true);
+      const papers = await subFolder(inbox.id, 'Papers', true);
+      return { folderId: papers.id, token: await getToken() };
     },
     async getLibraryInfo() {
       const folder = await dataFolder();
@@ -257,8 +279,9 @@
       const bytes = new Uint8Array(await (await drive('files/' + encodeURIComponent(info.id) + '?alt=media')).arrayBuffer());
       return { stamp: info.stamp, library: bytesToB64(bytes) };
     },
-    // With your account, as on Apps Script (and on this device meanwhile).
-    savePrefs(changes) { return apps('savePrefs', [changes]).catch(() => ({})); },
+    // Your preferences (theme, tools, recently viewed...), in
+    // LibLande/prefs.json, so they follow you across devices.
+    savePrefs(changes) { return savePrefs(changes); },
     // As in Code.gs: before the first save of the day to a PDF, a copy goes
     // to LibLande/Backups/PDFs; copies older than 60 days are removed.
     async backupPdf(fileId) {
@@ -329,16 +352,109 @@
   }
   const viaApps = name => (...args) => apps(name, args);
 
+  /* ------------------------------------------------------------ preferences */
+  // LibLande/prefs.json; the first time, Apps Script's (which came with
+  // the settings). Changes are gathered for a moment, then written onto a
+  // fresh copy of the file, so another device's changes to other
+  // preferences aren't lost.
+  const PREFS_FILE = 'prefs.json';
+  let prefsMemo = null, prefsWaiting = {}, prefsTimer = null;
+  async function loadPrefs(settings) {
+    if (prefsMemo) return Object.assign({}, prefsMemo, prefsWaiting);
+    const saved = await builder.readJson(await dataFolder(), PREFS_FILE);
+    prefsMemo = saved || (settings && settings.prefs) || {};
+    return Object.assign({}, prefsMemo, prefsWaiting);
+  }
+  function savePrefs(changes) {
+    Object.assign(prefsWaiting, changes || {});
+    clearTimeout(prefsTimer);
+    return new Promise(resolve => {
+      prefsTimer = setTimeout(async () => {
+        const these = prefsWaiting;
+        prefsWaiting = {};
+        try {
+          const folder = await dataFolder();
+          const now = Object.assign((await builder.readJson(folder, PREFS_FILE)) || prefsMemo || {}, these);
+          await builder.writeFile(folder, PREFS_FILE, JSON.stringify(now), 'application/json');
+          prefsMemo = now;
+        } catch (e) {
+          prefsWaiting = Object.assign(these, prefsWaiting);
+          console.warn('Preferences:', e.message);
+        }
+        resolve(Object.assign({}, prefsMemo, prefsWaiting));
+      }, 1500);
+    });
+  }
+  const names = {};
+  async function folderName(id) {
+    if (!id) return '';
+    if (!(id in names)) {
+      try { names[id] = (await (await drive('files/' + encodeURIComponent(id) + '?fields=name')).json()).name; } catch (e) { return ''; }
+    }
+    return names[id];
+  }
+
+  /* ------------------------------------------------------------ DOI lookup */
+  // Details for a DOI from Crossref, as BibTeX fields (as Code.gs's).
+  async function lookupDoi(input) {
+    const doi = String(input || '').trim().replace(/^https?:\/\/(dx\.)?doi\.org\//i, '').replace(/^doi:\s*/i, '');
+    if (!/^10\.\d{4,9}\/\S+$/.test(doi)) {
+      throw new Error('That doesn\u2019t look like a DOI. A DOI starts with 10., like 10.1111/phpr.70141.');
+    }
+    let res;
+    try {
+      res = await fetch('https://api.crossref.org/works/' + doi.split('/').map(encodeURIComponent).join('/'));
+    } catch (e) {
+      throw new Error(navigator.onLine ? 'Crossref can\u2019t be reached just now. Try again, or fill in the details yourself.' : 'You\u2019re offline.');
+    }
+    if (res.status === 404) throw new Error('Crossref has no publication with that DOI.');
+    if (!res.ok) throw new Error('The DOI lookup didn\u2019t work (error ' + res.status + '). Try again, or fill in the details yourself.');
+    const w = (await res.json()).message;
+    const types = { 'journal-article': 'article', 'book-chapter': 'incollection', 'book-section': 'incollection',
+      'book-part': 'incollection', 'book': 'book', 'monograph': 'book', 'edited-book': 'book', 'reference-book': 'book',
+      'proceedings-article': 'inproceedings', 'dissertation': 'phdthesis', 'report': 'techreport', 'posted-content': 'unpublished' };
+    const type = types[w.type] || 'misc';
+    const people = list => (list || []).map(p => p.family ? (p.given ? p.family + ', ' + p.given : p.family) : (p.name || ''))
+      .filter(Boolean).join(' and ');
+    const first = a => (a && a[0]) || '';
+    const parts = (w['published-print'] || w['published-online'] || w.issued || w.created || {})['date-parts'];
+    const f = {
+      title: first(w.title) + (first(w.subtitle) ? ': ' + first(w.subtitle) : ''),
+      author: people(w.author),
+      year: parts && parts[0] && parts[0][0] ? String(parts[0][0]) : '',
+      month: parts && parts[0] && parts[0][1] ? 'Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec'.split(' ')[parts[0][1] - 1] || '' : '',
+      doi: w.DOI || doi,
+      url: w.URL || '',
+      publisher: w.publisher || '',
+    };
+    if (type === 'article') {
+      f.journal = first(w['container-title']);
+      f.volume = w.volume || '';
+      f.number = w.issue || '';
+      f.issn = first(w.ISSN);
+    } else if (type === 'incollection' || type === 'inproceedings') {
+      f.booktitle = first(w['container-title']);
+      f.editor = people(w.editor);
+    } else if (type === 'book') {
+      if (!f.author) f.editor = people(w.editor);
+      f.isbn = first(w.ISBN);
+    }
+    if (w.page) f.pages = String(w.page).replace(/-/g, '--');
+    if (w.abstract) f.abstract = w.abstract.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').replace(/^\s*Abstract\s*/i, '').trim();
+    Object.keys(f).forEach(k => { f[k] = String(f[k] || '').replace(/[{}]/g, '').trim(); if (!f[k]) delete f[k]; });
+    return { type, fields: f };
+  }
+
   /* ------------------------------------------------------------ building */
   // builder.js builds the library here when the .bib or inbox changed; one
   // build at a time. A failed build's reason is passed on once, with the
   // next status.
   const builder = window.makeLiblandeBuilder({ drive, apps });
   let buildRun = null, buildErr = null, lastBuilt = null;
-  async function checkBuild() {
+  // w: what builder.look found. True if a build is under way.
+  function startBuild(w) {
     if (buildRun) return true;
-    const w = await builder.look({ daily: true });
-    if (!w.configured || !w.needed || buildRun) return !!buildRun;
+    if (!w.configured || !w.needed || !navigator.onLine) return false;
     buildErr = null;
     buildRun = builder.build({ daily: true }, w)
       .then(r => {
