@@ -276,7 +276,9 @@
       return { folderId: folder.id, url: 'https://drive.google.com/drive/folders/' + folder.id, name, token: await getToken() };
     },
     // Where a new publication's PDF is uploaded: LibLande/Inbox/Papers.
+    // (The .bib starts downloading meanwhile, for the change that follows.)
     async getInboxUploadInfo() {
+      edits.prefetch().catch(() => {});
       const inbox = await subFolder(await dataFolder(), 'Inbox', true);
       const papers = await subFolder(inbox.id, 'Papers', true);
       return { folderId: papers.id, token: await getToken() };

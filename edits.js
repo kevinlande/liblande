@@ -29,6 +29,151 @@
   const fileTime = () => { const d = new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + pad(d.getMinutes()) + pad(d.getSeconds()); };
   const bytesToB64 = bytes => { let s = ''; for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i] & 0xff); return btoa(s); };
 
+  /* ------------------------------------------------ the text work */
+  // Pure work on the .bib's text, with Build.gs: run in the worker
+  // (build-worker.js loads this file too) or on the page. Each returns
+  // {text: the new text, or null to leave the file as it is, ...} or
+  // throws, saying why nothing was saved.
+  const CHANGED = 'Tap Refresh, wait for the library to update, and make your change again.';
+  const hashOf = (text, key) => { const loc = locateEntry_(text, key); return fingerprint_(text.slice(loc.start, loc.end)); };
+  const groupsHashOf = parsed => fingerprint_(groupsComment_(parsed[1]));
+  // (Also returns the .bib, read.)
+  function checkGroup(text, name, keys, fileName) {
+    const before = parseBib_(text);
+    if (staticGroups_(before[1]).some(g => g.name === name)) throw new Error('There’s already a static group called “' + name + '”.');
+    const inBib = new Set(before[0].map(e => e[1]));
+    const missing = keys.find(k => !inBib.has(k));
+    if (missing) throw new Error('“' + missing + '” isn’t in ' + fileName + '.');
+    return before;
+  }
+
+  const core = {
+    hashOf,
+    hasKey: (text, key) => parseBib_(text)[0].some(e => e[1] === key),
+    // (As Code.gs's saveEntry, between reading the file and writing it.)
+    saveEntry(text, req, fileName, stamp) {
+      if (stamp != null && !req.expectHash && req.expectStamp && stamp !== req.expectStamp) {
+        throw new Error(fileName + ' has changed since LibLande last read it (perhaps it was saved in BibDesk). ' + CHANGED);
+      }
+      const before = parseBib_(text);
+      if (req.expectHash && hashOf(text, req.key) !== req.expectHash) {
+        throw new Error('This publication has been changed since LibLande last read it (perhaps in BibDesk). ' + CHANGED);
+      }
+      const changingGroups = !!req.groups && ((req.groups.add || []).length + (req.groups.remove || []).length > 0);
+      if (changingGroups && req.expectGroupsHash && groupsHashOf(before) !== req.expectGroupsHash) {
+        throw new Error('Your static groups have been changed since LibLande last read them (perhaps in BibDesk). ' + CHANGED);
+      }
+      const set = Object.assign({}, req.set || {});
+      if (Object.keys(set).length || changingGroups) set['date-modified'] = req.modified;
+      let edited = Object.keys(set).length ? editEntry_(text, req.key, set) : text;
+      if (req.groups) edited = editGroups_(edited, req.key, req.groups.add || [], req.groups.remove || []);
+      if (edited === text) return { text: null };
+      // Checked before writing: same entries, and exactly the requested changes.
+      const after = parseBib_(edited);
+      if (after[0].length !== before[0].length) throw new Error('The edit would have changed the number of entries, so LibLande didn’t save it.');
+      const entry = after[0].find(e => e[1] === req.key);
+      Object.keys(set).forEach(n => {
+        const want = set[n] == null ? '' : String(set[n]);
+        const got = entry && entry[2][n] !== undefined ? entry[2][n] : '';
+        if (got !== want) throw new Error('The ' + n + ' field didn’t come out as expected, so LibLande didn’t save it.');
+      });
+      if (req.groups) {
+        const groups = staticGroups_(after[1]);
+        (req.groups.add || []).concat(req.groups.remove || []).forEach(name => {
+          const g = groups.find(x => x.name === name);
+          const inIt = !!g && g.keys.indexOf(req.key) >= 0;
+          if (!g || inIt !== (req.groups.add || []).indexOf(name) >= 0) {
+            throw new Error('The group “' + name + '” didn’t come out as expected, so LibLande didn’t save it.');
+          }
+        });
+      }
+      return { text: edited, hash: hashOf(edited, req.key), groupsHash: groupsHashOf(after) };
+    },
+    // (As Code.gs's applyPending: waiting groups first, then the edits.)
+    applyPending(original, edits, waiting) {
+      let text = original;
+      waiting.forEach(n => { text = ensureStaticGroup_(text, n); });
+      if (text !== original && parseBib_(text)[0].length !== parseBib_(original)[0].length) throw new Error('Adding the new groups went wrong, so LibLande didn’t save anything.');
+      const result = applyEdits_(text, edits, groupsHashOf(parseBib_(original)));
+      const changed = result.applied.length || text !== original;
+      const edited = changed ? result.edited : original;
+      const hashes = {};
+      result.applied.forEach(e => { hashes[e.key] = hashOf(edited, e.key); });
+      return { text: changed ? edited : null, applied: result.applied.map(e => e.key), appliedEdits: result.applied, skipped: result.skipped,
+        hashes, gh: groupsHashOf(parseBib_(edited)) };
+    },
+    // A new group can be made: its name is free and its publications are
+    // in the .bib.
+    groupCheck(text, name, keys, fileName) { checkGroup(text, name, keys, fileName); return true; },
+    createGroup(text, name, keys, modified, fileName) {
+      const before = checkGroup(text, name, keys, fileName);
+      let edited = ensureStaticGroup_(text, name);
+      keys.forEach(k => {
+        if (modified) edited = editEntry_(edited, k, { 'date-modified': modified });
+        edited = editGroups_(edited, k, [name], []);
+      });
+      const after = parseBib_(edited);
+      const group = staticGroups_(after[1]).find(g => g.name === name);
+      if (after[0].length !== before[0].length || !group || keys.some(k => group.keys.indexOf(k) < 0)) {
+        throw new Error('The new group didn’t come out as expected, so LibLande didn’t save it.');
+      }
+      const hashes = {};
+      keys.forEach(k => { hashes[k] = hashOf(edited, k); });
+      return { text: edited, gh: groupsHashOf(after), hashes };
+    },
+    readingGroup(text, name, add, remove) {
+      const parsed = parseBib_(text);
+      const inBib = new Set(parsed[0].map(e => e[1]));
+      let edited = ensureStaticGroup_(text, name);
+      const current = staticGroups_(parseBib_(edited)[1]).find(g => g.name === name);
+      const has = new Set(current ? current.keys : []);
+      add.filter(k => inBib.has(k) && !has.has(k)).forEach(k => { edited = editGroups_(edited, k, [name], []); });
+      remove.filter(k => has.has(k)).forEach(k => { edited = editGroups_(edited, k, [], [name]); });
+      if (edited === text) return { text: null };
+      const after = parseBib_(edited);
+      const group = staticGroups_(after[1]).find(g => g.name === name);
+      if (after[0].length !== parsed[0].length || !group ||
+          add.some(k => inBib.has(k) && group.keys.indexOf(k) < 0) || remove.some(k => group.keys.indexOf(k) >= 0)) {
+        throw new Error('The reading-list group didn’t come out right, so LibLande didn’t save it.');
+      }
+      return { text: edited, gh: groupsHashOf(after), groupKeys: group.keys };
+    },
+    addToMain(text, type, key, fields) {
+      const before = parseBib_(text)[0];
+      const next = appendEntry_(text, bibEntryText_(type, key, fields));
+      const after = parseBib_(next)[0];
+      if (after.length !== before.length + 1 || !after.some(e => e[1] === key)) {
+        throw new Error('The new entry didn’t come out right, so LibLande didn’t save it.');
+      }
+      return { text: next, hash: hashOf(next, key) };
+    },
+    // attachPdf: the entry's fields, and which bdsk-file-N the PDF takes.
+    attachPrepare(text, req) {
+      const loc = locateEntry_(text, req.key);
+      if (req.expectHash && fingerprint_(text.slice(loc.start, loc.end)) !== req.expectHash) {
+        throw new Error('This publication has been changed since LibLande last read it (perhaps in BibDesk). ' +
+          'Tap Refresh, wait for the library to update, and try again.');
+      }
+      const fields = parseBib_(text.slice(loc.start, loc.end))[0][0][2];
+      const nums = Object.keys(fields).map(n => /^bdsk-file-(\d+)$/.exec(n)).filter(Boolean).map(x => Number(x[1])).sort((a, b) => a - b);
+      const n = req.replace && nums.length ? nums[0] : (nums.length ? nums[nums.length - 1] + 1 : 1);
+      return { fields, nums, n };
+    },
+    attachEdit(text, req, n, value) {
+      const set = {};
+      set['bdsk-file-' + n] = value;
+      set['date-modified'] = req.modified;
+      const edited = editEntry_(text, req.key, set);
+      const before = parseBib_(text)[0], after = parseBib_(edited)[0];
+      const entry = after.find(e => e[1] === req.key);
+      if (after.length !== before.length || !entry || entry[2]['bdsk-file-' + n] !== set['bdsk-file-' + n]) {
+        throw new Error('The link didn’t come out right, so LibLande didn’t save it.');
+      }
+      return { text: edited, hash: hashOf(edited, req.key) };
+    },
+  };
+  root.liblandeEditCore = core;
+
   function makeEdits(io) {
     const B = io.builder;
     const json = async (path, opts, base) => (await io.drive(path, opts, base)).json();
@@ -163,6 +308,8 @@
       return {
         relPath,
         info: { n: fileName, p: relPath, id: file.id },
+        folderPath: segs.concat([folder.name]).join('/'),
+        folderId: folder.id,
         undo: async () => {
           try { await patch(file.id, { name: oldName }, oldParent ? '&addParents=' + encodeURIComponent(oldParent) + '&removeParents=' + encodeURIComponent(folder.id) : ''); } catch (e) { /* leave it filed */ }
         },
@@ -179,59 +326,49 @@
       return hit || subFolder(parentId, name, true);
     }
     const bdskValue = relPath => bytesToB64(bdskFileBytes_(relPath));
-    const hashOf = (text, key) => { const loc = locateEntry_(text, key); return fingerprint_(text.slice(loc.start, loc.end)); };
+
+    // The text work (reading the .bib, editing, checking): in the worker
+    // (build-worker.js), so the page doesn't freeze, or here without one.
+    let worker = null, seq = 0;
+    const calls = {};
+    function run(name, ...args) {
+      if (typeof Worker === 'function' && root.LIBLANDE_BUILD_WORKER !== false) {
+        try {
+          if (!worker) {
+            worker = new Worker('build-worker.js');
+            worker.onmessage = ev => {
+              const c = calls[ev.data.id];
+              if (!c) return;
+              delete calls[ev.data.id];
+              if (ev.data.error) c.reject(new Error(ev.data.error)); else c.resolve(ev.data.result);
+            };
+            worker.onerror = ev => {
+              Object.keys(calls).forEach(k => { calls[k].reject(new Error(ev.message || 'LibLande couldn’t read the .bib file.')); delete calls[k]; });
+              worker = null;
+            };
+          }
+          const id = ++seq;
+          return new Promise((resolve, reject) => { calls[id] = { resolve, reject }; worker.postMessage({ id, call: name, args }); });
+        } catch (e) { /* no worker: here */ }
+      }
+      return Promise.resolve().then(() => core[name](...args));
+    }
 
     /* -------------------------------------------- the functions */
     const F = {};
+
+    // The .bib downloaded ahead (while a PDF uploads, say), so the change
+    // that follows needn't wait for it.
+    F.prefetch = async () => { await read(await mainBibId()); };
 
     // Save changes to one entry (as Code.gs's saveEntry).
     F.saveEntry = req => serial(async () => {
       if (req.where !== 'inbox' && !(await direct())) throw new Error('Turn on “Save edits straight to your .bib file” in settings first.');
       const id = req.where === 'inbox' ? await inboxFile(false) : await mainBibId();
       if (!id) throw new Error('LibLande couldn’t find the file to edit.');
-      const changedElsewhere = 'Tap Refresh, wait for the library to update, and make your change again.';
-      let check = null;
-      const out = await changeFile(id, (text, m) => {
-        if (req.where !== 'inbox' && !req.expectHash && req.expectStamp && Date.parse(m.modifiedTime) !== req.expectStamp) {
-          throw new Error(m.name + ' has changed since LibLande last read it (perhaps it was saved in BibDesk). ' + changedElsewhere);
-        }
-        const before = parseBib_(text);
-        if (req.expectHash && hashOf(text, req.key) !== req.expectHash) {
-          throw new Error('This publication has been changed since LibLande last read it (perhaps in BibDesk). ' + changedElsewhere);
-        }
-        const changingGroups = !!req.groups && ((req.groups.add || []).length + (req.groups.remove || []).length > 0);
-        if (changingGroups && req.expectGroupsHash && fingerprint_(groupsComment_(before[1])) !== req.expectGroupsHash) {
-          throw new Error('Your static groups have been changed since LibLande last read them (perhaps in BibDesk). ' + changedElsewhere);
-        }
-        const set = Object.assign({}, req.set || {});
-        if (Object.keys(set).length || changingGroups) set['date-modified'] = req.modified;
-        let edited = Object.keys(set).length ? editEntry_(text, req.key, set) : text;
-        if (req.groups) edited = editGroups_(edited, req.key, req.groups.add || [], req.groups.remove || []);
-        if (edited === text) return null;
-        // Check before writing: same entries, and exactly the requested changes.
-        const after = parseBib_(edited);
-        if (after[0].length !== before[0].length) throw new Error('The edit would have changed the number of entries, so LibLande didn’t save it.');
-        const entry = after[0].find(e => e[1] === req.key);
-        Object.keys(set).forEach(n => {
-          const want = set[n] == null ? '' : String(set[n]);
-          const got = entry && entry[2][n] !== undefined ? entry[2][n] : '';
-          if (got !== want) throw new Error('The ' + n + ' field didn’t come out as expected, so LibLande didn’t save it.');
-        });
-        if (req.groups) {
-          const groups = staticGroups_(after[1]);
-          (req.groups.add || []).concat(req.groups.remove || []).forEach(name => {
-            const g = groups.find(x => x.name === name);
-            const inIt = !!g && g.keys.indexOf(req.key) >= 0;
-            if (!g || inIt !== (req.groups.add || []).indexOf(name) >= 0) {
-              throw new Error('The group “' + name + '” didn’t come out as expected, so LibLande didn’t save it.');
-            }
-          });
-        }
-        check = after;
-        return { text: edited };
-      }, req.backupName);
+      const out = await changeFile(id, async (text, m) => run('saveEntry', text, req, m.name, req.where !== 'inbox' ? Date.parse(m.modifiedTime) : null), req.backupName);
       if (!out.text) return { stamp: Date.parse(out.m.modifiedTime), unchanged: true };
-      return { stamp: out.stamp, hash: hashOf(out.text, req.key), groupsHash: fingerprint_(groupsComment_(check[1])) };
+      return { stamp: out.stamp, hash: out.hash, groupsHash: out.groupsHash };
     });
 
     // Save an edit as pending (as Code.gs's queueEdit).
@@ -243,9 +380,8 @@
         const expect = earlier ? earlier.expectHash : req.expectHash;
         if (expect) {
           const { text } = await read(await mainBibId());
-          if (hashOf(text, req.key) !== expect) {
-            throw new Error('This publication has been changed since LibLande last read it (perhaps in BibDesk). ' +
-              'Tap Refresh, wait for the library to update, and make your change again.' +
+          if (await run('hashOf', text, req.key) !== expect) {
+            throw new Error('This publication has been changed since LibLande last read it (perhaps in BibDesk). ' + CHANGED +
               (earlier ? ' Its earlier pending edit can’t be applied either; discard it first.' : ''));
           }
         }
@@ -269,31 +405,21 @@
       const edits = await loadPending();
       const waiting = ((await settings()).pendingGroups || []).slice();
       if (!edits.length && !waiting.length) return { applied: [], skipped: [], pending: [] };
-      let result = null;
-      const out = await changeFile(await mainBibId(), original => {
-        let text = original;
-        waiting.forEach(n => { text = ensureStaticGroup_(text, n); });
-        if (text !== original && parseBib_(text)[0].length !== parseBib_(original)[0].length) throw new Error('Adding the new groups went wrong, so LibLande didn’t save anything.');
-        result = applyEdits_(text, edits, fingerprint_(groupsComment_(parseBib_(original)[1])));
-        return result.applied.length || text !== original ? { text: result.edited } : null;
-      }, req && req.backupName);
+      const out = await changeFile(await mainBibId(), original => run('applyPending', original, edits, waiting), req && req.backupName);
       if (waiting.length) await B.updateSettings(s => { s.pendingGroups = (s.pendingGroups || []).filter(n => waiting.indexOf(n) < 0); });
       const reasons = {};
-      result.skipped.forEach(s => { reasons[s.key] = s.reason; });
-      const appliedKeys = new Set(result.applied.map(e => e.key));
+      out.skipped.forEach(x => { reasons[x.key] = x.reason; });
+      const done = new Set(out.appliedEdits.map(e => JSON.stringify(e)));
       const d = await changeJson(PENDING_FILE, blankPending, d => {
         // (Only the edits applied go; any queued meanwhile stay.)
-        d.edits = d.edits.filter(e => !(appliedKeys.has(e.key) && result.applied.some(a => a.key === e.key && JSON.stringify(a) === JSON.stringify(e))));
+        d.edits = d.edits.filter(e => !done.has(JSON.stringify(e)));
         d.edits.forEach(e => { if (reasons[e.key]) e.conflict = reasons[e.key]; });
       });
-      const edited = out.text || result.edited;
-      const hashes = {};
-      result.applied.forEach(e => { hashes[e.key] = hashOf(edited, e.key); });
-      return { applied: result.applied.map(e => e.key), skipped: result.skipped, pending: d.edits, source: out.m.name,
-        hashes, gh: fingerprint_(groupsComment_(parseBib_(edited)[1])) };
+      return { applied: out.applied, skipped: out.skipped, pending: d.edits, source: out.m.name, hashes: out.hashes, gh: out.gh };
     });
 
-    // Add a publication to the inbox (as Code.gs's addToInbox).
+    // Add a publication to the inbox (as Code.gs's addToInbox). (The inbox
+    // is small: done here.)
     F.addToInbox = req => serial(async () => {
       const id = await inboxFile(true);
       await changeFile(id, text => {
@@ -311,31 +437,29 @@
       return { key: req.key };
     });
 
+    // A filed PDF, told to the build, so it needn't look for it in Drive.
+    const noteFiled = filed => { try { B.noteFile(filed.relPath, filed.info.id, filed.folderPath, filed.folderId); } catch (e) { /* found by the build */ } };
+
     // Add a publication to the main .bib, filing its PDF first (as
     // Code.gs's addToMain).
     F.addToMain = req => serial(async () => {
       if (!(await direct())) throw new Error('Turn on “Save edits straight to your .bib file” in settings first.');
       let filed = null;
       const out = await changeFile(await mainBibId(), async (text, m) => {
-        const before = parseBib_(text)[0];
-        if (before.some(e => e[1] === req.key)) throw new Error('Your library already has a publication with the cite key ' + req.key + '.');
+        if (await run('hasKey', text, req.key)) throw new Error('Your library already has a publication with the cite key ' + req.key + '.');
         const fields = Object.assign({}, req.fields);
         fields['date-added'] = fields['date-modified'] = req.now;
         filed = req.uploadId ? await filePdf(m, req.uploadId, fields, req.prefix) : null;
         try {
           if (filed) fields['bdsk-file-1'] = bdskValue(filed.relPath);
-          const next = appendEntry_(text, bibEntryText_(req.type, req.key, fields));
-          const after = parseBib_(next)[0];
-          if (after.length !== before.length + 1 || !after.some(e => e[1] === req.key)) {
-            throw new Error('The new entry didn’t come out right, so LibLande didn’t save it.');
-          }
-          return { text: next, undo: filed ? filed.undo : null };
+          return Object.assign(await run('addToMain', text, req.type, req.key, fields), { undo: filed ? filed.undo : null });
         } catch (e) {
           if (filed) await filed.undo();
           throw e;
         }
       }, req.backupName);
-      return { key: req.key, hash: hashOf(out.text, req.key), file: filed && filed.info };
+      if (filed) noteFiled(filed);
+      return { key: req.key, hash: out.hash, file: filed && filed.info };
     });
 
     // Link an uploaded PDF to a publication in the main .bib (as Code.gs's
@@ -345,33 +469,19 @@
       if (!(await direct())) throw new Error('Turn on “Save edits straight to your .bib file” in settings to attach PDFs.');
       let filed = null, nums = [];
       const out = await changeFile(await mainBibId(), async (text, m) => {
-        const loc = locateEntry_(text, req.key);
-        if (req.expectHash && fingerprint_(text.slice(loc.start, loc.end)) !== req.expectHash) {
-          throw new Error('This publication has been changed since LibLande last read it (perhaps in BibDesk). ' +
-            'Tap Refresh, wait for the library to update, and try again.');
-        }
-        const fields = parseBib_(text.slice(loc.start, loc.end))[0][0][2];
-        nums = Object.keys(fields).map(n => /^bdsk-file-(\d+)$/.exec(n)).filter(Boolean).map(x => Number(x[1])).sort((a, b) => a - b);
-        const n = req.replace && nums.length ? nums[0] : (nums.length ? nums[nums.length - 1] + 1 : 1);
-        filed = await filePdf(m, req.uploadId, fields, req.prefix);
+        const pre = await run('attachPrepare', text, req);
+        nums = pre.nums;
+        filed = await filePdf(m, req.uploadId, pre.fields, req.prefix);
         try {
-          const set = {};
-          set['bdsk-file-' + n] = bdskValue(filed.relPath);
-          set['date-modified'] = req.modified;
-          const edited = editEntry_(text, req.key, set);
-          const before = parseBib_(text)[0], after = parseBib_(edited)[0];
-          const entry = after.find(e => e[1] === req.key);
-          if (after.length !== before.length || !entry || entry[2]['bdsk-file-' + n] !== set['bdsk-file-' + n]) {
-            throw new Error('The link didn’t come out right, so LibLande didn’t save it.');
-          }
-          return { text: edited, undo: filed.undo };
+          return Object.assign(await run('attachEdit', text, req, pre.n, bdskValue(filed.relPath)), { undo: filed.undo });
         } catch (e) {
           await filed.undo();
           throw e;
         }
       }, req.backupName);
+      noteFiled(filed);
       if (req.replace && req.replaceId) { try { await patch(req.replaceId, { trashed: true }); } catch (e) { /* already gone */ } }
-      return { hash: hashOf(out.text, req.key), file: filed.info, replaced: !!(req.replace && nums.length) };
+      return { hash: out.hash, file: filed.info, replaced: !!(req.replace && nums.length) };
     });
 
     // A new static group, made in the sidebar (as Code.gs's createGroup).
@@ -382,11 +492,7 @@
       const id = await mainBibId();
       if (!(await direct())) {
         const { m, text } = await read(id);
-        const before = parseBib_(text);
-        if (staticGroups_(before[1]).some(g => g.name === name)) throw new Error('There’s already a static group called “' + name + '”.');
-        const inBib = new Set(before[0].map(e => e[1]));
-        const missing = keys.find(k => !inBib.has(k));
-        if (missing) throw new Error('“' + missing + '” isn’t in ' + m.name + '.');
+        await run('groupCheck', text, name, keys, m.name);
         await B.updateSettings(s => { s.pendingGroups = s.pendingGroups || []; if (s.pendingGroups.indexOf(name) < 0) s.pendingGroups.push(name); });
         const d = await changeJson(PENDING_FILE, blankPending, d => {
           if (!keys.length) return false;
@@ -394,28 +500,8 @@
         });
         return { pendingGroup: true, pending: d.edits };
       }
-      let group = null, after = null;
-      const out = await changeFile(id, (text, m) => {
-        const before = parseBib_(text);
-        if (staticGroups_(before[1]).some(g => g.name === name)) throw new Error('There’s already a static group called “' + name + '”.');
-        const inBib = new Set(before[0].map(e => e[1]));
-        const missing = keys.find(k => !inBib.has(k));
-        if (missing) throw new Error('“' + missing + '” isn’t in ' + m.name + '.');
-        let edited = ensureStaticGroup_(text, name);
-        keys.forEach(k => {
-          if (req.modified) edited = editEntry_(edited, k, { 'date-modified': req.modified });
-          edited = editGroups_(edited, k, [name], []);
-        });
-        after = parseBib_(edited);
-        group = staticGroups_(after[1]).find(g => g.name === name);
-        if (after[0].length !== before[0].length || !group || keys.some(k => group.keys.indexOf(k) < 0)) {
-          throw new Error('The new group didn’t come out as expected, so LibLande didn’t save it.');
-        }
-        return { text: edited };
-      }, req.backupName);
-      const res = { gh: fingerprint_(groupsComment_(after[1])), stamp: out.stamp, hashes: {} };
-      keys.forEach(k => { res.hashes[k] = hashOf(out.text, k); });
-      return res;
+      const out = await changeFile(id, (text, m) => run('createGroup', text, name, keys, req.modified || null, m.name), req.backupName);
+      return { gh: out.gh, stamp: out.stamp, hashes: out.hashes };
     });
 
     /* -------------------------------------------- the reading list */
@@ -464,26 +550,9 @@
         });
         return { pending: d.edits };
       }
-      let group = null, after = null;
-      const out = await changeFile(await mainBibId(), text => {
-        const parsed = parseBib_(text);
-        const inBib = new Set(parsed[0].map(e => e[1]));
-        let edited = ensureStaticGroup_(text, name);
-        const current = staticGroups_(parseBib_(edited)[1]).find(g => g.name === name);
-        const has = new Set(current ? current.keys : []);
-        add.filter(k => inBib.has(k) && !has.has(k)).forEach(k => { edited = editGroups_(edited, k, [name], []); });
-        remove.filter(k => has.has(k)).forEach(k => { edited = editGroups_(edited, k, [], [name]); });
-        if (edited === text) return null;
-        after = parseBib_(edited);
-        group = staticGroups_(after[1]).find(g => g.name === name);
-        if (after[0].length !== parsed[0].length || !group ||
-            add.some(k => inBib.has(k) && group.keys.indexOf(k) < 0) || remove.some(k => group.keys.indexOf(k) >= 0)) {
-          throw new Error('The reading-list group didn’t come out right, so LibLande didn’t save it.');
-        }
-        return { text: edited };
-      }, req.backupName);
+      const out = await changeFile(await mainBibId(), text => run('readingGroup', text, name, add, remove), req.backupName);
       if (!out.text) return {};
-      return { gh: fingerprint_(groupsComment_(after[1])), groupKeys: group.keys, group: name };
+      return { gh: out.gh, groupKeys: out.groupKeys, group: name };
     }
     // After each build: changes made to the group in BibDesk come into the
     // list (as Code.gs's reconcileReading_).
@@ -510,8 +579,7 @@
       });
     });
 
-    // Saving edits straight to the .bib, on or off (as Code.gs's
-    // setDirect); Apps Script is told too, for the Apps Script version.
+    // Saving edits straight to the .bib, on or off (as Code.gs's setDirect).
     F.setDirect = on => serial(async () => {
       if (on && (await loadPending()).length) throw new Error('Apply or discard your pending edits first.');
       await B.updateSettings(s => { s.directEdits = !!on; });

@@ -82,6 +82,13 @@
     // a build after an edit made here needn't download the .bib again.
     const kept = {};
     function remember(id, modifiedTime, value) { kept[id] = { modifiedTime, value }; }
+    // PDFs filed here since the last build (paths and IDs), added to the
+    // papers folder's index then, so it needn't look for them in Drive.
+    const filed = { files: {}, folders: {} };
+    function noteFile(path, id, folderPath, folderId) {
+      filed.files[path] = id;
+      if (folderPath && folderId) filed.folders[folderPath] = folderId;
+    }
     async function textAt(id, modifiedTime) {
       if (kept[id] && kept[id].modifiedTime === modifiedTime) return kept[id].value;
       const value = await text(id);
@@ -319,6 +326,13 @@
         await writeFile(folder, INDEX_FILE, JSON.stringify(index), 'application/json');
         lastFull = String(Date.now());
       }
+      if (!fullListing && Object.keys(filed.files).length) {
+        Object.assign(index.files, filed.files);
+        Object.assign(index.folders, filed.folders);
+        index.hash = indexHash(index.files);
+        await writeFile(folder, INDEX_FILE, JSON.stringify(index), 'application/json');
+      }
+      filed.files = {}; filed.folders = {};
       mark(fullListing ? 'listed papers folder' : 'read saved index');
       const inboxPaths = inbox ? (await listTree(inboxFolder.id, '')).files : {};
       // (Listed while the .bib downloads: see readTexts.)
@@ -371,7 +385,7 @@
       try { return JSON.parse(await text(f.id)); } catch (e) { return null; }
     }
 
-    return { look, build, settings, updateSettings, dataFolder, named, meta, text, textAt, remember, readJson, writeFile, listAll };
+    return { look, build, settings, updateSettings, dataFolder, named, meta, text, textAt, remember, noteFile, readJson, writeFile, listAll };
   }
 
   root.makeLiblandeBuilder = makeBuilder;
