@@ -11,11 +11,12 @@
  * The library is built here too, on this device (builder.js), when the
  * .bib or the inbox has changed: on opening and on Refresh.
  *
- * Everything else (adding and editing entries, the reading list, groups,
- * exports, settings) is passed to the Apps Script project itself, through
- * Google's Apps Script API (scripts.run), with the same sign-in: the same
- * code, and the same lock on the .bib, as the Apps Script version.
- * (build.py fills in DEPLOYMENT, the deployment's ID.)
+ * Adding and editing entries, pending edits, groups and the reading list
+ * are done here too (edits.js), with the same checks and backups as
+ * Code.gs. Apps Script is still asked for the settings when they're chosen
+ * or changed (exportSettings, saveSettings), through Google's Apps Script
+ * API (scripts.run), with the same sign-in. (build.py fills in DEPLOYMENT,
+ * the deployment's ID.)
  */
 (() => {
   'use strict';
@@ -241,11 +242,24 @@
       await builder.settings(true);
       return SERVER.getStatus();
     },
+    // (Apps Script is told too, for the Apps Script version; it may refuse,
+    // as when there are pending edits.)
     async setDirect(on) {
-      await apps('setDirect', [on]);
-      await builder.settings(true);
+      await edits.setDirect(on);
+      apps('setDirect', [on]).catch(() => {});
       return SERVER.getStatus();
     },
+    // Changing the .bib, the inbox, pending edits and the reading list:
+    // edits.js, here.
+    saveEntry(req) { return edits.saveEntry(req); },
+    queueEdit(req) { return edits.queueEdit(req); },
+    discardPending(key) { return edits.discardPending(key); },
+    applyPending(req) { return edits.applyPending(req); },
+    addToInbox(req) { return edits.addToInbox(req); },
+    addToMain(req) { return edits.addToMain(req); },
+    attachPdf(req) { return edits.attachPdf(req); },
+    createGroup(req) { return edits.createGroup(req); },
+    readingOps(req) { return edits.readingOps(req); },
     // Details for a DOI, from Crossref (as Code.gs's lookupDoi).
     lookupDoi(input) { return lookupDoi(input); },
     // An export's folder, LibLande/Exports/<name>, with references.bib and
@@ -321,10 +335,8 @@
       return out;
     },
   };
-  // The rest: Apps Script's own function, run for you. Until a call has
-  // worked, the page leaves the reading list alone at start
-  // (LIBLANDE_NO_EDITS), in case Apps Script can't be reached this way.
-  window.LIBLANDE_NO_EDITS = true;
+  // The rest: Apps Script's own function, run for you.
+  window.LIBLANDE_NO_EDITS = false;
   async function apps(name, args) {
     const go = async t => {
       try {
@@ -449,7 +461,8 @@
   // builder.js builds the library here when the .bib or inbox changed; one
   // build at a time. A failed build's reason is passed on once, with the
   // next status.
-  const builder = window.makeLiblandeBuilder({ drive, apps });
+  const builder = window.makeLiblandeBuilder({ drive, apps, reconcile: groups => edits.reconcileReading(groups) });
+  const edits = window.makeLiblandeEdits({ drive, builder, getToken });
   let buildRun = null, buildErr = null, lastBuilt = null;
   // w: what builder.look found. True if a build is under way.
   function startBuild(w) {

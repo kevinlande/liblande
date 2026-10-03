@@ -78,6 +78,16 @@
     const named = async (parentId, name, fields, folder) => (await listAll('name = ' + q(name) + ' and ' + q(parentId) +
       ' in parents and trashed = false' + (folder ? " and mimeType = '" + FOLDER + "'" : ''), fields || 'id,name,modifiedTime', 'modifiedTime desc'))[0] || null;
     const text = async id => (await io.drive('files/' + encodeURIComponent(id) + '?alt=media')).text();
+    // The last text of each file read or written here, by modified time:
+    // a build after an edit made here needn't download the .bib again.
+    const kept = {};
+    function remember(id, modifiedTime, value) { kept[id] = { modifiedTime, value }; }
+    async function textAt(id, modifiedTime) {
+      if (kept[id] && kept[id].modifiedTime === modifiedTime) return kept[id].value;
+      const value = await text(id);
+      remember(id, modifiedTime, value);
+      return value;
+    }
 
     // LibLande's folder in My Drive: the one holding the library.
     let dataId = null;
@@ -106,20 +116,36 @@
     /* -------------------------------------------- settings */
     // Which .bib and papers folder: LibLande/settings.json, made from Apps
     // Script's settings the first time (and again when they change there).
+    // fresh: the .bib and papers folder from Apps Script again (after
+    // they're changed in Settings, which Apps Script checks); the rest of
+    // settings.json stays as it is here.
     let known = null;
+    async function readSettings() {
+      const folder = await dataFolder();
+      const f = folder && await named(folder, SETTINGS_FILE, 'id');
+      if (!f) return null;
+      try { const s = JSON.parse(await text(f.id)); return s && s.bibId ? s : null; } catch (e) { return null; }
+    }
     async function settings(fresh) {
       if (known && !fresh) return known;
-      const folder = await dataFolder();
-      if (!fresh && folder) {
-        const f = await named(folder, SETTINGS_FILE, 'id');
-        if (f) {
-          try { const s = JSON.parse(await text(f.id)); if (s && s.bibId) return (known = s); } catch (e) { /* made again below */ }
-        }
-      }
+      const saved = await readSettings();
+      if (saved && !fresh) return (known = saved);
       const s = await io.apps('exportSettings', []);
-      if (!s || !s.bibId) return null;
-      if (folder) await writeFile(folder, SETTINGS_FILE, JSON.stringify(s, null, 1), 'application/json');
-      return (known = s);
+      if (!s || !s.bibId) return saved || null;
+      const next = saved ? Object.assign(saved, { bibId: s.bibId, papersId: s.papersId }) : s;
+      const folder = await dataFolder();
+      if (folder) await writeFile(folder, SETTINGS_FILE, JSON.stringify(next, null, 1), 'application/json');
+      return (known = next);
+    }
+    // Change settings.json: fn(settings) changes it in place, on a fresh
+    // copy of the file.
+    async function updateSettings(fn) {
+      const s = (await readSettings()) || (await settings(false));
+      if (!s) throw new Error('LibLande isn\u2019t set up yet.');
+      fn(s);
+      await writeFile(await dataFolder(), SETTINGS_FILE, JSON.stringify(s, null, 1), 'application/json');
+      known = s;
+      return s;
     }
 
     /* -------------------------------------------- the papers folder */
@@ -269,7 +295,7 @@
       // which may find nothing new).
       const changed = !!o.force || !lib || !current || lp.bibStamp !== bibStamp || (lp.inboxStamp || '') !== inboxStamp;
       let texts = null;
-      const readTexts = () => texts || (texts = Promise.all([text(bib.id), inbox ? text(inbox.id) : Promise.resolve(null)]));
+      const readTexts = () => texts || (texts = Promise.all([textAt(bib.id, bib.modifiedTime), inbox ? textAt(inbox.id, inbox.modifiedTime) : Promise.resolve(null)]));
       if (changed) readTexts().catch(() => {});
       const papersId = s.papersId || (bib.parents && bib.parents[0]);
       if (!papersId) throw new Error('LibLande can’t see the folder that holds your .bib file. Choose your papers folder in Settings.');
@@ -332,9 +358,8 @@
       }
       const saved = await writeFile(folder, LIBRARY_FILE, out.gz, 'application/gzip', props);
       mark('saved');
-      // The reading list follows the "Reading List" group (Apps Script
-      // keeps the list, for now): not waited for.
-      io.apps('reconcileReading', [out.groups]).catch(e => console.warn('Reading list:', e.message));
+      // The reading list follows the "Reading List" group: not waited for.
+      (io.reconcile ? io.reconcile(out.groups) : io.apps('reconcileReading', [out.groups])).catch(e => console.warn('Reading list:', e.message));
       console.log('LibLande build (on this device): ' + times.join(', ') + '; total ' + ((Date.now() - started) / 1000).toFixed(1) + ' s');
       // (gz: the library itself, so the page needn't download it again.)
       return { built: true, id: saved.id, stamp: Date.parse(saved.modifiedTime), entries: out.entries, gz: out.gz };
@@ -346,7 +371,7 @@
       try { return JSON.parse(await text(f.id)); } catch (e) { return null; }
     }
 
-    return { look, build, settings, dataFolder, named, meta, text, readJson, writeFile, listAll };
+    return { look, build, settings, updateSettings, dataFolder, named, meta, text, textAt, remember, readJson, writeFile, listAll };
   }
 
   root.makeLiblandeBuilder = makeBuilder;
