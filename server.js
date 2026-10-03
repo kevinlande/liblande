@@ -8,11 +8,14 @@
  * the Drive API directly. Apps Script keeps building the library in the
  * background (every 10 minutes), into the same LibLande folder in Drive.
  *
+ * The library is built here too, on this device (builder.js), when the
+ * .bib or the inbox has changed: on opening and on Refresh.
+ *
  * Everything else (adding and editing entries, the reading list, groups,
- * exports, settings, refreshing) is passed to the Apps Script project
- * itself, through Google's Apps Script API (scripts.run), with the same
- * sign-in: the same code, and the same lock on the .bib, as the Apps
- * Script version. (build.py fills in DEPLOYMENT, the deployment's ID.)
+ * exports, settings) is passed to the Apps Script project itself, through
+ * Google's Apps Script API (scripts.run), with the same sign-in: the same
+ * code, and the same lock on the .bib, as the Apps Script version.
+ * (build.py fills in DEPLOYMENT, the deployment's ID.)
  */
 (() => {
   'use strict';
@@ -192,13 +195,19 @@
 
   /* ------------------------------------------------------------ the server */
   const SERVER = {
-    // Apps Script's own answer (it knows about builds under way, and keeps
-    // your settings); if it can't be had, what Drive says.
+    // Apps Script's own answer (it keeps your settings, pending edits and
+    // reading list); if it can't be had, what Drive says. Meanwhile, a
+    // look at whether the library needs building, which starts here.
     async getStatus() {
+      const looking = navigator.onLine ? checkBuild().catch(e => { console.warn('Checking the library:', e.message); return false; }) : Promise.resolve(false);
+      let st = null;
       if (navigator.onLine) {
-        try { return await apps('getStatus', []); } catch (e) { console.warn('Apps Script\u2019s status:', e.message); }
+        try { st = await apps('getStatus', []); } catch (e) { console.warn('Apps Script\u2019s status:', e.message); }
       }
-      return SERVER.driveStatus();
+      if (!st) st = await SERVER.driveStatus();
+      if (await looking || buildRun) st.building = true;
+      if (buildErr) { st.error = buildErr; buildErr = null; }
+      return st;
     },
     async driveStatus() {
       const folder = await dataFolder();
@@ -220,10 +229,15 @@
         prefs: {},
       };
     },
-    // Apps Script looks at the .bib now and rebuilds; if it can't be
-    // asked, only what it built last is looked for.
-    async refreshNow() {
-      try { return await apps('refreshNow', []); } catch (e) { return SERVER.driveStatus(); }
+    // Refresh: a look at the .bib and the inbox, and a build here if
+    // either changed (the page waits for it, asking getStatus).
+    refreshNow() { return SERVER.getStatus(); },
+    // New settings: Apps Script checks and keeps them, and the copy the
+    // build here uses is made again.
+    async saveSettings(bibLink, papersLink) {
+      const st = await apps('saveSettings', [bibLink, papersLink]);
+      try { await builder.settings(true); } catch (e) { console.warn('Settings:', e.message); }
+      return st;
     },
     async getLibraryInfo() {
       const folder = await dataFolder();
@@ -308,6 +322,23 @@
     return j.response ? j.response.result : undefined;
   }
   const viaApps = name => (...args) => apps(name, args);
+
+  /* ------------------------------------------------------------ building */
+  // builder.js builds the library here when the .bib or inbox changed; one
+  // build at a time. A failed build's reason is passed on once, with the
+  // next status.
+  const builder = window.makeLiblandeBuilder({ drive, apps });
+  let buildRun = null, buildErr = null;
+  async function checkBuild() {
+    if (buildRun) return true;
+    const w = await builder.look({ daily: true });
+    if (!w.configured || !w.needed || buildRun) return !!buildRun;
+    buildErr = null;
+    buildRun = builder.build({ daily: true }, w)
+      .catch(e => { buildErr = (e && e.message) || String(e); console.warn('LibLande build:', buildErr); })
+      .finally(() => { buildRun = null; });
+    return true;
+  }
 
   // google.script.run, as the page uses it.
   const runner = (ok, fail) => new Proxy({}, {
