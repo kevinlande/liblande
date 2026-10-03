@@ -1562,7 +1562,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-03.05</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-03.06</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1577,7 +1577,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-03.05';
+      l.querySelector('small').textContent = 'Version 2026-10-03.06';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1589,7 +1589,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-03.05): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-03.06): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -1835,7 +1835,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-03.05`;
+    `<br>LibLande version 2026-10-03.06`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -10447,7 +10447,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-03.05</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-03.06</small>`;
 };
 
 function gunzipJSON(bytes) {
@@ -10472,7 +10472,7 @@ async function download() {
     let info = fromStatus, r = null;
     if (info) { stage('Downloading the library from Google Drive'); r = await get(info); }
     if (!r || r.status === 401 || r.status === 403) {
-      stage('Asking Apps Script where the library is');
+      stage(window.LIBLANDE_PAGES ? 'Finding the library in Google Drive' : 'Asking Apps Script where the library is');
       info = await callServer('getLibraryInfo');
       stage('Downloading the library from Google Drive');
       r = await get(info);
@@ -10481,7 +10481,7 @@ async function download() {
     return { stamp: info.stamp, gz: new Uint8Array(await r.arrayBuffer()) };
   } catch (e) {
     console.warn('Direct Drive download failed; using Apps Script instead.', e);
-    stage('Downloading the library through Apps Script');
+    stage(window.LIBLANDE_PAGES ? 'Downloading the library again' : 'Downloading the library through Apps Script');
     const r = await callServer('getLibrary');
     return { stamp: r.stamp, gz: b64ToBytes(r.library) };
   }

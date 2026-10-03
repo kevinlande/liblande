@@ -13,10 +13,10 @@
  * first, the other sees the library is current and leaves it be.
  *
  * makeBuilder(io): io.drive(path, opts, base) is an authorised Drive
- * request that throws unless it worked; io.apps(name, args) runs an Apps
- * Script function (for settings and the reading list, until those move
- * here too). The parsing runs in a worker (build-worker.js) when there is
- * one, so the page doesn't freeze; otherwise here.
+ * request that throws unless it worked; io.reconcile(groups) brings the
+ * reading list in line with the "Reading List" group after a build. The
+ * parsing runs in a worker (build-worker.js) when there is one, so the
+ * page doesn't freeze; otherwise here.
  */
 (function (root) {
   'use strict';
@@ -96,15 +96,20 @@
       return value;
     }
 
-    // LibLande's folder in My Drive: the one holding the library.
+    // LibLande's folder in My Drive: the one holding the library (made,
+    // with create, when there's none).
     let dataId = null;
-    async function dataFolder() {
+    async function dataFolder(create) {
       if (dataId) return dataId;
       const folders = await listAll('name = ' + q(DATA_FOLDER) + " and 'root' in parents and mimeType = '" + FOLDER + "' and trashed = false", 'id');
       for (const f of folders) {
         if (await named(f.id, LIBRARY_FILE, 'id') || await named(f.id, SETTINGS_FILE, 'id')) return (dataId = f.id);
       }
-      return (dataId = folders.length ? folders[0].id : null);
+      if (folders.length) return (dataId = folders[0].id);
+      if (!create) return null;
+      const made = await (await io.drive('files?fields=id', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: DATA_FOLDER, mimeType: FOLDER, parents: ['root'] }) })).json();
+      return (dataId = made.id);
     }
 
     // Write a file in the LibLande folder (in place, keeping its ID), with
@@ -123,9 +128,9 @@
     /* -------------------------------------------- settings */
     // Which .bib and papers folder: LibLande/settings.json, made from Apps
     // Script's settings the first time (and again when they change there).
-    // fresh: the .bib and papers folder from Apps Script again (after
-    // they're changed in Settings, which Apps Script checks); the rest of
-    // settings.json stays as it is here.
+    // Which .bib and papers folder, and how edits are saved:
+    // LibLande/settings.json (first made from Apps Script's settings).
+    // fresh: read the file again.
     let known = null;
     async function readSettings() {
       const folder = await dataFolder();
@@ -135,22 +140,14 @@
     }
     async function settings(fresh) {
       if (known && !fresh) return known;
-      const saved = await readSettings();
-      if (saved && !fresh) return (known = saved);
-      const s = await io.apps('exportSettings', []);
-      if (!s || !s.bibId) return saved || null;
-      const next = saved ? Object.assign(saved, { bibId: s.bibId, papersId: s.papersId }) : s;
-      const folder = await dataFolder();
-      if (folder) await writeFile(folder, SETTINGS_FILE, JSON.stringify(next, null, 1), 'application/json');
-      return (known = next);
+      return (known = await readSettings());
     }
     // Change settings.json: fn(settings) changes it in place, on a fresh
-    // copy of the file.
+    // copy of the file (or a new one).
     async function updateSettings(fn) {
-      const s = (await readSettings()) || (await settings(false));
-      if (!s) throw new Error('LibLande isn\u2019t set up yet.');
+      const s = (await readSettings()) || { bibId: '', papersId: '', directEdits: false, pendingGroups: [], readingGroup: '', prefs: {} };
       fn(s);
-      await writeFile(await dataFolder(), SETTINGS_FILE, JSON.stringify(s, null, 1), 'application/json');
+      await writeFile(await dataFolder(true), SETTINGS_FILE, JSON.stringify(s, null, 1), 'application/json');
       known = s;
       return s;
     }
@@ -373,7 +370,7 @@
       const saved = await writeFile(folder, LIBRARY_FILE, out.gz, 'application/gzip', props);
       mark('saved');
       // The reading list follows the "Reading List" group: not waited for.
-      (io.reconcile ? io.reconcile(out.groups) : io.apps('reconcileReading', [out.groups])).catch(e => console.warn('Reading list:', e.message));
+      if (io.reconcile) io.reconcile(out.groups).catch(e => console.warn('Reading list:', e.message));
       console.log('LibLande build (on this device): ' + times.join(', ') + '; total ' + ((Date.now() - started) / 1000).toFixed(1) + ' s');
       // (gz: the library itself, so the page needn't download it again.)
       return { built: true, id: saved.id, stamp: Date.parse(saved.modifiedTime), entries: out.entries, gz: out.gz };

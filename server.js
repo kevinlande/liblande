@@ -1,31 +1,23 @@
 /*
- * LibLande on GitHub Pages: a stand-in for Apps Script.
+ * LibLande on GitHub Pages: what Apps Script's Code.gs does, done here.
  *
  * The page (index.html, the same file Apps Script serves) talks to its
- * server through google.script.run. Here that's answered in the browser:
- * Google sign-in gives a Drive token, and the reading side of Code.gs
- * (status, library download, tokens, PDF backups, thumbnails) is done with
- * the Drive API directly. Apps Script keeps building the library in the
- * background (every 10 minutes), into the same LibLande folder in Drive.
- *
- * The library is built here too, on this device (builder.js), when the
- * .bib or the inbox has changed: on opening and on Refresh.
- *
- * Adding and editing entries, pending edits, groups and the reading list
- * are done here too (edits.js), with the same checks and backups as
- * Code.gs. Apps Script is still asked for the settings when they're chosen
- * or changed (exportSettings, saveSettings), through Google's Apps Script
- * API (scripts.run), with the same sign-in. (build.py fills in DEPLOYMENT,
- * the deployment's ID.)
+ * server through google.script.run. Here that's answered in the browser,
+ * with Google Drive's web API and a Drive sign-in: the status, settings
+ * (LibLande/settings.json) and preferences (prefs.json), the library's
+ * download, PDF backups, thumbnails, DOI lookups (from Crossref) and
+ * exports; the library is built here (builder.js) when the .bib or the
+ * inbox has changed, on opening and on Refresh; and adding and editing
+ * entries, pending edits, groups and the reading list change the .bib here
+ * (edits.js), with the same checks and backups as Code.gs. Apps Script
+ * isn't asked anything.
  */
 (() => {
   'use strict';
   window.LIBLANDE_PAGES = true;
   const CLIENT_ID = '789682218462-98mjugngb46ttd01ucp9dcj71ufspjgn.apps.googleusercontent.com';
-  // Drive, plus what Apps Script's own code needs to run for you (fetching
-  // from the web, and the background-build triggers).
-  const SCOPE = ['drive', 'script.external_request', 'script.scriptapp'].map(s => 'https://www.googleapis.com/auth/' + s).join(' ');
-  const DEPLOYMENT = 'AKfycbxRSWbVU93pvk7_8uTUVqKc6OyxqzqNo2AUUDpSbKCcymCn23msaQwsljZCBLXC0xE6';
+  // Google Drive (your .bib, papers and LibLande folder): all it needs.
+  const SCOPE = 'https://www.googleapis.com/auth/drive';
   const API = 'https://www.googleapis.com/drive/v3/';
   const FOLDER = 'application/vnd.google-apps.folder';
   // As in Code.gs.
@@ -234,19 +226,37 @@
     // Refresh: a look at the .bib and the inbox, and a build here if
     // either changed (the page waits for it, asking getStatus).
     refreshNow() { return SERVER.getStatus(); },
-    // New settings, and saving edits straight to the .bib on or off: Apps
-    // Script checks and keeps them (it still saves edits), and the copy
-    // kept here is made again from its.
+    // New settings, from the links pasted in Settings (as Code.gs's
+    // saveSettings): the .bib and, if given, the papers folder, checked and
+    // kept in settings.json. A library built from other ones goes to the
+    // Drive trash, and is built again.
     async saveSettings(bibLink, papersLink) {
-      await apps('saveSettings', [bibLink, papersLink]);
-      await builder.settings(true);
+      const bibId = idFromLink(bibLink);
+      if (!bibId) throw new Error('Paste the link to your .bib file. In Google Drive, right-click the file and choose Share, then Copy link.');
+      let bib;
+      try { bib = await builder.meta(bibId, 'id,name,parents,trashed'); } catch (e) {
+        throw new Error('LibLande couldn\u2019t open that file. Check that the link is to a file you can open in Google Drive.');
+      }
+      if (!/\.bib$/i.test(bib.name)) throw new Error('\u201c' + bib.name + '\u201d isn\u2019t a .bib file. Paste the link to your BibTeX library.');
+      let papersId = '';
+      if (papersLink && String(papersLink).trim()) {
+        papersId = idFromLink(papersLink);
+        let ok = false;
+        try { ok = !!papersId && (await builder.meta(papersId, 'mimeType')).mimeType === FOLDER; } catch (e) { ok = false; }
+        if (!ok) throw new Error('LibLande couldn\u2019t open that papers folder. Paste the link to a folder, or leave the box empty.');
+      } else if (!(bib.parents && bib.parents[0])) {
+        throw new Error('LibLande can\u2019t see the folder that holds this .bib file. Paste the link to your papers folder too.');
+      }
+      const before = await builder.settings(true);
+      await builder.updateSettings(s => { s.bibId = bibId; s.papersId = papersId; });
+      if (before && (before.bibId !== bibId || (before.papersId || '') !== papersId)) {
+        const old = await builder.named(await builder.dataFolder(true), LIBRARY_FILE, 'id');
+        if (old) await drive('files/' + encodeURIComponent(old.id) + '?fields=id', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ trashed: true }) });
+      }
       return SERVER.getStatus();
     },
-    // (Apps Script is told too, for the Apps Script version; it may refuse,
-    // as when there are pending edits.)
     async setDirect(on) {
       await edits.setDirect(on);
-      apps('setDirect', [on]).catch(() => {});
       return SERVER.getStatus();
     },
     // Changing the .bib, the inbox, pending edits and the reading list:
@@ -337,38 +347,20 @@
       return out;
     },
   };
-  // The rest: Apps Script's own function, run for you.
   window.LIBLANDE_NO_EDITS = false;
-  async function apps(name, args) {
-    const go = async t => {
-      try {
-        return await fetch('https://script.googleapis.com/v1/scripts/' + DEPLOYMENT + ':run', { method: 'POST',
-          headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ function: name, parameters: args.map(a => (a === undefined ? null : a)), devMode: false }) });
-      } catch (e) {
-        throw new Error(navigator.onLine ? 'Apps Script can\u2019t be reached just now.' : 'You\u2019re offline.');
-      }
-    };
-    let r = await go(await getToken());
-    if (r.status === 401) r = await go(await getToken(true));
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok) {
-      const msg = (j.error && j.error.message) || ('error ' + r.status);
-      throw new Error('LibLande on GitHub Pages couldn\u2019t ask Apps Script to do this (' + msg + ').');
-    }
-    // An error in Apps Script's code: its own message, as on Apps Script.
-    if (j.error) {
-      const d = (j.error.details || [])[0];
-      throw new Error((d && d.errorMessage) || j.error.message || 'Apps Script hit an error.');
-    }
-    window.LIBLANDE_NO_EDITS = false;
-    return j.response ? j.response.result : undefined;
+  // Anything else the page asks for isn't in this version.
+  const missing = name => () => Promise.reject(new Error('LibLande on GitHub Pages can\u2019t do this (' + name + ').'));
+  // A Drive file or folder ID from a pasted link, or a bare ID (as
+  // Code.gs's idFromLink_).
+  function idFromLink(s) {
+    s = String(s || '').trim();
+    const m = /\/d\/([\w-]{20,})/.exec(s) || /[?&]id=([\w-]{20,})/.exec(s) || /\/folders\/([\w-]{20,})/.exec(s) || /^([\w-]{20,})$/.exec(s);
+    return m ? m[1] : null;
   }
-  const viaApps = name => (...args) => apps(name, args);
 
   /* ------------------------------------------------------------ preferences */
   // LibLande/prefs.json; the first time, Apps Script's (which came with
-  // the settings). Changes are gathered for a moment, then written onto a
+  // the settings, when they were first copied from Apps Script). Changes are gathered for a moment, then written onto a
   // fresh copy of the file, so another device's changes to other
   // preferences aren't lost.
   const PREFS_FILE = 'prefs.json';
@@ -463,7 +455,7 @@
   // builder.js builds the library here when the .bib or inbox changed; one
   // build at a time. A failed build's reason is passed on once, with the
   // next status.
-  const builder = window.makeLiblandeBuilder({ drive, apps, reconcile: groups => edits.reconcileReading(groups) });
+  const builder = window.makeLiblandeBuilder({ drive, reconcile: groups => edits.reconcileReading(groups) });
   const edits = window.makeLiblandeEdits({ drive, builder, getToken });
   let buildRun = null, buildErr = null, lastBuilt = null;
   // w: what builder.look found. True if a build is under way.
@@ -489,7 +481,7 @@
       if (k === 'withFailureHandler') return f => runner(ok, f);
       if (k === 'withUserObject') return () => runner(ok, fail);
       if (typeof k !== 'string') return undefined;
-      const fn = SERVER[k] || viaApps(k);
+      const fn = SERVER[k] || missing(k);
       return (...args) => {
         Promise.resolve().then(() => fn(...args)).then(v => ok && ok(v), e => {
           if (fail) fail(e instanceof Error ? e : new Error(String(e)));
