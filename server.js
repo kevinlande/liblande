@@ -270,6 +270,7 @@
     attachPdf(req) { return edits.attachPdf(req); },
     createGroup(req) { return edits.createGroup(req); },
     readingOps(req) { return edits.readingOps(req); },
+    renameKey(req) { return edits.renameKey(req); },
     // Details for a DOI, from Crossref (as Code.gs's lookupDoi).
     lookupDoi(input) { return lookupDoi(input); },
     // An export's folder, LibLande/Exports/<name>, with references.bib and

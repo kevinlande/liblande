@@ -147,6 +147,17 @@
       }
       return { text: next, hash: hashOf(next, key) };
     },
+    // A new cite key (renameKey_ and checkRename_ in Build.gs).
+    renameKey(text, req) {
+      const loc = locateEntry_(text, req.key);
+      if (req.expectHash && fingerprint_(text.slice(loc.start, loc.end)) !== req.expectHash) {
+        throw new Error('This publication has been changed since LibLande last read it (perhaps in BibDesk). Tap Refresh, wait for the library to update, and try again.');
+      }
+      const newKey = String(req.newKey || '').trim();
+      const edited = renameKey_(text, req.key, newKey);
+      const after = checkRename_(text, edited, req.key, newKey);
+      return { text: edited, hash: hashOf(edited, newKey), gh: groupsHashOf(after) };
+    },
     // attachPdf: the entry's fields, and which bdsk-file-N the PDF takes.
     attachPrepare(text, req) {
       const loc = locateEntry_(text, req.key);
@@ -577,6 +588,21 @@
         d.syncedKeys = g.keys;
         d.seeded = true;
       });
+    });
+
+    // A new cite key (as Code.gs's renameKey): in the .bib, then the
+    // reading list.
+    F.renameKey = req => serial(async () => {
+      if (!(await direct())) throw new Error('Turn on \u201cSave edits straight to your .bib file\u201d in settings to change cite keys.');
+      if ((await loadPending()).some(e => e.key === req.key)) throw new Error('This publication has a pending edit. Apply or discard it first.');
+      const out = await changeFile(await mainBibId(), text => run('renameKey', text, req), req.backupName);
+      const nk = String(req.newKey).trim(), swap = k => (k === req.key ? nk : k);
+      const d = await changeJson(READING_FILE, blankReading, d => {
+        d.items.forEach(x => { x.key = swap(x.key); });
+        (d.done || []).forEach(x => { x.key = swap(x.key); });
+        if (d.syncedKeys) d.syncedKeys = d.syncedKeys.map(swap);
+      });
+      return { hash: out.hash, gh: out.gh, stamp: out.stamp, reading: readingOut(d) };
     });
 
     // Saving edits straight to the .bib, on or off (as Code.gs's setDirect).

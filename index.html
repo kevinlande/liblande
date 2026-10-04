@@ -739,6 +739,30 @@ button.fileicon { border: 0; background: none; cursor: pointer; }
 .dup-note { display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; border-radius: 8px; background: var(--accent-soft); font-size: 13px; color: var(--text); }
 .dup-note .i { flex: none; margin-top: 1px; color: var(--accent); }
 .dup-note button { border: 0; background: none; padding: 0; font: inherit; color: var(--accent); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.dup-note .dup-no { color: var(--muted); }
+/* Versions: shown under the main one, in the list and the details. */
+.row.child .c-title { padding-left: 22px; position: relative; }
+.row.child .c-title::before { content: ''; position: absolute; left: 8px; top: 50%; width: 8px; height: 8px; margin-top: -7px; border-left: 1.5px solid var(--faint); border-bottom: 1.5px solid var(--faint); }
+.card.child { padding-left: 34px; }
+.card.child::before { content: ''; position: absolute; left: 18px; top: 18px; width: 9px; height: 9px; border-left: 1.5px solid var(--faint); border-bottom: 1.5px solid var(--faint); }
+.row.join-on { outline: 2px solid var(--accent); outline-offset: -2px; background: var(--accent-soft); }
+.d-versions ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 14px; }
+.d-versions li.me b { font-weight: 600; }
+.d-versions button[data-version] { border: 0; background: none; padding: 0; font: inherit; color: var(--accent); text-align: left; cursor: pointer; }
+.d-versions .v-where { color: var(--muted); font-size: 13px; }
+.d-versions .v-unjoin { border: 0; background: none; padding: 0 2px; font: inherit; font-size: 12.5px; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+/* Cite keys: changed in place. */
+.citekey-edit { border: 0; background: none; padding: 2px 4px; color: var(--faint); cursor: pointer; display: inline-flex; align-items: center; }
+.citekey-edit:hover { color: var(--accent); }
+.citekey-edit .i { width: 14px; height: 14px; }
+.citekey-input { font: 12.5px var(--mono, ui-monospace, monospace); padding: 3px 8px; border: 1px solid var(--accent); border-radius: 6px; background: var(--bg); color: var(--text); min-width: 16ch; outline: none; }
+/* Forthcoming: Crossref's updates, to tick. */
+.fu-item { padding: 8px 0; border-top: 1px solid var(--line); display: grid; gap: 4px; }
+.fu-title { font-weight: 600; font-size: 14px; }
+.fu-who { font-weight: 400; color: var(--muted); font-size: 12.5px; }
+.fu-item .check { font-size: 13.5px; margin-left: 4px; }
+.fu-none { margin-top: 10px; font-size: 13px; color: var(--muted); }
+.fu-none p { margin: 4px 0 0 12px; }
 .notes-body { white-space: pre-line; cursor: text; border-radius: 2px; }
 @media (hover: hover) { .notes-body:hover { background: var(--accent-soft); box-shadow: 0 0 0 5px var(--accent-soft); } }
 .notes-body.notes-empty { color: var(--faint); font-style: italic; }
@@ -1428,8 +1452,13 @@ try {
         <span class="pick-count"></span>
         <button type="button" class="linkish" id="pickAll">Select all</button>
         <button type="button" class="linkish" id="pickNone">Clear</button>
+        <button type="button" class="btn" id="pickJoin" hidden>Join&#x2026;</button>
         <button type="button" class="btn primary" id="pickExport">Export&#x2026;</button>
         <button type="button" class="pick-x" id="pickDone" aria-label="Stop selecting" title="Stop selecting (Esc)"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </div>
+      <div class="rl-list-bar" id="forthBar" hidden>
+        <span class="rl-count"></span>
+        <button type="button" class="btn" id="forthCheck">Check for updates&#x2026;</button>
       </div>
       <div class="rl-list-bar" id="rlBar" hidden>
         <span class="rl-count"></span>
@@ -1562,7 +1591,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-03.06</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-03.09</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1577,7 +1606,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-03.06';
+      l.querySelector('small').textContent = 'Version 2026-10-03.09';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1589,7 +1618,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-03.06): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-03.09): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -1621,6 +1650,8 @@ const ICON = {
   down: '<svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>',
   copy: '<svg class="i" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>',
   link: '<svg class="i" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>',
+  forth: '<svg class="i" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4M12 13v3l2 1"/></svg>',
+  versions: '<svg class="i" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M4 16V6a2 2 0 0 1 2-2h10"/></svg>',
   read: '<svg class="i" viewBox="0 0 24 24"><path d="M2 5h6a4 4 0 0 1 4 4v11a3 3 0 0 0-3-3H2z"/><path d="M22 5h-6a4 4 0 0 0-4 4v11a3 3 0 0 1 3-3h7z"/></svg>',
   share: '<svg class="i" viewBox="0 0 24 24"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>',
   drive: '<svg class="i" viewBox="0 0 24 24"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>',
@@ -1821,6 +1852,7 @@ function init(data, again) {
     TYPES.get(e.t).push(e);
   }
   findDups();
+  findVersions();
   GROUPS = data.groups.map(g => ({ name: g.name, items: g.keys.map(k => BYKEY.get(k)).filter(Boolean) }));
   // New groups still waiting to go into the .bib (with pending edits).
   const waiting = store.get('newGroups', []).filter(n => !GROUPS.some(g => g.name === n));
@@ -1835,7 +1867,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-03.06`;
+    `<br>LibLande version 2026-10-03.09`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -2238,6 +2270,28 @@ async function doiFromPdf(file) {
 // first author's surname (ignoring case, accents and punctuation). (Chapters
 // of one book can share the book's DOI.)
 let DUPS = new Map();
+// Pairs you've said aren't the same ("key1|key2", in order), kept with
+// your preferences so every device knows.
+const pairOf = (a, b) => (a < b ? a + '|' + b : b + '|' + a);
+const NOT_DUPS = new Set(store.get('notDups', []));
+function notDupsMerge(prefs) {
+  const before = NOT_DUPS.size;
+  (prefs && prefs.notDups || []).forEach(p => NOT_DUPS.add(p));
+  if (NOT_DUPS.size === before) return false;
+  store.set('notDups', [...NOT_DUPS]);
+  return true;
+}
+// This publication isn't the same as the ones it was matched with.
+function notDuplicates(e) {
+  (DUPS.get(e.k) || []).forEach(x => NOT_DUPS.add(pairOf(e.k, x.k)));
+  store.set('notDups', [...NOT_DUPS]);
+  if (window.google && google.script && google.script.run) google.script.run.withFailureHandler(() => {}).savePrefs({ notDups: [...NOT_DUPS] });
+  findDups();
+  renderGroups();
+  refresh(false);
+  renderDetail();
+  toast('Not shown as possible duplicates any more', 2500);
+}
 function dupKeys(e) {
   const out = [], f = e.f || {};
   const doi = norm(f.doi || '').trim().replace(/^https?:\/\/(dx\.)?doi\.org[/]/, '').replace(/^doi:\s*/, '');
@@ -2265,7 +2319,7 @@ function findDups() {
   for (const list of by.values()) {
     if (list.length < 2) continue;
     list.forEach(e => {
-      const same = list.filter(x => x !== e && !differentBooks(e, x));
+      const same = list.filter(x => x !== e && !differentBooks(e, x) && !NOT_DUPS.has(pairOf(e.k, x.k)));
       if (!same.length) return;
       const others = DUPS.get(e.k) || [];
       same.forEach(x => { if (others.indexOf(x) < 0) others.push(x); });
@@ -2280,11 +2334,71 @@ function findDups() {
     others.forEach(x => { x.dupSet = x.dupSet || e.dupSet; });
   }
 }
+/* ------------------------------------------------------------ forthcoming */
+// Forthcoming publications, and recent articles not yet in an issue: a
+// group that fills itself. An entry leaves it once it's complete.
+const FORTH_RE = /forthcoming|in press|accepted|to appear|online first|early view/i;
+const THIS_YEAR = new Date().getFullYear();
+function isForthcoming(e) {
+  if (e.ib) return false;
+  const f = e.f;
+  if (FORTH_RE.test(f.year || '') || (!f.year && FORTH_RE.test(f.note || ''))) return true;
+  if (e.t !== 'article') return false;
+  const y = parseInt(f.year, 10);
+  return y >= THIS_YEAR - 2 && (!f.volume || !f.pages);
+}
+
+/* ------------------------------------------------------------ versions */
+// Versions of one work (an article and its reprint in a collection, two
+// editions of a book): a later version names the main one in its
+// "related" field (BibLaTeX's), so the link is kept in the .bib. Each
+// version is shown under its main one.
+let VERSION_OF = new Map(), VERSIONS = new Map();
+const relatedKeys = e => String((e.r && e.r.related) || e.f.related || '').split(',').map(k => k.trim()).filter(Boolean);
+function findVersions() {
+  VERSION_OF = new Map(); VERSIONS = new Map();
+  const mainOf = e => relatedKeys(e).map(k => BYKEY.get(k)).find(x => x && x !== e);
+  // Up a chain of versions to the first. (Versions that name each other
+  // in a loop: the one whose key sorts first is the main one.)
+  const rootOf = e => {
+    const path = [e];
+    let m = mainOf(e);
+    while (m && path.indexOf(m) < 0) { path.push(m); m = mainOf(m); }
+    if (!m) return path[path.length - 1];
+    return path.slice(path.indexOf(m)).reduce((a, b) => (cmpStr(a.k, b.k) <= 0 ? a : b));
+  };
+  for (const e of ENTRIES) {
+    if (!relatedKeys(e).length) continue;
+    const m = rootOf(e);
+    if (m === e) continue;
+    VERSION_OF.set(e.k, m.k);
+    if (!VERSIONS.has(m.k)) VERSIONS.set(m.k, []);
+    VERSIONS.get(m.k).push(e);
+  }
+  for (const list of VERSIONS.values()) list.sort((a, b) => a.yearN - b.yearN || cmpStr(a.k, b.k));
+}
+// The list with each version just under its main one (when both are in
+// it); NESTED: the versions shown so.
+let NESTED = new Set();
+function nestVersions(v) {
+  NESTED = new Set();
+  if (!VERSION_OF.size) return v;
+  const inView = new Set(v.map(e => e.k)), out = [];
+  for (const e of v) {
+    const main = VERSION_OF.get(e.k);
+    if (main && inView.has(main)) continue;
+    out.push(e);
+    for (const c of VERSIONS.get(e.k) || []) if (inView.has(c.k)) { out.push(c); NESTED.add(c.k); }
+  }
+  return out;
+}
+
 // The duplicates group keeps each set together.
 const dupOrder = () => ENTRIES.filter(e => e.dup).sort((a, b) => cmpStr(a.dupSet, b.dupSet) || a.yearN - b.yearN || cmpStr(a.k, b.k));
 function groupItems(id) {
   if (id === 'all') return ENTRIES;
   if (id === 'dups') return dupOrder();
+  if (id === 'forth') return ENTRIES.filter(isForthcoming);
   if (id === 'recent') return RECENT.seen.map(x => BYKEY.get(x[0])).filter(Boolean);
   if (id === 'inbox') return ENTRIES.filter(e => e.ib);
   if (id === 'pending') return ENTRIES.filter(e => e.pend);
@@ -2300,6 +2414,7 @@ function groupName(id) {
   if (id === 'inbox') return 'Inbox';
   if (id === 'pending') return 'Pending edits';
   if (id === 'dups') return 'Possible duplicates';
+  if (id === 'forth') return 'Forthcoming';
   if (id === 'recent') return 'Recently viewed';
   if (id === 'toread') return 'Reading list';
   if (id.startsWith('t:')) return TYPE_NAMES[id.slice(2)] || id.slice(2);
@@ -2314,6 +2429,7 @@ function renderGroups() {
     (inboxCount || state.group === 'inbox' ? grpBtn('inbox', 'Inbox', inboxCount, ICON.inbox) : '') +
     (PENDING.length || state.group === 'pending' ? grpBtn('pending', 'Pending edits', ENTRIES.filter(e => e.pend).length, ICON.clock) : '') +
     (DUPS.size || state.group === 'dups' ? grpBtn('dups', 'Possible duplicates', DUPS.size, ICON.copy) : '') +
+    ((n => (n || state.group === 'forth' ? grpBtn('forth', 'Forthcoming', n, ICON.forth) : ''))(ENTRIES.filter(isForthcoming).length)) +
     (RECENT.seen.length || state.group === 'recent' ? grpBtn('recent', 'Recently viewed', groupItems('recent').length, ICON.history) : '') + `</div>`;
   if (GROUPS.some(g => !(gs && g === readingGroup())) || gs) {
     h += `<div class="sec"><div class="sec-row"><div class="sec-h">Static groups</div>` +
@@ -2475,8 +2591,10 @@ function refresh(resetSel) {
   let v = toks.length ? base.filter(e => { const s = searchText(e, field); return toks.every(t => s.includes(t)); }) : base.slice();
   const cmp = SORTS[state.sort] || colSort(state.sort, v) || SORTS.added;
   if (state.group !== 'toread' && state.group !== 'dups' && state.group !== 'recent') v.sort(cmp.blank ? (a, b) => cmp.blank(a) - cmp.blank(b) || state.dir * cmp(a, b) : state.dir > 0 ? cmp : (a, b) => cmp(b, a));
+  if (state.group !== 'toread' && state.group !== 'dups' && state.group !== 'recent') v = nestVersions(v); else NESTED = new Set();
   state.view = v;
   renderRLBar();
+  renderForthBar();
   renderTabs();
 
   $('#statusL').textContent = toks.length
@@ -2794,7 +2912,8 @@ function rowHTML(e, i, top, h) {
     ? `<button type="button" class="fileicon" data-open-pdf="${i}" title="${n > 1 ? 'Read one of its ' + n + ' PDFs' : 'Read ' + esc(f.n)}" aria-label="Read the PDF">${ICON.doc}</button>`
     : f ? `<a class="fileicon" href="${esc(driveUrl(f))}" target="_blank" rel="noopener" title="Open ${esc(f.n)}" aria-label="Open linked file">${ICON.doc}</a>`
     : '';
-  return `<div class="row${e.k === state.selKey ? ' sel' : ''}${state.picked.has(e.k) ? ' picked' : ''}${i % 2 ? ' odd' : ''}" data-i="${i}" style="top:${top}px;height:${h}px">` +
+  return `<div class="row${e.k === state.selKey ? ' sel' : ''}${state.picked.has(e.k) ? ' picked' : ''}${i % 2 ? ' odd' : ''}${NESTED.has(e.k) ? ' child' : ''}" data-i="${i}"` +
+    `${rowDrag() ? ' draggable="true"' : ''} style="top:${top}px;height:${h}px">` +
     `<span class="c-file">${file}</span>` + COL_LIST.map(k => colCell(k, e)).join('') + `</div>`;
 }
 function colCell(k, e) {
@@ -2814,7 +2933,7 @@ function cardWait(e) {
   return x ? ` <span class="${staleRL(x) ? 'stale' : ''}">\u00b7 ${esc(waited(x, true))}</span>` : '';
 }
 function cardHTML(e, i, top, h) {
-  return `<div class="card${e.k === state.selKey && !state.picking ? ' sel' : ''}${state.picked.has(e.k) ? ' picked' : ''}${h < CARD_H[1] ? ' one' : ''}" data-i="${i}" style="top:${top}px;height:${h}px">` +
+  return `<div class="card${e.k === state.selKey && !state.picking ? ' sel' : ''}${state.picked.has(e.k) ? ' picked' : ''}${h < CARD_H[1] ? ' one' : ''}${NESTED.has(e.k) ? ' child' : ''}" data-i="${i}" style="top:${top}px;height:${h}px">` +
     (state.picking ? pickBox(e) : '') + `<div class="t">${esc(e.f.title || '(untitled)')}</div>` +
     `<div class="m"><span>${esc(e.authorsInit)}${e.f.year ? ' \u00b7 ' + esc(e.f.year) : ''}${rlTag(e)}${cardWait(e)}</span></div>` +
     `<div class="m"><span class="v">${esc(e.venue)}</span>${!e.files ? '' : readablePdfs(e).length && !state.picking
@@ -3232,6 +3351,7 @@ function renderDetail() {
   let h = `<div class="d-inner">`;
   h += `<div class="d-kicker"><span class="d-type">${esc(TYPE_NAMES[e.t] || e.t)}</span>` +
     `<button class="citekey" data-copy="key" title="Copy cite key"><span class="ck">${esc(e.k)}</span>${ICON.copy}</button>` +
+    (gs && !e.ib ? `<button type="button" class="citekey-edit" data-rename title="Change the cite key" aria-label="Change the cite key">${ICON.pencil}</button>` : '') +
     (e.ib ? `<span class="pill">Inbox</span>` : '') +
     (e.pend ? `<span class="pill pend${e.pendWhy ? ' conflict' : ''}">Pending</span>` : '') +
     (gs ? `<button type="button" class="btn d-edit" data-edit>${ICON.pencil}<span>Edit</span></button>` : '') + `</div>`;
@@ -3305,7 +3425,8 @@ function renderDetail() {
   const twins = DUPS.get(e.k);
   if (twins) {
     h += `<div class="dup-note">${ICON.copy}<span>Possibly the same as ` + twins.map(x =>
-      `<button type="button" data-twin="${esc(x.k)}">${esc(x.authorsShort || x.k)}${x.f.year ? ' (' + esc(x.f.year) + ')' : ''}${x.ib ? ' in your inbox' : ''}</button>`).join(', ') + `</span></div>`;
+      `<button type="button" data-twin="${esc(x.k)}">${esc(x.authorsShort || x.k)}${x.f.year ? ' (' + esc(x.f.year) + ')' : ''}${x.ib ? ' in your inbox' : ''}</button>`).join(', ') +
+      `. <button type="button" class="dup-no" data-notdup title="Stop showing ${twins.length === 1 ? 'these two' : 'these'} as possible duplicates">Not the same</button></span></div>`;
   }
   const missing = (e.files || []).filter(x => x.x);
   if (missing.length) h += `<div class="warn">The linked file ${esc(missing[0].p)} wasn\u2019t found in your papers folder on Google Drive.</div>`;
@@ -3342,12 +3463,15 @@ function renderDetail() {
       (e.groups || []).map(g => `<button class="chip grp-chip" data-goto="${esc('s:' + g)}">${esc(g)}</button>`).join('') +
       e.kw.map(k => `<button class="chip" data-goto="${esc('k:' + k)}">${esc(k)}</button>`).join('') + kwAdd + `</div>`;
   }
+  h += versionsHTML(e);
   if (f.abstract) h += `<section class="d-sec"><h3>Abstract</h3><p class="d-abstract">${esc(f.abstract)}</p></section>`;
   // Notes: click to write or change them, right here.
   if (gs) h += `<section class="d-sec d-notes"><h3>Notes</h3><div class="d-abstract notes-body${f.annote ? '' : ' notes-empty'}" data-notes>${f.annote ? esc(f.annote) : 'Add notes\u2026'}</div></section>`;
   else if (f.annote) h += `<section class="d-sec"><h3>Notes</h3><p class="d-abstract">${esc(f.annote)}</p></section>`;
 
   const skip = new Set(['abstract', 'annote', 'keywords', 'date-added', 'date-modified', 'read', 'rating']);
+  // (Related: shown as Versions, when it names publications in the library.)
+  if (VERSION_OF.has(e.k) || relatedKeys(e).every(k => BYKEY.has(k))) skip.add('related');
   const keys = Object.keys(f).filter(k => !skip.has(k)).sort((a, b) => {
     const ia = FIELD_ORDER.indexOf(a), ib = FIELD_ORDER.indexOf(b);
     return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b);
@@ -3435,6 +3559,7 @@ detailEl.addEventListener('focusout', ev => {
 });
 detailEl.addEventListener('click', ev => {
   if (ev.target.closest('[data-export]')) { openExport(); return; }
+  if (ev.target.closest('[data-join]')) { openJoin(pickedEntries()); return; }
   if (ev.target.closest('[data-pick-clear]')) { state.picked.clear(); paint(); renderPickBar(); renderDetail(); return; }
   const cs = ev.target.closest('[data-copy-sel]');
   if (cs) { cs.closest('details').open = false; copyAs(cs.dataset.copySel); return; }
@@ -3443,6 +3568,12 @@ detailEl.addEventListener('click', ev => {
   if (e && ev.target.closest('[data-edit]')) { openEdit(e); return; }
   const ka = ev.target.closest('[data-kw-add]');
   if (gs && e && ka) { openKwAdd(ka); return; }
+  if (e && ev.target.closest('[data-notdup]')) { notDuplicates(e); return; }
+  if (gs && e && ev.target.closest('[data-rename]')) { editKey(e); return; }
+  const vgo = ev.target.closest('[data-version]');
+  if (vgo) { showTwin(vgo.dataset.version); return; }
+  const un = ev.target.closest('[data-unjoin]');
+  if (gs && un) { unjoin(BYKEY.get(un.dataset.unjoin)); return; }
   const twin = ev.target.closest('[data-twin]');
   if (twin) { showTwin(twin.dataset.twin); return; }
   const notes = ev.target.closest('[data-notes]');
@@ -9399,9 +9530,11 @@ async function lookupIntoEdit() {
 function openAdd(pdf) {
   sheet = { mode: 'add', pdf: null };
   const h = sheetHead('Add a publication', 'Add to library') +
-    `<div class="fld"><label for="doiLookup">From a DOI</label><div class="doi-row">` +
-    `<input id="doiLookup" type="text" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="10.1111/phpr.70141">` +
-    `<button type="button" class="btn" id="doiGo">Look up</button></div></div>` +
+    `<div class="fld"><label for="doiLookup">From a DOI or BibTeX</label><div class="doi-row">` +
+    `<input id="doiLookup" type="text" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="A DOI, or paste a BibTeX entry">` +
+    `<button type="button" class="btn" id="doiGo">Fill in</button>` +
+    (navigator.clipboard && navigator.clipboard.readText ? `<button type="button" class="btn" id="bibPaste" title="Fill in from the DOI or BibTeX entry you copied">Paste</button>` : '') +
+    `</div></div>` +
     `<div class="fld"><label for="addType">Type</label><select id="addType">${TYPE_CHOICES.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></div>` +
     `<div class="fields-grid" id="addFields"></div>` + keywordEditor([]) +
     `<div class="fld"><label for="addPdf">PDF <span class="opt">(optional)</span></label><input type="file" id="addPdf" accept="application/pdf,.pdf"><p class="add-pdf-name" id="addPdfName" hidden></p></div>` +
@@ -9433,7 +9566,107 @@ function sheetKeywords() {
   return [...$('#kwEdit').querySelectorAll('.kw-chip')].map(c => c.dataset.kw);
 }
 
+/* ------------------------------------------------------------ BibTeX pasted in */
+const looksLikeBibtex = t => /@\s*[A-Za-z]+\s*[{(]/.test(t) && /=/.test(t);
+// One BibTeX entry (the first, if there are several): {type, key, fields:
+// {name: value as written in the .bib}, more: whether others follow}.
+// Braces count as BibTeX counts them; a bare word (a month like jan, or an
+// @string name) stays as it is, and parts joined with # are joined.
+function parseBibtexEntry(s) {
+  const head = /@\s*([A-Za-z]+)\s*([{(])/g;
+  let m;
+  while ((m = head.exec(s)) && /^(comment|string|preamble)$/i.test(m[1])) { /* skip */ }
+  if (!m) return null;
+  const close = m[2] === '{' ? '}' : ')', n = s.length;
+  let i = head.lastIndex;
+  const comma = s.indexOf(',', i);
+  if (comma < 0) return null;
+  const key = s.slice(i, comma).trim();
+  i = comma + 1;
+  const fields = {};
+  for (;;) {
+    while (i < n && /[\s,]/.test(s[i])) i++;
+    if (i >= n || s[i] === close) break;
+    const nm = /^([A-Za-z][\w\-:.+]*)\s*=\s*/.exec(s.slice(i, i + 300));
+    if (!nm) break;
+    i += nm[0].length;
+    const parts = [];
+    for (;;) {
+      while (i < n && /\s/.test(s[i])) i++;
+      if (s[i] === '{') {
+        let d = 0, j = i;
+        for (; j < n; j++) { if (s[j] === '{') d++; else if (s[j] === '}' && --d === 0) break; }
+        parts.push(s.slice(i + 1, j));
+        i = j + 1;
+      } else if (s[i] === '"') {
+        let d = 0, j = i + 1;
+        for (; j < n; j++) { if (s[j] === '{') d++; else if (s[j] === '}') d--; else if (s[j] === '"' && d === 0) break; }
+        parts.push(s.slice(i + 1, j));
+        i = j + 1;
+      } else {
+        const t = /^[\w\-.:+\/]+/.exec(s.slice(i, i + 300));
+        if (!t) break;
+        parts.push(t[0]);
+        i += t[0].length;
+      }
+      while (i < n && /\s/.test(s[i])) i++;
+      if (s[i] === '#') { i++; continue; }
+      break;
+    }
+    fields[nm[1].toLowerCase()] = parts.join('').replace(/\s+/g, ' ').trim();
+  }
+  return { type: m[1].toLowerCase(), key, fields, more: /@\s*[A-Za-z]+\s*[{(]/.test(s.slice(i)) };
+}
+// Fields of BibDesk's own, and the dates, which LibLande sets itself.
+const BIB_OWN = n => /^bdsk-/.test(n) || ['file', 'local-url', 'date-added', 'date-modified'].indexOf(n) >= 0;
+function fillFromBibtex(text) {
+  const p = parseBibtexEntry(text);
+  if (!p || !Object.keys(p.fields).length) {
+    sheetMsg('That doesn\u2019t look like a BibTeX entry. One starts like @article{key, and has fields like title = {\u2026}.', true);
+    return;
+  }
+  const f = {};
+  Object.keys(p.fields).forEach(n => { if (!BIB_OWN(n) && p.fields[n]) f[n] = p.fields[n]; });
+  const kws = splitKw(f.keywords);
+  delete f.keywords;
+  const sel = $('#addType');
+  if (![...sel.options].some(o => o.value === p.type)) sel.add(new Option(p.type, p.type));
+  sel.value = p.type;
+  renderAddFields(f);
+  // Fields the form has no box for go in too, as they are.
+  const shown = new Set([...$('#sheetBody').querySelectorAll('[data-field]')].map(el => el.dataset.field));
+  sheet.extra = {};
+  Object.keys(f).forEach(n => { if (!shown.has(n)) sheet.extra[n] = f[n]; });
+  $('#kwEdit').querySelectorAll('.kw-chip').forEach(c => c.remove());
+  kws.forEach(addKeyword);
+  $('#doiLookup').value = '';
+  const extra = Object.keys(sheet.extra);
+  const have = f.doi && ENTRIES.find(x => (x.f.doi || '').toLowerCase() === f.doi.toLowerCase());
+  sheetMsg(have ? 'Already in your library: \u201c' + (have.f.title || have.k) + '\u201d. You can still add it.'
+    : 'Filled in from the BibTeX' + (p.more ? ' (its first entry)' : '') + '.' +
+      (extra.length ? ' Also kept, without a box here: ' + extra.join(', ') + '.' : '') + ' Check the details, then add it.', !!have);
+}
+// The box: a BibTeX entry, or a DOI to look up.
+function fillFromBox() {
+  const t = $('#doiLookup').value;
+  if (looksLikeBibtex(t)) fillFromBibtex(t); else lookupIntoForm();
+}
+// Paste: what was copied, read straight from the clipboard (Safari asks
+// first).
+async function pasteIntoForm() {
+  let t = '';
+  try { t = await navigator.clipboard.readText(); } catch (err) {
+    sheetMsg('LibLande couldn\u2019t read what you copied. Paste it into the box instead.', true);
+    return;
+  }
+  if (!t.trim()) { sheetMsg('Nothing has been copied. Copy a DOI or a BibTeX entry first.', true); return; }
+  if (looksLikeBibtex(t)) { fillFromBibtex(t); return; }
+  $('#doiLookup').value = t.trim();
+  lookupIntoForm();
+}
+
 async function lookupIntoForm() {
+  if (sheet) sheet.extra = {};
   const doi = $('#doiLookup').value.trim();
   if (!doi) { sheetMsg('Paste a DOI first.', true); return; }
   $('#doiGo').disabled = true;
@@ -9640,6 +9873,8 @@ async function saveAdd() {
   if (!vals.title) { sheetMsg('A publication needs a title.', true); return; }
   const kws = sheetKeywords();
   if (kws.length) vals.keywords = kws.join('; ');
+  // (Fields from a pasted BibTeX entry that the form has no box for.)
+  Object.keys(sheet.extra || {}).forEach(n => { if (!vals[n]) vals[n] = sheet.extra[n]; });
   if (vals.month) vals.month = tidyMonth(vals.month);
   Object.keys(vals).forEach(n => { if (!vals[n]) delete vals[n]; });
   // Already in the library? Say so once; a second press adds it anyway.
@@ -9704,7 +9939,7 @@ async function saveAdd() {
 $('#sheetForm').addEventListener('submit', ev => {
   ev.preventDefault();
   if (!sheet || $('#sheetSave').disabled) return;
-  if (sheet.mode === 'edit') saveEdit(); else if (sheet.mode === 'apply') runApply(); else if (sheet.mode === 'export') runExport(); else if (sheet.mode === 'export-save') saveExport(); else if (sheet.mode === 'help' || sheet.mode === 'triage') closeSheet(); else if (sheet.mode === 'attach') { const a = sheet, mode = ($('#sheetBody').querySelector('[name=attachMode]:checked') || {}).value; closeSheet(); runAttach(a.entry, a.file, mode === 'replace'); } else saveAdd();
+  if (sheet.mode === 'edit') saveEdit(); else if (sheet.mode === 'forth') saveForth(); else if (sheet.mode === 'join') saveJoin(); else if (sheet.mode === 'apply') runApply(); else if (sheet.mode === 'export') runExport(); else if (sheet.mode === 'export-save') saveExport(); else if (sheet.mode === 'help' || sheet.mode === 'triage') closeSheet(); else if (sheet.mode === 'attach') { const a = sheet, mode = ($('#sheetBody').querySelector('[name=attachMode]:checked') || {}).value; closeSheet(); runAttach(a.entry, a.file, mode === 'replace'); } else saveAdd();
 });
 $('#sheetCancel').addEventListener('click', closeSheet);
 $('#sheetBody').addEventListener('click', ev => { const x = ev.target.closest('[data-sheet-cancel]'); if (x && !x.disabled) closeSheet(); });
@@ -9719,7 +9954,8 @@ $('#sheetBody').addEventListener('click', ev => {
   }
   const x = ev.target.closest('.kw-chip button');
   if (x) { x.parentElement.remove(); return; }
-  if (ev.target.closest('#doiGo')) lookupIntoForm();
+  if (ev.target.closest('#doiGo')) fillFromBox();
+  if (ev.target.closest('#bibPaste')) pasteIntoForm();
   if (ev.target.closest('#editDoiGo')) lookupIntoEdit();
 });
 $('#sheetBody').addEventListener('keydown', ev => {
@@ -9728,7 +9964,14 @@ $('#sheetBody').addEventListener('keydown', ev => {
     if (ev.key === 'Enter' || ev.key === ',' || ev.key === ';') { ev.preventDefault(); addKeyword(kwSuggOn(ev.target) || ev.target.value); }
     else if (ev.key === 'Backspace' && !ev.target.value) { const chips = $('#kwEdit').querySelectorAll('.kw-chip'); if (chips.length) chips[chips.length - 1].remove(); }
   }
-  if (ev.target.id === 'doiLookup' && ev.key === 'Enter') { ev.preventDefault(); lookupIntoForm(); }
+  if (ev.target.id === 'doiLookup' && ev.key === 'Enter') { ev.preventDefault(); fillFromBox(); }
+});
+// A BibTeX entry pasted into the DOI box fills in the form at once (with
+// its line breaks, which a one-line box would drop).
+$('#sheetBody').addEventListener('paste', ev => {
+  if (ev.target.id !== 'doiLookup') return;
+  const t = ev.clipboardData && ev.clipboardData.getData('text');
+  if (t && looksLikeBibtex(t)) { ev.preventDefault(); fillFromBibtex(t); }
 });
 $('#sheetBody').addEventListener('input', ev => {
   if (ev.target.id === 'kwInput') kwSuggest(ev.target, [...$('#kwEdit').querySelectorAll('.kw-chip')].map(c => c.dataset.kw));
@@ -9937,6 +10180,7 @@ function renderPickBar() {
   bar.querySelector('.pick-count').textContent = n ? n + ' selected' : 'Tap publications to select them';
   $('#pickNone').hidden = !n;
   $('#pickExport').hidden = !n || !gs;
+  $('#pickJoin').hidden = !(gs && n >= 2 && pickedEntries().every(x => !x.ib));
 }
 const SHOW_REFS = 200;
 function selectionHTML() {
@@ -9947,6 +10191,7 @@ function selectionHTML() {
     `<h1 class="d-title">${n} publication${n === 1 ? '' : 's'} selected</h1>` +
     `<p class="d-venue">${withPdf} of them ${withPdf === 1 ? 'has' : 'have'} a PDF in Google Drive.</p>` +
     `<div class="actions">` + (gs ? `<button type="button" class="btn primary" data-export>${ICON.share}<span>Export\u2026</span></button>` : '') +
+    (gs && n >= 2 && list.every(x => !x.ib) ? `<button type="button" class="btn" data-join>${ICON.versions}<span>Join as versions\u2026</span></button>` : '') +
     `<details class="menu"><summary class="btn">${ICON.copy}<span>Copy</span>${ICON.chev}</summary>` +
     `<div class="menu-list" role="menu"><button type="button" role="menuitem" data-copy-sel="bibtex">BibTeX<kbd>\u2325B</kbd></button>` +
     `<button type="button" role="menuitem" data-copy-sel="apa">APA (long)<kbd>\u2325A</kbd></button>` +
@@ -9963,6 +10208,271 @@ function copySelection(kind) {
   const refs = apaOrder(list).map(apaCitation);
   copy(refs.map(c => c.text).join('\n\n'), 'Copied ' + n + ' APA reference' + (n === 1 ? '' : 's'), refs.map(c => '<p>' + c.html + '</p>').join(''));
 }
+
+/* ------------------------------------------------------------ forthcoming: updates */
+function renderForthBar() {
+  const bar = $('#forthBar');
+  bar.hidden = !(gs && state.group === 'forth');
+  if (bar.hidden) return;
+  const n = groupItems('forth').length;
+  bar.querySelector('.rl-count').textContent = n ? n + ' forthcoming or not yet in an issue' : 'Nothing forthcoming';
+  $('#forthCheck').hidden = !n;
+}
+$('#forthCheck').addEventListener('click', () => checkForthcoming());
+$('#pickJoin').addEventListener('click', () => openJoin(pickedEntries()));
+// What Crossref has on a publication: by its DOI, or else by its title
+// and first author (only a match of the same title counts).
+const CROSSREF = 'https:\/\/api.crossref.org/works';
+const plainTitle = t => norm(String(t || '')).replace(/[^a-z0-9]+/g, '');
+async function crossrefFor(e) {
+  const doi = String(e.f.doi || '').trim().replace(/^https?:\/\/(dx\.)?doi\.org[/]/i, '').replace(/^doi:\s*/i, '');
+  if (/^10\.\S+[/]\S+$/.test(doi)) {
+    const r = await fetch(CROSSREF + '/' + doi.split('/').map(encodeURIComponent).join('/'));
+    if (r.ok) return (await r.json()).message;
+    if (r.status !== 404) throw new Error('Crossref answered ' + r.status);
+  }
+  if (!e.f.title) return null;
+  const who = ((e.a && e.a[0]) || [''])[0];
+  const r = await fetch(CROSSREF + '?rows=5&query.bibliographic=' + encodeURIComponent(e.f.title) + (who ? '&query.author=' + encodeURIComponent(who) : ''));
+  if (!r.ok) throw new Error('Crossref answered ' + r.status);
+  const want = plainTitle(e.f.title);
+  return ((await r.json()).message.items || []).find(w => plainTitle((w.title || [])[0]) === want) || null;
+}
+// The changes Crossref suggests: [{n, from, to, on}], on = ticked to start
+// with. Only empty fields are filled, and a "forthcoming" year; another
+// year is offered unticked (Crossref's can be the online-first year).
+function forthChanges(e, w) {
+  const f = e.f, out = [];
+  const inIssue = !!(w.volume || w.page);
+  const parts = ((inIssue && (w['published-print'] || w.issued)) || w['published-online'] || w.issued || {})['date-parts'];
+  const year = parts && parts[0] && parts[0][0] ? String(parts[0][0]) : '';
+  const month = parts && parts[0] && parts[0][1] ? MONTH_ABBR[parts[0][1] - 1] : '';
+  const clean = v => String(v || '').replace(/[{}]/g, '').trim();
+  const add = (n, to, on) => { to = clean(to); if (to && to !== (f[n] || '')) out.push({ n, from: f[n] || '', to, on }); };
+  if (inIssue && year) {
+    const forth = !f.year || FORTH_RE.test(f.year);
+    if (forth || f.year !== year) add('year', year, forth);
+    if (!f.volume) add('volume', w.volume, true);
+    if (!f.number) add('number', w.issue, true);
+    if (!f.pages && w.page) add('pages', String(w.page).replace(/-/g, '--'), true);
+    if (!f.month && month) add('month', month, true);
+  }
+  if (!f.doi) add('doi', w.DOI, true);
+  if (e.t === 'article' && !f.journal) add('journal', (w['container-title'] || [])[0], true);
+  return { changes: out, inIssue };
+}
+async function checkForthcoming() {
+  const list = groupItems('forth').slice(0, 60);
+  if (!list.length) return;
+  const found = [], none = [], failed = [];
+  let i = 0;
+  toast('Asking Crossref about ' + list.length + ' publication' + (list.length === 1 ? '' : 's') + '\u2026', 0);
+  // (A few at a time.)
+  await Promise.all([0, 1, 2, 3].map(async () => {
+    while (i < list.length) {
+      const e = list[i++];
+      try {
+        const w = await crossrefFor(e);
+        const c = w ? forthChanges(e, w) : null;
+        if (c && c.changes.length) found.push({ e, changes: c.changes, inIssue: c.inIssue }); else none.push(e);
+      } catch (err) { failed.push(e); }
+      toast('Asking Crossref\u2026 (' + (found.length + none.length + failed.length) + ' of ' + list.length + ')', 0);
+    }
+  }));
+  toast('', 1);
+  found.sort((a, b) => cmpStr(a.e.f.title || a.e.k, b.e.f.title || b.e.k));
+  sheet = { mode: 'forth', found };
+  const label = n => FIELD_LABELS[n] || n;
+  showSheet(`<h2>Updates from Crossref</h2>` +
+    (found.length ? `<p class="sheet-note">Tick the changes to save. Only empty fields are filled in; a different year is offered unticked, since Crossref\u2019s can be the year it appeared online.</p>` +
+      found.map((x, j) => `<div class="fu-item"><div class="fu-title">${esc(x.e.f.title || x.e.k)} <span class="fu-who">${esc(x.e.authorsShort || '')}${x.inIssue ? '' : ' \u00b7 not in an issue yet'}</span></div>` +
+        x.changes.map((c, k) => `<label class="check"><input type="checkbox" data-fu="${j}:${k}"${c.on ? ' checked' : ''}> ${esc(label(c.n))}: ${c.from ? `<s>${esc(c.from)}</s> \u2192 ` : ''}${esc(c.to)}</label>`).join('') + `</div>`).join('')
+      : `<p class="sheet-note">Crossref has nothing new on any of them yet.</p>`) +
+    (none.length ? `<details class="fu-none"><summary>No update yet (${none.length})</summary>${none.map(e => `<p>${esc(e.f.title || e.k)}</p>`).join('')}</details>` : '') +
+    (failed.length ? `<p class="sheet-note">Crossref couldn\u2019t be asked about ${failed.length}. Try again later.</p>` : ''),
+    found.length ? 'Save' : 'Close');
+  if (!found.length) $('#sheetCancel').hidden = true;
+}
+async function saveForth() {
+  const s = sheet;
+  if (!s.found.length) { closeSheet(); return; }
+  const todo = s.found.map((x, j) => {
+    const set = {};
+    x.changes.forEach((c, k) => { const b = $('#sheetBody').querySelector(`[data-fu="${j}:${k}"]`); if (b && b.checked) set[c.n] = c.to; });
+    return { e: x.e, set };
+  }).filter(x => Object.keys(x.set).length);
+  if (!todo.length) { closeSheet(); return; }
+  sheetBusy(true);
+  let done = 0;
+  try {
+    for (const x of todo) {
+      sheetMsg('Saving ' + (++done) + ' of ' + todo.length + '\u2026');
+      await writeEdit(x.e, x.set, [], []);
+    }
+    closeSheet();
+    toast('Updated ' + todo.length + ' publication' + (todo.length === 1 ? '' : 's'), 4000);
+  } catch (err) {
+    sheetMsg('Saved ' + (done - 1) + '; then: ' + errText(err), true);
+  } finally {
+    if (sheet === s) sheetBusy(false);
+  }
+}
+
+/* ------------------------------------------------------------ cite keys */
+// The cite key, changed in place: Return saves, Esc or leaving cancels.
+function editKey(e) {
+  const btn = detailEl.querySelector('.citekey');
+  if (!btn) return;
+  if (!DIRECT) { toast('To change cite keys, turn on \u201cSave changes straight to your .bib file\u201d in Settings.', 5000); return; }
+  const input = document.createElement('input');
+  input.className = 'citekey-input';
+  input.value = e.k;
+  input.setAttribute('aria-label', 'New cite key');
+  input.autocapitalize = 'off'; input.spellcheck = false;
+  btn.replaceWith(input);
+  detailEl.querySelector('[data-rename]').hidden = true;
+  input.focus(); input.select();
+  let over = false;
+  const finish = go => {
+    if (over) return;
+    over = true;
+    if (go && input.value.trim() && input.value.trim() !== e.k) renameEntry(e, input.value.trim()); else renderDetail();
+  };
+  input.addEventListener('keydown', ev => {
+    if (ev.key === 'Enter') { ev.preventDefault(); finish(true); }
+    else if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); finish(false); }
+  });
+  input.addEventListener('blur', () => finish(false));
+}
+async function renameEntry(e, newKey) {
+  const old = e.k;
+  toast('Changing the cite key\u2026', 0);
+  try {
+    const res = await callServer('renameKey', { key: old, newKey, expectHash: e.h || null, backupName: fileTime() });
+    // Here too: the entry, its groups, links to it, what was viewed.
+    e.k = newKey; e.h = res.hash;
+    if (res.gh) DATA.gh = res.gh;
+    (DATA.groups || []).forEach(g => { g.keys = g.keys.map(k => (k === old ? newKey : k)); });
+    ENTRIES.forEach(x => ['crossref', 'related'].forEach(n => {
+      [x.f, x.r].forEach(o => { if (o && o[n]) o[n] = o[n].split(',').map(k => (k.trim() === old ? newKey : k)).join(','); });
+    }));
+    RECENT.seen.forEach(x => { if (x[0] === old) x[0] = newKey; });
+    store.set('recentSeen', RECENT.seen);
+    const pairs = [...NOT_DUPS].map(p => p.split('|').map(k => (k === old ? newKey : k))).map(([a, b]) => pairOf(a, b));
+    NOT_DUPS.clear(); pairs.forEach(p => NOT_DUPS.add(p)); store.set('notDups', [...NOT_DUPS]);
+    google.script.run.withFailureHandler(() => {}).savePrefs({ recentSeen: RECENT.seen.slice(0, 60), notDups: [...NOT_DUPS] });
+    if (res.reading) setReading(res.reading);
+    if (state.selKey === old) state.selKey = newKey;
+    init(DATA, true);
+    toast('Cite key changed to ' + newKey + '. Documents that cite ' + old + ' need the new key.', 7000);
+    afterWrite();
+  } catch (err) {
+    toast('Couldn\u2019t change the cite key: ' + errText(err), 6000);
+    renderDetail();
+  }
+}
+
+/* ------------------------------------------------------------ versions: joining */
+function versionsHTML(e) {
+  const mainK = VERSION_OF.get(e.k), main = mainK ? BYKEY.get(mainK) : (VERSIONS.has(e.k) ? e : null);
+  if (!main) return '';
+  const family = [main].concat(VERSIONS.get(main.k) || []);
+  const line = x => {
+    const where = x.venue || (x.f.publisher ? x.f.publisher : '');
+    const me = x === e;
+    return `<li${me ? ' class="me"' : ''}>` + (me ? `<b>This one</b>` : `<button type="button" data-version="${esc(x.k)}">${esc(x.f.title || x.k)}</button>`) +
+      ` <span class="v-where">${esc([x.f.year, where, x.f.edition ? x.f.edition + ' ed.' : ''].filter(Boolean).join(' \u00b7 '))}</span>` +
+      (x === main ? ` <span class="pill">Main</span>` : gs && !x.ib ? ` <button type="button" class="v-unjoin" data-unjoin="${esc(x.k)}" title="Show it as a separate publication">Unjoin</button>` : '') + `</li>`;
+  };
+  return `<section class="d-sec d-versions"><h3>Versions</h3><ul>${family.map(line).join('')}</ul></section>`;
+}
+// Join: the other publications name the main one in their related field.
+function openJoin(list) {
+  list = list.filter(Boolean);
+  if (list.length < 2) return;
+  const first = list.slice().sort((a, b) => a.yearN - b.yearN)[0];
+  sheet = { mode: 'join', list };
+  showSheet(`<h2>Join as versions</h2><p class="sheet-note">The same work in different places or years: an article and its reprint, ` +
+    `two editions of a book. The others are shown under the main version, and each names it in its \u201crelated\u201d field in the .bib.</p>` +
+    `<fieldset class="fld grp-fieldset"><legend>Main version</legend><div class="exp-choices">` +
+    list.map(x => `<label class="check"><input type="radio" name="joinMain" value="${esc(x.k)}"${x === first ? ' checked' : ''}> ` +
+      `${esc(x.f.title || x.k)} <span class="fu-who">${esc([x.authorsShort, x.f.year, x.venue].filter(Boolean).join(' \u00b7 '))}</span></label>`).join('') +
+    `</div></fieldset>`, 'Join');
+}
+async function saveJoin() {
+  const s = sheet, mainK = ($('#sheetBody').querySelector('[name=joinMain]:checked') || {}).value;
+  const main = BYKEY.get(mainK);
+  if (!main) return;
+  const others = s.list.filter(x => x !== main);
+  sheetBusy(true);
+  try {
+    let n = 0;
+    for (const x of others) {
+      sheetMsg('Joining ' + (++n) + ' of ' + others.length + '\u2026');
+      // (Its own main version, if it had one, gives way to this one.)
+      const keep = relatedKeys(x).filter(k => k !== main.k && k !== VERSION_OF.get(x.k));
+      await writeEdit(x, { related: [main.k].concat(keep).join(',') }, [], []);
+    }
+    closeSheet();
+    state.picked.clear(); state.picking = false; renderPickBar();
+    init(DATA, true);
+    state.selKey = main.k; refresh(false); revealSelected();
+    toast('Joined ' + others.length + ' version' + (others.length === 1 ? '' : 's') + ' under \u201c' + (main.f.title || main.k) + '\u201d', 4000);
+  } catch (err) {
+    sheetMsg(errText(err), true);
+  } finally {
+    if (sheet === s) sheetBusy(false);
+  }
+}
+function unjoin(x) {
+  if (!x) return;
+  const mainK = VERSION_OF.get(x.k);
+  const rest = relatedKeys(x).filter(k => k !== mainK).join(',');
+  quickSet(x, { related: rest }, 'Shown as a separate publication');
+}
+// On a computer: drag a row onto another to join it under that one.
+const rowDrag = () => !!gs && !coarseMQ.matches;
+const KEY_TYPE = 'application/x-liblande-key';
+let dragKey = null;
+rowsEl.addEventListener('dragstart', ev => {
+  const r = ev.target.closest && ev.target.closest('.row[data-i]');
+  const e = r && state.view[+r.dataset.i];
+  if (!e || state.picking || e.ib) { ev.preventDefault(); return; }
+  dragKey = e.k;
+  ev.dataTransfer.setData(KEY_TYPE, e.k);
+  ev.dataTransfer.setData('text/plain', e.k);
+  ev.dataTransfer.effectAllowed = 'link';
+});
+rowsEl.addEventListener('dragend', () => { dragKey = null; markJoin(null); });
+let joinEl = null;
+function markJoin(r, e) {
+  if (joinEl && joinEl !== r) joinEl.classList.remove('join-on');
+  joinEl = r || null;
+  if (joinEl) joinEl.classList.add('join-on');
+  const hint = $('#dropHint');
+  hint.hidden = !r;
+  if (r) hint.textContent = 'Join under \u201c' + (e.f.title || e.k) + '\u201d';
+}
+rowsEl.addEventListener('dragover', ev => {
+  if (!dragKey) return;
+  const r = ev.target.closest('.row[data-i]');
+  const e = r && state.view[+r.dataset.i];
+  if (!e || e.k === dragKey || e.ib) { markJoin(null); return; }
+  ev.preventDefault();
+  ev.dataTransfer.dropEffect = 'link';
+  markJoin(r, e);
+});
+rowsEl.addEventListener('drop', ev => {
+  if (!dragKey) return;
+  ev.preventDefault();
+  const r = ev.target.closest('.row[data-i]'), e = r && state.view[+r.dataset.i], moved = BYKEY.get(dragKey);
+  dragKey = null;
+  markJoin(null);
+  if (!e || !moved || e === moved) return;
+  openJoin([e, moved]);
+  const main = $('#sheetBody').querySelector(`[name=joinMain][value="${CSS.escape(e.k)}"]`);
+  if (main) main.checked = true;
+});
 
 /* ------------------------------------------------------------ export */
 function exportDefaultName() {
@@ -10447,7 +10957,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-03.06</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-03.09</small>`;
 };
 
 function gunzipJSON(bytes) {
@@ -10568,7 +11078,11 @@ if (!gs) {
     const look = status.prefs && status.prefs.style;
     if (look && look !== store.get('style', 'liblande') && $('#setup').hidden) { store.set('style', look); applyStyle(look); }
     // And what you looked at lately.
-    if (status.prefs) { recentMerge(status.prefs); if (ENTRIES.length) renderGroups(); }
+    if (status.prefs) {
+      recentMerge(status.prefs);
+      if (notDupsMerge(status.prefs) && ENTRIES.length) { findDups(); refresh(false); }
+      if (ENTRIES.length) renderGroups();
+    }
     // So is where the markup toolbar was left, on this kind of device.
     const place = status.prefs && status.prefs['palette.' + deviceKind()];
     if (place) {
@@ -10800,6 +11314,7 @@ if (!gs) {
 }
 // For the test suite (_test/suite.html) only: a few of the reader's
 // insides, when the test page asks for them.
-if (window.LIBLANDE_TEST) window.LL = { V, BM, JOURNAL, LOCAL, AUTO, saveMarkup, setTool, combineMarks, makeZip, MARK_ERASER: () => MARK.eraserSize };
+if (window.LIBLANDE_TEST) window.LL = { V, BM, JOURNAL, LOCAL, AUTO, saveMarkup, setTool, combineMarks, makeZip, MARK_ERASER: () => MARK.eraserSize,
+  lib: () => ({ ENTRIES, BYKEY, DATA, VERSION_OF, VERSIONS, NESTED, state }), init, refresh, isForthcoming, forthChanges, parseBibtexEntry };
 })();
 </script>

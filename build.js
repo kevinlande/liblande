@@ -724,3 +724,55 @@ function ensureStaticGroup_(text, name) {
   if (close < 0) throw new Error('LibLande couldn' + '\u2019' + 't read your static groups.');
   return text.slice(0, at) + block.slice(0, close) + dict + block.slice(close) + text.slice(end);
 }
+
+// A new cite key for an entry: the entry itself, the static groups that
+// list it, and other entries' crossref, xdata and related fields that
+// name it. (LaTeX documents that cite the old key aren't LibLande's to
+// change.)
+const KEY_LINK_FIELDS_ = ['crossref', 'xdata', 'related'];
+function renameKey_(text, oldKey, newKey) {
+  newKey = String(newKey || '').trim();
+  if (!newKey) throw new Error('Type the new cite key.');
+  if (!/^[^\s,{}()"'#%~\\=]+$/.test(newKey)) {
+    throw new Error('A cite key can\u2019t have spaces, commas, braces, quotation marks, or any of ( ) # % ~ \\ =.');
+  }
+  const entries = parseBib_(text)[0];
+  const clash = entries.find(e => e[1] !== oldKey && e[1].toLowerCase() === newKey.toLowerCase());
+  if (clash) throw new Error('There\u2019s already a publication with the cite key ' + clash[1] + '.');
+  const loc = locateEntry_(text, oldKey);
+  const head = text.slice(loc.start, loc.fieldsStart);
+  const at = head.lastIndexOf(oldKey);
+  let out = text.slice(0, loc.start) + head.slice(0, at) + newKey + head.slice(at + oldKey.length) + text.slice(loc.fieldsStart);
+  parseBib_(out)[0].forEach(e => {
+    const set = {};
+    KEY_LINK_FIELDS_.forEach(n => {
+      if (e[2][n] == null) return;
+      const parts = e[2][n].split(',');
+      if (parts.some(p => p.trim() === oldKey)) set[n] = parts.map(p => (p.trim() === oldKey ? p.replace(oldKey, newKey) : p)).join(',');
+    });
+    if (Object.keys(set).length) out = editEntry_(out, e[1], set);
+  });
+  const g = out.indexOf('@comment{BibDesk Static Groups{');
+  if (g >= 0) {
+    const end = matchBrace_(out, g + '@comment'.length);
+    const xml = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const comment = out.slice(g, end).replace(/(<key>keys<\/key>\s*<string>)([\s\S]*?)(<\/string>)/g,
+      (m, a, list, b) => a + list.split(',').map(k => (k.trim() === xml(oldKey) ? k.replace(xml(oldKey), xml(newKey)) : k)).join(',') + b);
+    out = out.slice(0, g) + comment + out.slice(end);
+  }
+  return out;
+}
+// The rename came out right: the same entries under the new name, and
+// every group and link that had the old key now has the new one.
+function checkRename_(before, after, oldKey, newKey) {
+  const fail = () => { throw new Error('The new cite key didn\u2019t come out as expected, so LibLande didn\u2019t save it.'); };
+  const a = parseBib_(before), b = parseBib_(after);
+  if (a[0].length !== b[0].length || b[0].some(e => e[1] === oldKey) || b[0].filter(e => e[1] === newKey).length !== 1) fail();
+  const ga = staticGroups_(a[1]), gb = staticGroups_(b[1]);
+  if (ga.length !== gb.length) fail();
+  ga.forEach((g, i) => {
+    const want = g.keys.map(k => (k === oldKey ? newKey : k)).join(',');
+    if (gb[i].name !== g.name || gb[i].keys.join(',') !== want) fail();
+  });
+  return b;
+}
