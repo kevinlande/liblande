@@ -422,6 +422,8 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
   padding: 8px 12px; background: var(--accent-soft); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); font-size: 13px; animation: pickIn .18s ease-out; }
 @keyframes pickIn { from { transform: translateY(12px); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .pick-bar { animation: none; } }
+/* (Under a panel such as Join, out of the way.) */
+body:has(#sheet:not([hidden])) .pick-bar { visibility: hidden; }
 .app.picking .rows { margin-bottom: 64px; }
 .pick-x { flex: none; display: grid; place-items: center; width: 30px; height: 30px; margin-right: -4px; border: 0; border-radius: 8px; background: none; color: var(--muted); cursor: pointer; }
 .pick-x:hover { background: var(--bg); color: var(--text); }
@@ -747,6 +749,18 @@ button.fileicon { border: 0; background: none; cursor: pointer; }
 .card.child::before { content: ''; position: absolute; left: 18px; top: 18px; width: 9px; height: 9px; border-left: 1.5px solid var(--faint); border-bottom: 1.5px solid var(--faint); }
 .row.join-on { outline: 2px solid var(--accent); outline-offset: -2px; background: var(--accent-soft); }
 .row[draggable="true"] { -webkit-user-drag: element; }
+/* Join: choosing the main version, as cards. */
+.join-q { margin: 6px 0 0; font-weight: 600; font-size: 15px; }
+.join-choices { display: grid; gap: 8px; margin-top: 4px; }
+.setup-card label.join-choice { margin: 0; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; font-weight: 400; cursor: pointer; }
+.join-choice:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.join-choice input { flex: none; }
+.jc-text { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.jc-title { font-weight: 600; font-size: 14px; }
+.jc-meta { color: var(--muted); font-size: 12.5px; }
+.jc-main { flex: none; visibility: hidden; padding: 1px 8px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-size: 11.5px; font-weight: 600; }
+.join-choice:has(input:checked) .jc-main { visibility: visible; }
+@media (min-width: 700px) { .sheet.pop.join-sheet .setup-card { width: min(560px, 100%); } }
 .d-versions ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 14px; }
 .d-versions li.me b { font-weight: 600; }
 .d-versions button[data-version] { border: 0; background: none; padding: 0; font: inherit; color: var(--accent); text-align: left; cursor: pointer; }
@@ -1592,7 +1606,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-03.10</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-03.11</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1607,7 +1621,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-03.10';
+      l.querySelector('small').textContent = 'Version 2026-10-03.11';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1619,7 +1633,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-03.10): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-03.11): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -1868,7 +1882,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-03.10`;
+    `<br>LibLande version 2026-10-03.11`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -10388,41 +10402,67 @@ function versionsHTML(e) {
   return `<section class="d-sec d-versions"><h3>Versions</h3><ul>${family.map(line).join('')}</ul></section>`;
 }
 // Join: the other publications name the main one in their related field.
+// From a selection: a small panel to choose the main version.
 function openJoin(list) {
   list = list.filter(Boolean);
   if (list.length < 2) return;
   const first = list.slice().sort((a, b) => a.yearN - b.yearN)[0];
   sheet = { mode: 'join', list };
-  showSheet(`<h2>Join as versions</h2><p class="sheet-note">The same work in different places or years: an article and its reprint, ` +
-    `two editions of a book. The others are shown under the main version, and each names it in its \u201crelated\u201d field in the .bib.</p>` +
-    `<fieldset class="fld grp-fieldset"><legend>Main version</legend><div class="exp-choices">` +
-    list.map(x => `<label class="check"><input type="radio" name="joinMain" value="${esc(x.k)}"${x === first ? ' checked' : ''}> ` +
-      `${esc(x.f.title || x.k)} <span class="fu-who">${esc([x.authorsShort, x.f.year, x.venue].filter(Boolean).join(' \u00b7 '))}</span></label>`).join('') +
-    `</div></fieldset>`, 'Join');
+  showSheet(sheetHead('Join as versions', 'Join') +
+    `<p class="join-q">Which is the main version?</p>` +
+    `<p class="sheet-note">The others are listed under it, as other versions of the same work: a reprint, a translation, another edition.</p>` +
+    `<div class="join-choices">` + list.map(x => `<label class="join-choice"><input type="radio" name="joinMain" value="${esc(x.k)}"${x === first ? ' checked' : ''}>` +
+      `<span class="jc-text"><span class="jc-title">${esc(x.f.title || x.k)}</span>` +
+      `<span class="jc-meta">${esc([x.authorsShort, x.f.year, x.venue || x.f.publisher, x.f.edition ? x.f.edition + ' ed.' : ''].filter(Boolean).join(' \u00b7 '))}</span></span>` +
+      `<span class="jc-main">Main</span></label>`).join('') + `</div>`, 'Join');
+  $('#sheet').classList.add('head-mode', 'compact', 'pop', 'join-sheet');
+}
+// Join `others` under `main`: each names it in its related field (in place
+// of any main version it had before). Returns what each had, for Undo.
+async function joinUnder(main, others, progress) {
+  const before = [];
+  let n = 0;
+  for (const x of others) {
+    if (progress) progress(++n, others.length);
+    before.push([x, rawOf(x, 'related').trim()]);
+    const keep = relatedKeys(x).filter(k => k !== main.k && k !== VERSION_OF.get(x.k));
+    await writeEdit(x, { related: [main.k].concat(keep).join(',') }, [], []);
+  }
+  init(DATA, true);
+  state.selKey = main.k; refresh(false); revealSelected();
+  return before;
 }
 async function saveJoin() {
-  const s = sheet, mainK = ($('#sheetBody').querySelector('[name=joinMain]:checked') || {}).value;
-  const main = BYKEY.get(mainK);
+  const s = sheet, main = BYKEY.get(($('#sheetBody').querySelector('[name=joinMain]:checked') || {}).value);
   if (!main) return;
   const others = s.list.filter(x => x !== main);
   sheetBusy(true);
   try {
-    let n = 0;
-    for (const x of others) {
-      sheetMsg('Joining ' + (++n) + ' of ' + others.length + '\u2026');
-      // (Its own main version, if it had one, gives way to this one.)
-      const keep = relatedKeys(x).filter(k => k !== main.k && k !== VERSION_OF.get(x.k));
-      await writeEdit(x, { related: [main.k].concat(keep).join(',') }, [], []);
-    }
+    await joinUnder(main, others, (n, of) => sheetMsg(of > 1 ? 'Joining ' + n + ' of ' + of + '\u2026' : 'Joining\u2026'));
     closeSheet();
-    state.picked.clear(); state.picking = false; renderPickBar();
-    init(DATA, true);
-    state.selKey = main.k; refresh(false); revealSelected();
+    setPicking(false);
     toast('Joined ' + others.length + ' version' + (others.length === 1 ? '' : 's') + ' under \u201c' + (main.f.title || main.k) + '\u201d', 4000);
   } catch (err) {
     sheetMsg(errText(err), true);
   } finally {
     if (sheet === s) sheetBusy(false);
+  }
+}
+// Dragged onto a row: joined under it at once (the row dropped on is the
+// main version), with Undo.
+async function joinByDrag(main, moved) {
+  toast('Joining\u2026', 0);
+  try {
+    const before = await joinUnder(main, [moved]);
+    toast('\u201c' + (moved.f.title || moved.k) + '\u201d is now a version of \u201c' + (main.f.title || main.k) + '\u201d', 6000, { label: 'Undo', run: async () => {
+      try {
+        for (const [x, was] of before) { const now = BYKEY.get(x.k); if (now) await writeEdit(now, { related: was }, [], []); }
+        init(DATA, true); refresh(false);
+        toast('Undone', 2000);
+      } catch (err) { toast('Couldn\u2019t undo: ' + errText(err), 5000); }
+    } });
+  } catch (err) {
+    toast('Couldn\u2019t join them: ' + errText(err), 6000);
   }
 }
 function unjoin(x) {
@@ -10453,7 +10493,7 @@ function markJoin(r, e) {
   if (joinEl) joinEl.classList.add('join-on');
   const hint = $('#dropHint');
   hint.hidden = !r;
-  if (r) hint.textContent = 'Join under \u201c' + (e.f.title || e.k) + '\u201d';
+  if (r) hint.textContent = 'Drop to make it a version of \u201c' + (e.f.title || e.k) + '\u201d (the main one)';
 }
 // (Safari takes a row as somewhere to drop only if it says so as the drag
 // enters it, as well as while it's over it.)
@@ -10475,9 +10515,7 @@ rowsEl.addEventListener('drop', ev => {
   dragKey = null;
   markJoin(null);
   if (!e || !moved || e === moved) return;
-  openJoin([e, moved]);
-  const main = $('#sheetBody').querySelector(`[name=joinMain][value="${CSS.escape(e.k)}"]`);
-  if (main) main.checked = true;
+  joinByDrag(e, moved);
 });
 
 /* ------------------------------------------------------------ export */
@@ -10963,7 +11001,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-03.10</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-03.11</small>`;
 };
 
 function gunzipJSON(bytes) {
