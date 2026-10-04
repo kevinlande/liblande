@@ -746,6 +746,7 @@ button.fileicon { border: 0; background: none; cursor: pointer; }
 .card.child { padding-left: 34px; }
 .card.child::before { content: ''; position: absolute; left: 18px; top: 18px; width: 9px; height: 9px; border-left: 1.5px solid var(--faint); border-bottom: 1.5px solid var(--faint); }
 .row.join-on { outline: 2px solid var(--accent); outline-offset: -2px; background: var(--accent-soft); }
+.row[draggable="true"] { -webkit-user-drag: element; }
 .d-versions ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 14px; }
 .d-versions li.me b { font-weight: 600; }
 .d-versions button[data-version] { border: 0; background: none; padding: 0; font: inherit; color: var(--accent); text-align: left; cursor: pointer; }
@@ -1591,7 +1592,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-03.09</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-03.10</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1606,7 +1607,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-03.09';
+      l.querySelector('small').textContent = 'Version 2026-10-03.10';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1618,7 +1619,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-03.09): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-03.10): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -1867,7 +1868,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-03.09`;
+    `<br>LibLande version 2026-10-03.10`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -10441,7 +10442,8 @@ rowsEl.addEventListener('dragstart', ev => {
   dragKey = e.k;
   ev.dataTransfer.setData(KEY_TYPE, e.k);
   ev.dataTransfer.setData('text/plain', e.k);
-  ev.dataTransfer.effectAllowed = 'link';
+  // ("move": Safari doesn't drop a "link" drag.)
+  ev.dataTransfer.effectAllowed = 'move';
 });
 rowsEl.addEventListener('dragend', () => { dragKey = null; markJoin(null); });
 let joinEl = null;
@@ -10453,19 +10455,23 @@ function markJoin(r, e) {
   hint.hidden = !r;
   if (r) hint.textContent = 'Join under \u201c' + (e.f.title || e.k) + '\u201d';
 }
-rowsEl.addEventListener('dragover', ev => {
+// (Safari takes a row as somewhere to drop only if it says so as the drag
+// enters it, as well as while it's over it.)
+const joinOver = ev => {
   if (!dragKey) return;
-  const r = ev.target.closest('.row[data-i]');
+  const r = ev.target.closest && ev.target.closest('.row[data-i]');
   const e = r && state.view[+r.dataset.i];
   if (!e || e.k === dragKey || e.ib) { markJoin(null); return; }
   ev.preventDefault();
-  ev.dataTransfer.dropEffect = 'link';
+  ev.dataTransfer.dropEffect = 'move';
   markJoin(r, e);
-});
+};
+rowsEl.addEventListener('dragenter', joinOver);
+rowsEl.addEventListener('dragover', joinOver);
 rowsEl.addEventListener('drop', ev => {
   if (!dragKey) return;
   ev.preventDefault();
-  const r = ev.target.closest('.row[data-i]'), e = r && state.view[+r.dataset.i], moved = BYKEY.get(dragKey);
+  const r = ev.target.closest && ev.target.closest('.row[data-i]'), e = r && state.view[+r.dataset.i], moved = BYKEY.get(dragKey);
   dragKey = null;
   markJoin(null);
   if (!e || !moved || e === moved) return;
@@ -10957,7 +10963,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-03.09</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-03.10</small>`;
 };
 
 function gunzipJSON(bytes) {
