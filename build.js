@@ -776,3 +776,5 @@ function checkRename_(before, after, oldKey, newKey) {
   });
   return b;
 }
+
+;if (self.document) (self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {}).build = '2026-10-04.02';
