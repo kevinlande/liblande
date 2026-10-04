@@ -324,9 +324,15 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 /* Adding, on an iPad or a computer: a panel over the library (a phone's
    screen is too small for one; there it fills the screen). */
 @media (min-width: 700px) {
-  .sheet.pop:not([hidden]) { background: rgba(0, 0, 0, .32); padding: max(16px, env(safe-area-inset-top, 0px)) 16px 16px; overflow: hidden; align-content: center; }
-  .sheet.pop .setup-card { width: min(760px, 100%); max-height: calc(100dvh - 32px - env(safe-area-inset-top, 0px)); overflow-y: auto; overscroll-behavior: contain; margin: 0; padding: 0 20px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); box-shadow: 0 18px 60px rgba(0, 0, 0, .3); }
-  .sheet.pop .sheet-head { padding-top: 12px; }
+  .setup.pop:not([hidden]) { background: rgba(0, 0, 0, .32); padding: max(16px, env(safe-area-inset-top, 0px)) 16px 16px; overflow: hidden; align-content: center; }
+  .setup.pop .setup-card { width: min(760px, 100%); max-height: calc(100dvh - 32px - env(safe-area-inset-top, 0px)); overflow-y: auto; overscroll-behavior: contain; margin: 0; padding: 0 20px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); box-shadow: 0 18px 60px rgba(0, 0, 0, .3); }
+  .setup.pop .sheet-head { padding-top: 12px; }
+  /* Every other panel (updates, export, applying edits, shortcuts,
+     Settings): narrower, its title at the top and its buttons at the
+     bottom, both in view while the middle scrolls. */
+  .setup.pop:not(.compact) .setup-card { width: min(620px, 100%); padding-top: 18px; }
+  .setup.pop:not(.head-mode) .setup-actions { position: sticky; bottom: -16px; margin: 4px -20px -16px; padding: 12px 20px 16px; background: var(--bg); border-top: 1px solid var(--line); }
+  .setup.pop.head-mode:not(.compact) .setup-card { padding-top: 0; }
 }
 /* Settings: a list of rows (a switch or a tick box, each with a line of
    explanation), then the library's files. */
@@ -760,7 +766,7 @@ button.fileicon { border: 0; background: none; cursor: pointer; }
 .jc-meta { color: var(--muted); font-size: 12.5px; }
 .jc-main { flex: none; visibility: hidden; padding: 1px 8px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-size: 11.5px; font-weight: 600; }
 .join-choice:has(input:checked) .jc-main { visibility: visible; }
-@media (min-width: 700px) { .sheet.pop.join-sheet .setup-card { width: min(560px, 100%); } }
+@media (min-width: 700px) { .setup.pop.join-sheet .setup-card { width: min(560px, 100%); } }
 .d-versions ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 14px; }
 .d-versions li.me b { font-weight: 600; }
 .d-versions button[data-version] { border: 0; background: none; padding: 0; font: inherit; color: var(--accent); text-align: left; cursor: pointer; }
@@ -1606,7 +1612,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-03.11</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-04.01</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1621,7 +1627,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-03.11';
+      l.querySelector('small').textContent = 'Version 2026-10-04.01';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1633,7 +1639,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-03.11): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-04.01): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -1882,7 +1888,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-03.11`;
+    `<br>LibLande version 2026-10-04.01`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -9410,7 +9416,10 @@ const starButtons = r => [1, 2, 3, 4, 5].map(i => `<button type="button" data-st
 
 function showSheet(html, saveLabel) {
   undockSheet();
-  $('#sheet').classList.remove('head-mode', 'compact', 'pop');
+  // (On an iPad or computer, a panel over the library; a phone's fills the
+  // screen.)
+  $('#sheet').classList.remove('head-mode', 'compact', 'join-sheet');
+  $('#sheet').classList.add('pop');
   $('#sheetBody').innerHTML = html;
   $('#sheetSave').textContent = saveLabel;
   $('#sheetSave').hidden = false;
@@ -9418,7 +9427,7 @@ function showSheet(html, saveLabel) {
   $('#sheetCancel').textContent = 'Cancel';
   sheetMsg('');
   $('#sheet').hidden = false;
-  $('#sheet').scrollTop = 0;
+  $('#sheet').scrollTop = $('#sheetForm').scrollTop = 0;
   closeDrawer();
   const first = $('#sheetBody').querySelector('input[type="text"], textarea');
   if (first && !coarseMQ.matches) first.focus();
@@ -9491,6 +9500,7 @@ function openEdit(e) {
       `</div></fieldset>`;
   }
   showSheet(h, 'Save');
+  $('#sheet').classList.remove('pop');
   $('#sheet').classList.add('head-mode', 'compact');
   // Fill in, next to the DOI: what Crossref has for the empty fields.
   const doi = $('#fld-doi');
@@ -10320,6 +10330,26 @@ async function saveForth() {
   sheetBusy(true);
   let done = 0;
   try {
+    // Straight to the .bib (on GitHub Pages): all of them in one save.
+    if (DIRECT && window.LIBLANDE_PAGES) {
+      sheetMsg('Saving ' + todo.length + ' update' + (todo.length === 1 ? '' : 's') + ' to ' + DATA.source + '\u2026');
+      const now = bibdeskTime();
+      const res = await callServer('saveEntries', { items: todo.map(x => ({ key: x.e.k, set: x.set, expectHash: x.e.h || null })), modified: now, backupName: fileTime() });
+      if (res.stamp) lastBibStamp = res.stamp;
+      todo.forEach(x => {
+        if (!res.hashes[x.e.k]) return;
+        x.e.h = res.hashes[x.e.k];
+        setFields(x.e, Object.assign({}, x.set, { 'date-modified': now }));
+        done++;
+      });
+      init(DATA, true);
+      afterWrite();
+      closeSheet();
+      const skipped = res.skipped || [];
+      toast('Updated ' + done + ' publication' + (done === 1 ? '' : 's') +
+        (skipped.length ? '; ' + skipped.length + ' left as they were (changed elsewhere since LibLande read them)' : ''), skipped.length ? 7000 : 4000);
+      return;
+    }
     for (const x of todo) {
       sheetMsg('Saving ' + (++done) + ' of ' + todo.length + '\u2026');
       await writeEdit(x.e, x.set, [], []);
@@ -10327,7 +10357,7 @@ async function saveForth() {
     closeSheet();
     toast('Updated ' + todo.length + ' publication' + (todo.length === 1 ? '' : 's'), 4000);
   } catch (err) {
-    sheetMsg('Saved ' + (done - 1) + '; then: ' + errText(err), true);
+    sheetMsg((done ? 'Saved ' + (done - 1) + '; then: ' : '') + errText(err), true);
   } finally {
     if (sheet === s) sheetBusy(false);
   }
@@ -11001,7 +11031,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-03.11</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-04.01</small>`;
 };
 
 function gunzipJSON(bytes) {
@@ -11234,6 +11264,8 @@ if (!gs) {
     $('#loading').hidden = true;
     $('#setup').hidden = false;
     $('#setup').classList.toggle('head-mode', configured);
+    // (Settings: a panel over the library; the first setup fills the screen.)
+    $('#setup').classList.toggle('pop', configured);
     $('#setHead').hidden = !configured;
     $('#setupTitle').hidden = configured;
     $('#setupIntro').hidden = configured;

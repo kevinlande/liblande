@@ -147,6 +147,36 @@
       }
       return { text: next, hash: hashOf(next, key) };
     },
+    // Several entries' fields at once (updates from Crossref, say), in one
+    // save: each checked against its fingerprint and edited, then the whole
+    // checked once. An entry that can't be edited is left out, with why.
+    saveMany(text, items, modified) {
+      const before = parseBib_(text)[0];
+      let cur = text;
+      const applied = [], skipped = [];
+      for (const it of items) {
+        try {
+          if (it.expectHash && hashOf(cur, it.key) !== it.expectHash) throw new Error('It has been changed since LibLande last read it (perhaps in BibDesk).');
+          const set = Object.assign({}, it.set, { 'date-modified': modified });
+          cur = editEntry_(cur, it.key, set);
+          applied.push({ key: it.key, set });
+        } catch (e) {
+          skipped.push({ key: it.key, reason: e.message });
+        }
+      }
+      if (!applied.length) return { text: null, hashes: {}, skipped };
+      const after = parseBib_(cur)[0];
+      if (after.length !== before.length) throw new Error('The updates would have changed the number of entries, so LibLande didn\u2019t save them.');
+      const byKey = new Map(after.map(e => [e[1], e]));
+      applied.forEach(a => Object.keys(a.set).forEach(n => {
+        const want = a.set[n] == null ? '' : String(a.set[n]), e = byKey.get(a.key);
+        const got = e && e[2][n] !== undefined ? e[2][n] : '';
+        if (got !== want) throw new Error('The ' + n + ' field of ' + a.key + ' didn\u2019t come out as expected, so LibLande didn\u2019t save the updates.');
+      }));
+      const hashes = {};
+      applied.forEach(a => { hashes[a.key] = hashOf(cur, a.key); });
+      return { text: cur, hashes, skipped };
+    },
     // A new cite key (renameKey_ and checkRename_ in Build.gs).
     renameKey(text, req) {
       const loc = locateEntry_(text, req.key);
@@ -588,6 +618,14 @@
         d.syncedKeys = g.keys;
         d.seeded = true;
       });
+    });
+
+    // Several entries changed in one save (core.saveMany): one backup, one
+    // upload.
+    F.saveEntries = req => serial(async () => {
+      if (!(await direct())) throw new Error('Turn on \u201cSave edits straight to your .bib file\u201d in settings first.');
+      const out = await changeFile(await mainBibId(), text => run('saveMany', text, req.items || [], req.modified), req.backupName);
+      return { stamp: out.stamp || null, hashes: out.hashes || {}, skipped: out.skipped || [] };
     });
 
     // A new cite key (as Code.gs's renameKey): in the .bib, then the
