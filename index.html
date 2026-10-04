@@ -194,15 +194,13 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
   background: var(--side); border-right: 1px solid var(--line);
   display: flex; flex-direction: column; min-height: 0; overflow: hidden;
 }
-:root { --top-room: 0px; }
-/* On GitHub Pages: a strip pinned across the top, the status bar's height,
+/* A strip pinned across the top, the status bar's height,
    in the bars' colour. Safari 26 (iPadOS 26) fills the status bar's area
    with the colour of a full-width pinned element it finds just below the
    top edge; without one, it draws a haze there instead, over the top bars.
    (It looks for it as a tap would, so it can't be see-through to taps.) */
 .status-cap { position: fixed; top: 0; left: 0; right: 0; height: max(6px, env(safe-area-inset-top, 0px)); background: var(--panel); z-index: 2147483000; }
-:root.top-room { --top-room: 12px; }
-.side-head { padding: calc(12px + max(env(safe-area-inset-top, 0px), var(--top-room))) 8px 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.side-head { padding: calc(12px + env(safe-area-inset-top, 0px)) 8px 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .side-actions { display: flex; align-items: center; gap: 2px; }
 .side-head h1 { margin: 0; font: 600 17px/1.2 var(--serif); letter-spacing: .005em; display: flex; align-items: center; gap: 8px; }
 .app-icon { width: 26px; height: 26px; flex: none; }
@@ -267,7 +265,7 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .seg button { border: 0; background: none; padding: 4px 6px; font-size: 11.5px; color: var(--muted); text-align: center; min-width: 0; }
 .seg button + button { border-left: 1px solid var(--line); }
 .seg button[aria-checked="true"] { background: var(--accent); color: var(--accent-ink); }
-.setup { position: fixed; inset: 0; z-index: 65; background: var(--bg); overflow-y: auto; padding: calc(24px + max(env(safe-area-inset-top, 0px), var(--top-room))) 16px calc(24px + env(safe-area-inset-bottom, 0px)); display: grid; justify-items: center; align-content: start; }
+.setup { position: fixed; inset: 0; z-index: 65; background: var(--bg); overflow-y: auto; padding: calc(24px + env(safe-area-inset-top, 0px)) 16px calc(24px + env(safe-area-inset-bottom, 0px)); display: grid; justify-items: center; align-content: start; }
 .setup-card { width: min(520px, 100%); display: grid; gap: 8px; margin-top: 6vh; }
 .setup-card h2 { margin: 0 0 4px; font: 600 26px/1.2 var(--serif); }
 .setup-card p { margin: 0; color: var(--muted); line-height: 1.5; }
@@ -291,7 +289,7 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .setup.head-mode { padding-top: 0; }
 .setup.head-mode .setup-card { margin-top: 0; }
 .sheet-head { position: sticky; top: 0; z-index: 3; display: flex; align-items: center; gap: 8px; margin: 0 0 4px;
-  padding: calc(10px + max(env(safe-area-inset-top, 0px), var(--top-room))) 0 8px; background: var(--bg); border-bottom: 1px solid var(--line); }
+  padding: calc(10px + env(safe-area-inset-top, 0px)) 0 8px; background: var(--bg); border-bottom: 1px solid var(--line); }
 .setup-card .sheet-head h2 { flex: 1; min-width: 0; margin: 0; }
 .sheet-head .sheet-x { flex: none; width: 36px; height: 36px; justify-content: center; padding: 0; }
 .sheet-head .sheet-x .i { width: 18px; height: 18px; }
@@ -485,7 +483,7 @@ body:has(#sheet:not([hidden])) .pick-bar { visibility: hidden; }
 /* (Around the list: a frame laid over it, since the list's own outline
    was drawn under the rows, which cut it into stripes.) */
 .listwrap.drop-on::after { content: ''; position: absolute; inset: 0; z-index: 20; border: 3px solid var(--accent); border-radius: 8px; background: color-mix(in srgb, var(--accent) 6%, transparent); pointer-events: none; }
-.drop-hint { position: fixed; top: calc(12px + max(env(safe-area-inset-top, 0px), var(--top-room))); left: 50%; transform: translateX(-50%); z-index: 90; pointer-events: none; max-width: calc(100% - 32px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 7px 14px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-size: 13.5px; font-weight: 600; box-shadow: 0 4px 16px rgba(0,0,0,.18); }
+.drop-hint { position: fixed; top: calc(12px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); z-index: 90; pointer-events: none; max-width: calc(100% - 32px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 7px 14px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-size: 13.5px; font-weight: 600; box-shadow: 0 4px 16px rgba(0,0,0,.18); }
 .attach-choice { display: grid; gap: 10px; margin-top: 10px; }
 .setup-card .attach-choice input[type="radio"] { width: 16px; height: 16px; accent-color: var(--accent); }
 .setup-edit { display: grid; gap: 4px; margin: 6px 0 4px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
@@ -576,7 +574,7 @@ body:has(#sheet:not([hidden])) .pick-bar { visibility: hidden; }
 .toolbar {
   --tb-gap: 8px;
   display: flex; align-items: center; gap: var(--tb-gap); flex-wrap: wrap;
-  padding: calc(8px + max(env(safe-area-inset-top, 0px), var(--top-room))) 12px 8px; border-bottom: 1px solid var(--line); background: var(--panel);
+  padding: calc(8px + env(safe-area-inset-top, 0px)) 12px 8px; border-bottom: 1px solid var(--line); background: var(--panel);
 }
 .tb-btn {
   display: inline-flex; align-items: center; gap: 4px;
@@ -849,7 +847,7 @@ details.d-sec[open] summary { margin-bottom: 8px; }
 .viewer { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; background: var(--paper-bg); }
 .v-bar {
   display: flex; align-items: center; gap: 6px; padding: 6px 8px;
-  padding-top: calc(6px + max(env(safe-area-inset-top, 0px), var(--top-room)));
+  padding-top: calc(6px + env(safe-area-inset-top, 0px));
   padding-left: calc(8px + env(safe-area-inset-left, 0px)); padding-right: calc(8px + env(safe-area-inset-right, 0px));
   background: var(--panel); border-bottom: 1px solid var(--line);
 }
@@ -1309,7 +1307,7 @@ details.d-sec[open] summary { margin-bottom: 8px; }
   .sidebar { position: static; transform: none; width: auto; box-shadow: none; border-right: 0; padding: 0; transition: none; }
   .app[data-view="groups"] .main { display: none; }
   .app:not([data-view="groups"]) .sidebar { display: none; }
-  .side-head { padding: calc(12px + max(env(safe-area-inset-top, 0px), var(--top-room))) 10px 8px 16px; }
+  .side-head { padding: calc(12px + env(safe-area-inset-top, 0px)) 10px 8px 16px; }
   .side-head h1 { font-size: 26px; gap: 10px; }
   .app-icon { width: 34px; height: 34px; }
   .side-head .x { display: none; }
@@ -1318,7 +1316,7 @@ details.d-sec[open] summary { margin-bottom: 8px; }
   /* (Low into the home indicator's room, kept in from the sides clear of
      the screen's rounded corners.) */
   .side-foot { padding: 10px 24px max(10px, calc(env(safe-area-inset-bottom, 0px) - 22px)) 24px; }
-  .toolbar { padding: calc(8px + max(env(safe-area-inset-top, 0px), var(--top-room))) 12px 8px; }
+  .toolbar { padding: calc(8px + env(safe-area-inset-top, 0px)) 12px 8px; }
   /* The list shows the sidebar icon (to the groups); a publication, a back
      button to the list. */
   .tb-side { display: none; }
@@ -1385,18 +1383,10 @@ try {
   var look = JSON.parse(localStorage.getItem('landelib.style'));
   if (look && look !== 'liblande') document.documentElement.setAttribute('data-style', look);
 } catch (e) {}
-// iPadOS draws a translucent haze under the status bar of Home Screen
-// apps, over the top of the page. LibLande (inside Google's frame) can't
-// turn it off, so it leaves a little room for it when it can tell it's a
-// Home Screen app on an iPad. (An iPhone needs none.) On GitHub Pages the
-// page reaches the top of the screen and the bars leave the status bar's
-// own height (safe-area-inset-top) instead.
+// The page reaches the top of the screen; the bars leave the status bar's
+// own height (safe-area-inset-top), and the strip behind the status bar
+// (.status-cap) is in the bars' colour.
 try {
-  localStorage.removeItem('landelib.topRoom');
-  localStorage.removeItem('landelib.paletteAway');
-  var ipad = /iPad/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  var homeScreen = navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
-  if (ipad && homeScreen && !window.LIBLANDE_PAGES) document.documentElement.classList.add('top-room');
   if (window.LIBLANDE_PAGES) document.addEventListener('DOMContentLoaded', function () {
     var cap = document.createElement('div');
     cap.className = 'status-cap';
@@ -1612,7 +1602,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-04.03</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-04.04</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1627,7 +1617,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-04.03';
+      l.querySelector('small').textContent = 'Version 2026-10-04.04';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1639,7 +1629,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-04.03): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-04.04): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -1796,7 +1786,6 @@ $('#themeSeg').addEventListener('click', ev => {
     location.reload();
     return;
   }
-  if (window.LIBLANDE_PAGES) toast('The strip behind the clock takes the new colour the next time LibLande opens.', 4000);
   if (window.google && google.script && google.script.run) google.script.run.withFailureHandler(() => {}).savePrefs({ theme: b.dataset.themeSet });
 });
 
@@ -1908,7 +1897,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-04.03`;
+    `<br>LibLande version 2026-10-04.04`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -1925,7 +1914,7 @@ function init(data, again) {
 }
 
 /* ------------------------------------------------------------ reading list */
-// Kept by Apps Script in LibLande/reading-list.json. Up next is a short
+// Kept in LibLande/reading-list.json. Up next is a short
 // list (about five) of what you mean to read soon; Later holds the rest.
 const UP_NEXT = 5;
 let READING = { items: [], done: [], seeded: true };
@@ -1970,7 +1959,7 @@ function rlTag(e) {
   return x && x.list === 'next' ? '<span class="rl-tag next">Up next</span>' : '';
 }
 
-// Local copy of Apps Script's change, so the page updates at once.
+// The change made here at once, so the page updates before it's saved.
 function readingLocal(req) {
   const d = READING, find = k => d.items.find(x => x.key === k), now = Date.now();
   if (req.op === 'seed') {
@@ -1987,7 +1976,7 @@ function readingLocal(req) {
     if (req.op === 'done') d.done.unshift({ key: req.key, at: now });
   }
 }
-// Changes show at once and go to Apps Script together, a moment after the
+// Changes show at once and are saved together, a moment after the
 // last one, so a run of them (in Triage, say) is one save of the .bib.
 const RL_QUEUE = { ops: [], push: [], pull: [], timer: 0, busy: null };
 function rlOp(req, message) {
@@ -2139,8 +2128,7 @@ $('#vRL').addEventListener('click', () => {
 // group yet go into it, and finished ones come out of it.
 let readingChecked = false;
 function seedReading() {
-  // (Not on GitHub Pages until Apps Script has answered it there.)
-  if (!gs || window.LIBLANDE_NO_EDITS || !ENTRIES.length || readingChecked) return;
+  if (!gs || !ENTRIES.length || readingChecked) return;
   readingChecked = true;
   const g = readingGroup(), inGroup = new Set(g ? g.items.map(e => e.k) : []);
   const pending = new Set(PENDING.map(p => p.key));
@@ -2947,7 +2935,7 @@ const pickBox = e => `<span class="pickbox${state.picked.has(e.k) ? ' on' : ''}"
 function rowHTML(e, i, top, h) {
   const f = e.files && e.files[0], n = readablePdfs(e).length;
   // The file icon opens the PDF in the reader (a menu when there are
-  // several); without Apps Script, or for a file not found in Drive, it
+  // several); without a server (the local tests), or for a file not found in Drive, it
   // links to Google Drive.
   const file = state.picking ? pickBox(e) : n
     ? `<button type="button" class="fileicon" data-open-pdf="${i}" title="${n > 1 ? 'Read one of its ' + n + ' PDFs' : 'Read ' + esc(f.n)}" aria-label="Read the PDF">${ICON.doc}</button>`
@@ -3436,7 +3424,7 @@ function renderDetail() {
       : menu('', `${ICON.drive}<span>Drive</span>`, 'Open in Google Drive', files.map(drive).join('')));
   } else {
     // Not openable here (not found in Drive, or the page isn't running in
-    // Apps Script): links to Google Drive.
+    // a server): links to Google Drive.
     files.forEach((fl, j) => {
       const num = files.length > 1 ? ' ' + (j + 1) : '';
       btns.push(`<a class="btn${j === 0 ? ' primary act-read' : ''}" href="${esc(driveUrl(fl))}" target="_blank" rel="noopener" title="${esc(fl.p)}">${ICON.doc}<span>${fl.id ? 'Open PDF' : 'Find in Drive'}${num}</span></a>`);
@@ -3529,7 +3517,7 @@ function renderDetail() {
   loadThumbs();
 }
 
-// Thumbnails come from Google Drive through Apps Script (getThumbnails)
+// Thumbnails come from Google Drive (getThumbnails)
 // and are kept for this visit. A PDF Drive hasn't made one for yet shows
 // an icon, and is asked about again a minute later.
 const THUMBS = new Map(), THUMB_WAIT = new Set();
@@ -4601,8 +4589,8 @@ window.addEventListener('keydown', ev => {
   if (V.tool !== 'read' && !$('#viewer').hidden && /^(Backspace|Delete|z|y)$/i.test(ev.key)) setTimeout(markDrawing, 0);
 }, true);
 // The PDF with its new annotations goes back into the same Google Drive
-// file (so its link in the .bib stays the same), after Apps Script copies
-// the old version to LibLande/Backups/PDFs. If the file changed elsewhere
+// file (so its link in the .bib stays the same), after the old version is
+// copied to LibLande/Backups/PDFs. If the file changed elsewhere
 // since it was opened (in PDF Expert, say), LibLande asks first.
 // Commit a mark being drawn. With the pen (or eraser) on, PDF.js can end
 // the drawing in place, staying in ink mode; otherwise switch PDF.js to no
@@ -10049,7 +10037,7 @@ async function quietRefresh() {
 }
 
 /* ------------------------------------------------------------ pending edits */
-// Edits to the main .bib wait as pending edits (kept by Apps Script) until
+// Edits to the main .bib wait as pending edits (in LibLande/pending-edits.json) until
 // you apply them. The page shows them on top of the library as if applied.
 let PENDING = [];
 // Whether edits go straight into the .bib (setDirect in Code.gs).
@@ -10350,8 +10338,8 @@ async function saveForth() {
   sheetBusy(true);
   let done = 0;
   try {
-    // Straight to the .bib (on GitHub Pages): all of them in one save.
-    if (DIRECT && window.LIBLANDE_PAGES) {
+    // Straight to the .bib: all of them in one save.
+    if (DIRECT) {
       sheetMsg('Saving ' + todo.length + ' update' + (todo.length === 1 ? '' : 's') + ' to ' + DATA.source + '\u2026');
       const now = bibdeskTime();
       const res = await callServer('saveEntries', { items: todo.map(x => ({ key: x.e.k, set: x.set, expectHash: x.e.h || null })), modified: now, backupName: fileTime() });
@@ -11013,13 +11001,14 @@ document.addEventListener('keydown', ev => {
 });
 
 /* ------------------------------------------------------------ load */
-// Served by Apps Script: the server returns library.json gzipped and base64-encoded.
-// Anywhere else: fetch library.json next to the page.
+// With the server (pages/server.js, standing in for google.script.run):
+// the library from Google Drive. Without one (the local tests): fetch
+// library.json next to the page.
 const gs = window.google && google.script && google.script.run;
 const callServer = (name, ...args) => new Promise((resolve, reject) => {
   const runner = gs.withSuccessHandler(resolve).withFailureHandler(reject);
   if (typeof runner[name] !== 'function') {
-    reject(new Error('This page needs a newer Code.gs (it has no ' + name + ' function). In Apps Script, paste the latest Code.gs, then deploy a new version.'));
+    reject(new Error('LibLande can\u2019t do this (' + name + '). Close it and open it again to get the latest version.'));
     return;
   }
   runner[name](...args);
@@ -11051,7 +11040,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-04.03</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-04.04</small>`;
 };
 
 function gunzipJSON(bytes) {
@@ -11059,15 +11048,13 @@ function gunzipJSON(bytes) {
 }
 const b64ToBytes = b64 => Uint8Array.from(atob(b64), c => c.charCodeAt(0));
 
-// Download library.json.gz. Apps Script only says which file and hands over
-// a token; the file itself comes straight from Google Drive, which is much
-// faster than passing 2 MB back through Apps Script. If that fails, fall
-// back to the slower route.
+// Download library.json.gz from Google Drive. If that fails, the server is
+// asked for it as base64 (getLibrary).
 async function download() {
   // The status (from getStatus) says where the library is, with a token;
-  // only without them (or if the token has run out) is Apps Script asked.
+  // only without them (or if the token has run out) is the server asked.
   const fromStatus = status && status.libraryId && status.token ? { id: status.libraryId, stamp: status.stamp, token: status.token } : null;
-  // (On GitHub Pages, a library just built on this device is at hand.)
+  // (A library just built on this device is at hand.)
   const built = window.LIBLANDE_BUILT;
   if (built && status && built.id === status.libraryId && built.stamp === status.stamp) return { stamp: built.stamp, gz: built.gz };
   const get = info => fetch('https:\/\/www.googleapis.com/drive/v3/files/' + encodeURIComponent(info.id) + '?alt=media',
@@ -11076,7 +11063,7 @@ async function download() {
     let info = fromStatus, r = null;
     if (info) { stage('Downloading the library from Google Drive'); r = await get(info); }
     if (!r || r.status === 401 || r.status === 403) {
-      stage(window.LIBLANDE_PAGES ? 'Finding the library in Google Drive' : 'Asking Apps Script where the library is');
+      stage('Finding the library in Google Drive');
       info = await callServer('getLibraryInfo');
       stage('Downloading the library from Google Drive');
       r = await get(info);
@@ -11084,8 +11071,8 @@ async function download() {
     if (!r.ok) throw new Error('Drive answered ' + r.status);
     return { stamp: info.stamp, gz: new Uint8Array(await r.arrayBuffer()) };
   } catch (e) {
-    console.warn('Direct Drive download failed; using Apps Script instead.', e);
-    stage(window.LIBLANDE_PAGES ? 'Downloading the library again' : 'Downloading the library through Apps Script');
+    console.warn('Direct Drive download failed; trying again another way.', e);
+    stage('Downloading the library again');
     const r = await callServer('getLibrary');
     return { stamp: r.stamp, gz: b64ToBytes(r.library) };
   }
@@ -11152,13 +11139,13 @@ if (!gs) {
     const cached = await Promise.race([cache.get(), new Promise(r => setTimeout(() => r(null), 3000))]);
     if (cached) {
       // A saved copy means LibLande is set up: show Add and Settings now,
-      // not after Apps Script answers (how adding works is remembered from
+      // not after Google Drive answers (how adding works is remembered from
       // last time until then).
       DIRECT = store.get('direct', false);
       $('#settingsBtn').hidden = false; $('#addBtn').hidden = false;
       await show(cached, false);
     }
-    stage(window.LIBLANDE_PAGES ? 'Checking Google Drive' : 'Contacting Apps Script');
+    stage(gs ? 'Checking Google Drive' : 'Loading');
     statusReq = callServer('getStatus');
     statusReq.catch(() => { statusReq = null; });
     status = await statusReq;
@@ -11209,8 +11196,8 @@ if (!gs) {
     else showError(err);
   });
 
-  // Refresh: ask Apps Script to check the .bib now, then download the
-  // library if it's newer than the copy on this page.
+  // Refresh: look at the .bib now (rebuilding the library if it changed),
+  // then load the library if it's newer than the copy on this page.
   const btn = $('#refreshBtn');
   btn.hidden = false;
   btn.addEventListener('click', () => {
@@ -11319,7 +11306,7 @@ if (!gs) {
   });
   $('#setClose').addEventListener('click', closeSettings);
   document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && !$('#setup').hidden && !$('#setHead').hidden) { ev.preventDefault(); closeSettings(); } });
-  // With a saved copy, Settings shows before Apps Script has answered: wait
+  // With a saved copy, Settings shows before Google Drive has answered: wait
   // for the answer (or ask again, if it failed) rather than show the
   // first-time setup.
   $('#settingsBtn').addEventListener('click', async () => {

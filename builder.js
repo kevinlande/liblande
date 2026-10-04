@@ -1,16 +1,15 @@
 /*
  * LibLande on GitHub Pages: building the library on this device.
  *
- * The same steps as runBuild_ in Code.gs, with Drive's web API instead of
- * Apps Script's: look at the .bib and the inbox; if either changed (or
- * once a day, to catch new and renamed PDFs), list the papers folder, read
- * the .bib, parse it with Build.gs (the same file Apps Script uses, served
- * here as build.js) and save library.json.gz in the LibLande folder.
+ * The same steps as runBuild_ in Code.gs (Apps Script's, until LibLande
+ * moved), with Drive's web API: look at the .bib and the inbox; if either
+ * changed (or once a day, to catch new and renamed PDFs), list the papers
+ * folder, read the .bib, parse it with Build.gs (served here as build.js)
+ * and save library.json.gz in the LibLande folder.
  *
  * What the last build was made from goes on library.json.gz itself, as
  * Drive file properties (bibStamp, inboxStamp, signature, buildVersion,
- * lastFull), which Apps Script reads and writes too: whichever side builds
- * first, the other sees the library is current and leaves it be.
+ * lastFull): a device that finds them current leaves the library be.
  *
  * makeBuilder(io): io.drive(path, opts, base) is an authorised Drive
  * request that throws unless it worked; io.reconcile(groups) brings the
@@ -20,7 +19,7 @@
  */
 (function (root) {
   'use strict';
-  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).builder = '2026-10-04.03';
+  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).builder = '2026-10-04.04';
   const FOLDER = 'application/vnd.google-apps.folder';
   const DATA_FOLDER = 'LibLande', LIBRARY_FILE = 'library.json.gz', INDEX_FILE = 'file-index.json',
     SETTINGS_FILE = 'settings.json', INBOX_FOLDER = 'Inbox', INBOX_FILE = 'LibLande inbox.bib';

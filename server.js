@@ -1,23 +1,23 @@
 /*
- * LibLande on GitHub Pages: what Apps Script's Code.gs does, done here.
+ * LibLande on GitHub Pages: its server, in the browser.
  *
- * The page (index.html, the same file Apps Script serves) talks to its
- * server through google.script.run. Here that's answered in the browser,
+ * The page (index.html) talks to its server through google.script.run, as
+ * it did when Apps Script served it (until 2026-10-04; Code.gs is kept in
+ * the repo as a record). Here that's answered in the browser,
  * with Google Drive's web API and a Drive sign-in: the status, settings
  * (LibLande/settings.json) and preferences (prefs.json), the library's
  * download, PDF backups, thumbnails, DOI lookups (from Crossref) and
  * exports; the library is built here (builder.js) when the .bib or the
  * inbox has changed, on opening and on Refresh; and adding and editing
  * entries, pending edits, groups and the reading list change the .bib here
- * (edits.js), with the same checks and backups as Code.gs. Apps Script
- * isn't asked anything.
+ * (edits.js), with the same checks and backups as Code.gs had.
  */
 (() => {
   'use strict';
   window.LIBLANDE_PAGES = true;
   // (Which version each part of the app is from: index.html checks they
   // match. build.py fills it in.)
-  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-10-04.03';
+  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-10-04.04';
   const CLIENT_ID = '789682218462-98mjugngb46ttd01ucp9dcj71ufspjgn.apps.googleusercontent.com';
   // Google Drive (your .bib, papers and LibLande folder): all it needs.
   const SCOPE = 'https://www.googleapis.com/auth/drive';
@@ -39,7 +39,7 @@
   // that's missing or has run out waits for one: a bar asks for it, and any
   // tap will do. A token kept from last time is used while it lasts.
   let token = store.get('token', null);   // {value, at, expiresIn, scope}
-  // (One from before Apps Script was asked too lacks its permissions.)
+  // (One asked for with other permissions is asked for again.)
   if (token && token.scope !== SCOPE) token = null;
   let email = store.get('email', '');
   let client = null, asking = false, waiters = [];
@@ -301,7 +301,7 @@
     async getLibraryInfo() {
       const folder = await dataFolder();
       const lib = folder && await fileIn(folder, LIBRARY_FILE);
-      if (!lib) throw new Error('The library hasn’t been built yet. Open LibLande on Apps Script to build it.');
+      if (!lib) throw new Error('The library hasn\u2019t been built yet. Tap Refresh to build it.');
       return { id: lib.id, stamp: Date.parse(lib.modifiedTime), token: await getToken() };
     },
     getToken() { return getToken(); },
@@ -352,7 +352,6 @@
       return out;
     },
   };
-  window.LIBLANDE_NO_EDITS = false;
   // Anything else the page asks for isn't in this version.
   const missing = name => () => Promise.reject(new Error('LibLande on GitHub Pages can\u2019t do this (' + name + ').'));
   // A Drive file or folder ID from a pasted link, or a bare ID (as
@@ -364,8 +363,8 @@
   }
 
   /* ------------------------------------------------------------ preferences */
-  // LibLande/prefs.json; the first time, Apps Script's (which came with
-  // the settings, when they were first copied from Apps Script). Changes are gathered for a moment, then written onto a
+  // LibLande/prefs.json; the first time, those in settings.json (copied
+  // from Apps Script's when LibLande moved). Changes are gathered for a moment, then written onto a
   // fresh copy of the file, so another device's changes to other
   // preferences aren't lost.
   const PREFS_FILE = 'prefs.json';
