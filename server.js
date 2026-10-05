@@ -17,7 +17,7 @@
   window.LIBLANDE_PAGES = true;
   // (Which version each part of the app is from: index.html checks they
   // match. build.py fills it in.)
-  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-10-05.07';
+  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-10-05.09';
   const CLIENT_ID = '789682218462-98mjugngb46ttd01ucp9dcj71ufspjgn.apps.googleusercontent.com';
   // Google Drive (your .bib, papers and LibLande folder): all it needs.
   const SCOPE = 'https://www.googleapis.com/auth/drive';
@@ -274,12 +274,16 @@
     queueEdit: later('queueEdit', req => ({ queued: true, pending: offlineLists.pending(req) })),
     discardPending: later('discardPending', key => ({ queued: true, pending: offlineLists.discard(key) })),
     applyPending(req) { return edits.applyPending(req); },
-    addToInbox(req) { return edits.addToInbox(req); },
-    addToMain(req) { return edits.addToMain(req); },
+    addToInbox: later('addToInbox', req => ({ queued: true, key: req.key })),
+    // (A PDF has to be uploaded first: with one, adding needs a connection.)
+    addToMain: later('addToMain', req => {
+      if (req.uploadId) { const e = new Error('You\u2019re offline.'); e.offline = true; throw e; }
+      return { queued: true, key: req.key, hash: null, file: null };
+    }),
     attachPdf(req) { return edits.attachPdf(req); },
-    createGroup(req) { return edits.createGroup(req); },
+    createGroup: later('createGroup', () => ({ queued: true })),
     readingOps: later('readingOps', req => ({ queued: true, reading: offlineLists.reading(req) })),
-    renameKey(req) { return edits.renameKey(req); },
+    renameKey: later('renameKey', req => ({ queued: true, hash: null, gh: null, reading: offlineLists.renameKey(req.key, String(req.newKey).trim()) })),
     saveEntries(req) { return edits.saveEntries(req); },
     // Details for a DOI, from Crossref (as Code.gs's lookupDoi).
     lookupDoi(input) { return lookupDoi(input); },
@@ -386,15 +390,17 @@
   function later(name, offline) {
     return async (...args) => {
       if (navigator.onLine && outbox.length) { try { await flushOutbox(); } catch (e) { /* tried */ } }
-      if (!navigator.onLine || outbox.length) { keepForLater(name, args); return offline(...args); }
+      // (The answer first: a change that can't be kept offline says so,
+      // and isn't kept.)
+      const keep = () => { const res = offline(...args); keepForLater(name, args); return res; };
+      if (!navigator.onLine || outbox.length) return keep();
       try {
         const res = await edits[name](...args);
         offlineLists.update(res);
         return res;
       } catch (e) {
         if (!isOffline(e)) throw e;
-        keepForLater(name, args);
-        return offline(...args);
+        return keep();
       }
     };
   }
@@ -419,6 +425,15 @@
       this.known.pending = this.known.pending.filter(e => e.key !== key);
       store.set('lists', this.known);
       return this.known.pending.slice();
+    },
+    renameKey(from, to) {
+      const swap = k => (k === from ? to : k), d = this.known.reading;
+      (d.items || []).forEach(x => { x.key = swap(x.key); });
+      (d.done || []).forEach(x => { x.key = swap(x.key); });
+      if (d.syncedKeys) d.syncedKeys = d.syncedKeys.map(swap);
+      this.known.pending.forEach(e => { e.key = swap(e.key); });
+      store.set('lists', this.known);
+      return JSON.parse(JSON.stringify(d));
     },
     reading(req) {
       const d = this.known.reading, now = Date.now();

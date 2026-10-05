@@ -1612,7 +1612,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-05.07</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-05.09</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1627,7 +1627,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-05.07';
+      l.querySelector('small').textContent = 'Version 2026-10-05.09';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1639,7 +1639,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-05.07): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-05.09): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -1907,7 +1907,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-05.07`;
+    `<br>LibLande version 2026-10-05.09`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -3989,6 +3989,28 @@ function loadPdfViewer() {
 
 // Downloads use the same kind of short-lived token as the library download.
 let tokenCache = null;
+// On GitHub Pages: the PDFs of the publications added most recently are
+// downloaded ahead, once each, a little after LibLande opens, so they
+// open with no connection too (sw.js keeps them, with the papers you've
+// opened). Only with a token already in hand (never asking you to sign
+// in for it), one at a time, and not while LibLande is in the background.
+const AHEAD = 10;
+async function fetchAhead() {
+  if (!window.LIBLANDE_PAGES || !window.caches || !navigator.onLine || !ENTRIES.length) return;
+  const list = ENTRIES.filter(e => !e.ib && readablePdfs(e).length).sort((a, b) => cmpStr(b.added || '', a.added || '')).slice(0, AHEAD);
+  let kept;
+  try { kept = await caches.open('liblande-papers'); } catch (err) { return; }
+  for (const e of list) {
+    const f = readablePdfs(e)[0], url = 'https:\/\/www.googleapis.com/drive/v3/files/' + encodeURIComponent(f.id) + '?alt=media';
+    if (await kept.match(url)) continue;
+    if (!navigator.onLine || document.hidden || !tokenCache || Date.now() - tokenCache.at > 50 * 60 * 1000) return;
+    try {
+      const r = await fetch(url, { headers: { Authorization: 'Bearer ' + tokenCache.token } });
+      if (!r.ok) return;
+      await r.arrayBuffer();
+    } catch (err) { return; }
+  }
+}
 async function driveToken(fresh) {
   if (!fresh && tokenCache && Date.now() - tokenCache.at < 30 * 60 * 1000) return tokenCache.token;
   let token;
@@ -4279,12 +4301,34 @@ async function openReader(entry, file, pos) {
       }
       JOURNAL_USE.delete(file.id);
     }
-    const data = kept ? new Uint8Array(kept.bytes) : bytes;
-    V.bytes = data; V.md5 = md5; V.openBytes = data;
+    let data = kept ? new Uint8Array(kept.bytes) : bytes;
     vStatus('Opening\u2026');
     // PDF.js takes over the buffer it's given, so hand it a copy.
-    const doc = await lib.getDocument({ data: data.slice(0), enableHWA: true }).promise;
+    let doc = await lib.getDocument({ data: data.slice(0), enableHWA: true }).promise;
     if (my !== V.token) { closePdf(doc); return; }
+    // September's underlines and strike-throughs made real (see
+    // oldLineMarks): the paper opened again, with them. (Not in the tests,
+    // unless one asks: a test paper has a stroke like them.)
+    let oldLines = 0;
+    const seenKey = file.id + ':' + (md5 || data.length);
+    if (gs && !kept && !OLD_LINES_SEEN.has(seenKey) && (!window.LIBLANDE_TEST || window.LIBLANDE_OLD_LINES) && mayHaveOldLines(data)) {
+      try {
+        const found = await oldLineMarks(doc);
+        if (found.length) {
+          const r = await convertOldLines(data, found);
+          if (r.n && my === V.token) {
+            // (The new one opened before the first is closed, as when
+            // switching papers: they share PDF.js's worker.)
+            const next = await lib.getDocument({ data: r.bytes.slice(0), enableHWA: true }).promise;
+            closePdf(doc);
+            doc = next; data = r.bytes; oldLines = r.n;
+          }
+        }
+      } catch (err) { console.warn('Old underlines:', err); }
+      if (my !== V.token) { closePdf(doc); return; }
+      if (!oldLines) { OLD_LINES_SEEN.add(seenKey); store.set('oldLinesSeen', [...OLD_LINES_SEEN].slice(-400)); }
+    }
+    V.bytes = data; V.md5 = md5; V.openBytes = data;
     ensureViewer(lib, viewerLib);
     V.doc = doc;
     // (PDF.js 6 counts the PDF's own marks as changes when it puts them on
@@ -4325,7 +4369,18 @@ async function openReader(entry, file, pos) {
       });
       toast('Your marks from ' + new Date(kept.at).toLocaleString() + ' that hadn\u2019t reached Google Drive are back' +
         (navigator.onLine ? ', and are being saved to it.' : ' (kept on this device until you\u2019re online).'), 6000);
-    } else if (clash) {
+    } else if (oldLines) {
+      // (To be saved: the paper as it now is, with the real ones.)
+      bmLoaded.then(() => {
+        if (doc !== V.doc) return;
+        V.dirty = true;
+        saveUI();
+        autoChanged();
+      });
+      toast(oldLines + (oldLines === 1 ? ' underline or strike-through' : ' underlines and strike-throughs') +
+        ' drawn as pen strokes by an earlier LibLande ' + (oldLines === 1 ? 'is' : 'are') + ' now real, as other apps show them. Saved with the paper.', 7000);
+    }
+    if (clash) {
       vStatus('Marks you made on this device (' + new Date(clash.at).toLocaleString() + ') never reached Google Drive, and the PDF there has changed since.', false,
         [['Use my marks', () => { JOURNAL_USE.add(file.id); openReader(entry, file, spot()); }],
           ['Discard them', () => { forgetKept(file.id).catch(() => {}); vStatus(''); }], ['Decide later', null]]);
@@ -6061,6 +6116,106 @@ function pageDrawn(n) {
     timer = setTimeout(finish, 3000);
   });
 }
+// A PDF mark (pdf-lib dict d) made an Underline or StrikeOut over the
+// lines in quads, with an appearance (the line, drawn) any reader can show.
+function makeLineMark(ctx, N, d, kind, q, c, rect) {
+  const f = v => (+v).toFixed(2);
+  let ops = (c.length === 3 ? c.map(f).join(' ') : '0 0 0') + ' RG 0 J\n';
+  for (let k = 0; k + 7 < q.length; k += 8) {
+    const xs = [q[k], q[k + 2], q[k + 4], q[k + 6]], ys = [q[k + 1], q[k + 3], q[k + 5], q[k + 7]];
+    const xl = Math.min(...xs), xr = Math.max(...xs), yb = Math.min(...ys), yt = Math.max(...ys), y = lineY(kind, yb, yt);
+    ops += `${f(lineThickness(yt - yb))} w ${f(xl)} ${f(y)} m ${f(xr)} ${f(y)} l S\n`;
+  }
+  const ap = ctx.register(ctx.stream(ops, { Type: 'XObject', Subtype: 'Form', BBox: rect.length === 4 ? rect : [0, 0, 1, 1], Resources: {} }));
+  d.set(N('Subtype'), N(kind === 'underline' ? 'Underline' : 'StrikeOut'));
+  d.set(N('AP'), ctx.obj({ N: ap }));
+}
+
+// Underlines and strike-throughs LibLande drew on 1 October 2026 (versions
+// .10 and .11, before it made real ones) were pen strokes: one straight,
+// level, thin stroke per line of text, a little under the text or through
+// its middle. Found when a paper opens (only one with pen strokes is
+// looked at), they become real Underline and StrikeOut marks in their
+// place, saved with the paper's next upload. A stroke that isn't on a line
+// of the paper's text is left as a drawing.
+// (Cheap, first: a stroke of exactly two points in the file at all.)
+const mayHaveOldLines = data => /\/InkList\s*\[\s*\[\s*-?[\d.]+\s+-?[\d.]+\s+-?[\d.]+\s+-?[\d.]+\s*\]/.test(new TextDecoder('latin1').decode(data));
+async function oldLineMarks(doc) {
+  const points = list => {
+    if (!list) return [];
+    if (typeof list[0] === 'number' || ArrayBuffer.isView(list)) { const o = []; for (let i = 0; i + 1 < list.length; i += 2) o.push([list[i], list[i + 1]]); return o; }
+    return Array.from(list).map(p => [p.x, p.y]);
+  };
+  // (Each stroke exactly two points at the same height: no hand draws
+  // that. 0.8 to 2 points thick, as LibLande made them.)
+  const level = a => {
+    const w = a.borderStyle ? a.borderStyle.width : 1;
+    return a.subtype === 'Ink' && a.inkLists && a.inkLists.length && w >= 0.79 && w <= 2.01 &&
+      Array.from(a.inkLists).every(l => {
+        const ps = points(l);
+        return ps.length === 2 && Math.abs(ps[0][1] - ps[1][1]) < 0.01 && Math.abs(ps[0][0] - ps[1][0]) > 3;
+      });
+  };
+  const found = [];
+  {
+    for (let p = 1; p <= doc.numPages; p++) {
+      const page = await doc.getPage(p);
+      const marks = (await page.getAnnotations()).filter(level);
+      if (!marks.length) continue;
+      const lines = (await page.getTextContent()).items.filter(it => it.str && it.str.trim())
+        .map(it => ({ x0: it.transform[4], x1: it.transform[4] + it.width, b: it.transform[5], h: it.height || Math.hypot(it.transform[2], it.transform[3]) || 10 }));
+      for (const a of marks) {
+        const quads = [];
+        let kind = null, ok = true;
+        for (const l of Array.from(a.inkLists)) {
+          const ps = points(l), xs = ps.map(q => q[0]), xl = Math.min(...xs), xr = Math.max(...xs), y = ps.reduce((t, q) => t + q[1], 0) / ps.length;
+          const line = lines.find(it => it.x1 > xl + 1 && it.x0 < xr - 1 && y > it.b - 0.45 * it.h && y < it.b + 0.8 * it.h);
+          if (!line) { ok = false; break; }
+          const k = (y - line.b) / line.h < 0.12 ? 'underline' : 'strike';
+          if (kind && k !== kind) { ok = false; break; }
+          kind = k;
+          // (A box for the line of text that puts LibLande's line where the stroke was.)
+          const H = line.h * 1.2, yb = y - (k === 'underline' ? 0.08 : 0.42) * H;
+          quads.push(xl, yb + H, xr, yb + H, xl, yb, xr, yb);
+        }
+        if (ok && kind) found.push({ id: a.id, kind, quads, color: Array.from(a.color || [0.85, 0.18, 0.13]).map(v => (v > 1 ? v / 255 : v)) });
+      }
+    }
+  }
+  return found;
+}
+async function convertOldLines(bytes, found) {
+  const { PDFDocument, PDFName, PDFDict, PDFRef } = await loadPdfLib();
+  let pdf;
+  try { pdf = await PDFDocument.load(bytes, { updateMetadata: false, throwOnInvalidObject: false }); } catch (err) { return { bytes, n: 0 }; }
+  const N = PDFName.of, ctx = pdf.context, byId = new Map(found.map(f => [f.id, f]));
+  let n = 0;
+  for (const page of pdf.getPages()) {
+    const annots = page.node.Annots();
+    if (!annots) continue;
+    for (let i = 0; i < annots.size(); i++) {
+      const ref = annots.get(i);
+      if (!(ref instanceof PDFRef)) continue;
+      const f = byId.get(ref.objectNumber + 'R' + (ref.generationNumber ? ref.generationNumber : ''));
+      const d = f && ctx.lookup(ref);
+      if (!(d instanceof PDFDict) || d.get(N('Subtype')) !== N('Ink')) continue;
+      const q = f.quads;
+      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+      for (let k = 0; k + 1 < q.length; k += 2) { x0 = Math.min(x0, q[k]); x1 = Math.max(x1, q[k]); y0 = Math.min(y0, q[k + 1]); y1 = Math.max(y1, q[k + 1]); }
+      const rect = [x0, y0, x1, y1];
+      d.delete(N('InkList')); d.delete(N('BS')); d.delete(N('Border')); d.delete(N('IT'));
+      d.set(N('QuadPoints'), ctx.obj(q));
+      d.set(N('Rect'), ctx.obj(rect));
+      d.set(N('C'), ctx.obj(f.color));
+      makeLineMark(ctx, N, d, f.kind, q, f.color, rect);
+      n++;
+    }
+  }
+  return { bytes: n ? await pdf.save({ useObjectStreams: false }) : bytes, n };
+}
+// Papers already looked at (file ID and checksum): not looked at again.
+const OLD_LINES_SEEN = new Set(store.get('oldLinesSeen', []));
+
 // For Google Drive (and sharing): LibLande's underlines and strike-throughs
 // as real Underline and StrikeOut marks, each with an appearance any PDF
 // reader can draw. A file without any comes back as it was.
@@ -6082,17 +6237,8 @@ async function realLines(bytes) {
       const ca = d.lookupMaybe(N('CA'), PDFNumber), kind = lineKindOf(ca && ca.asNumber());
       if (!kind) continue;
       const q = nums(d.lookupMaybe(N('QuadPoints'), PDFArray)), c = nums(d.lookupMaybe(N('C'), PDFArray)), rect = nums(d.lookupMaybe(N('Rect'), PDFArray));
-      const f = v => (+v).toFixed(2);
-      let ops = (c.length === 3 ? c.map(f).join(' ') : '0 0 0') + ' RG 0 J\n';
-      for (let k = 0; k + 7 < q.length; k += 8) {
-        const xs = [q[k], q[k + 2], q[k + 4], q[k + 6]], ys = [q[k + 1], q[k + 3], q[k + 5], q[k + 7]];
-        const xl = Math.min(...xs), xr = Math.max(...xs), yb = Math.min(...ys), yt = Math.max(...ys), y = lineY(kind, yb, yt);
-        ops += `${f(lineThickness(yt - yb))} w ${f(xl)} ${f(y)} m ${f(xr)} ${f(y)} l S\n`;
-      }
-      const ap = ctx.register(ctx.stream(ops, { Type: 'XObject', Subtype: 'Form', BBox: rect.length === 4 ? rect : [0, 0, 1, 1], Resources: {} }));
-      d.set(N('Subtype'), N(kind === 'underline' ? 'Underline' : 'StrikeOut'));
+      makeLineMark(ctx, N, d, kind, q, c, rect);
       d.delete(N('CA'));
-      d.set(N('AP'), ctx.obj({ N: ap }));
       n++;
     }
   }
@@ -9906,7 +10052,11 @@ async function createNewGroup() {
     const res = await callServer('createGroup', { name, keys, modified: now, backupName: fileTime() });
     const what = items.length === 1 ? ', with \u201c' + (items[0].f.title || items[0].k) + '\u201d in it' : items.length ? ', with ' + items.length + ' publications in it' : '';
     Object.assign(NG, { open: false, busy: false, name: '' });
-    if (res && res.pendingGroup) {
+    if (res && res.queued) {
+      DATA.groups = (DATA.groups || []).concat([{ name, keys: keys.slice() }]);
+      init(DATA, true);
+      toast('Created \u201c' + name + '\u201d on this device; it goes to Google Drive when you\u2019re back online', 5000);
+    } else if (res && res.pendingGroup) {
       store.set('newGroups', store.get('newGroups', []).concat([name]));
       if (res.pending) setPending(res.pending, false);
       if (items.length) await reloadLibrary(); else init(DATA, true);
@@ -10013,6 +10163,20 @@ async function quickSet(e, set, msg, undoing) {
   }
 }
 
+// A publication as the library shows it, from the fields of a new one.
+function newEntry(type, key, vals, now, inbox) {
+  const e = { k: key, t: type, f: {} };
+  if (inbox) e.ib = 1;
+  Object.keys(vals).forEach(n => {
+    e.f[n] = AREA_FIELDS.has(n) ? vals[n] : shownValue(vals[n]);
+    if (e.f[n] !== vals[n]) (e.r = e.r || {})[n] = vals[n];
+  });
+  if (vals.author) e.a = parseNamesLite(vals.author);
+  if (vals.editor) e.e = parseNamesLite(vals.editor);
+  if (vals.url) e.u = [vals.url];
+  e.f['date-added'] = e.f['date-modified'] = now;
+  return e;
+}
 async function saveAdd() {
   const type = $('#addType').value, vals = sheetValues();
   if (!vals.title) { sheetMsg('A publication needs a title.', true); return; }
@@ -10037,6 +10201,7 @@ async function saveAdd() {
   sheetBusy(true);
   try {
     let upload = null, pdfName = null;
+    if (pdf && !navigator.onLine) throw new Error('Adding a publication with its PDF needs a connection. Add it without the PDF now, and attach the PDF when you\u2019re back online.');
     if (pdf) {
       sheetMsg('Uploading the PDF\u2026');
       const info = await callServer('getInboxUploadInfo');
@@ -10050,19 +10215,13 @@ async function saveAdd() {
       res = await callServer('addToMain', { type, key, fields: vals, uploadId: upload && upload.id, prefix: papersPrefix(), now, backupName: fileTime() });
     } else {
       sheetMsg('Adding\u2026');
-      await callServer('addToInbox', { type, key, fields: vals, pdfName, now, backupName: fileTime() });
+      res = await callServer('addToInbox', { type, key, fields: vals, pdfName, now, backupName: fileTime() });
     }
-    const e = DIRECT ? { k: key, t: type, f: {}, h: res.hash } : { k: key, t: type, f: {}, ib: 1 };
-    Object.keys(vals).forEach(n => {
-      e.f[n] = AREA_FIELDS.has(n) ? vals[n] : shownValue(vals[n]);
-      if (e.f[n] !== vals[n]) (e.r = e.r || {})[n] = vals[n];
-    });
-    if (vals.author) e.a = parseNamesLite(vals.author);
-    if (vals.editor) e.e = parseNamesLite(vals.editor);
+    const e = newEntry(type, key, vals, now, !DIRECT);
+    if (DIRECT) e.h = res.hash;
+    if (res && res.queued) e.offline = true;
     if (DIRECT && res.file) e.files = [res.file];
     else if (upload && !DIRECT) e.files = [{ n: pdfName, p: 'Papers/' + pdfName, id: upload.id }];
-    if (vals.url) e.u = [vals.url];
-    e.f['date-added'] = e.f['date-modified'] = now;
     DATA.entries.push(e);
     init(DATA, true);
     closeSheet();
@@ -10071,8 +10230,9 @@ async function saveAdd() {
     renderDetail();
     revealSelected();
     if (phoneMQ.matches) go('detail');
-    showDone(vals.title, DIRECT ? 'Added to ' + DATA.source + (res.file ? ', with its PDF in ' + res.file.p.replace(/[/][^/]*$/, '') : '') : 'Added to your LibLande inbox');
     if (toRead) rlAdd(key);
+    if (res && res.queued) { showDone(vals.title, 'Added on this device; it goes to ' + (DIRECT ? DATA.source : 'your LibLande inbox') + ' when you\u2019re back online'); return; }
+    showDone(vals.title, DIRECT ? 'Added to ' + DATA.source + (res.file ? ', with its PDF in ' + res.file.p.replace(/[/][^/]*$/, '') : '') : 'Added to your LibLande inbox');
     afterWrite();
   } catch (err) {
     sheetMsg(errText(err), true);
@@ -10195,8 +10355,29 @@ function overlayOffline(data) {
   if (!kept.length) return;
   const main = new Map(data.entries.filter(e => !e.ib).map(e => [e.k, e])), inbox = new Map(data.entries.filter(e => e.ib).map(e => [e.k, e]));
   kept.forEach(x => {
+    const r = x.args[0] || {};
+    // (Added, renamed and new groups first, in the order made.)
+    if ((x.name === 'addToMain' || x.name === 'addToInbox') && !main.has(r.key) && !inbox.has(r.key)) {
+      const e = newEntry(r.type, r.key, r.fields || {}, r.now, x.name === 'addToInbox');
+      e.offline = true;
+      data.entries.push(e);
+      (x.name === 'addToInbox' ? inbox : main).set(r.key, e);
+      return;
+    }
+    if (x.name === 'renameKey') {
+      const e = main.get(r.key), to = String(r.newKey || '').trim();
+      if (!e || !to || main.has(to)) return;
+      e.k = to; e.offline = true;
+      main.delete(r.key); main.set(to, e);
+      (data.groups || []).forEach(g => { g.keys = g.keys.map(k => (k === r.key ? to : k)); });
+      return;
+    }
+    if (x.name === 'createGroup') {
+      if (!(data.groups || []).some(g => g.name === r.name)) (data.groups = data.groups || []).push({ name: r.name, keys: (r.keys || []).slice() });
+      return;
+    }
     if (x.name !== 'saveEntry') return;
-    const r = x.args[0] || {}, e = (r.where === 'inbox' ? inbox : main).get(r.key);
+    const e = (r.where === 'inbox' ? inbox : main).get(r.key);
     if (!e) return;
     e.offline = true;
     setFields(e, Object.assign({}, r.set || {}, r.modified ? { 'date-modified': r.modified } : {}));
@@ -10560,9 +10741,10 @@ async function renameEntry(e, newKey) {
     google.script.run.withFailureHandler(() => {}).savePrefs({ recentSeen: RECENT.seen.slice(0, 60), notDups: [...NOT_DUPS] });
     if (res.reading) setReading(res.reading);
     if (state.selKey === old) state.selKey = newKey;
+    if (res.queued) e.offline = true;
     init(DATA, true);
-    toast('Cite key changed to ' + newKey + '. Documents that cite ' + old + ' need the new key.', 7000);
-    afterWrite();
+    toast('Cite key changed to ' + newKey + (res.queued ? ' on this device; it goes to ' + DATA.source + ' when you\u2019re back online.' : '.') + ' Documents that cite ' + old + ' need the new key.', 7000);
+    if (!res.queued) afterWrite();
   } catch (err) {
     toast('Couldn\u2019t change the cite key: ' + errText(err), 6000);
     renderDetail();
@@ -11184,7 +11366,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-05.07</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-05.09</small>`;
 };
 
 function gunzipJSON(bytes) {
@@ -11335,7 +11517,7 @@ if (!gs) {
       await show(lib, false);
       cache.put(lib);
     }
-  })().then(seedReading).then(() => setTimeout(uploadKept, 3000)).catch(err => {
+  })().then(seedReading).then(() => { setTimeout(uploadKept, 3000); setTimeout(fetchAhead, 20000); }).catch(err => {
     if (ENTRIES.length) toast('Couldn\u2019t check for updates: ' + errText(err), 5000);
     else showError(err);
   });
@@ -11542,6 +11724,7 @@ if (!gs) {
 // For the test suite (_test/suite.html) only: a few of the reader's
 // insides, when the test page asks for them.
 if (window.LIBLANDE_TEST) window.LL = { V, BM, JOURNAL, LOCAL, AUTO, saveMarkup, setTool, combineMarks, makeZip, MARK_ERASER: () => MARK.eraserSize,
-  lib: () => ({ ENTRIES, BYKEY, DATA, VERSION_OF, VERSIONS, NESTED, state }), init, refresh, isForthcoming, forthChanges, parseBibtexEntry };
+  lib: () => ({ ENTRIES, BYKEY, DATA, VERSION_OF, VERSIONS, NESTED, state }), init, refresh, isForthcoming, forthChanges, parseBibtexEntry,
+  oldLineMarks, convertOldLines, fetchAhead };
 })();
 </script>
