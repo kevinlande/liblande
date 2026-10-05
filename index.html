@@ -318,6 +318,13 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .sheet.compact .rate-row { margin-top: 2px; }
 .sheet.compact .grp-fieldset legend { margin-top: 4px; font-size: 12.5px; color: var(--muted); }
 .sheet.compact .grp-checks { gap: 4px 16px; }
+/* Static groups in Edit: across the whole panel, in as many columns as fit
+   (the compact form's two columns, name and box, would squeeze them into
+   one). */
+.sheet.compact .grp-fieldset { display: block; }
+.sheet.compact .grp-checks { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
+.sheet.compact .grp-checks .check { font-size: 13.5px; align-items: flex-start; }
+.sheet.compact .grp-checks .check input { margin-top: 2px; flex: none; }
 .sheet.compact .setup-card .sheet-head h2 { font-size: 20px; }
 /* Adding, on an iPad or a computer: a panel over the library (a phone's
    screen is too small for one; there it fills the screen). */
@@ -1602,7 +1609,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-04.04</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-05.02</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1617,7 +1624,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-04.04';
+      l.querySelector('small').textContent = 'Version 2026-10-05.02';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1629,7 +1636,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-04.04): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-05.02): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -1897,7 +1904,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-04.04`;
+    `<br>LibLande version 2026-10-05.02`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -9507,8 +9514,8 @@ function openEdit(e) {
       GROUPS.map(g => `<label class="check"><input type="checkbox" data-group="${esc(g.name)}"${(e.groups || []).indexOf(g.name) >= 0 ? ' checked' : ''}> ${esc(g.name)}</label>`).join('') +
       `</div></fieldset>`;
   }
+  // (A panel over the library, like Add; a phone's fills the screen.)
   showSheet(h, 'Save');
-  $('#sheet').classList.remove('pop');
   $('#sheet').classList.add('head-mode', 'compact');
   // Fill in, next to the DOI: what Crossref has for the empty fields.
   const doi = $('#fld-doi');
@@ -9519,7 +9526,6 @@ function openEdit(e) {
     row.append(doi);
     row.insertAdjacentHTML('beforeend', `<button type="button" class="btn" id="editDoiGo" title="Fill in the empty fields from the DOI">Fill in</button>`);
   }
-  dockSheet();
   sheet.snap = sheetSnapshot();
 }
 // Edit's Fill in: puts what Crossref has into the form's empty fields
@@ -10899,7 +10905,7 @@ const onLayout = () => {
 };
 phoneMQ.addEventListener('change', onLayout);
 phoneMQ.addEventListener('change', renderTabs);
-phoneMQ.addEventListener('change', () => { if (phoneMQ.matches) undockSheet(); else if (sheet && sheet.mode === 'edit' && !$('#sheet').hidden) dockSheet(); });
+phoneMQ.addEventListener('change', () => { if (phoneMQ.matches) undockSheet(); });
 tabletMQ.addEventListener('change', onLayout);
 coarseMQ.addEventListener('change', onLayout);
 window.addEventListener('resize', () => requestAnimationFrame(paint));
@@ -11040,7 +11046,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-04.04</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-05.02</small>`;
 };
 
 function gunzipJSON(bytes) {
