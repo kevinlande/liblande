@@ -1612,7 +1612,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-05.04</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-05.07</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1627,7 +1627,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-05.04';
+      l.querySelector('small').textContent = 'Version 2026-10-05.07';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1639,7 +1639,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-05.04): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-05.07): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -1907,7 +1907,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-05.04`;
+    `<br>LibLande version 2026-10-05.07`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -4154,7 +4154,7 @@ function ensureViewer(lib, VL) {
     el.textContent = !q ? '' : none ? 'Not found' : mc && mc.total ? (mc.current || 1) + ' of ' + mc.total + (mc.total >= 1000 ? '+' : '') : state === 3 ? 'Searching\u2026' : '';
   };
   bus.on('updatefindmatchescount', e => findCount(e.matchesCount));
-  bus.on('updatefindcontrolstate', e => findCount(e.matchesCount, e.state));
+  bus.on('updatefindcontrolstate', e => { findCount(e.matchesCount, e.state); revealFindMatch(); });
   bus.on('pagechanging', e => {
     $('#vPage').textContent = e.pageNumber + ' / ' + viewer.pagesCount;
     markCurrentThumb(true);
@@ -4577,6 +4577,28 @@ function discardAndClose() {
 // A new mark isn't in the PDF's annotations until PDF.js commits it (on a
 // change of tool), so anything done with a tool counts as possibly
 // unsaved; saving commits first and uploads only if something changed.
+// The match found: PDF.js scrolls it to just below the top of the paper's
+// area, but the bars at the top (and the search bar) sit over that area,
+// so it can land under them. For a moment after each step of a search
+// (PDF.js scrolls when the page's text is ready), a match out of sight is
+// brought a third of the way down what's in view.
+let FIND_REVEAL = 0;
+function revealFindMatch() {
+  cancelAnimationFrame(FIND_REVEAL);
+  const until = performance.now() + 900;
+  const step = () => {
+    const el = document.querySelector('#vPages .textLayer .highlight.selected'), sc = $('#vScroll');
+    if (el && sc) {
+      const r = el.getBoundingClientRect(), box = sc.getBoundingClientRect();
+      let top = box.top;
+      document.querySelectorAll('#vTop, #viewer .v-bar, #vFind').forEach(b => { if (!b.hidden && b.offsetParent !== null) top = Math.max(top, b.getBoundingClientRect().bottom); });
+      const bottom = box.bottom;
+      if (r.top < top + 8 || r.bottom > bottom - 8) sc.scrollTop += r.top - (top + (bottom - top) / 3);
+    }
+    if (performance.now() < until) FIND_REVEAL = requestAnimationFrame(step);
+  };
+  FIND_REVEAL = requestAnimationFrame(step);
+}
 // What the marks on the paper come to (PDF.js's own fingerprint of them).
 function storageHash(doc) {
   try { return doc.annotationStorage.serializable.hash; } catch (err) { return null; }
@@ -5954,7 +5976,9 @@ async function sectionLines(pageNumber) {
 // the PDF is saved, and removes it if this one is deleted. (Not a step
 // for Undo: nothing about it has changed yet.)
 const TAKEN = new Set();
-async function takeOverLine(hit) {
+// (batch: the page isn't drawn again here; the caller does it once, with
+// redrawPages, after taking over several.)
+async function takeOverLine(hit, batch) {
   if (!V.doc || !V.ui || !hit || !hit.id) return null;
   const idx = +hit.page.dataset.pageNumber - 1, layer = V.ui.getLayer(idx);
   if (!layer) return null;
@@ -5985,26 +6009,57 @@ async function takeOverLine(hit) {
   const hide = async () => {
     const sec = hit.page.querySelector(`.annotationLayer [data-annotation-id="${CSS.escape(a.id)}"]`);
     if (sec) sec.style.display = 'none';
+    try { V.doc.annotationStorage.resetModifiedIds(); } catch (err) { /* older PDF.js */ }
     for (let i = 0; i < 20 && !V.doc.annotationStorage.modifiedIds.ids.has(a.id); i++) await new Promise(r => requestAnimationFrame(r));
-    const pv = V.viewer.getPageView(idx);
-    if (!pv || !V.bus) return Promise.resolve();
-    const drawn = new Promise(res => {
-      const done = e => { if (e.pageNumber === idx + 1) { V.bus.off('pagerendered', done); res(); } };
-      V.bus.on('pagerendered', done);
-      setTimeout(() => { V.bus.off('pagerendered', done); res(); }, 3000);
-    });
-    pv.reset();
-    V.viewer.update();
-    return drawn;
+    return redrawPages([idx + 1]);
   };
   putMark(layer, ed);
   TAKEN.add(a.id);
   const note = a.contentsObj && a.contentsObj.str;
   if (note) { try { ed.comment = note; } catch (err) { /* without it */ } }
-  await hide();
+  if (batch) {
+    const sec = hit.page.querySelector(`.annotationLayer [data-annotation-id="${CSS.escape(a.id)}"]`);
+    if (sec) sec.style.display = 'none';
+  } else await hide();
   markDrawing();
   decorateLines();
   return ed;
+}
+// Pages drawn again (each once), without the originals of marks taken over.
+async function redrawPages(pageNumbers) {
+  if (!V.viewer || !V.bus || !V.doc) return;
+  try { V.doc.annotationStorage.resetModifiedIds(); } catch (err) { /* older PDF.js */ }
+  const drawn = [...new Set(pageNumbers)].map(n => {
+    const pv = V.viewer.getPageView(n - 1);
+    if (!pv) return null;
+    const p = pageDrawn(n);
+    pv.reset();
+    return p;
+  });
+  V.viewer.update();
+  await Promise.all(drawn);
+}
+// A page drawn again, all of it: a drawing under way when it was started
+// over (which PDF.js still reports) doesn't count; at a high zoom, the
+// sharper detail drawn over part of it (PDF.js 6) comes after the page
+// and counts too. At most 3 seconds.
+function pageDrawn(n) {
+  return new Promise(res => {
+    let pageDone = false, timer = 0;
+    const finish = () => { V.bus.off('pagerendered', seen); clearTimeout(timer); res(); };
+    const seen = e => {
+      if (e.pageNumber !== n) return;
+      if (e.isDetailView) { if (pageDone) finish(); return; }
+      pageDone = true;
+      // (Without a detail layer, the page is all there is.)
+      setTimeout(() => {
+        const pv = V.viewer && V.viewer.getPageView(n - 1), dv = pv && pv.detailView;
+        if (!dv || dv.renderingState === 3) finish();
+      }, 60);
+    };
+    V.bus.on('pagerendered', seen);
+    timer = setTimeout(finish, 3000);
+  });
 }
 // For Google Drive (and sharing): LibLande's underlines and strike-throughs
 // as real Underline and StrikeOut marks, each with an appearance any PDF
@@ -6529,14 +6584,15 @@ document.addEventListener('pointerdown', ev => {
     box.hidden = false;
     box.style.cssText = `left:${r.left}px;top:${r.top}px;width:${r.right - r.left}px;height:${r.bottom - r.top}px`;
   }, true);
-  const end = ev => {
+  const end = async ev => {
     if (!start) return;
     ev.stopPropagation();
     const r = rectOf(ev.clientX, ev.clientY);
     start = null;
     if (r.right - r.left < 5 && r.bottom - r.top < 5) { box.hidden = true; V.ui.unselectAll(); return; }
     // Every mark the box touches, on the pages it covers.
-    const hits = [];
+    const hits = [], lines = [];
+    const inBox = b => b.right >= r.left && b.left <= r.right && b.bottom >= r.top && b.top <= r.bottom;
     document.querySelectorAll('#vPages .page[data-page-number]').forEach(page => {
       const pr = page.getBoundingClientRect();
       if (pr.bottom < r.top || pr.top > r.bottom) return;
@@ -6544,9 +6600,23 @@ document.addEventListener('pointerdown', ev => {
         if (!ed.div || ed.deleted || !ed.div.isConnected) continue;
         const b = ed.div.getBoundingClientRect();
         if (b.width === 0 && b.height === 0) continue;
-        if (b.right >= r.left && b.left <= r.right && b.bottom >= r.top && b.top <= r.bottom) hits.push(ed);
+        if (inBox(b)) hits.push(ed);
       }
+      // Underlines and strike-throughs saved in the PDF aren't marks PDF.js
+      // can edit: each gets LibLande's in its place (as a tap does), and
+      // that one counts.
+      page.querySelectorAll('.annotationLayer section.underlineAnnotation, .annotationLayer section.strikeoutAnnotation').forEach(sec => {
+        const id = sec.dataset.annotationId;
+        if (!id || TAKEN.has(id) || V.ui.isDeletedAnnotationElement?.(id)) return;
+        const b = sec.getBoundingClientRect();
+        if (b.width && inBox(b)) lines.push({ id, page });
+      });
     });
+    for (const hit of lines) {
+      const ed = await takeOverLine(hit, true);
+      if (ed) hits.push(ed);
+    }
+    if (lines.length) await redrawPages(lines.map(h => +h.page.dataset.pageNumber));
     V.ui.unselectAll();
     showRegionMenu(r, hits);
   };
@@ -11114,7 +11184,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-05.04</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-05.07</small>`;
 };
 
 function gunzipJSON(bytes) {
