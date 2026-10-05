@@ -1215,6 +1215,9 @@ details.d-sec[open] summary { margin-bottom: 8px; }
 /* A saved comment is shown as text; a tap on it edits it. */
 .v-comment-view { max-height: 40vh; overflow-y: auto; padding: 2px 2px 4px; white-space: pre-wrap; overflow-wrap: anywhere; font: 14px/1.45 var(--ui); color: var(--text); cursor: text; }
 .viewer.commenting .editToolbar { visibility: hidden; }
+/* (PDF.js 6 puts a comment button of its own beside marks that have one;
+   LibLande's note pins show them already.) */
+#vPages .annotationCommentButton { display: none !important; }
 /* PDF.js closes things on the page (a highlight's list of colours, for
    one) by adding the class "hidden"; the rule that hides them is in PDF.js's
    own viewer, not the part LibLande uses, so it's here. */
@@ -1609,7 +1612,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-05.02</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-05.04</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1624,7 +1627,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-05.02';
+      l.querySelector('small').textContent = 'Version 2026-10-05.04';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1636,7 +1639,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-05.02): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-05.04): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -1904,7 +1907,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-05.02`;
+    `<br>LibLande version 2026-10-05.04`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -3390,6 +3393,7 @@ function renderDetail() {
     (gs && !e.ib ? `<button type="button" class="citekey-edit" data-rename title="Change the cite key" aria-label="Change the cite key">${ICON.pencil}</button>` : '') +
     (e.ib ? `<span class="pill">Inbox</span>` : '') +
     (e.pend ? `<span class="pill pend${e.pendWhy ? ' conflict' : ''}">Pending</span>` : '') +
+    (e.offline ? `<span class="pill pend" title="Changed while offline: it goes to Google Drive when you\u2019re back online">On this device</span>` : '') +
     (gs ? `<button type="button" class="btn d-edit" data-edit>${ICON.pencil}<span>Edit</span></button>` : '') + `</div>`;
   h += `<h1 class="d-title">${esc(f.title || '(untitled)')}</h1>`;
   const people = e.a && e.a.length ? e.a : e.e || [];
@@ -3930,7 +3934,7 @@ function bibtex(e, extra) {
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
 // notes stored in the PDF and can add new ones. PDF.js loads the first time
 // a paper is opened.
-const PDFJS = './vendor/pdf.js/5.4.149/';
+const PDFJS = './vendor/pdf.js/6.4.299/';
 let pdfjsReady = null, viewerReady = null;
 // Whether a mark is selected (PDF.js 6 keeps this on the mark itself).
 const isPicked = ed => !!ed && (V.ui && V.ui.isSelected ? V.ui.isSelected(ed) : !!ed.isSelected);
@@ -4160,7 +4164,8 @@ function ensureViewer(lib, VL) {
   });
   bus.on('pagesloaded', e => { $('#vPage').textContent = viewer.currentPageNumber + ' / ' + e.pagesCount; RAIL.lastPage = viewer.currentPageNumber; railSoon(); });
   bus.on('scalechanging', () => railSoon());
-  bus.on('annotationeditorstateschanged', e => {
+  // (PDF.js 6 calls it editingstateschanged; 5, annotationeditorstateschanged.)
+  const onEditingStates = e => {
     if (e.details && e.details.hasSelectedEditor) { setTimeout(toolbarAtTap, 0); setTimeout(toolbarAtTap, 120); }
     const d = e.details || {};
     V.selected = !!d.hasSelectedEditor; V.canUndo = !!d.hasSomethingToUndo; V.canRedo = !!d.hasSomethingToRedo;
@@ -4175,7 +4180,9 @@ function ensureViewer(lib, VL) {
       setTimeout(() => { if (V.ui) V.ui.unselectAll(); }, 0);
     }
     paletteState();
-  });
+  };
+  bus.on('annotationeditorstateschanged', onEditingStates);
+  bus.on('editingstateschanged', onEditingStates);
   bus.on('annotationeditormodechanged', () => { applyMarkParams(); refreshAllPins(); });
   // When nothing is being drawn, draw the next few pages ahead too, so
   // they're ready before they scroll into view.
@@ -4280,7 +4287,25 @@ async function openReader(entry, file, pos) {
     if (my !== V.token) { closePdf(doc); return; }
     ensureViewer(lib, viewerLib);
     V.doc = doc;
-    doc.annotationStorage.onSetModified = () => { if (doc === V.doc) { V.dirty = true; saveUI(); } };
+    // (PDF.js 6 counts the PDF's own marks as changes when it puts them on
+    // a page again, as after an upload: a change that leaves the marks as
+    // they were saved isn't one, and the count starts again, so the next
+    // real change is noticed.)
+    V.savedMarks = storageHash(doc);
+    doc.annotationStorage.onSetModified = () => {
+      if (doc !== V.doc) return;
+      V.dirty = true; saveUI();
+      setTimeout(() => {
+        if (doc !== V.doc || V.saving || LOCAL.making) return;
+        if (storageHash(doc) !== V.savedMarks) return;
+        doc.annotationStorage.resetModified();
+        V.dirty = false;
+        // (Putting them back also counts as a step for Undo, which started
+        // the auto-save clock: nothing to upload.)
+        if (!V.bmDirty && !V.drawing) { clearTimeout(AUTO.timer); AUTO.first = AUTO.last = 0; }
+        saveUI();
+      }, 0);
+    };
     doc.annotationStorage.onResetModified = () => { if (doc === V.doc && !LOCAL.making) { V.dirty = false; saveUI(); } };
     pinsReset();
     const bmLoaded = loadBookmarks(doc);
@@ -4552,6 +4577,10 @@ function discardAndClose() {
 // A new mark isn't in the PDF's annotations until PDF.js commits it (on a
 // change of tool), so anything done with a tool counts as possibly
 // unsaved; saving commits first and uploads only if something changed.
+// What the marks on the paper come to (PDF.js's own fingerprint of them).
+function storageHash(doc) {
+  try { return doc.annotationStorage.serializable.hash; } catch (err) { return null; }
+}
 function markDrawing() {
   if (!V.doc || V.drawing) return;
   V.drawing = true;
@@ -4685,6 +4714,7 @@ async function saveMarkup(force, auto, now) {
       V.savedSinceOpen = true;
       if (doc === V.doc) {
         doc.annotationStorage.resetModified();
+        V.savedMarks = storageHash(doc);
         // (PDF.js reports only its own changes; this may have been set here.)
         V.dirty = false;
         // (Without them, Drive has the bookmarks the PDF was opened with.)
@@ -6585,9 +6615,13 @@ function colourList(tb) {
         // PDF.js gives a highlight a new colour at the usual highlight
         // opacity, which would make an underline a highlight: for this
         // change (and its Undo and Redo) the opacity it uses is the line's.
-        const HE = ed.constructor, was = HE._defaultOpacity;
-        HE._defaultOpacity = LINE_OPACITY[line];
-        try { ed.updateParams(P.HIGHLIGHT_COLOR, o.dataset.color); } finally { HE._defaultOpacity = was; }
+        // (PDF.js 6 takes the opacity with the colour; 5 took its default.)
+        if (typeof ed._updateColorAndOpacity === 'function') ed._updateColorAndOpacity(o.dataset.color, LINE_OPACITY[line], P.HIGHLIGHT_COLOR);
+        else {
+          const HE = ed.constructor, was = HE._defaultOpacity;
+          HE._defaultOpacity = LINE_OPACITY[line];
+          try { ed.updateParams(P.HIGHLIGHT_COLOR, o.dataset.color); } finally { HE._defaultOpacity = was; }
+        }
         decorateLine(ed);
       } else {
         ed.updateParams(text ? P.FREETEXT_COLOR : P.INK_COLOR, o.dataset.color);
@@ -9868,7 +9902,7 @@ async function writeEdit(e, set, add, remove, before) {
     if (before) before();
     setPending(res.pending, false);
     await reloadLibrary();
-    return 'Saved as a pending edit';
+    return res.queued ? 'Saved as a pending edit, on this device until you\u2019re back online' : 'Saved as a pending edit';
   }
   const now = bibdeskTime();
   const res = await callServer('saveEntry', {
@@ -9883,6 +9917,8 @@ async function writeEdit(e, set, add, remove, before) {
   if (res && res.groupsHash && !e.ib) DATA.gh = res.groupsHash;
   if (before) before();
   applyLocal(e, Object.assign({}, set, { 'date-modified': now }), add, remove);
+  // (Offline: kept on this device, and saved when it's back online.)
+  if (res && res.queued) { e.offline = true; renderDetail(); return 'Saved on this device; it goes to ' + (e.ib ? 'your inbox' : DATA.source) + ' when you\u2019re back online'; }
   afterWrite();
   return e.ib ? 'Saved to your inbox' : 'Saved to ' + DATA.source;
 }
@@ -10064,7 +10100,8 @@ function setFields(e, set) {
 }
 
 function overlayPending(data) {
-  data.entries.forEach(e => { delete e.pend; delete e.pendWhy; });
+  data.entries.forEach(e => { delete e.pend; delete e.pendWhy; delete e.offline; });
+  overlayOffline(data);
   if (!PENDING.length) return;
   const byKey = new Map(data.entries.filter(e => !e.ib).map(e => [e.k, e]));
   PENDING.forEach(p => {
@@ -10080,6 +10117,37 @@ function overlayPending(data) {
     });
   });
 }
+
+// Edits made with no connection, kept on this device until it's back (on
+// GitHub Pages: server.js's window.liblandeOutbox), shown as made.
+function overlayOffline(data) {
+  const kept = window.liblandeOutbox ? window.liblandeOutbox() : [];
+  if (!kept.length) return;
+  const main = new Map(data.entries.filter(e => !e.ib).map(e => [e.k, e])), inbox = new Map(data.entries.filter(e => e.ib).map(e => [e.k, e]));
+  kept.forEach(x => {
+    if (x.name !== 'saveEntry') return;
+    const r = x.args[0] || {}, e = (r.where === 'inbox' ? inbox : main).get(r.key);
+    if (!e) return;
+    e.offline = true;
+    setFields(e, Object.assign({}, r.set || {}, r.modified ? { 'date-modified': r.modified } : {}));
+    const add = (r.groups && r.groups.add) || [], remove = (r.groups && r.groups.remove) || [];
+    (data.groups || []).forEach(g => {
+      if (add.indexOf(g.name) >= 0 && g.keys.indexOf(e.k) < 0) g.keys.push(e.k);
+      if (remove.indexOf(g.name) >= 0) g.keys = g.keys.filter(k => k !== e.k);
+    });
+  });
+}
+// Back online: what was kept on this device has gone to Drive (or couldn't).
+window.addEventListener('liblande-outbox', ev => {
+  const d = ev.detail || {}, n = d.saved || 0, failed = d.failed || [];
+  let msg = n ? n + ' change' + (n === 1 ? '' : 's') + ' made offline ' + (n === 1 ? 'is' : 'are') + ' now saved to Google Drive.' : '';
+  if (failed.length) {
+    const who = failed.map(f => { const e = f.key && BYKEY.get(f.key); return e ? '\u201c' + (e.f.title || e.k) + '\u201d' : f.key; }).filter(Boolean);
+    msg += (msg ? ' ' : '') + failed.length + ' couldn\u2019t be' + (who.length ? ' (' + who.slice(0, 3).join(', ') + (who.length > 3 ? '\u2026' : '') + ')' : '') + ': ' + failed[0].reason;
+  }
+  toast(msg, failed.length ? 10000 : 5000);
+  afterWrite();
+});
 
 function setPending(list, redraw) {
   list = Array.isArray(list) ? list : [];
@@ -11046,7 +11114,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-05.02</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-05.04</small>`;
 };
 
 function gunzipJSON(bytes) {

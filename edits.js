@@ -18,7 +18,7 @@
  */
 (function (root) {
   'use strict';
-  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).edits = '2026-10-05.02';
+  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).edits = '2026-10-05.04';
   const FOLDER = 'application/vnd.google-apps.folder';
   const UPLOAD = 'https://www.googleapis.com/upload/drive/v3/';
   const PENDING_FILE = 'pending-edits.json', READING_FILE = 'reading-list.json',
@@ -215,6 +215,26 @@
     },
   };
   root.liblandeEditCore = core;
+
+  // One change to the reading list (also made on the page while offline).
+  function applyReadingOp(d, req, now) {
+    const find = k => d.items.find(x => x.key === k);
+    if (req.op === 'seed') {
+      if (!d.seeded) (req.keys || []).forEach(k => { if (!find(k)) d.items.push({ key: k, list: 'later', added: now }); });
+      d.seeded = true;
+    } else if (req.op === 'add') {
+      const x = find(req.key);
+      if (x) x.list = req.list || x.list;
+      else d.items.push({ key: req.key, list: req.list || 'next', added: now });
+    } else if (req.op === 'move') {
+      const x = find(req.key);
+      if (x) x.list = req.list;
+    } else if (req.op === 'remove' || req.op === 'done') {
+      d.items = d.items.filter(x => x.key !== req.key);
+      if (req.op === 'done') d.done = [{ key: req.key, at: now }].concat(d.done || []).slice(0, 200);
+    }
+  }
+  root.liblandeReadingOp = applyReadingOp;
 
   function makeEdits(io) {
     const B = io.builder;
@@ -547,23 +567,6 @@
     });
 
     /* -------------------------------------------- the reading list */
-    function applyReadingOp(d, req, now) {
-      const find = k => d.items.find(x => x.key === k);
-      if (req.op === 'seed') {
-        if (!d.seeded) (req.keys || []).forEach(k => { if (!find(k)) d.items.push({ key: k, list: 'later', added: now }); });
-        d.seeded = true;
-      } else if (req.op === 'add') {
-        const x = find(req.key);
-        if (x) x.list = req.list || x.list;
-        else d.items.push({ key: req.key, list: req.list || 'next', added: now });
-      } else if (req.op === 'move') {
-        const x = find(req.key);
-        if (x) x.list = req.list;
-      } else if (req.op === 'remove' || req.op === 'done') {
-        d.items = d.items.filter(x => x.key !== req.key);
-        if (req.op === 'done') d.done = [{ key: req.key, at: now }].concat(d.done || []).slice(0, 200);
-      }
-    }
     // Several reading-list changes at once (as Code.gs's readingOps):
     // papers added or taken off also go into, or out of, the BibDesk group
     // "★ Reading List", in the .bib with direct saving on, otherwise

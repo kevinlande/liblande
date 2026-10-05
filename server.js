@@ -17,7 +17,7 @@
   window.LIBLANDE_PAGES = true;
   // (Which version each part of the app is from: index.html checks they
   // match. build.py fills it in.)
-  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-10-05.02';
+  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-10-05.04';
   const CLIENT_ID = '789682218462-98mjugngb46ttd01ucp9dcj71ufspjgn.apps.googleusercontent.com';
   // Google Drive (your .bib, papers and LibLande folder): all it needs.
   const SCOPE = 'https://www.googleapis.com/auth/drive';
@@ -131,7 +131,9 @@
       try {
         return await fetch(base + path, Object.assign({}, opts, { headers: Object.assign({}, opts.headers, { Authorization: 'Bearer ' + t }) }));
       } catch (e) {
-        throw new Error(navigator.onLine ? 'Google Drive can\u2019t be reached just now.' : 'You\u2019re offline.');
+        const err = new Error(navigator.onLine ? 'Google Drive can\u2019t be reached just now.' : 'You\u2019re offline.');
+        err.offline = true;
+        throw err;
       }
     };
     let r = await go(await getToken());
@@ -199,6 +201,8 @@
       // (Asked again while a build is under way, as the page does every
       // few seconds: answered as soon as it's done.)
       const running = buildRun;
+      // (Changes kept from a time offline go to Drive first.)
+      if (outbox.length && navigator.onLine) { try { await flushOutbox(); } catch (e) { /* tried */ } }
       const w = await builder.look({ daily: true });
       if (!w.configured) return { configured: false };
       const started = startBuild(w);
@@ -222,6 +226,7 @@
         prefs,
       };
       if (buildErr) { st.error = buildErr; buildErr = null; }
+      offlineLists.update(st);
       // The library just built here.
       if (lastBuilt && !(st.stamp > lastBuilt.stamp)) { st.stamp = lastBuilt.stamp; st.libraryId = lastBuilt.id; }
       return st;
@@ -264,15 +269,16 @@
     },
     // Changing the .bib, the inbox, pending edits and the reading list:
     // edits.js, here.
-    saveEntry(req) { return edits.saveEntry(req); },
-    queueEdit(req) { return edits.queueEdit(req); },
-    discardPending(key) { return edits.discardPending(key); },
+    // (These four are kept on this device while offline: see below.)
+    saveEntry: later('saveEntry', () => ({ queued: true })),
+    queueEdit: later('queueEdit', req => ({ queued: true, pending: offlineLists.pending(req) })),
+    discardPending: later('discardPending', key => ({ queued: true, pending: offlineLists.discard(key) })),
     applyPending(req) { return edits.applyPending(req); },
     addToInbox(req) { return edits.addToInbox(req); },
     addToMain(req) { return edits.addToMain(req); },
     attachPdf(req) { return edits.attachPdf(req); },
     createGroup(req) { return edits.createGroup(req); },
-    readingOps(req) { return edits.readingOps(req); },
+    readingOps: later('readingOps', req => ({ queued: true, reading: offlineLists.reading(req) })),
     renameKey(req) { return edits.renameKey(req); },
     saveEntries(req) { return edits.saveEntries(req); },
     // Details for a DOI, from Crossref (as Code.gs's lookupDoi).
@@ -361,6 +367,98 @@
     const m = /\/d\/([\w-]{20,})/.exec(s) || /[?&]id=([\w-]{20,})/.exec(s) || /\/folders\/([\w-]{20,})/.exec(s) || /^([\w-]{20,})$/.exec(s);
     return m ? m[1] : null;
   }
+
+  /* ------------------------------------------------------------ offline */
+  // Changes made with no connection (to entries, pending edits and the
+  // reading list) wait here, on this device, in the order made; when it's
+  // back, they're made in Drive in that order (flushOutbox). Meanwhile the
+  // page shows them (index.html's overlayPending reads
+  // window.liblandeOutbox), and asks with the answers given here: what the
+  // pending edits and reading list come to with them.
+  let outbox = store.get('outbox', []);
+  window.liblandeOutbox = () => outbox.slice();
+  const isOffline = e => !navigator.onLine || !!(e && e.offline);
+  function keepForLater(name, args) {
+    outbox.push({ name, args, at: Date.now() });
+    store.set('outbox', outbox);
+  }
+  // (Made in Drive first: anything kept from before, so the order holds.)
+  function later(name, offline) {
+    return async (...args) => {
+      if (navigator.onLine && outbox.length) { try { await flushOutbox(); } catch (e) { /* tried */ } }
+      if (!navigator.onLine || outbox.length) { keepForLater(name, args); return offline(...args); }
+      try {
+        const res = await edits[name](...args);
+        offlineLists.update(res);
+        return res;
+      } catch (e) {
+        if (!isOffline(e)) throw e;
+        keepForLater(name, args);
+        return offline(...args);
+      }
+    };
+  }
+  // The pending edits and the reading list as last known (from the status,
+  // or an answer), with the changes kept here made to them.
+  const offlineLists = {
+    known: store.get('lists', { pending: [], reading: { items: [], done: [], seeded: false, syncedKeys: null } }),
+    update(res) {
+      if (!res) return;
+      if (Array.isArray(res.pending)) this.known.pending = res.pending;
+      if (res.reading) this.known.reading = res.reading;
+      store.set('lists', this.known);
+    },
+    pending(req) {
+      const set = req.set || {};
+      mergeEdit_(this.known.pending, { key: req.key, set, groups: { add: (req.groups && req.groups.add) || [], remove: (req.groups && req.groups.remove) || [] },
+        expectHash: req.expectHash || null, expectGroupsHash: req.expectGroupsHash || null, modified: req.modified });
+      store.set('lists', this.known);
+      return this.known.pending.slice();
+    },
+    discard(key) {
+      this.known.pending = this.known.pending.filter(e => e.key !== key);
+      store.set('lists', this.known);
+      return this.known.pending.slice();
+    },
+    reading(req) {
+      const d = this.known.reading, now = Date.now();
+      (req.ops || []).forEach(op => window.liblandeReadingOp(d, op, now));
+      store.set('lists', this.known);
+      return JSON.parse(JSON.stringify(d));
+    },
+  };
+  // Back online: the kept changes made in Drive, in order. Two edits to the
+  // same publication were both checked against how it was before either;
+  // the second is checked against what the first made it. One that can't
+  // be made (the publication was changed elsewhere meanwhile, say) is left
+  // out, with why. The page hears how it went (the event liblande-outbox).
+  let flushing = null;
+  function flushOutbox() {
+    if (flushing) return flushing;
+    if (!outbox.length || !navigator.onLine) return Promise.resolve();
+    flushing = (async () => {
+      let saved = 0;
+      const failed = [], hashes = {};
+      while (outbox.length) {
+        const item = outbox[0], req = item.args[0];
+        if (req && typeof req === 'object' && req.key && hashes[req.key] && req.expectHash === hashes[req.key].from) req.expectHash = hashes[req.key].to;
+        try {
+          const res = await edits[item.name](...item.args);
+          offlineLists.update(res);
+          if (item.name === 'saveEntry' && res && res.hash && req.expectHash) hashes[req.key] = { from: req.expectHash, to: res.hash };
+          saved++;
+        } catch (e) {
+          if (isOffline(e)) break;
+          failed.push({ name: item.name, key: req && req.key || (typeof req === 'string' ? req : ''), reason: e.message });
+        }
+        outbox.shift();
+        store.set('outbox', outbox);
+      }
+      if (saved || failed.length) window.dispatchEvent(new CustomEvent('liblande-outbox', { detail: { saved, failed, waiting: outbox.length } }));
+    })().finally(() => { flushing = null; });
+    return flushing;
+  }
+  window.addEventListener('online', () => setTimeout(() => { flushOutbox().catch(() => {}); }, 1500));
 
   /* ------------------------------------------------------------ preferences */
   // LibLande/prefs.json; the first time, those in settings.json (copied
