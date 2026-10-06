@@ -863,9 +863,21 @@ details.d-sec[open] summary { margin-bottom: 8px; }
   padding: 4px calc(8px + env(safe-area-inset-right, 0px)) 4px calc(8px + env(safe-area-inset-left, 0px)); background: var(--panel); border-bottom: 1px solid var(--line); }
 .v-tabs::-webkit-scrollbar { display: none; }
 .v-tabs:empty, .v-tabs.single { display: none; }
-.v-tab { flex: none; display: inline-flex; align-items: center; max-width: 240px; border-radius: 7px; color: var(--muted); font: 600 12.5px var(--ui); }
+.v-tab { flex: 0 1 auto; display: inline-flex; align-items: center; min-width: 116px; max-width: 240px; border-radius: 7px; color: var(--muted); font: 600 12.5px var(--ui); }
 .v-tab:hover { background: var(--side-hover); color: var(--text); }
-.v-tab[aria-selected="true"] { background: var(--accent-soft); color: var(--text); }
+.v-tab[aria-selected="true"] { background: var(--accent-soft); color: var(--text); min-width: 160px; }
+/* Many papers open: the tabs narrow (to a point), then scroll; at an end
+   with tabs out of sight, the strip fades and a button says how many are
+   past it (a tap lists them, to go to one). */
+.v-tabs-wrap { position: relative; flex: none; }
+.v-tabs-more { position: absolute; top: 0; bottom: 1px; z-index: 1; display: flex; align-items: center; gap: 1px; border: 0; cursor: pointer;
+  color: var(--text); font: 700 11.5px var(--ui); font-variant-numeric: tabular-nums; padding: 0 8px; }
+.v-tabs-more[hidden] { display: none; }
+.v-tabs-more.left { left: 0; padding-left: calc(6px + env(safe-area-inset-left, 0px)); padding-right: 26px; background: linear-gradient(to right, var(--panel) 55%, transparent); }
+.v-tabs-more.right { right: 0; padding-right: calc(6px + env(safe-area-inset-right, 0px)); padding-left: 26px; background: linear-gradient(to left, var(--panel) 55%, transparent); }
+.v-tabs-more b { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--accent); color: #fff; font: inherit; }
+.v-tabs-more .i { width: 14px; height: 14px; stroke-width: 2.4; }
+.v-tabs-more:hover b { filter: brightness(1.1); }
 .v-tab-go { min-width: 0; border: 0; background: none; color: inherit; font: inherit; padding: 5px 2px 5px 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
 .v-tab-x { flex: none; width: 24px; height: 24px; margin-right: 2px; border: 0; background: none; border-radius: 5px; color: var(--muted); display: grid; place-items: center; cursor: pointer; }
 .v-tab-x:hover { background: var(--line); color: var(--text); }
@@ -1531,7 +1543,7 @@ try {
       <a class="tb-btn" id="vDrive" href="#" target="_blank" rel="noopener" aria-label="Open in Google Drive" title="Open in Google Drive"><svg class="i" viewBox="0 0 24 24"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></a>
     </div>
   </header>
-  <nav class="v-tabs" id="vTabs" role="tablist" aria-label="Open papers"></nav>
+  <div class="v-tabs-wrap"><nav class="v-tabs" id="vTabs" role="tablist" aria-label="Open papers"></nav><button type="button" class="v-tabs-more left" id="vTabsLeft" hidden></button><button type="button" class="v-tabs-more right" id="vTabsRight" hidden></button></div>
   <div class="v-find" id="vFind" hidden role="search">
     <input type="search" id="vFindInput" placeholder="Search in this paper" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="Search in this paper">
     <span class="v-find-count" id="vFindCount" role="status"></span>
@@ -1612,7 +1624,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-05.10</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-06.02</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1627,7 +1639,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-05.10';
+      l.querySelector('small').textContent = 'Version 2026-10-06.02';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1639,7 +1651,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-05.10): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-06.02): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -1907,7 +1919,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-05.10`;
+    `<br>LibLande version 2026-10-06.02`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -1946,6 +1958,7 @@ function setReading(d) {
   }
   RL = new Map(READING.items.map(x => [x.key, x]));
   if (!ENTRIES.length) return;
+  fetchAheadSoon();
   // Only the parts that show the reading list: the To read count, the
   // list's tags, and the reading-list line on the open publication.
   renderTabs();
@@ -3989,11 +4002,12 @@ function loadPdfViewer() {
 
 // Downloads use the same kind of short-lived token as the library download.
 let tokenCache = null;
-// On GitHub Pages: the PDFs of the publications added most recently (in
-// the inbox too) are downloaded ahead, once each, so they open with no
+// On GitHub Pages: the PDFs of the papers Up next on your reading list,
+// and of the publications added most recently (in the inbox too), are
+// downloaded ahead, once each, so they open with no
 // connection too (sw.js keeps them, with the papers you've opened). A
 // little after LibLande opens, and again whenever it comes back to the
-// screen or online, or the library changes: an app kept on the home
+// screen or online, or the library or reading list changes: an app kept on the home
 // screen is mostly resumed, not opened afresh, and a run stops when
 // LibLande goes to the background. Only with a token already in hand
 // (never asking you to sign in for it), and one paper at a time.
@@ -4006,7 +4020,9 @@ function fetchAhead() {
 }
 async function fetchAheadNow() {
   if (!window.LIBLANDE_PAGES || !window.caches || !navigator.onLine || !ENTRIES.length) return;
-  const list = ENTRIES.filter(e => readablePdfs(e).length).sort((a, b) => cmpStr(b.added || '', a.added || '')).slice(0, AHEAD);
+  const next = readingOrder().filter(x => x.list === 'next').map(x => BYKEY.get(x.key));
+  const newest = ENTRIES.slice().sort((a, b) => cmpStr(b.added || '', a.added || '')).filter(e => readablePdfs(e).length).slice(0, AHEAD);
+  const list = [...new Set(next.concat(newest))].filter(e => e && readablePdfs(e).length);
   const kept = await caches.open('liblande-papers');
   for (const e of list) {
     const f = readablePdfs(e)[0], url = 'https:\/\/www.googleapis.com/drive/v3/files/' + encodeURIComponent(f.id) + '?alt=media';
@@ -4512,6 +4528,7 @@ function renderPaperTabs() {
   if (PTABS.active >= PTABS.list.length) PTABS.active = PTABS.list.length - 1;
   if (PTABS.active < 0 && PTABS.list.length) PTABS.active = 0;
   const nav = $('#vTabs');
+  closeTabsMenu();
   nav.innerHTML = PTABS.list.map((t, i) => {
     const x = tabEntry(t), title = x ? x.e.f.title || x.f.n : t.key;
     return `<div class="v-tab" role="tab" aria-selected="${i === PTABS.active}"><button type="button" class="v-tab-go" data-ptab="${i}" title="${esc(title)}">${esc(title)}</button>` +
@@ -4527,7 +4544,71 @@ function renderPaperTabs() {
   saveTabs();
   const on = nav.querySelector('[aria-selected="true"]');
   if (on && !$('#viewer').hidden) on.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  tabsMore();
 }
+// The tabs out of sight at each end of the strip, as buttons over its
+// ends: a tap lists them.
+const TABS_OUT = { left: [], right: [] };
+function tabsMore() {
+  const nav = $('#vTabs'), L = $('#vTabsLeft'), R = $('#vTabsRight');
+  const box = nav.getBoundingClientRect();
+  TABS_OUT.left = []; TABS_OUT.right = [];
+  const room = nav.scrollWidth - nav.clientWidth;
+  if (room > 1) {
+    // (Only at an end it can scroll to; there, a tab partly hidden under
+    // the button counts too.)
+    const atStart = nav.scrollLeft < 2, atEnd = nav.scrollLeft > room - 2;
+    [...nav.children].forEach((t, i) => {
+      const r = t.getBoundingClientRect();
+      if (!atStart && r.left < box.left + 24) TABS_OUT.left.push(i);
+      else if (!atEnd && r.right > box.right - 24) TABS_OUT.right.push(i);
+    });
+  }
+  const left = TABS_OUT.left.length, right = TABS_OUT.right.length;
+  const chev = d => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>`;
+  L.hidden = !left; R.hidden = !right;
+  if (left) { L.innerHTML = chev('M15 6l-6 6 6 6') + `<b>${left}</b>`; L.setAttribute('aria-label', left + ' more open paper' + (left > 1 ? 's' : '') + ', to the left'); L.title = L.getAttribute('aria-label'); }
+  if (right) { R.innerHTML = `<b>${right}</b>` + chev('M9 6l6 6-6 6'); R.setAttribute('aria-label', right + ' more open paper' + (right > 1 ? 's' : '') + ', to the right'); R.title = R.getAttribute('aria-label'); }
+}
+$('#vTabs').addEventListener('scroll', () => requestAnimationFrame(tabsMore), { passive: true });
+// (And when the strip's width changes: the window, or the viewer shown.)
+if (window.ResizeObserver) new ResizeObserver(() => tabsMore()).observe($('#vTabs'));
+function closeTabsMenu() { const m = $('#tabsMenu'); if (m) m.remove(); }
+function tabsMenu(side) {
+  const was = $('#tabsMenu');
+  closeTabsMenu();
+  if (was && was.dataset.side === side) return;
+  const list = TABS_OUT[side].filter(i => PTABS.list[i]);
+  if (!list.length) return;
+  const btn = side === 'left' ? $('#vTabsLeft') : $('#vTabsRight');
+  const m = document.createElement('div');
+  m.className = 'menu-list pdf-menu link-menu recent-menu';
+  m.id = 'tabsMenu';
+  m.dataset.side = side;
+  m.setAttribute('role', 'menu');
+  m.innerHTML = '<div class="menu-head">Open papers ' + (side === 'left' ? 'to the left' : 'to the right') + '</div>' + list.map(i => {
+    const t = PTABS.list[i], x = tabEntry(t), e = x && x.e;
+    const title = x ? e.f.title || x.f.n : t.key;
+    return `<button type="button" role="menuitem" data-tm="${i}"><span class="rc-title">${esc(title)}</span>` +
+      (e ? `<span class="rc-sub">${esc(e.authorsShort || '')}${e.f.year ? ' \u00b7 ' + esc(e.f.year) : ''}</span>` : '') + '</button>';
+  }).join('');
+  document.body.appendChild(m);
+  const r = btn.getBoundingClientRect();
+  const x = side === 'left' ? r.left : r.right - m.offsetWidth;
+  m.style.left = Math.max(8, Math.min(window.innerWidth - m.offsetWidth - 8, x)) + 'px';
+  m.style.top = (r.bottom + 6) + 'px';
+  m.addEventListener('click', ev => {
+    const b = ev.target.closest('[data-tm]');
+    if (!b) return;
+    closeTabsMenu();
+    const i = +b.dataset.tm;
+    if (i !== PTABS.active) switchPaperTab(i);
+  });
+}
+$('#vTabsLeft').addEventListener('click', () => tabsMenu('left'));
+$('#vTabsRight').addEventListener('click', () => tabsMenu('right'));
+document.addEventListener('pointerdown', ev => { if ($('#tabsMenu') && !ev.target.closest('#tabsMenu, .v-tabs-more')) closeTabsMenu(); }, true);
+document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && $('#tabsMenu')) { ev.stopPropagation(); closeTabsMenu(); } }, true);
 // Where the front tab's paper is (only while it's showing).
 function rememberTab() {
   const t = PTABS.list[PTABS.active];
@@ -11378,7 +11459,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-05.10</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-06.02</small>`;
 };
 
 function gunzipJSON(bytes) {
@@ -11738,6 +11819,6 @@ if (!gs) {
 // insides, when the test page asks for them.
 if (window.LIBLANDE_TEST) window.LL = { V, BM, JOURNAL, LOCAL, AUTO, saveMarkup, setTool, combineMarks, makeZip, MARK_ERASER: () => MARK.eraserSize,
   lib: () => ({ ENTRIES, BYKEY, DATA, VERSION_OF, VERSIONS, NESTED, state }), init, refresh, isForthcoming, forthChanges, parseBibtexEntry,
-  oldLineMarks, convertOldLines, fetchAhead };
+  oldLineMarks, convertOldLines, fetchAhead, PTABS, renderPaperTabs };
 })();
 </script>
