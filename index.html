@@ -1624,7 +1624,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-06.02</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-06.03</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1639,7 +1639,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-06.02';
+      l.querySelector('small').textContent = 'Version 2026-10-06.03';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1651,7 +1651,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-06.02): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-06.03): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -1919,7 +1919,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-06.02`;
+    `<br>LibLande version 2026-10-06.03`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -10675,16 +10675,26 @@ $('#pickJoin').addEventListener('click', () => openJoin(pickedEntries()));
 // and first author (only a match of the same title counts).
 const CROSSREF = 'https:\/\/api.crossref.org/works';
 const plainTitle = t => norm(String(t || '')).replace(/[^a-z0-9]+/g, '');
+// Crossref turns away requests that come too fast (429, "too many"):
+// then a wait, longer each time, or as long as it asks, and again.
+async function crossrefGet(url) {
+  for (let n = 0; ; n++) {
+    const r = await fetch(url);
+    if (r.status !== 429 || n >= 5) return r;
+    const asked = parseFloat(r.headers.get('Retry-After'));
+    await new Promise(ok => setTimeout(ok, asked > 0 ? Math.min(asked, 30) * 1000 : 1000 * 2 ** n));
+  }
+}
 async function crossrefFor(e) {
   const doi = String(e.f.doi || '').trim().replace(/^https?:\/\/(dx\.)?doi\.org[/]/i, '').replace(/^doi:\s*/i, '');
   if (/^10\.\S+[/]\S+$/.test(doi)) {
-    const r = await fetch(CROSSREF + '/' + doi.split('/').map(encodeURIComponent).join('/'));
+    const r = await crossrefGet(CROSSREF + '/' + doi.split('/').map(encodeURIComponent).join('/'));
     if (r.ok) return (await r.json()).message;
     if (r.status !== 404) throw new Error('Crossref answered ' + r.status);
   }
   if (!e.f.title) return null;
   const who = ((e.a && e.a[0]) || [''])[0];
-  const r = await fetch(CROSSREF + '?rows=5&query.bibliographic=' + encodeURIComponent(e.f.title) + (who ? '&query.author=' + encodeURIComponent(who) : ''));
+  const r = await crossrefGet(CROSSREF + '?rows=5&query.bibliographic=' + encodeURIComponent(e.f.title) + (who ? '&query.author=' + encodeURIComponent(who) : ''));
   if (!r.ok) throw new Error('Crossref answered ' + r.status);
   const want = plainTitle(e.f.title);
   return ((await r.json()).message.items || []).find(w => plainTitle((w.title || [])[0]) === want) || null;
@@ -10716,20 +10726,16 @@ async function checkForthcoming() {
   const list = groupItems('forth').slice(0, 60);
   if (!list.length) return;
   const found = [], none = [], failed = [];
-  let i = 0;
   toast('Asking Crossref about ' + list.length + ' publication' + (list.length === 1 ? '' : 's') + '\u2026', 0);
-  // (A few at a time.)
-  await Promise.all([0, 1, 2, 3].map(async () => {
-    while (i < list.length) {
-      const e = list[i++];
-      try {
-        const w = await crossrefFor(e);
-        const c = w ? forthChanges(e, w) : null;
-        if (c && c.changes.length) found.push({ e, changes: c.changes, inIssue: c.inIssue }); else none.push(e);
-      } catch (err) { failed.push(e); }
-      toast('Asking Crossref\u2026 (' + (found.length + none.length + failed.length) + ' of ' + list.length + ')', 0);
-    }
-  }));
+  // (One at a time: Crossref turns away several at once.)
+  for (const e of list) {
+    try {
+      const w = await crossrefFor(e);
+      const c = w ? forthChanges(e, w) : null;
+      if (c && c.changes.length) found.push({ e, changes: c.changes, inIssue: c.inIssue }); else none.push(e);
+    } catch (err) { failed.push(e); }
+    toast('Asking Crossref\u2026 (' + (found.length + none.length + failed.length) + ' of ' + list.length + ')', 0);
+  }
   toast('', 1);
   found.sort((a, b) => cmpStr(a.e.f.title || a.e.k, b.e.f.title || b.e.k));
   sheet = { mode: 'forth', found };
@@ -11459,7 +11465,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-06.02</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-06.03</small>`;
 };
 
 function gunzipJSON(bytes) {

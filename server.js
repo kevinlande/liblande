@@ -17,7 +17,7 @@
   window.LIBLANDE_PAGES = true;
   // (Which version each part of the app is from: index.html checks they
   // match. build.py fills it in.)
-  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-10-06.02';
+  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-10-06.03';
   const CLIENT_ID = '789682218462-98mjugngb46ttd01ucp9dcj71ufspjgn.apps.googleusercontent.com';
   // Google Drive (your .bib, papers and LibLande folder): all it needs.
   const SCOPE = 'https://www.googleapis.com/auth/drive';
@@ -126,12 +126,25 @@
   }
 
   /* ------------------------------------------------------------ Drive */
+  // (A request with no answer is given up after a while: on an iPad, one
+  // under way when LibLande goes to the background can be left with none,
+  // ever, and changes to the .bib wait their turn behind it.)
+  const STALL = 45 * 1000, STALL_SENDING = 5 * 60 * 1000, STALL_READING = 5 * 60 * 1000;
   async function drive(path, opts = {}, base = API) {
     const go = async t => {
+      const stop = window.AbortController ? new AbortController() : null;
+      const big = opts.body && typeof opts.body !== 'string';
+      let timer = stop && setTimeout(() => stop.abort(), big ? STALL_SENDING : STALL);
       try {
-        return await fetch(base + path, Object.assign({}, opts, { headers: Object.assign({}, opts.headers, { Authorization: 'Bearer ' + t }) }));
+        const r = await fetch(base + path, Object.assign({}, opts, { headers: Object.assign({}, opts.headers, { Authorization: 'Bearer ' + t }) },
+          stop ? { signal: stop.signal } : {}));
+        // (Then a while longer for what it sends.)
+        if (stop) { clearTimeout(timer); timer = setTimeout(() => stop.abort(), STALL_READING); }
+        return r;
       } catch (e) {
-        const err = new Error(navigator.onLine ? 'Google Drive can\u2019t be reached just now.' : 'You\u2019re offline.');
+        if (timer) clearTimeout(timer);
+        const err = new Error(!navigator.onLine ? 'You\u2019re offline.' : stop && stop.signal.aborted
+          ? 'Google Drive didn\u2019t answer. Try again.' : 'Google Drive can\u2019t be reached just now.');
         err.offline = true;
         throw err;
       }

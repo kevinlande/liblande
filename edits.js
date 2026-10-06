@@ -18,7 +18,7 @@
  */
 (function (root) {
   'use strict';
-  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).edits = '2026-10-06.02';
+  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).edits = '2026-10-06.03';
   const FOLDER = 'application/vnd.google-apps.folder';
   const UPLOAD = 'https://www.googleapis.com/upload/drive/v3/';
   const PENDING_FILE = 'pending-edits.json', READING_FILE = 'reading-list.json',
@@ -392,6 +392,7 @@
     // The text work (reading the .bib, editing, checking): in the worker
     // (build-worker.js), so the page doesn't freeze, or here without one.
     let worker = null, seq = 0;
+    const WORKER_WAIT = 60 * 1000;
     const calls = {};
     function run(name, ...args) {
       if (typeof Worker === 'function' && root.LIBLANDE_BUILD_WORKER !== false) {
@@ -409,8 +410,19 @@
               worker = null;
             };
           }
-          const id = ++seq;
-          return new Promise((resolve, reject) => { calls[id] = { resolve, reject }; worker.postMessage({ id, call: name, args }); });
+          const id = ++seq, w = worker;
+          return new Promise((resolve, reject) => {
+            // (A worker that never answers, as one can when an iPad puts
+            // LibLande to sleep: given up, and the work done here instead.)
+            const timer = setTimeout(() => {
+              if (!calls[id]) return;
+              delete calls[id];
+              if (worker === w) { try { w.terminate(); } catch (e) { /* gone */ } worker = null; }
+              Promise.resolve().then(() => core[name](...args)).then(resolve, reject);
+            }, WORKER_WAIT);
+            calls[id] = { resolve: v => { clearTimeout(timer); resolve(v); }, reject: e => { clearTimeout(timer); reject(e); } };
+            w.postMessage({ id, call: name, args });
+          });
         } catch (e) { /* no worker: here */ }
       }
       return Promise.resolve().then(() => core[name](...args));
