@@ -18,7 +18,7 @@
  */
 (function (root) {
   'use strict';
-  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).edits = '2026-10-06.03';
+  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).edits = '2026-10-06.04';
   const FOLDER = 'application/vnd.google-apps.folder';
   const UPLOAD = 'https://www.googleapis.com/upload/drive/v3/';
   const PENDING_FILE = 'pending-edits.json', READING_FILE = 'reading-list.json',
@@ -301,15 +301,22 @@
     // the file be), and optionally undo() for what it did besides. If the
     // file changed while this ran, its side effects are undone and it runs
     // again on the new text; after 3 tries, nothing is saved.
-    async function changeFile(id, change, when) {
+    // step(what), if given, hears each step as it starts.
+    async function changeFile(id, change, when, step) {
+      step = step || (() => {});
       for (let attempt = 0; attempt < 3; attempt++) {
+        step('Reading your .bib file');
         const { m, text } = await read(id);
+        step('Making the changes');
         const out = await change(text, m);
         if (!out || out.text == null || out.text === text) return Object.assign({ m }, out || {});
+        step('Checking it wasn\u2019t changed meanwhile');
         const now = await meta(id, 'modifiedTime');
         if (now.modifiedTime !== m.modifiedTime) { if (out.undo) await out.undo(); continue; }
         try {
+          step('Making a backup copy');
           await backup(m, when);
+          step('Saving to Google Drive');
           const saved = await writeText(m, out.text);
           return Object.assign(out, { m, saved, stamp: Date.parse(saved.modifiedTime) });
         } catch (e) {
@@ -638,11 +645,15 @@
 
     // Several entries changed in one save (core.saveMany): one backup, one
     // upload.
-    F.saveEntries = req => serial(async () => {
+    F.saveEntries = req => {
+      const step = typeof req.onStep === 'function' ? req.onStep : () => {};
+      step('Waiting for an earlier change to finish');
+      return serial(async () => {
       if (!(await direct())) throw new Error('Turn on \u201cSave edits straight to your .bib file\u201d in settings first.');
-      const out = await changeFile(await mainBibId(), text => run('saveMany', text, req.items || [], req.modified), req.backupName);
+      const out = await changeFile(await mainBibId(), text => run('saveMany', text, req.items || [], req.modified), req.backupName, step);
       return { stamp: out.stamp || null, hashes: out.hashes || {}, skipped: out.skipped || [] };
-    });
+      });
+    };
 
     // A new cite key (as Code.gs's renameKey): in the .bib, then the
     // reading list.

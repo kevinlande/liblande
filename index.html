@@ -1624,7 +1624,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-06.03</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-06.04</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1639,7 +1639,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-06.03';
+      l.querySelector('small').textContent = 'Version 2026-10-06.04';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1651,7 +1651,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-06.03): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-06.04): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -1919,7 +1919,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-06.03`;
+    `<br>LibLande version 2026-10-06.04`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -9774,6 +9774,8 @@ const starButtons = r => [1, 2, 3, 4, 5].map(i => `<button type="button" data-st
 
 function showSheet(html, saveLabel) {
   undockSheet();
+  // (Never busy to start with, whatever the last one was left as.)
+  sheetBusy(false);
   // (On an iPad or computer, a panel over the library; a phone's fills the
   // screen.)
   $('#sheet').classList.remove('head-mode', 'compact', 'join-sheet');
@@ -10766,7 +10768,17 @@ async function saveForth() {
     if (DIRECT) {
       sheetMsg('Saving ' + todo.length + ' update' + (todo.length === 1 ? '' : 's') + ' to ' + DATA.source + '\u2026');
       const now = bibdeskTime();
-      const res = await callServer('saveEntries', { items: todo.map(x => ({ key: x.e.k, set: x.set, expectHash: x.e.h || null })), modified: now, backupName: fileTime() });
+      // (Each step shows as it starts, with the time so far: a slow one
+      // can be seen, and named.)
+      const t0 = Date.now();
+      let step = '';
+      const tell = () => { if (step && sheet === s) sheetMsg(step + '\u2026 (' + Math.round((Date.now() - t0) / 1000) + ' s)'); };
+      const clock = setInterval(tell, 1000);
+      let res;
+      try {
+        res = await callServer('saveEntries', { items: todo.map(x => ({ key: x.e.k, set: x.set, expectHash: x.e.h || null })), modified: now, backupName: fileTime(),
+          onStep: t => { step = t; tell(); } });
+      } finally { clearInterval(clock); }
       if (res.stamp) lastBibStamp = res.stamp;
       todo.forEach(x => {
         if (!res.hashes[x.e.k]) return;
@@ -11465,7 +11477,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-06.03</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-06.04</small>`;
 };
 
 function gunzipJSON(bytes) {
