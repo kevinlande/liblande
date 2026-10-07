@@ -1625,7 +1625,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-06.05</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-06.06</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1640,7 +1640,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-06.05';
+      l.querySelector('small').textContent = 'Version 2026-10-06.06';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1652,7 +1652,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-06.05): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-06.06): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -1920,7 +1920,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-06.05`;
+    `<br>LibLande version 2026-10-06.06`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -2305,7 +2305,7 @@ async function setAddPdf(file) {
 }
 async function doiFromPdf(file) {
   const lib = await loadPdfJs();
-  const pdf = await lib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+  const pdf = await openPdf(lib, { data: new Uint8Array(await file.arrayBuffer()) }).promise;
   try {
     for (let p = 1; p <= Math.min(2, pdf.numPages); p++) {
       const tc = await (await pdf.getPage(p)).getTextContent();
@@ -3957,6 +3957,12 @@ function closePdf(d) {
   if (!d) return undefined;
   return d.loadingTask ? d.loadingTask.destroy() : d.destroy();
 }
+// Every PDF opened with the one worker, handed over: then closing a paper
+// leaves it running. (Left to PDF.js, a paper's task shares the worker and
+// takes it down on closing; a paper opened meanwhile, as one is on a slow
+// iPhone, fails: "the worker is being destroyed".)
+let PDF_WORKER = null;
+const openPdf = (lib, params) => lib.getDocument(Object.assign({}, params, PDF_WORKER ? { worker: PDF_WORKER } : {}));
 function loadPdfJs() {
   if (!pdfjsReady) {
     pdfjsReady = (async () => {
@@ -3966,6 +3972,7 @@ function loadPdfJs() {
       if (!r.ok) throw new Error('worker ' + r.status);
       const url = URL.createObjectURL(new Blob([await r.text()], { type: 'text/javascript' }));
       lib.GlobalWorkerOptions.workerPort = new Worker(url, { type: 'module' });
+      PDF_WORKER = new lib.PDFWorker({ port: lib.GlobalWorkerOptions.workerPort });
       globalThis.pdfjsLib = lib;
       return lib;
     })().catch(err => {
@@ -4333,7 +4340,7 @@ async function openReader(entry, file, pos) {
     let data = kept ? new Uint8Array(kept.bytes) : bytes;
     vStatus('Opening\u2026');
     // PDF.js takes over the buffer it's given, so hand it a copy.
-    let doc = await lib.getDocument({ data: data.slice(0), enableHWA: true }).promise;
+    let doc = await openPdf(lib, { data: data.slice(0), enableHWA: true }).promise;
     if (my !== V.token) { closePdf(doc); return; }
     // September's underlines and strike-throughs made real (see
     // oldLineMarks): the paper opened again, with them. (Not in the tests,
@@ -4348,7 +4355,7 @@ async function openReader(entry, file, pos) {
           if (r.n && my === V.token) {
             // (The new one opened before the first is closed, as when
             // switching papers: they share PDF.js's worker.)
-            const next = await lib.getDocument({ data: r.bytes.slice(0), enableHWA: true }).promise;
+            const next = await openPdf(lib, { data: r.bytes.slice(0), enableHWA: true }).promise;
             closePdf(doc);
             doc = next; data = r.bytes; oldLines = r.n;
           }
@@ -5039,7 +5046,7 @@ async function combineMarks() {
     const md5 = await pdfMd5(file).catch(() => null);
     recentPdfs.delete(file.id);
     const newer = await getPdfBytes(file);
-    const tmp = await V.lib.getDocument({ data: newer.slice(0) }).promise;
+    const tmp = await openPdf(V.lib, { data: newer.slice(0) }).promise;
     let out = newer;
     try {
       // (PDF.js writes only entries named as its marks are.)
@@ -8388,7 +8395,7 @@ async function showMarks() {
     // The list comes from the PDF as last saved, so read the saved copy.
     let doc = V.doc, temp = null;
     try {
-      if (V.bytes && V.savedSinceOpen) { temp = await V.lib.getDocument({ data: V.bytes.slice(0) }).promise; doc = temp; }
+      if (V.bytes && V.savedSinceOpen) { temp = await openPdf(V.lib, { data: V.bytes.slice(0) }).promise; doc = temp; }
       const marks = await collectMarks(doc, my);
       if (!marks || my !== SIDE.token) return;
       SIDE.marks = marks;
@@ -11478,7 +11485,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-06.05</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-06.06</small>`;
 };
 
 function gunzipJSON(bytes) {
@@ -11838,6 +11845,6 @@ if (!gs) {
 // insides, when the test page asks for them.
 if (window.LIBLANDE_TEST) window.LL = { V, BM, JOURNAL, LOCAL, AUTO, saveMarkup, setTool, combineMarks, makeZip, MARK_ERASER: () => MARK.eraserSize,
   lib: () => ({ ENTRIES, BYKEY, DATA, VERSION_OF, VERSIONS, NESTED, state }), init, refresh, isForthcoming, forthChanges, parseBibtexEntry,
-  oldLineMarks, convertOldLines, fetchAhead, PTABS, renderPaperTabs };
+  oldLineMarks, convertOldLines, fetchAhead, PTABS, renderPaperTabs, openPdf, loadPdfJs };
 })();
 </script>
