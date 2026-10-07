@@ -1742,7 +1742,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-07.09</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-07.10</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1757,7 +1757,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-07.09';
+      l.querySelector('small').textContent = 'Version 2026-10-07.10';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1769,7 +1769,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-07.09): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-07.10): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -2041,7 +2041,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-07.09`;
+    `<br>LibLande version 2026-10-07.10`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -4168,7 +4168,9 @@ function closePdf(d) {
 // takes it down on closing; a paper opened meanwhile, as one is on a slow
 // iPhone, fails: "the worker is being destroyed".)
 let PDF_WORKER = null;
-const openPdf = (lib, params) => lib.getDocument(Object.assign({}, params, PDF_WORKER ? { worker: PDF_WORKER } : {}));
+// (Fonts keep their names, as "Times-Italic": Quote tells italic and bold
+// by them.)
+const openPdf = (lib, params) => lib.getDocument(Object.assign({ fontExtraProperties: true }, params, PDF_WORKER ? { worker: PDF_WORKER } : {}));
 // PDF.js 6's search uses RegExp.escape, new in Safari 18.2: without it
 // (an iPhone on an older iOS), searching a paper finds nothing. The
 // characters that mean something in a pattern, escaped (also valid with
@@ -4534,7 +4536,7 @@ async function openReader(entry, file, pos) {
   TAKEN.clear();
   $('#viewer').classList.remove('bars-hidden');
   V.restore = pos && pos.top != null ? pos : null;
-  Object.assign(V, { entry, file, bytes: null, md5: null, dirty: false, drawing: false, selected: false, canUndo: false, canRedo: false, pageLabels: undefined, quotePages: null });
+  Object.assign(V, { entry, file, bytes: null, md5: null, dirty: false, drawing: false, selected: false, canUndo: false, canRedo: false, pageLabels: undefined, quotePages: null, quoteFonts: null });
   hideQuote();
   $('#vTitle').textContent = entry.f.title || file.n;
   $('#vDrive').href = driveUrl(file);
@@ -7762,6 +7764,93 @@ function quoteText(raw) {
   t = t.replace(/[“”"]/g, c => c === '“' ? '‘' : c === '”' ? '’' : ((open = !open) ? '‘' : '’'));
   return t;
 }
+// Italic and bold, from the passage's own fonts: each span of a page's
+// text layer is one of the page's text items (those with text), in order,
+// and each item names its font. A font is italic or bold by its name
+// ("MinionPro-It", "Times-BoldItalic", "AdvOT1234.BI") or its flags.
+// Per page: an array, one {i, b} for each span.
+const FONT_I = /italic|oblique|slant|-it$|-it[a-z]*$|\bit$|\.b?i$|-ital/i;
+const FONT_B = /bold|black|heavy|semibold|demibold|-bd|\bbd$|\.bi?$|-sb$/i;
+async function quoteFonts(n) {
+  const cache = V.quoteFonts || (V.quoteFonts = new Map());
+  if (cache.has(n)) return cache.get(n);
+  let out = null;
+  try {
+    const page = await V.doc.getPage(n);
+    await page.getOperatorList();
+    const items = (await page.getTextContent({ includeMarkedContent: true })).items.filter(it => it.str);
+    out = items.map(it => {
+      let f = null;
+      try { f = page.commonObjs.has(it.fontName) ? page.commonObjs.get(it.fontName) : null; } catch (err) { /* none */ }
+      const name = String((f && f.name) || '').replace(/^[A-Z]{6}\+/, '');
+      return { i: !!(f && f.italic) || FONT_I.test(name), b: !!(f && (f.bold || f.black)) || FONT_B.test(name) };
+    });
+  } catch (err) { out = null; }
+  cache.set(n, out);
+  return out;
+}
+// The selection as letters, each with its style (0 plain, 1 italic, 2
+// bold, 3 both), line ends as "\n"; then tidied as quoteText tidies.
+async function quoteLetters(range) {
+  const pages = new Map(), spansOf = page => {
+    if (!pages.has(page)) pages.set(page, [...page.querySelectorAll('.textLayer span')].filter(x => !x.classList.contains('markedContent') && !x.querySelector('span')));
+    return pages.get(page);
+  };
+  const root = range.commonAncestorContainer.nodeType === 1 ? range.commonAncestorContainer : range.commonAncestorContainer.parentNode;
+  const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+  const out = [];
+  for (let node = walk.currentNode; node; node = walk.nextNode()) {
+    if (!range.intersectsNode(node)) continue;
+    if (node.nodeType === 1) { if (node.tagName === 'BR') out.push({ c: '\n', s: 0 }); continue; }
+    const span = node.parentElement && node.parentElement.closest('.textLayer span');
+    const page = span && span.closest('.page');
+    if (!page || !page.closest('#vPages')) continue;
+    const from = node === range.startContainer ? range.startOffset : 0, to = node === range.endContainer ? range.endOffset : node.length;
+    const fonts = await quoteFonts(+page.dataset.pageNumber), k = spansOf(page).indexOf(span), f = fonts && k >= 0 ? fonts[k] : null;
+    const st = f ? (f.i ? 1 : 0) + (f.b ? 2 : 0) : 0;
+    for (const c of node.data.slice(from, to)) out.push({ c, s: st });
+  }
+  // The tidying: soft hyphens out, ligatures spelled out, a word broken at
+  // a line's end joined, spaces and line ends as single spaces, quotation
+  // marks inside made single.
+  let L = [];
+  out.forEach(x => {
+    if (x.c === '­') return;
+    const lig = LIGATURES[x.c];
+    if (lig) [...lig].forEach(c => L.push({ c, s: x.s })); else L.push(x);
+  });
+  const joined = [];
+  for (let i = 0; i < L.length; i++) {
+    if (/[-‐]/.test(L[i].c) && i > 0 && /\p{L}/u.test(L[i - 1].c)) {
+      let j = i + 1;
+      while (j < L.length && /[ \t]/.test(L[j].c)) j++;
+      if (j < L.length && L[j].c === '\n') {
+        j++;
+        while (j < L.length && /\s/.test(L[j].c)) j++;
+        if (j < L.length && /\p{Ll}/u.test(L[j].c)) { i = j - 1; continue; }
+      }
+    }
+    joined.push(L[i]);
+  }
+  L = [];
+  joined.forEach(x => {
+    if (/\s/.test(x.c)) { if (L.length && L[L.length - 1].c !== ' ') L.push({ c: ' ', s: L[L.length - 1].s }); return; }
+    L.push(x);
+  });
+  while (L.length && L[0].c === ' ') L.shift();
+  while (L.length && L[L.length - 1].c === ' ') L.pop();
+  let open = false;
+  L.forEach(x => { if (x.c === '“') x.c = '‘'; else if (x.c === '”') x.c = '’'; else if (x.c === '"') x.c = (open = !open) ? '‘' : '’'; });
+  return L;
+}
+// Letters to HTML: runs of the same style in <i>, <b>.
+function lettersHTML(L) {
+  let html = '', run = '', st = -1;
+  const flush = () => { if (!run) return; let h = esc(run); if (st & 1) h = '<i>' + h + '</i>'; if (st & 2) h = '<b>' + h + '</b>'; html += h; run = ''; };
+  L.forEach(x => { const s = x.c === ' ' ? st : x.s; if (s !== st) { flush(); st = s; } run += x.c; });
+  flush();
+  return html;
+}
 // The printed numbers at the top or foot of a PDF page.
 async function printedNumbers(n) {
   try {
@@ -7805,7 +7894,7 @@ function quoteSelection() {
   const text = quoteText(s.toString());
   if (text.length < 2) return null;
   const pa = +a.closest('.page').dataset.pageNumber, pb = +b.closest('.page').dataset.pageNumber;
-  return { text, from: Math.min(pa, pb), to: Math.max(pa, pb), rect: r.getBoundingClientRect() };
+  return { text, from: Math.min(pa, pb), to: Math.max(pa, pb), rect: r.getBoundingClientRect(), range: r.cloneRange() };
 }
 function hideQuote() { if (QUOTE.el) QUOTE.el.hidden = true; QUOTE.sel = null; }
 function quoteDismiss() {
@@ -7819,7 +7908,11 @@ async function showQuote() {
   if (!sel) { hideQuote(); return null; }
   const my = ++QUOTE.run;
   const [p1, p2] = await Promise.all([printedPage(sel.from), sel.to !== sel.from ? printedPage(sel.to) : null]);
+  // (Its italics and bold, worked out now: the copy itself has to be at
+  // once, on the click.)
+  const L = await quoteLetters(sel.range).catch(() => null);
   if (my !== QUOTE.run) return null;
+  if (L && L.length) { sel.letters = L; sel.text = L.map(x => x.c).join(''); }
   if (!QUOTE.el) {
     QUOTE.el = document.createElement('div');
     QUOTE.el.className = 'quote-bar';
@@ -7866,8 +7959,15 @@ function quoteCopy() {
   // colour of its own: invisible on a dark page).
   const block = s.text.split(/\s+/).length >= 40;
   const text = block ? s.text + ' ' + cite : '“' + s.text.replace(/[.,;:]+$/, '') + '” ' + cite;
+  // Formatted too: the passage's italics and bold (in black: see copy).
+  let html = null;
+  if (s.letters) {
+    const L = s.letters.slice();
+    if (!block) while (L.length && /[.,;:]/.test(L[L.length - 1].c)) L.pop();
+    html = block ? '<p style="margin:0 0 0 0.5in">' + lettersHTML(L) + ' ' + esc(cite) + '</p>' : '“' + lettersHTML(L) + '” ' + esc(cite);
+  }
   QUOTE.copied = s.text;
-  copy(text, block ? 'Copied the block quotation, with its citation (indent it where you paste it)' : 'Copied the quotation, with its citation');
+  copy(text, block ? 'Copied the block quotation, with its citation' : 'Copied the quotation, with its citation', html);
   // (The button says so for a moment; then the bar and the selection go.)
   const go = QUOTE.el.querySelector('.quote-go');
   go.innerHTML = ICON.check + '<span>Copied</span>';
@@ -12678,7 +12778,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-07.09</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-07.10</small>`;
 };
 
 function gunzipJSON(bytes) {
