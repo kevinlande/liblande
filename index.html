@@ -1625,7 +1625,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-06.06</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-06.07</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1640,7 +1640,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-06.06';
+      l.querySelector('small').textContent = 'Version 2026-10-06.07';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1652,7 +1652,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-06.06): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-06.07): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -1920,7 +1920,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-06.06`;
+    `<br>LibLande version 2026-10-06.07`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -3963,6 +3963,34 @@ function closePdf(d) {
 // iPhone, fails: "the worker is being destroyed".)
 let PDF_WORKER = null;
 const openPdf = (lib, params) => lib.getDocument(Object.assign({}, params, PDF_WORKER ? { worker: PDF_WORKER } : {}));
+// PDF.js 6's search uses RegExp.escape, new in Safari 18.2: without it
+// (an iPhone on an older iOS), searching a paper finds nothing. The
+// characters that mean something in a pattern, escaped (also valid with
+// the u flag, which PDF.js uses).
+if (typeof RegExp.escape !== 'function') {
+  RegExp.escape = s => String(s).replace(/[\\^$.*+?()[\]{}|/]/g, '\\$&');
+}
+// PDF.js 6 reads a page's text (for searching a paper) with "for await"
+// over a stream, which some Safari versions can't do: then every search
+// in a paper was "Not found" on an iPhone. Here, and in PDF.js's worker,
+// streams are made to work that way when they don't already.
+function addStreamIteration() {
+  const RS = self.ReadableStream;
+  if (!RS || RS.prototype[Symbol.asyncIterator]) return;
+  RS.prototype.values = RS.prototype.values || function ({ preventCancel = false } = {}) {
+    const reader = this.getReader();
+    return {
+      next: () => reader.read(),
+      async return(value) {
+        if (!preventCancel) { const p = reader.cancel(value); reader.releaseLock(); await p; } else reader.releaseLock();
+        return { done: true, value };
+      },
+      [Symbol.asyncIterator]() { return this; },
+    };
+  };
+  RS.prototype[Symbol.asyncIterator] = RS.prototype.values;
+}
+addStreamIteration();
 function loadPdfJs() {
   if (!pdfjsReady) {
     pdfjsReady = (async () => {
@@ -3970,7 +3998,7 @@ function loadPdfJs() {
       // A worker from another site isn't allowed, so start it from a copy.
       const r = await fetch(PDFJS + 'pdf.worker.min.mjs');
       if (!r.ok) throw new Error('worker ' + r.status);
-      const url = URL.createObjectURL(new Blob([await r.text()], { type: 'text/javascript' }));
+      const url = URL.createObjectURL(new Blob(['(' + addStreamIteration + ')();\n', await r.text()], { type: 'text/javascript' }));
       lib.GlobalWorkerOptions.workerPort = new Worker(url, { type: 'module' });
       PDF_WORKER = new lib.PDFWorker({ port: lib.GlobalWorkerOptions.workerPort });
       globalThis.pdfjsLib = lib;
@@ -11485,7 +11513,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-06.06</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-06.07</small>`;
 };
 
 function gunzipJSON(bytes) {
@@ -11845,6 +11873,6 @@ if (!gs) {
 // insides, when the test page asks for them.
 if (window.LIBLANDE_TEST) window.LL = { V, BM, JOURNAL, LOCAL, AUTO, saveMarkup, setTool, combineMarks, makeZip, MARK_ERASER: () => MARK.eraserSize,
   lib: () => ({ ENTRIES, BYKEY, DATA, VERSION_OF, VERSIONS, NESTED, state }), init, refresh, isForthcoming, forthChanges, parseBibtexEntry,
-  oldLineMarks, convertOldLines, fetchAhead, PTABS, renderPaperTabs, openPdf, loadPdfJs };
+  oldLineMarks, convertOldLines, fetchAhead, PTABS, renderPaperTabs, openPdf, loadPdfJs, addStreamIteration };
 })();
 </script>
