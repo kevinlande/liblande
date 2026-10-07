@@ -17,7 +17,7 @@
   window.LIBLANDE_PAGES = true;
   // (Which version each part of the app is from: index.html checks they
   // match. build.py fills it in.)
-  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-10-06.07';
+  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-10-06.08';
   const CLIENT_ID = '789682218462-98mjugngb46ttd01ucp9dcj71ufspjgn.apps.googleusercontent.com';
   // Google Drive (your .bib, papers and LibLande folder): all it needs.
   const SCOPE = 'https://www.googleapis.com/auth/drive';
@@ -487,6 +487,12 @@
     return flushing;
   }
   window.addEventListener('online', () => setTimeout(() => { flushOutbox().catch(() => {}); }, 1500));
+  // (Safari often doesn't say it's back online, as when LibLande comes
+  // back to the screen with a connection already: so also then, and every
+  // half minute while changes wait, with the page on screen.)
+  const flushSoon = () => { if (outbox.length && navigator.onLine && !document.hidden) flushOutbox().catch(() => {}); };
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(flushSoon, 1500); });
+  setInterval(flushSoon, 30 * 1000);
 
   /* ------------------------------------------------------------ preferences */
   // LibLande/prefs.json; the first time, those in settings.json (copied
