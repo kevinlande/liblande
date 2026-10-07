@@ -1011,7 +1011,7 @@ body.is-offline .fileicon:not(.saved), body.is-offline .pdf:not(.saved) { opacit
 .quote-go .i { width: 16px; height: 16px; color: var(--accent); }
 .quote-go.done { color: var(--accent); }
 .quote-pg { display: inline-flex; align-items: center; gap: 3px; padding: 0 6px 0 8px; border-left: 1px solid var(--line); color: var(--muted); }
-.quote-pg input { width: auto; min-width: 2.2em; border: 1px solid transparent; border-radius: 5px; background: none; color: var(--text); font: inherit; padding: 3px 4px; text-align: center; }
+.quote-pg input { width: auto; min-width: 2.2em; border: 1px solid var(--line); border-radius: 5px; background: none; color: var(--text); font: inherit; padding: 3px 4px; text-align: center; }
 .quote-pg input:focus { border-color: var(--accent); outline: none; }
 .quote-bar.unsure .quote-pg input { border-color: #b8860b; }
 .quote-bar.unsure .quote-pg::after { content: '?'; color: #b8860b; font-weight: 700; }
@@ -1742,7 +1742,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-07.08</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-07.09</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1757,7 +1757,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-07.08';
+      l.querySelector('small').textContent = 'Version 2026-10-07.09';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1769,7 +1769,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-07.08): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-07.09): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -2041,7 +2041,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-07.08`;
+    `<br>LibLande version 2026-10-07.09`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -7808,6 +7808,12 @@ function quoteSelection() {
   return { text, from: Math.min(pa, pb), to: Math.max(pa, pb), rect: r.getBoundingClientRect() };
 }
 function hideQuote() { if (QUOTE.el) QUOTE.el.hidden = true; QUOTE.sel = null; }
+function quoteDismiss() {
+  if (QUOTE.el && QUOTE.el.contains(document.activeElement)) document.activeElement.blur();
+  hideQuote();
+  const sel = getSelection();
+  if (sel) sel.removeAllRanges();
+}
 async function showQuote() {
   const sel = quoteSelection();
   if (!sel) { hideQuote(); return null; }
@@ -7823,15 +7829,20 @@ async function showQuote() {
     // (Pressing in the bar keeps the selection.)
     QUOTE.el.addEventListener('pointerdown', ev => { if (!ev.target.closest('input')) ev.preventDefault(); });
     QUOTE.el.querySelector('input').addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); quoteCopy(); } });
+    // (Wide enough for what's typed: 327–345, say.)
+    QUOTE.el.querySelector('input').addEventListener('input', ev => { ev.target.size = Math.max(3, ev.target.value.length + 1); });
     document.body.appendChild(QUOTE.el);
   }
   QUOTE.sel = sel;
+  // (Another passage chosen: the last copy's tidying up is called off.)
+  const go = QUOTE.el.querySelector('.quote-go');
+  if (go.classList.contains('done') && QUOTE.copied !== sel.text) { clearTimeout(QUOTE.doneT); go.classList.remove('done'); go.innerHTML = ICON.quote + '<span>Quote</span>'; }
   const page = p2 && p2.page !== p1.page ? p1.page + '–' + p2.page : p1.page, sure = p1.sure && (!p2 || p2.sure);
   const inp = QUOTE.el.querySelector('input');
   inp.value = page;
-  inp.size = Math.max(2, page.length);
+  inp.size = Math.max(3, page.length + 1);
   QUOTE.el.classList.toggle('unsure', !sure);
-  QUOTE.el.querySelector('.quote-pg').title = sure ? 'The journal’s page' : 'A guess at the journal’s page: check it';
+  QUOTE.el.querySelector('.quote-pg').title = sure ? 'The journal’s page (click to change it)' : 'A guess at the journal’s page: check it, and change it if need be';
   QUOTE.el.hidden = false;
   // Above the passage; below it on a touch screen (iOS's own menu is above).
   const w = QUOTE.el.offsetWidth, h = QUOTE.el.offsetHeight, r = sel.rect;
@@ -7849,21 +7860,20 @@ function quoteCopy() {
   const pg = QUOTE.el.querySelector('input').value.trim().replace(/-+/g, '–');
   const base = apaInText(V.entry).text;
   const cite = pg ? base.slice(0, -1) + ', ' + (/–/.test(pg) ? 'pp. ' : 'p. ') + pg + ')' : base;
-  let text, html;
-  if (s.text.split(/\s+/).length >= 40) {
-    // A block quotation: no quotation marks, the citation after its end.
-    text = s.text + ' ' + cite;
-    html = '<p style="margin:0 0 0 0.5in">' + esc(text) + '</p>';
-  } else {
-    text = '“' + s.text.replace(/[.,;:]+$/, '') + '” ' + cite;
-    html = esc(text);
-  }
-  copy(text, 'Copied the quotation, with its citation', html);
+  // A block quotation (40 words or more): no quotation marks, the citation
+  // after its end. Plain text only, so it takes on the document's own font
+  // and colour where it's pasted (formatted text came into Word with a
+  // colour of its own: invisible on a dark page).
+  const block = s.text.split(/\s+/).length >= 40;
+  const text = block ? s.text + ' ' + cite : '“' + s.text.replace(/[.,;:]+$/, '') + '” ' + cite;
+  QUOTE.copied = s.text;
+  copy(text, block ? 'Copied the block quotation, with its citation (indent it where you paste it)' : 'Copied the quotation, with its citation');
   // (The button says so for a moment; then the bar and the selection go.)
   const go = QUOTE.el.querySelector('.quote-go');
   go.innerHTML = ICON.check + '<span>Copied</span>';
   go.classList.add('done');
   clearTimeout(QUOTE.doneT);
+  if (quoteEditing()) document.activeElement.blur();
   QUOTE.doneT = setTimeout(() => {
     go.innerHTML = ICON.quote + '<span>Quote</span>';
     go.classList.remove('done');
@@ -7875,14 +7885,17 @@ function quoteCopy() {
     if (sel) sel.removeAllRanges();
   }, 900);
 }
+// (Typing in the page field moves the browser's selection there: the bar
+// and the passage it had stay.)
+const quoteEditing = () => !!(QUOTE.el && !QUOTE.el.hidden && QUOTE.el.contains(document.activeElement));
 document.addEventListener('selectionchange', () => {
-  if ($('#viewer').hidden) return;
+  if ($('#viewer').hidden || quoteEditing()) return;
   clearTimeout(QUOTE.timer);
   if (QUOTE.el && !QUOTE.el.hidden && !quoteSelection()) hideQuote();
   QUOTE.timer = setTimeout(showQuote, 250);
 });
 $('#vScroll').addEventListener('scroll', () => {
-  if (!QUOTE.el || QUOTE.el.hidden) return;
+  if (!QUOTE.el || QUOTE.el.hidden || quoteEditing()) return;
   QUOTE.el.hidden = true;
   clearTimeout(QUOTE.timer);
   QUOTE.timer = setTimeout(showQuote, 300);
@@ -12484,6 +12497,11 @@ function copy(text, msg, html) {
     const ta = box.querySelector('textarea'); ta.focus(); ta.select();
   };
   const plain = () => navigator.clipboard.writeText(text).then(() => toast(msg), fallback);
+  // (Formatted text pastes with the colours it's given: without them,
+  // Safari gave it the page's own, white in the dark theme, and it came
+  // into Word invisible. So black on nothing, as from any printed page;
+  // italics and bold as they are.)
+  if (html) html = '<div style="color:#000000;background-color:transparent">' + html + '</div>';
   try {
     if (html && window.ClipboardItem && navigator.clipboard.write) {
       navigator.clipboard.write([new ClipboardItem({
@@ -12560,6 +12578,9 @@ document.addEventListener('keydown', ev => {
     if ((ev.metaKey || ev.ctrlKey) && ev.key === 's') { ev.preventDefault(); saveMarkup().then(keptNote); return; }
     if ((ev.metaKey || ev.ctrlKey) && ev.key === 'f') { ev.preventDefault(); openFind(); return; }
     if ((ev.metaKey || ev.ctrlKey) && ev.key === 'g') { ev.preventDefault(); runFind('again', ev.shiftKey); return; }
+    // Esc with the Quote bar up: just the bar goes (and the selection),
+    // even from its page field; not the paper.
+    if (ev.key === 'Escape' && QUOTE.el && !QUOTE.el.hidden) { ev.preventDefault(); quoteDismiss(); return; }
     // (Your shortcuts first: see KEY_ACTS.)
     const mine = !typing && KEY_ACTS.find(a => a.scope === 'pdf' && keyIs(ev, a.id));
     if (mine) { ev.preventDefault(); runPdfKey(mine.id); return; }
@@ -12657,7 +12678,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-07.08</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-07.09</small>`;
 };
 
 function gunzipJSON(bytes) {
