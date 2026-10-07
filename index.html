@@ -1742,7 +1742,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-07.11</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-07.12</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1757,7 +1757,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-07.11';
+      l.querySelector('small').textContent = 'Version 2026-10-07.12';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1769,7 +1769,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-07.11): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-07.12): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -2041,7 +2041,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-07.11`;
+    `<br>LibLande version 2026-10-07.12`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -4155,6 +4155,10 @@ function bibtex(e, extra) {
 // notes stored in the PDF and can add new ones. PDF.js loads the first time
 // a paper is opened.
 const PDFJS = './vendor/pdf.js/6.4.299/';
+// PDF.js's decoders for images in some scans (JBIG2, JPEG 2000), character
+// maps and standard fonts: npm's package (the site's own copy on Pages).
+// Full addresses: the worker, started from a copy, can't follow a relative one.
+const PDFJS_DATA = new URL('./vendor/pdf.js/6.4.299/', location.href).href;
 let pdfjsReady = null, viewerReady = null;
 // Whether a mark is selected (PDF.js 6 keeps this on the mark itself).
 const isPicked = ed => !!ed && (V.ui && V.ui.isSelected ? V.ui.isSelected(ed) : !!ed.isSelected);
@@ -4170,7 +4174,8 @@ function closePdf(d) {
 let PDF_WORKER = null;
 // (Fonts keep their names, as "Times-Italic": Quote tells italic and bold
 // by them.)
-const openPdf = (lib, params) => lib.getDocument(Object.assign({ fontExtraProperties: true }, params, PDF_WORKER ? { worker: PDF_WORKER } : {}));
+const openPdf = (lib, params) => lib.getDocument(Object.assign({ fontExtraProperties: true, wasmUrl: PDFJS_DATA + 'wasm/',
+  cMapUrl: PDFJS_DATA + 'cmaps/', cMapPacked: true, standardFontDataUrl: PDFJS_DATA + 'standard_fonts/' }, params, PDF_WORKER ? { worker: PDF_WORKER } : {}));
 // PDF.js 6's search uses RegExp.escape, new in Safari 18.2: without it
 // (an iPhone on an older iOS), searching a paper finds nothing. The
 // characters that mean something in a pattern, escaped (also valid with
@@ -12788,7 +12793,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-07.11</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-07.12</small>`;
 };
 
 function gunzipJSON(bytes) {
