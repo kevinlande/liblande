@@ -1742,7 +1742,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-07.10</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-07.11</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1757,7 +1757,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-07.10';
+      l.querySelector('small').textContent = 'Version 2026-10-07.11';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1769,7 +1769,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-07.10): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-07.11): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -2041,7 +2041,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-07.10`;
+    `<br>LibLande version 2026-10-07.11`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -7937,14 +7937,19 @@ async function showQuote() {
   QUOTE.el.classList.toggle('unsure', !sure);
   QUOTE.el.querySelector('.quote-pg').title = sure ? 'The journal’s page (click to change it)' : 'A guess at the journal’s page: check it, and change it if need be';
   QUOTE.el.hidden = false;
-  // Above the passage; below it on a touch screen (iOS's own menu is above).
-  const w = QUOTE.el.offsetWidth, h = QUOTE.el.offsetHeight, r = sel.rect;
+  // Where the selecting ended: the point lifted from (a drag's end), else
+  // the end of the selection (made with the keys, say). Just below it, so
+  // the passage isn't covered (and iOS's own menu, above, isn't either);
+  // above it when there's no room below.
+  const w = QUOTE.el.offsetWidth, h = QUOTE.el.offsetHeight;
   const touch = lastPointer === 'touch' || coarseMQ.matches;
-  let top = touch ? r.bottom + 12 : r.top - h - 8;
-  if (top < 8) top = r.bottom + 12;
-  if (top + h > innerHeight - 8) top = Math.max(8, r.top - h - 8);
+  const up = QUOTE.up && Date.now() - QUOTE.up.at < 3000 ? QUOTE.up : null;
+  const ends = sel.range.getClientRects(), last = ends.length ? ends[ends.length - 1] : sel.rect;
+  const x = up ? up.x : last.right, yTop = up ? up.y - 10 : last.top, yBottom = up ? up.y + 14 : last.bottom;
+  let top = yBottom + (touch ? 10 : 6);
+  if (top + h > innerHeight - 8) top = Math.max(8, yTop - h - 6);
   QUOTE.el.style.top = top + 'px';
-  QUOTE.el.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + 'px';
+  QUOTE.el.style.left = Math.max(8, Math.min(innerWidth - w - 8, x - w / 2)) + 'px';
   return sel;
 }
 function quoteCopy() {
@@ -7988,6 +7993,10 @@ function quoteCopy() {
 // (Typing in the page field moves the browser's selection there: the bar
 // and the passage it had stay.)
 const quoteEditing = () => !!(QUOTE.el && !QUOTE.el.hidden && QUOTE.el.contains(document.activeElement));
+// (Where a drag or press over the paper ended, to put the bar there.)
+document.addEventListener('pointerup', ev => {
+  if (ev.target && ev.target.closest && ev.target.closest('#vPages')) QUOTE.up = { x: ev.clientX, y: ev.clientY, at: Date.now() };
+}, true);
 document.addEventListener('selectionchange', () => {
   if ($('#viewer').hidden || quoteEditing()) return;
   clearTimeout(QUOTE.timer);
@@ -7996,6 +8005,7 @@ document.addEventListener('selectionchange', () => {
 });
 $('#vScroll').addEventListener('scroll', () => {
   if (!QUOTE.el || QUOTE.el.hidden || quoteEditing()) return;
+  QUOTE.up = null;
   QUOTE.el.hidden = true;
   clearTimeout(QUOTE.timer);
   QUOTE.timer = setTimeout(showQuote, 300);
@@ -12778,7 +12788,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-07.10</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-07.11</small>`;
 };
 
 function gunzipJSON(bytes) {
