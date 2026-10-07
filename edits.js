@@ -18,7 +18,7 @@
  */
 (function (root) {
   'use strict';
-  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).edits = '2026-10-07.06';
+  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).edits = '2026-10-07.08';
   const FOLDER = 'application/vnd.google-apps.folder';
   const UPLOAD = 'https://www.googleapis.com/upload/drive/v3/';
   const PENDING_FILE = 'pending-edits.json', READING_FILE = 'reading-list.json',
@@ -151,6 +151,8 @@
     // Several entries' fields at once (updates from Crossref, say), in one
     // save: each checked against its fingerprint and edited, then the whole
     // checked once. An entry that can't be edited is left out, with why.
+    // An item can also go into static groups, or out of them (groups: {add,
+    // remove}), which leaves its fields and date be.
     saveMany(text, items, modified) {
       const before = parseBib_(text)[0];
       let cur = text;
@@ -158,9 +160,14 @@
       for (const it of items) {
         try {
           if (it.expectHash && hashOf(cur, it.key) !== it.expectHash) throw new Error('It has been changed since LibLande last read it (perhaps in BibDesk).');
-          const set = Object.assign({}, it.set, { 'date-modified': modified });
-          cur = editEntry_(cur, it.key, set);
-          applied.push({ key: it.key, set });
+          const fields = it.set && Object.keys(it.set).length;
+          const set = fields ? Object.assign({}, it.set, { 'date-modified': modified }) : {};
+          const g = it.groups || {}, add = g.add || [], remove = g.remove || [];
+          let next = fields ? editEntry_(cur, it.key, set) : cur;
+          if (add.length) add.forEach(name => { next = ensureStaticGroup_(next, name); });
+          if (add.length || remove.length) next = editGroups_(next, it.key, add, remove);
+          cur = next;
+          applied.push({ key: it.key, set, add, remove });
         } catch (e) {
           skipped.push({ key: it.key, reason: e.message });
         }
@@ -174,9 +181,14 @@
         const got = e && e[2][n] !== undefined ? e[2][n] : '';
         if (got !== want) throw new Error('The ' + n + ' field of ' + a.key + ' didn\u2019t come out as expected, so LibLande didn\u2019t save the updates.');
       }));
+      const groups = staticGroups_(parseBib_(cur)[1]);
+      applied.forEach(a => {
+        const inG = name => { const g = groups.find(x => x.name === name); return !!g && g.keys.indexOf(a.key) >= 0; };
+        if (a.add.some(n => !inG(n)) || a.remove.some(n => inG(n))) throw new Error('The groups of ' + a.key + ' didn\u2019t come out as expected, so LibLande didn\u2019t save the changes.');
+      });
       const hashes = {};
       applied.forEach(a => { hashes[a.key] = hashOf(cur, a.key); });
-      return { text: cur, hashes, skipped };
+      return { text: cur, hashes, skipped, gh: groupsHashOf(parseBib_(cur)) };
     },
     // A new cite key (renameKey_ and checkRename_ in Build.gs).
     renameKey(text, req) {
@@ -651,7 +663,7 @@
       return serial(async () => {
       if (!(await direct())) throw new Error('Turn on \u201cSave edits straight to your .bib file\u201d in settings first.');
       const out = await changeFile(await mainBibId(), text => run('saveMany', text, req.items || [], req.modified), req.backupName, step);
-      return { stamp: out.stamp || null, hashes: out.hashes || {}, skipped: out.skipped || [] };
+      return { stamp: out.stamp || null, hashes: out.hashes || {}, skipped: out.skipped || [], gh: out.gh || null };
       });
     };
 

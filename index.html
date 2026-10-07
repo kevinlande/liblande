@@ -543,6 +543,12 @@ body:has(#sheet:not([hidden])) .pick-bar { visibility: hidden; }
 .export-done p { margin: 0; color: var(--text); }
 .menu-list kbd { float: right; margin-left: 18px; font: 12px var(--ui); color: var(--faint); }
 .keys { border-collapse: collapse; width: 100%; font-size: 14px; }
+.keys-h { font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin: 14px 0 2px; }
+.key-set { border: 0; background: none; padding: 0; cursor: pointer; }
+.key-set kbd { cursor: pointer; }
+.key-set:hover kbd { border-color: var(--accent); }
+.key-set.listening kbd { border-color: var(--accent); color: var(--accent); }
+.key-mine { color: var(--accent); font-size: 11.5px; margin-left: 4px; }
 .keys th { text-align: left; white-space: nowrap; padding: 6px 16px 6px 0; vertical-align: top; font-weight: 400; }
 .keys td { padding: 6px 0; color: var(--text); }
 .keys tr + tr > * { border-top: 1px solid var(--line); }
@@ -973,6 +979,43 @@ details.d-sec[open] summary { margin-bottom: 8px; }
 .ms-ib .i { width: 15px; height: 15px; }
 @media (pointer: coarse) { .ms-ib { width: 36px; height: 36px; } }
 .ms-ref, .ms-raw, .ms-msg, .ms-ctx { overflow-wrap: anywhere; }
+/* Several changed at once: keywords as chips (tapped off: struck through). */
+/* Reading progress, on the reading list: a small bar under the words. */
+.rl-prog { display: inline-block; margin: 0 6px 0 0; padding: 0 6px 1px; border-radius: 6px; font: 600 11px var(--ui); color: var(--muted); vertical-align: 1px;
+  background: linear-gradient(var(--accent), var(--accent)) left bottom / var(--p, 0%) 2px no-repeat, var(--side-hover); }
+/* A paper saved on this device: a dot on its icon; offline, the others fade. */
+.fileicon.saved, .pdf.saved { position: relative; }
+.fileicon.saved::after { content: ''; position: absolute; right: 3px; bottom: 3px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 1.5px var(--bg); }
+.pdf.saved::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-right: 4px; vertical-align: 1px; }
+body.is-offline .fileicon:not(.saved), body.is-offline .pdf:not(.saved) { opacity: .3; }
+.pick-ib { padding: 6px 9px; } .pick-ib .i { width: 17px; height: 17px; }
+.bulk-kws { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
+.bulk-kw { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.bulk-kw.off { text-decoration: line-through; opacity: .55; }
+.bulk-n { color: var(--muted); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.bulk-groups { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 2px 12px; max-height: 40vh; overflow-y: auto; }
+/* Saved searches: Save in the search bar; the search shown above the list. */
+.search-save { flex: none; display: grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: 6px; background: none; color: var(--muted); cursor: pointer; padding: 0; }
+.search-save:hover { color: var(--accent); background: var(--side-hover); }
+.search-save[hidden] { display: none; }
+.search-save .i { width: 17px; height: 17px; }
+#smartBar .rl-count { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+#smartBar .rl-count .i { width: 15px; height: 15px; flex: none; }
+#smartBar code { font: 12.5px var(--mono, ui-monospace, monospace); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Quote: the bar by a passage selected while reading. */
+.quote-bar { position: fixed; z-index: 62; display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 10px;
+  background: var(--panel); box-shadow: 0 6px 20px rgba(0, 0, 0, .22); font: 500 13.5px var(--ui); color: var(--text); }
+.quote-bar[hidden] { display: none; }
+.quote-go { display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 7px; background: none; color: inherit; font: inherit; padding: 6px 10px; cursor: pointer; }
+.quote-go:hover { background: var(--side-hover); }
+.quote-go .i { width: 16px; height: 16px; color: var(--accent); }
+.quote-go.done { color: var(--accent); }
+.quote-pg { display: inline-flex; align-items: center; gap: 3px; padding: 0 6px 0 8px; border-left: 1px solid var(--line); color: var(--muted); }
+.quote-pg input { width: auto; min-width: 2.2em; border: 1px solid transparent; border-radius: 5px; background: none; color: var(--text); font: inherit; padding: 3px 4px; text-align: center; }
+.quote-pg input:focus { border-color: var(--accent); outline: none; }
+.quote-bar.unsure .quote-pg input { border-color: #b8860b; }
+.quote-bar.unsure .quote-pg::after { content: '?'; color: #b8860b; font-weight: 700; }
+@media (pointer: coarse) { .quote-pg input { font-size: 16px; } .quote-go { padding: 9px 12px; } }
 .ms-group { display: grid; gap: 4px; margin: 4px 0 8px; }
 .ms-gh { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin: 4px 0 2px; }
 .ms-gh .i { width: 14px; height: 14px; }
@@ -1331,7 +1374,7 @@ a.ms-ib { text-decoration: none; }
 .toast {
   position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%) translateY(12px);
   background: var(--text); color: var(--bg); padding: 8px 14px; border-radius: 8px; font-size: 13px;
-  opacity: 0; pointer-events: none; transition: opacity .18s, transform .18s; z-index: 50; box-shadow: var(--shadow);
+  opacity: 0; pointer-events: none; transition: opacity .18s, transform .18s; z-index: 100; box-shadow: var(--shadow);
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 .toast.has-action.show { pointer-events: auto; display: flex; align-items: center; gap: 12px; }
@@ -1543,6 +1586,7 @@ try {
           <option value="title">Title</option>
           <option value="kw">Keywords</option>
         </select>
+        <button type="button" class="search-save" id="searchSave" hidden aria-label="Save this search as a group" title="Save this search as a group in the sidebar"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1z"/><path d="M12 7.5v6M9 10.5h6"/></svg></button>
         <button type="button" class="search-x" id="searchX" aria-label="Close search" title="Close search (Esc)"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </label>
     </header>
@@ -1553,8 +1597,15 @@ try {
         <button type="button" class="linkish" id="pickAll">Select all</button>
         <button type="button" class="linkish" id="pickNone">Clear</button>
         <button type="button" class="btn" id="pickJoin" hidden>Join&#x2026;</button>
+        <button type="button" class="btn pick-ib" id="pickBulk" hidden aria-label="Keywords and groups" title="Keywords and groups for the selected"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.3"/></svg></button>
+        <button type="button" class="btn pick-ib" id="pickRL" hidden aria-label="Add to reading list" title="Add the selected to your reading list"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1z"/></svg></button>
         <button type="button" class="btn primary" id="pickExport">Export&#x2026;</button>
         <button type="button" class="pick-x" id="pickDone" aria-label="Stop selecting" title="Stop selecting (Esc)"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </div>
+      <div class="rl-list-bar" id="smartBar" hidden>
+        <span class="rl-count"></span>
+        <button type="button" class="btn" id="smartEdit">Edit&#x2026;</button>
+        <button type="button" class="btn" id="smartDel">Delete</button>
       </div>
       <div class="rl-list-bar" id="forthBar" hidden>
         <span class="rl-count"></span>
@@ -1691,7 +1742,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-07.06</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-07.08</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1706,7 +1757,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-07.06';
+      l.querySelector('small').textContent = 'Version 2026-10-07.08';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1718,7 +1769,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-07.06): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-07.08): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -1990,7 +2041,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-07.06`;
+    `<br>LibLande version 2026-10-07.08`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -2050,8 +2101,34 @@ function waited(x, short) {
 const staleRL = x => Date.now() - x.added > 56 * 86400000;
 function rlTag(e) {
   const x = RL.get(e.k);
-  return x && x.list === 'next' ? '<span class="rl-tag next">Up next</span>' : '';
+  return (x && x.list === 'next' ? '<span class="rl-tag next">Up next</span>' : '') + (x ? progressTag(e) : '');
 }
+// How far into each paper you've read: the furthest page reached, as a
+// share of its pages ({key: {p, at}}; page 1 alone doesn't count). Kept
+// with your preferences (the 300 read most lately), for every device.
+const PROGRESS = store.get('progress', {});
+function noteProgress(page, total) {
+  const e = V.entry;
+  if (!e || !total || page < 2) return;
+  const p = Math.min(100, Math.round(page / total * 100)), old = PROGRESS[e.k];
+  if (old && old.p >= p) return;
+  PROGRESS[e.k] = { p, at: Date.now() };
+  clearTimeout(noteProgress.t);
+  noteProgress.t = setTimeout(saveProgress, 4000);
+}
+function saveProgress() {
+  const keep = Object.entries(PROGRESS).sort((a, b) => b[1].at - a[1].at).slice(0, 300);
+  Object.keys(PROGRESS).forEach(k => { if (!keep.some(x => x[0] === k)) delete PROGRESS[k]; });
+  store.set('progress', PROGRESS);
+  if (gs) google.script.run.withFailureHandler(() => {}).savePrefs({ progress: PROGRESS });
+  if (ENTRIES.length) paint();
+}
+function progressMerge(prefs) {
+  Object.entries((prefs && prefs.progress) || {}).forEach(([k, v]) => { if (!PROGRESS[k] || PROGRESS[k].p < v.p) PROGRESS[k] = v; });
+  store.set('progress', PROGRESS);
+}
+const progressText = e => { const x = PROGRESS[e.k]; return !x ? '' : x.p >= 100 ? 'read through' : x.p + '% read'; };
+const progressTag = e => progressText(e) ? `<span class="rl-prog" style="--p:${PROGRESS[e.k].p}%">${progressText(e)}</span>` : '';
 
 // The change made here at once, so the page updates before it's saved.
 function readingLocal(req) {
@@ -2120,7 +2197,7 @@ function readingHTML(e) {
   const x = RL.get(e.k);
   // Not on the list: the Reading list button is in the row of actions.
   if (!x) return `<div class="rl-bar" hidden></div>`;
-  return `<div class="rl-bar on"><span class="rl-where${staleRL(x) ? ' stale' : ''}">${ICON.bookmark}On your reading list, waiting ${waited(x)}</span>` +
+  return `<div class="rl-bar on"><span class="rl-where${staleRL(x) ? ' stale' : ''}">${ICON.bookmark}On your reading list, waiting ${waited(x)}${progressText(e) ? ' \u00b7 ' + progressText(e) : ''}</span>` +
     `<div class="seg rl-seg" role="radiogroup" aria-label="Reading list"><button type="button" role="radio" data-rl="next" aria-checked="${x.list === 'next'}">Up next</button>` +
     `<button type="button" role="radio" data-rl="later" aria-checked="${x.list !== 'next'}">Later</button></div>` +
     `<button type="button" class="btn" data-rl="done">Done</button><button type="button" class="btn" data-rl="remove">Remove</button></div>`;
@@ -2528,6 +2605,7 @@ function groupItems(id) {
   if (id === 'toread') return readingOrder().map(x => BYKEY.get(x.key)).filter(Boolean);
   const [kind, name] = [id.slice(0, 2), id.slice(2)];
   if (kind === 's:') { const g = GROUPS.find(g => g.name === name); return g && g.items; }
+  if (kind === 'q:') { const x = SMART.list.find(x => x.name === name); const f = x && searchFilter(x.q, 'sAll'); return x ? (f ? ENTRIES.filter(f) : ENTRIES.slice()) : null; }
   if (kind === 'k:') return KEYWORDS.get(name);
   if (kind === 't:') return TYPES.get(name);
   return null;
@@ -2548,7 +2626,7 @@ function grpBtn(id, label, count, icon) {
 }
 // The checker's row: how much is left to fix in the manuscript checked last.
 const msToolLast = () => (MS.recent && MS.recent[0]) || null;
-const msToolTitle = () => { const x = msToolLast(); return x ? ' title="' + esc(x.name + ': ' + (x.todo ? x.todo + ' to fix' : 'all in order')) + '"' : ''; };
+const msToolTitle = () => { const x = msToolLast(); return ' title="' + esc('Check a manuscript\u2019s citations' + (x ? ' \u2014 ' + x.name + ': ' + (x.todo ? x.todo + ' to fix' : 'all in order') : '')) + '"'; };
 const msToolCount = () => { const x = msToolLast(); return !x ? '' : x.todo ? '<span class="ct ms-todo-ct">' + x.todo + '</span>' : '<span class="ct ms-ok-ct">' + ICON.check + '</span>'; };
 function renderGroups() {
   const inboxCount = ENTRIES.filter(e => e.ib).length;
@@ -2560,7 +2638,8 @@ function renderGroups() {
     ((n => (n || state.group === 'forth' ? grpBtn('forth', 'Forthcoming', n, ICON.forth) : ''))(ENTRIES.filter(isForthcoming).length)) +
     `</div>` +
     // (Tools: not lists, so no count.)
-    `<div class="sec"><div class="sec-h">Tools</div><button type="button" class="grp" data-tool="mscheck"${msToolTitle()}>${ICON.citecheck}<span class="nm">Check a manuscript\u2019s citations</span>${msToolCount()}</button></div>`;
+    (SMART.list.length ? `<div class="sec"><div class="sec-h">Saved searches</div>` + SMART.list.map(x => grpBtn('q:' + x.name, x.name, groupItems('q:' + x.name).length, ICON.search)).join('') + `</div>` : '') +
+    `<div class="sec"><div class="sec-h">Tools</div><button type="button" class="grp" data-tool="mscheck" aria-label="Cite Check: check a manuscript\u2019s citations"${msToolTitle()}>${ICON.citecheck}<span class="nm">Cite Check</span>${msToolCount()}</button></div>`;
   if (GROUPS.some(g => !(gs && g === readingGroup())) || gs) {
     h += `<div class="sec"><div class="sec-row"><div class="sec-h">Static groups</div>` +
       (gs ? `<button type="button" class="sec-add" data-new-group title="New static group" aria-label="New static group"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>` : '') + `</div>`;
@@ -2698,10 +2777,44 @@ function setGroup(id) {
 }
 
 /* ------------------------------------------------------------ filter + sort */
-function tokens(q) {
-  const out = []; const re = /"([^"]+)"|(\S+)/g; let m;
-  while ((m = re.exec(q))) out.push(norm(m[1] || m[2]));
-  return out;
+// A search, as a test of a publication (null for none). Words are looked
+// for in the field chosen (all of them, say); a word can name its own,
+// and start with - to leave out what has it:
+//   author:lee  title:"mental imagery"  kw:perception  journal:mind
+//   year:2020  year:2020-2024  year:>2019  year:forthcoming
+//   type:article  group:favorites  has:pdf  has:doi  is:read  is:unread  rating:4
+const SEARCH_FIELDS = { author: 'author', a: 'author', au: 'author', title: 'title', t: 'title', ti: 'title', kw: 'kw', k: 'kw', keyword: 'kw',
+  journal: 'venue', j: 'venue', venue: 'venue', in: 'venue', year: 'year', y: 'year', type: 'type', group: 'group', g: 'group', has: 'has', is: 'is',
+  rating: 'rating', key: 'key' };
+function searchFilter(q, field) {
+  const tests = [], re = /(-)?(?:([a-z]+):)?(?:"([^"]+)"|(\S+))/gi;
+  let m;
+  while ((m = re.exec(q || ''))) {
+    let name = m[2] && SEARCH_FIELDS[m[2].toLowerCase()];
+    const raw = m[3] || m[4], v = norm(raw);
+    let test;
+    if (!name) { const t = norm((m[2] ? m[2] + ':' : '') + raw); test = e => searchText(e, field).includes(t); }
+    else if (name === 'year') {
+      const r = /^(\d{4})?\s*-\s*(\d{4})?$/.exec(v), gt = /^>=?(\d{4})$/.exec(v), lt = /^<=?(\d{4})$/.exec(v);
+      if (FORTH_RE.test(v) || v === 'forth') test = e => FORTH_RE.test(e.f.year || '');
+      else if (r) test = e => e.yearN && (!r[1] || e.yearN >= +r[1]) && (!r[2] || e.yearN <= +r[2]);
+      else if (gt) test = e => e.yearN > +gt[1] - (v[1] === '=' ? 1 : 0);
+      else if (lt) test = e => e.yearN && e.yearN < +lt[1] + (v[1] === '=' ? 1 : 0);
+      else test = e => String(e.f.year || '').startsWith(raw);
+    }
+    else if (name === 'author') test = e => searchText(e, 'sAuthor').includes(v);
+    else if (name === 'title') test = e => searchText(e, 'sTitle').includes(v);
+    else if (name === 'kw') test = e => e.kw.some(k => norm(k).includes(v));
+    else if (name === 'venue') test = e => norm(e.venue).includes(v);
+    else if (name === 'type') test = e => e.t === v || norm(TYPE_NAMES[e.t] || '').includes(v);
+    else if (name === 'group') test = e => (e.groups || []).some(g => norm(g).includes(v));
+    else if (name === 'key') test = e => norm(e.k).includes(v);
+    else if (name === 'rating') test = e => e.rating >= (parseInt(v, 10) || 0);
+    else if (name === 'has') test = v === 'pdf' || v === 'file' ? e => readablePdfs(e).length || (e.files || []).length > 0 : v === 'doi' ? e => !!e.f.doi : v === 'notes' ? e => !!(e.f.annote || '').trim() : e => !!(e.f[v] || '').toString().trim();
+    else if (name === 'is') test = v === 'read' ? e => e.f.read === '1' : v === 'unread' ? e => e.f.read !== '1' : v === 'inbox' ? e => !!e.ib : () => true;
+    tests.push(m[1] ? e => !test(e) : test);
+  }
+  return tests.length ? e => tests.every(t => t(e)) : null;
 }
 // The sort keys are already folded to plain lower case (norm), so a plain
 // comparison is enough, and much quicker than localeCompare.
@@ -2717,15 +2830,17 @@ const SORTS = {
 };
 function refresh(resetSel) {
   const base = groupItems(state.group) || ENTRIES;
-  const toks = tokens(state.q);
   const field = { all: 'sAll', author: 'sAuthor', title: 'sTitle', kw: 'sKw' }[state.scope] || 'sAll';
-  let v = toks.length ? base.filter(e => { const s = searchText(e, field); return toks.every(t => s.includes(t)); }) : base.slice();
+  const match = searchFilter(state.q, field), toks = match ? [1] : [];
+  let v = match ? base.filter(match) : base.slice();
   const cmp = SORTS[state.sort] || colSort(state.sort, v) || SORTS.added;
   if (state.group !== 'toread' && state.group !== 'dups' && state.group !== 'recent') v.sort(cmp.blank ? (a, b) => cmp.blank(a) - cmp.blank(b) || state.dir * cmp(a, b) : state.dir > 0 ? cmp : (a, b) => cmp(b, a));
   if (state.group !== 'toread' && state.group !== 'dups' && state.group !== 'recent') v = nestVersions(v); else NESTED = new Set();
   state.view = v;
   renderRLBar();
   renderForthBar();
+  renderSmartBar();
+  $('#searchSave').hidden = !match;
   renderTabs();
 
   $('#statusL').textContent = toks.length
@@ -3033,6 +3148,23 @@ function paint() {
   for (let i = s; i < e; i++) out += phone ? cardHTML(v[i], i, rowTop(i), rowHt(i)) : rowHTML(v[i], i, rowTop(i), h);
   rowsEl.innerHTML = out;
 }
+// Papers saved on this device (sw.js keeps them), by file id: marked in
+// the list, and the others faded while offline.
+let SAVED = new Set();
+const savedHere = e => readablePdfs(e).some(f => SAVED.has(f.id));
+async function refreshSaved() {
+  if (!window.LIBLANDE_PAGES || !window.caches) return;
+  try {
+    const keys = await (await caches.open('liblande-papers')).keys();
+    const ids = new Set(keys.map(r => (/\/files\/([^/?]+)\?alt=media/.exec(r.url) || [])[1]).filter(Boolean).map(decodeURIComponent));
+    if ([...ids].join() !== [...SAVED].join()) { SAVED = ids; if (ENTRIES.length) paint(); }
+  } catch (err) { /* none kept */ }
+}
+const refreshSavedSoon = (ms = 2500) => { clearTimeout(refreshSaved.t); refreshSaved.t = setTimeout(refreshSaved, ms); };
+const showOnline = () => { document.body.classList.toggle('is-offline', !navigator.onLine); };
+window.addEventListener('online', showOnline);
+window.addEventListener('offline', showOnline);
+showOnline();
 const pickBox = e => `<span class="pickbox${state.picked.has(e.k) ? ' on' : ''}" aria-hidden="true">${state.picked.has(e.k) ? ICON.check : ''}</span>`;
 function rowHTML(e, i, top, h) {
   const f = e.files && e.files[0], n = readablePdfs(e).length;
@@ -3040,7 +3172,7 @@ function rowHTML(e, i, top, h) {
   // several); without a server (the local tests), or for a file not found in Drive, it
   // links to Google Drive.
   const file = state.picking ? pickBox(e) : n
-    ? `<button type="button" class="fileicon" data-open-pdf="${i}" title="${n > 1 ? 'Read one of its ' + n + ' PDFs' : 'Read ' + esc(f.n)}" aria-label="Read the PDF">${ICON.doc}</button>`
+    ? `<button type="button" class="fileicon${savedHere(e) ? ' saved' : ''}" data-open-pdf="${i}" title="${n > 1 ? 'Read one of its ' + n + ' PDFs' : 'Read ' + esc(f.n)}${savedHere(e) ? ' (saved on this device: opens offline)' : ''}" aria-label="Read the PDF">${ICON.doc}</button>`
     : f ? `<a class="fileicon" href="${esc(driveUrl(f))}" target="_blank" rel="noopener" title="Open ${esc(f.n)}" aria-label="Open linked file">${ICON.doc}</a>`
     : '';
   return `<div class="row${e.k === state.selKey ? ' sel' : ''}${state.picked.has(e.k) ? ' picked' : ''}${i % 2 ? ' odd' : ''}${NESTED.has(e.k) ? ' child' : ''}" data-i="${i}"` +
@@ -3068,7 +3200,7 @@ function cardHTML(e, i, top, h) {
     (state.picking ? pickBox(e) : '') + `<div class="t">${esc(e.f.title || '(untitled)')}</div>` +
     `<div class="m"><span>${esc(e.authorsInit)}${e.f.year ? ' \u00b7 ' + esc(e.f.year) : ''}${rlTag(e)}${cardWait(e)}</span></div>` +
     `<div class="m"><span class="v">${esc(e.venue)}</span>${!e.files ? '' : readablePdfs(e).length && !state.picking
-      ? `<button type="button" class="pdf" data-open-pdf="${i}" aria-label="Read the PDF">PDF${readablePdfs(e).length > 1 ? ' \u00b7 ' + readablePdfs(e).length : ''}</button>`
+      ? `<button type="button" class="pdf${savedHere(e) ? ' saved' : ''}" data-open-pdf="${i}" aria-label="Read the PDF${savedHere(e) ? ' (saved on this device)' : ''}">PDF${readablePdfs(e).length > 1 ? ' \u00b7 ' + readablePdfs(e).length : ''}</button>`
       : '<span class="pdf">PDF</span>'}</div></div>`;
 }
 // The PDFs of a publication that can be opened in the reader.
@@ -3538,9 +3670,9 @@ function renderDetail() {
     btns.push(`<a class="btn" href="${esc(u)}" target="_blank" rel="noopener" title="${esc(u)}">${ICON.link}<span>${esc(host)}</span></a>`);
   });
   btns.push(`<details class="menu"><summary class="btn" title="Copy the citation">${ICON.copy}<span>Copy</span>${ICON.chev}</summary>` +
-    `<div class="menu-list" role="menu"><button type="button" role="menuitem" data-copy="bibtex">BibTeX<kbd>\u2325B</kbd></button>` +
-    `<button type="button" role="menuitem" data-copy="apa">APA (long)<kbd>\u2325A</kbd></button>` +
-    `<button type="button" role="menuitem" data-copy="apa-short">APA (short)<kbd>\u2325S</kbd></button></div></details>`);
+    `<div class="menu-list" role="menu"><button type="button" role="menuitem" data-copy="bibtex">BibTeX<kbd>${esc(keyHint('copyBib'))}</kbd></button>` +
+    `<button type="button" role="menuitem" data-copy="apa">APA (long)<kbd>${esc(keyHint('copyApa'))}</kbd></button>` +
+    `<button type="button" role="menuitem" data-copy="apa-short">APA (short)<kbd>${esc(keyHint('copyShort'))}</kbd></button></div></details>`);
   h += `<div class="actions">${btns.join('')}</div>`;
   // Thumbnails go in line here, or (on a wide pane) in a column on the
   // right; both are drawn and the CSS shows one.
@@ -3686,6 +3818,8 @@ detailEl.addEventListener('focusout', ev => {
 detailEl.addEventListener('click', ev => {
   if (ev.target.closest('[data-export]')) { openExport(); return; }
   if (ev.target.closest('[data-join]')) { openJoin(pickedEntries()); return; }
+  if (ev.target.closest('[data-bulk]')) { openBulk(); return; }
+  if (ev.target.closest('[data-bulk-rl]')) { bulkReading(); return; }
   if (ev.target.closest('[data-pick-clear]')) { state.picked.clear(); paint(); renderPickBar(); renderDetail(); return; }
   const cs = ev.target.closest('[data-copy-sel]');
   if (cs) { cs.closest('details').open = false; copyAs(cs.dataset.copySel); return; }
@@ -4123,7 +4257,7 @@ const AHEAD = 10;
 let aheadRun = null, aheadTimer = 0;
 function fetchAheadSoon(ms) { clearTimeout(aheadTimer); aheadTimer = setTimeout(fetchAhead, ms == null ? 3000 : ms); }
 function fetchAhead() {
-  if (!aheadRun) aheadRun = fetchAheadNow().catch(() => {}).then(() => { aheadRun = null; });
+  if (!aheadRun) aheadRun = fetchAheadNow().catch(() => {}).then(() => { aheadRun = null; refreshSavedSoon(500); });
   return aheadRun;
 }
 async function fetchAheadNow() {
@@ -4192,6 +4326,7 @@ async function getPdfBytes(file, onProgress) {
     bytes = new Uint8Array(await r.arrayBuffer());
   }
   recentPdfs.set(file.id, bytes);
+  refreshSavedSoon();
   while (recentPdfs.size > 3) { const k = recentPdfs.keys().next().value; recentPdfs.delete(k); recentMd5.delete(k); }
   return bytes;
 }
@@ -4319,6 +4454,7 @@ function ensureViewer(lib, VL) {
     railSoon();
     if (RAIL.lastPage && e.pageNumber !== RAIL.lastPage) showPagePill(e.pageNumber, viewer.pagesCount);
     RAIL.lastPage = e.pageNumber;
+    noteProgress(e.pageNumber, viewer.pagesCount);
   });
   bus.on('pagesloaded', e => { $('#vPage').textContent = viewer.currentPageNumber + ' / ' + e.pagesCount; RAIL.lastPage = viewer.currentPageNumber; railSoon(); });
   bus.on('scalechanging', () => railSoon());
@@ -4398,7 +4534,8 @@ async function openReader(entry, file, pos) {
   TAKEN.clear();
   $('#viewer').classList.remove('bars-hidden');
   V.restore = pos && pos.top != null ? pos : null;
-  Object.assign(V, { entry, file, bytes: null, md5: null, dirty: false, drawing: false, selected: false, canUndo: false, canRedo: false });
+  Object.assign(V, { entry, file, bytes: null, md5: null, dirty: false, drawing: false, selected: false, canUndo: false, canRedo: false, pageLabels: undefined, quotePages: null });
+  hideQuote();
   $('#vTitle').textContent = entry.f.title || file.n;
   $('#vDrive').href = driveUrl(file);
   syncReaderRL();
@@ -4570,6 +4707,7 @@ async function saveNow() {
 // changes in the background (the paper stays open, so nothing is lost if
 // that fails; you're told, and can come back to it).
 async function closeReader() {
+  hideQuote();
   if ($('#viewer').hidden) return;
   rememberTab();
   hidePanel();
@@ -5446,6 +5584,7 @@ $('#vScroll').addEventListener('pointerup', () => {
   if (box && document.activeElement !== box) box.focus({ preventScroll: true });
 });
 function setTool(tool) {
+  if (tool !== 'read') hideQuote();
   if (tool === 'read') fingerMode(false);
   if (tool === 'markup') tool = markupTool();
   if (tool === 'lines') tool = lineTool();
@@ -7604,6 +7743,150 @@ document.addEventListener('selectstart', ev => {
 document.addEventListener('selectionchange', ev => {
   if (V.ui && V.tool !== 'read' && !$('#viewer').hidden) ev.stopImmediatePropagation();
 });
+
+/* ---- quoting: a passage selected while reading, copied with its citation */
+// A passage selected in Read mode gets a small bar with Quote, which copies
+// it as APA has it: "the passage" (Lee, 2026, p. 4), or, at 40 words or
+// more, as a block quotation with the citation after it. The page is the
+// journal's: from the PDF's own page labels, or the publication's page
+// range lined up with the PDF (a cover page skipped), or the number printed
+// at the top or foot of the page. A guess is marked, and can be changed.
+const QUOTE = { el: null, sel: null, timer: 0, run: 0 };
+const LIGATURES = { 'ﬀ': 'ff', 'ﬁ': 'fi', 'ﬂ': 'fl', 'ﬃ': 'ffi', 'ﬄ': 'ffl', 'ﬅ': 'st', 'ﬆ': 'st' };
+function quoteText(raw) {
+  let t = String(raw).replace(/­/g, '').replace(/[ﬀ-ﬆ]/g, c => LIGATURES[c])
+    .replace(/(\p{L})[-‐]\s*\n\s*(\p{Ll})/gu, '$1$2')
+    .replace(/\s+/g, ' ').trim();
+  // (Quotation marks in the passage become single ones.)
+  let open = false;
+  t = t.replace(/[“”"]/g, c => c === '“' ? '‘' : c === '”' ? '’' : ((open = !open) ? '‘' : '’'));
+  return t;
+}
+// The printed numbers at the top or foot of a PDF page.
+async function printedNumbers(n) {
+  try {
+    const page = await V.doc.getPage(n), h = page.view[3] - page.view[1];
+    const items = (await page.getTextContent()).items;
+    return items.filter(it => /^\d{1,4}$/.test((it.str || '').trim()) && (it.transform[5] > h * 0.86 || it.transform[5] < h * 0.12)).map(it => +it.str.trim());
+  } catch (err) { return []; }
+}
+// The journal's page for a PDF page: {page, sure}.
+async function printedPage(n) {
+  const doc = V.doc, cache = V.quotePages || (V.quotePages = new Map());
+  if (cache.has(n)) return cache.get(n);
+  let out = null;
+  if (V.pageLabels === undefined) V.pageLabels = await doc.getPageLabels().catch(() => null);
+  const L = V.pageLabels;
+  if (L && L.some((l, i) => l !== String(i + 1)) && /^(\d+|[ivxlcdm]+)$/i.test(L[n - 1] || '')) out = { page: L[n - 1], sure: true };
+  const m = /^(\d+)\s*[-–—]+\s*(\d+)$/.exec(((V.entry && V.entry.f.pages) || '').trim());
+  const start = m ? +m[1] : 0, count = m ? +m[2] - start + 1 : 0, N = doc.numPages;
+  if (!out && m && N === count) out = { page: String(start + n - 1), sure: true };
+  if (!out && m && N === count + 1 && n > 1) out = { page: String(start + n - 2), sure: true };
+  if (!out) {
+    const here = await printedNumbers(n);
+    if (here.length) {
+      const next = n < N ? await printedNumbers(n + 1) : [], prev = n > 1 ? await printedNumbers(n - 1) : [];
+      const seq = here.find(x => next.includes(x + 1) || prev.includes(x - 1));
+      out = seq != null ? { page: String(seq), sure: true } : here.length === 1 ? { page: String(here[0]), sure: false } : null;
+    }
+  }
+  if (!out) out = { page: String(m ? start + n - 1 : n), sure: false };
+  cache.set(n, out);
+  return out;
+}
+// The selection, if it's a passage of the paper being read.
+function quoteSelection() {
+  if ($('#viewer').hidden || !V.doc || !V.entry || V.tool !== 'read') return null;
+  const s = getSelection();
+  if (!s || s.isCollapsed || !s.rangeCount) return null;
+  const r = s.getRangeAt(0), el = n => (n && n.nodeType === 3 ? n.parentNode : n);
+  const a = el(r.startContainer), b = el(r.endContainer);
+  if (!a || !b || !a.closest || !a.closest('#vPages .textLayer') || !b.closest('#vPages .page')) return null;
+  const text = quoteText(s.toString());
+  if (text.length < 2) return null;
+  const pa = +a.closest('.page').dataset.pageNumber, pb = +b.closest('.page').dataset.pageNumber;
+  return { text, from: Math.min(pa, pb), to: Math.max(pa, pb), rect: r.getBoundingClientRect() };
+}
+function hideQuote() { if (QUOTE.el) QUOTE.el.hidden = true; QUOTE.sel = null; }
+async function showQuote() {
+  const sel = quoteSelection();
+  if (!sel) { hideQuote(); return null; }
+  const my = ++QUOTE.run;
+  const [p1, p2] = await Promise.all([printedPage(sel.from), sel.to !== sel.from ? printedPage(sel.to) : null]);
+  if (my !== QUOTE.run) return null;
+  if (!QUOTE.el) {
+    QUOTE.el = document.createElement('div');
+    QUOTE.el.className = 'quote-bar';
+    QUOTE.el.innerHTML = `<button type="button" class="quote-go" title="Copy the passage as a quotation, with its citation (${esc(keyHint('quote'))})">${ICON.quote}<span>Quote</span></button>` +
+      `<label class="quote-pg"><span>p.</span><input type="text" inputmode="numeric" autocomplete="off" aria-label="Page"></label>`;
+    QUOTE.el.querySelector('.quote-go').addEventListener('click', quoteCopy);
+    // (Pressing in the bar keeps the selection.)
+    QUOTE.el.addEventListener('pointerdown', ev => { if (!ev.target.closest('input')) ev.preventDefault(); });
+    QUOTE.el.querySelector('input').addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); quoteCopy(); } });
+    document.body.appendChild(QUOTE.el);
+  }
+  QUOTE.sel = sel;
+  const page = p2 && p2.page !== p1.page ? p1.page + '–' + p2.page : p1.page, sure = p1.sure && (!p2 || p2.sure);
+  const inp = QUOTE.el.querySelector('input');
+  inp.value = page;
+  inp.size = Math.max(2, page.length);
+  QUOTE.el.classList.toggle('unsure', !sure);
+  QUOTE.el.querySelector('.quote-pg').title = sure ? 'The journal’s page' : 'A guess at the journal’s page: check it';
+  QUOTE.el.hidden = false;
+  // Above the passage; below it on a touch screen (iOS's own menu is above).
+  const w = QUOTE.el.offsetWidth, h = QUOTE.el.offsetHeight, r = sel.rect;
+  const touch = lastPointer === 'touch' || coarseMQ.matches;
+  let top = touch ? r.bottom + 12 : r.top - h - 8;
+  if (top < 8) top = r.bottom + 12;
+  if (top + h > innerHeight - 8) top = Math.max(8, r.top - h - 8);
+  QUOTE.el.style.top = top + 'px';
+  QUOTE.el.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + 'px';
+  return sel;
+}
+function quoteCopy() {
+  const s = QUOTE.sel;
+  if (!s || !V.entry) return;
+  const pg = QUOTE.el.querySelector('input').value.trim().replace(/-+/g, '–');
+  const base = apaInText(V.entry).text;
+  const cite = pg ? base.slice(0, -1) + ', ' + (/–/.test(pg) ? 'pp. ' : 'p. ') + pg + ')' : base;
+  let text, html;
+  if (s.text.split(/\s+/).length >= 40) {
+    // A block quotation: no quotation marks, the citation after its end.
+    text = s.text + ' ' + cite;
+    html = '<p style="margin:0 0 0 0.5in">' + esc(text) + '</p>';
+  } else {
+    text = '“' + s.text.replace(/[.,;:]+$/, '') + '” ' + cite;
+    html = esc(text);
+  }
+  copy(text, 'Copied the quotation, with its citation', html);
+  // (The button says so for a moment; then the bar and the selection go.)
+  const go = QUOTE.el.querySelector('.quote-go');
+  go.innerHTML = ICON.check + '<span>Copied</span>';
+  go.classList.add('done');
+  clearTimeout(QUOTE.doneT);
+  QUOTE.doneT = setTimeout(() => {
+    go.innerHTML = ICON.quote + '<span>Quote</span>';
+    go.classList.remove('done');
+    // (Only if it's still that passage: not one chosen meanwhile.)
+    const now = quoteSelection();
+    if (now && now.text !== s.text) return;
+    hideQuote();
+    const sel = getSelection();
+    if (sel) sel.removeAllRanges();
+  }, 900);
+}
+document.addEventListener('selectionchange', () => {
+  if ($('#viewer').hidden) return;
+  clearTimeout(QUOTE.timer);
+  if (QUOTE.el && !QUOTE.el.hidden && !quoteSelection()) hideQuote();
+  QUOTE.timer = setTimeout(showQuote, 250);
+});
+$('#vScroll').addEventListener('scroll', () => {
+  if (!QUOTE.el || QUOTE.el.hidden) return;
+  QUOTE.el.hidden = true;
+  clearTimeout(QUOTE.timer);
+  QUOTE.timer = setTimeout(showQuote, 300);
+}, { passive: true });
 
 /* ---- marks: the toolbar on a tap; drawings moved with a long press */
 // A mark's toolbar (colour, comment, delete) shows only when you tap the
@@ -10426,7 +10709,7 @@ async function saveAdd() {
 $('#sheetForm').addEventListener('submit', ev => {
   ev.preventDefault();
   if (!sheet || $('#sheetSave').disabled) return;
-  if (sheet.mode === 'edit') saveEdit(); else if (sheet.mode === 'forth') saveForth(); else if (sheet.mode === 'join') saveJoin(); else if (sheet.mode === 'apply') runApply(); else if (sheet.mode === 'export') runExport(); else if (sheet.mode === 'export-save') saveExport(); else if (sheet.mode === 'help' || sheet.mode === 'triage' || sheet.mode === 'msreport') closeSheet(); else if (sheet.mode === 'mscheck') runMsCheck(); else if (sheet.mode === 'attach') { const a = sheet, mode = ($('#sheetBody').querySelector('[name=attachMode]:checked') || {}).value; closeSheet(); runAttach(a.entry, a.file, mode === 'replace'); } else saveAdd();
+  if (sheet.mode === 'edit') saveEdit(); else if (sheet.mode === 'forth') saveForth(); else if (sheet.mode === 'join') saveJoin(); else if (sheet.mode === 'apply') runApply(); else if (sheet.mode === 'export') runExport(); else if (sheet.mode === 'export-save') saveExport(); else if (sheet.mode === 'help' || sheet.mode === 'triage' || sheet.mode === 'msreport') closeSheet(); else if (sheet.mode === 'mscheck') runMsCheck(); else if (sheet.mode === 'smart') saveSmart(); else if (sheet.mode === 'bulk') saveBulk(); else if (sheet.mode === 'attach') { const a = sheet, mode = ($('#sheetBody').querySelector('[name=attachMode]:checked') || {}).value; closeSheet(); runAttach(a.entry, a.file, mode === 'replace'); } else saveAdd();
 });
 $('#sheetCancel').addEventListener('click', closeSheet);
 $('#sheetBody').addEventListener('click', ev => { const x = ev.target.closest('[data-sheet-cancel]'); if (x && !x.disabled) closeSheet(); });
@@ -10720,6 +11003,7 @@ function renderPickBar() {
   bar.querySelector('.pick-count').textContent = n ? n + ' selected' : 'Tap publications to select them';
   $('#pickNone').hidden = !n;
   $('#pickExport').hidden = !n || !gs;
+  $('#pickBulk').hidden = $('#pickRL').hidden = !n || !gs;
   $('#pickJoin').hidden = !(gs && n >= 2 && pickedEntries().every(x => !x.ib));
 }
 const SHOW_REFS = 200;
@@ -10732,10 +11016,12 @@ function selectionHTML() {
     `<p class="d-venue">${withPdf} of them ${withPdf === 1 ? 'has' : 'have'} a PDF in Google Drive.</p>` +
     `<div class="actions">` + (gs ? `<button type="button" class="btn primary" data-export>${ICON.share}<span>Export\u2026</span></button>` : '') +
     (gs && n >= 2 && list.every(x => !x.ib) ? `<button type="button" class="btn" data-join>${ICON.versions}<span>Join as versions\u2026</span></button>` : '') +
+    (gs ? `<button type="button" class="btn" data-bulk>${ICON.tag}<span>Keywords and groups\u2026</span></button>` +
+      `<button type="button" class="btn" data-bulk-rl>${ICON.bookmark}<span>Add to reading list</span></button>` : '') +
     `<details class="menu"><summary class="btn">${ICON.copy}<span>Copy</span>${ICON.chev}</summary>` +
-    `<div class="menu-list" role="menu"><button type="button" role="menuitem" data-copy-sel="bibtex">BibTeX<kbd>\u2325B</kbd></button>` +
-    `<button type="button" role="menuitem" data-copy-sel="apa">APA (long)<kbd>\u2325A</kbd></button>` +
-    `<button type="button" role="menuitem" data-copy-sel="short">APA (short)<kbd>\u2325S</kbd></button></div></details>` +
+    `<div class="menu-list" role="menu"><button type="button" role="menuitem" data-copy-sel="bibtex">BibTeX<kbd>${esc(keyHint('copyBib'))}</kbd></button>` +
+    `<button type="button" role="menuitem" data-copy-sel="apa">APA (long)<kbd>${esc(keyHint('copyApa'))}</kbd></button>` +
+    `<button type="button" role="menuitem" data-copy-sel="short">APA (short)<kbd>${esc(keyHint('copyShort'))}</kbd></button></div></details>` +
     `<button type="button" class="btn" data-pick-clear>Clear selection</button></div>` +
     `<section class="d-sec"><h3>References (APA)</h3><div class="apa-refs">` +
     apaOrder(list).slice(0, SHOW_REFS).map(e => `<p>${apaCitation(e).html}</p>`).join('') +
@@ -10749,7 +11035,149 @@ function copySelection(kind) {
   copy(refs.map(c => c.text).join('\n\n'), 'Copied ' + n + ' APA reference' + (n === 1 ? '' : 's'), refs.map(c => '<p>' + c.html + '</p>').join(''));
 }
 
+
+/* ---- many publications changed at once: keywords, groups, reading list */
+// For the publications selected: keywords taken off all of them (a tap on
+// one) or added to all; each static group ticked (all in), unticked (none)
+// or half-ticked (some, left as they are). One save to the .bib, one
+// backup.
+function openBulk() {
+  const list = pickedEntries().filter(e => !e.ib), n = list.length;
+  if (!DIRECT) { toast('To change several at once, turn on “Save changes straight to your .bib file” in Settings.', 5000); return; }
+  if (!n) { toast('Publications in your inbox can’t be changed together. Move them into your library first.', 4000); return; }
+  const kws = new Map();
+  list.forEach(e => e.kw.forEach(k => kws.set(k, (kws.get(k) || 0) + 1)));
+  const rg = readingGroup(), groups = GROUPS.filter(g => g !== rg);
+  sheet = { mode: 'bulk', list };
+  showSheet(`<h2>Change ${n} publication${n === 1 ? '' : 's'}</h2>` +
+    `<div class="fld"><label>Keywords</label>` +
+    (kws.size ? `<p class="sheet-note">Tap a keyword to take it off all of them.</p><div class="bulk-kws">` +
+      [...kws].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([k, c]) =>
+        `<button type="button" class="chip bulk-kw" data-kw="${esc(k)}" aria-pressed="false">${esc(k)}<span class="bulk-n">${c === n ? 'all' : c + '/' + n}</span></button>`).join('') + `</div>` : '') +
+    `<input id="bulkKwAdd" type="text" placeholder="Add keywords to all of them, separated by commas" autocomplete="off"></div>` +
+    (groups.length ? `<div class="fld"><label>Static groups</label><div class="bulk-groups">` +
+      groups.map(g => {
+        const c = list.filter(e => g.items.includes(e)).length, was = c === n ? 'all' : c ? 'some' : 'none';
+        return `<label class="check"><input type="checkbox" data-bulk-g="${esc(g.name)}" data-was="${was}"${was === 'all' ? ' checked' : ''}> ${esc(g.name)}${c && c < n ? ` <span class="bulk-n">${c}/${n}</span>` : ''}</label>`;
+      }).join('') + `</div></div>` : ''), 'Save');
+  $('#sheetBody').querySelectorAll('[data-was="some"]').forEach(b => { b.indeterminate = true; });
+}
+$('#sheetBody').addEventListener('click', ev => {
+  const k = sheet && sheet.mode === 'bulk' && ev.target.closest('.bulk-kw');
+  if (k) { const off = k.getAttribute('aria-pressed') !== 'true'; k.setAttribute('aria-pressed', String(off)); k.classList.toggle('off', off); }
+});
+async function saveBulk() {
+  const s = sheet, body = $('#sheetBody');
+  const drop = new Set([...body.querySelectorAll('.bulk-kw.off')].map(b => b.dataset.kw));
+  const more = $('#bulkKwAdd').value.split(/[,;]/).map(x => x.trim()).filter(Boolean);
+  const gAdd = [], gRemove = [];
+  body.querySelectorAll('[data-bulk-g]').forEach(b => {
+    if (b.indeterminate) return;
+    if (b.checked && b.dataset.was !== 'all') gAdd.push(b.dataset.bulkG);
+    if (!b.checked && b.dataset.was !== 'none') gRemove.push(b.dataset.bulkG);
+  });
+  const inGroup = (name, e) => { const g = GROUPS.find(x => x.name === name); return !!g && g.items.includes(e); };
+  const todo = s.list.map(e => {
+    const raw = rawOf(e, 'keywords'), have = splitKw(raw), next = have.filter(k => !drop.has(k));
+    more.forEach(k => { if (next.indexOf(k) < 0) next.push(k); });
+    const set = next.join('\u0001') !== have.join('\u0001') ? { keywords: next.join(/,/.test(raw) && !/;/.test(raw) ? ', ' : '; ') } : {};
+    return { e, set, add: gAdd.filter(n => !inGroup(n, e)), remove: gRemove.filter(n => inGroup(n, e)) };
+  }).filter(x => Object.keys(x.set).length || x.add.length || x.remove.length);
+  if (!todo.length) { closeSheet(); return; }
+  sheetBusy(true);
+  const t0 = Date.now();
+  let step = '';
+  const tell = () => { if (step && sheet === s) sheetMsg(step + '… (' + Math.round((Date.now() - t0) / 1000) + ' s)'); };
+  const clock = setInterval(tell, 1000);
+  try {
+    const now = bibdeskTime();
+    const res = await callServer('saveEntries', { items: todo.map(x => ({ key: x.e.k, set: x.set, groups: { add: x.add, remove: x.remove }, expectHash: x.e.h || null })),
+      modified: now, backupName: fileTime(), onStep: t => { step = t; tell(); } });
+    if (res.stamp) lastBibStamp = res.stamp;
+    if (res.gh) DATA.gh = res.gh;
+    let done = 0;
+    todo.forEach(x => {
+      if (!res.hashes[x.e.k]) return;
+      x.e.h = res.hashes[x.e.k];
+      if (Object.keys(x.set).length) setFields(x.e, Object.assign({}, x.set, { 'date-modified': now }));
+      x.add.forEach(name => {
+        let g = (DATA.groups || []).find(y => y.name === name);
+        if (!g) { g = { name, keys: [] }; (DATA.groups = DATA.groups || []).push(g); }
+        if (g.keys.indexOf(x.e.k) < 0) g.keys.push(x.e.k);
+      });
+      (DATA.groups || []).forEach(g => { if (x.remove.indexOf(g.name) >= 0) g.keys = g.keys.filter(k => k !== x.e.k); });
+      done++;
+    });
+    init(DATA, true);
+    afterWrite();
+    closeSheet();
+    const skipped = res.skipped || [];
+    toast('Changed ' + done + ' publication' + (done === 1 ? '' : 's') + (skipped.length ? '; ' + skipped.length + ' left as they were (changed elsewhere since LibLande read them)' : ''), skipped.length ? 7000 : 4000);
+  } catch (err) {
+    if (sheet === s) sheetMsg(errText(err), true);
+  } finally {
+    clearInterval(clock);
+    if (sheet === s) sheetBusy(false);
+  }
+}
+function bulkReading() {
+  const list = pickedEntries().filter(e => !RL.has(e.k));
+  if (!list.length) { toast('They’re all on your reading list already', 2500); return; }
+  list.forEach(e => rlOp({ op: 'add', key: e.k, list: 'later' }));
+  toast('Added ' + list.length + ' to your reading list, in Later', 3000);
+}
+
 /* ------------------------------------------------------------ forthcoming: updates */
+/* ---- saved searches: groups that fill themselves */
+// Kept with your preferences ({at, list: [{name, q}]}), so your other
+// devices have them too.
+const SMART = store.get('smart', { at: 0, list: [] });
+function smartSave() {
+  SMART.at = Date.now();
+  store.set('smart', SMART);
+  if (gs) google.script.run.withFailureHandler(() => {}).savePrefs({ smart: SMART });
+  renderGroups();
+}
+function smartMerge(prefs) {
+  const x = prefs && prefs.smart;
+  if (x && x.at > SMART.at) { SMART.at = x.at; SMART.list = x.list || []; store.set('smart', SMART); }
+}
+function renderSmartBar() {
+  const bar = $('#smartBar'), x = state.group.startsWith('q:') && SMART.list.find(y => y.name === state.group.slice(2));
+  bar.hidden = !x;
+  if (x) bar.querySelector('.rl-count').innerHTML = `${ICON.search}<code>${esc(x.q)}</code>`;
+}
+// Saving a search, or changing one: its name and what it searches for.
+function openSmart(x) {
+  sheet = { mode: 'smart', was: x ? x.name : null };
+  showSheet(`<h2>${x ? 'Change the saved search' : 'Save this search'}</h2>` +
+    `<p class="sheet-note">A saved search is a group in the sidebar that fills itself: whatever matches, now and later.</p>` +
+    `<div class="fld"><label for="smartName">Name</label><input id="smartName" type="text" value="${esc(x ? x.name : state.q.trim())}"></div>` +
+    `<div class="fld"><label for="smartQ">Search for</label><input id="smartQ" type="text" autocapitalize="off" autocorrect="off" spellcheck="false" value="${esc(x ? x.q : state.q.trim())}"></div>` +
+    `<p class="sheet-note">Words can name a field: <code>author:lee</code> <code>year:2020-2024</code> <code>kw:perception</code> <code>journal:mind</code> <code>type:book</code> <code>has:pdf</code> <code>is:unread</code>; start one with \u2212 to leave it out.</p>`, x ? 'Save' : 'Save search');
+  $('#smartName').focus();
+}
+function saveSmart() {
+  const name = $('#smartName').value.trim(), q = $('#smartQ').value.trim(), was = sheet.was;
+  if (!name || !q) { sheetMsg('Give it a name and something to search for.', true); return; }
+  if (name !== was && SMART.list.some(x => x.name === name)) { sheetMsg('There\u2019s already a saved search called \u201c' + name + '\u201d.', true); return; }
+  const i = SMART.list.findIndex(x => x.name === was), item = { name, q };
+  if (i >= 0) SMART.list[i] = item; else SMART.list.push(item);
+  closeSheet();
+  smartSave();
+  $('#q').value = ''; state.q = '';
+  setGroup('q:' + name);
+}
+$('#searchSave').addEventListener('click', () => openSmart(null));
+$('#smartEdit').addEventListener('click', () => { const x = SMART.list.find(y => y.name === state.group.slice(2)); if (x) openSmart(x); });
+$('#smartDel').addEventListener('click', () => {
+  const i = SMART.list.findIndex(y => y.name === state.group.slice(2));
+  if (i < 0) return;
+  const [x] = SMART.list.splice(i, 1);
+  smartSave();
+  setGroup('all');
+  toast('Deleted the saved search \u201c' + x.name + '\u201d', 6000, { label: 'Undo', run: () => { SMART.list.splice(i, 0, x); smartSave(); setGroup('q:' + x.name); } });
+});
 function renderForthBar() {
   const bar = $('#forthBar');
   bar.hidden = !(gs && state.group === 'forth');
@@ -10760,6 +11188,8 @@ function renderForthBar() {
 }
 $('#forthCheck').addEventListener('click', () => checkForthcoming());
 $('#pickJoin').addEventListener('click', () => openJoin(pickedEntries()));
+$('#pickBulk').addEventListener('click', () => openBulk());
+$('#pickRL').addEventListener('click', () => bulkReading());
 // What Crossref has on a publication: by its DOI, or else by its title
 // and first author (only a match of the same title counts).
 const CROSSREF = 'https:\/\/api.crossref.org/works';
@@ -11330,26 +11760,113 @@ function copyAs(kind) {
   }
 }
 
-const SHORTCUTS = [
-  ['\u2325A', 'Copy APA citation (long)'],
-  ['\u2325S', 'Copy APA in-text citation (short)'],
-  ['\u2325B', 'Copy BibTeX'],
-  ['\u2325K', 'Copy cite key'],
-  ['\u2325E', 'Edit the publication'],
-  ['Return', 'Read the PDF'],
-  ['\u2191 \u2193', 'Previous or next publication'],
-  ['Letters', 'Jump to publications starting with them, in the sorted column'],
-  ['/ or \u2318F', 'Search'],
-  ['\u2318-click, \u21e7-click', 'Select several publications'],
-  ['\u2318A', 'Select all shown'],
-  ['Esc', 'Stop selecting, or close a window'],
-  ['?', 'This list'],
+/* ---- keyboard shortcuts, the changeable ones yours to set */
+// A shortcut is a key (KeyboardEvent.code) with any of Ctrl, Alt, Shift
+// and Meta, as "Alt+KeyA". Library ones work in the list; reader ones
+// while a paper is open. Yours are kept with your preferences, so your
+// other devices have them too.
+const KEY_ACTS = [
+  { id: 'copyApa', scope: 'lib', def: 'Alt+KeyA', label: 'Copy APA citation (long)' },
+  { id: 'copyShort', scope: 'lib', def: 'Alt+KeyS', label: 'Copy APA in-text citation (short)' },
+  { id: 'copyBib', scope: 'lib', def: 'Alt+KeyB', label: 'Copy BibTeX' },
+  { id: 'copyKey', scope: 'lib', def: 'Alt+KeyK', label: 'Copy cite key' },
+  { id: 'edit', scope: 'lib', def: 'Alt+KeyE', label: 'Edit the publication' },
+  { id: 'quote', scope: 'pdf', def: 'Alt+KeyQ', label: 'Copy the selected passage as a quotation, with its citation' },
+  { id: 'closeTab', scope: 'pdf', def: 'Alt+KeyW', label: 'Close the paper’s tab' },
+  { id: 'markup', scope: 'pdf', def: 'KeyH', label: 'Highlighter' },
+  { id: 'lines', scope: 'pdf', def: 'KeyU', label: 'Underline and strike-through' },
+  { id: 'pen', scope: 'pdf', def: 'KeyP', label: 'Pen' },
+  { id: 'eraser', scope: 'pdf', def: 'KeyE', label: 'Eraser' },
+  { id: 'text', scope: 'pdf', def: 'KeyT', label: 'Text box' },
+  { id: 'comment', scope: 'pdf', def: 'KeyC', label: 'Comment' },
+  { id: 'select', scope: 'pdf', def: 'KeyV', label: 'Select marks' },
+  { id: 'bookmark', scope: 'pdf', def: 'KeyB', label: 'Bookmark the page' },
 ];
+const KEYS = { mine: store.get('keys', {}), at: store.get('keysAt', 0), listen: null };
+const keyOf = id => KEYS.mine[id] || KEY_ACTS.find(a => a.id === id).def;
+const comboOf = ev => [ev.ctrlKey && 'Ctrl', ev.altKey && 'Alt', ev.shiftKey && 'Shift', ev.metaKey && 'Meta'].filter(Boolean).concat(ev.code).join('+');
+const keyIs = (ev, id) => comboOf(ev) === keyOf(id);
+const KEY_NAMES = { Minus: '−', Equal: '=', Comma: ',', Period: '.', Slash: '/', Semicolon: ';', Quote: '\'', BracketLeft: '[', BracketRight: ']',
+  Backslash: '\\', Backquote: '`', Space: 'Space', ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→' };
+function keyLabel(combo) {
+  const parts = combo.split('+'), code = parts.pop();
+  const key = /^Key[A-Z]$/.test(code) ? code.slice(3) : /^Digit\d$/.test(code) ? code.slice(5) : KEY_NAMES[code] || code;
+  return parts.map(p => ({ Ctrl: '⌃', Alt: '⌥', Shift: '⇧', Meta: '⌘' })[p]).join('') + key;
+}
+const keyHint = id => keyLabel(keyOf(id));
+function keysSave() {
+  KEYS.at = Date.now();
+  store.set('keys', KEYS.mine);
+  store.set('keysAt', KEYS.at);
+  if (gs) google.script.run.withFailureHandler(() => {}).savePrefs({ keys: KEYS.mine, keysAt: KEYS.at });
+}
+function keysMerge(prefs) {
+  if (prefs && prefs.keysAt > KEYS.at) { KEYS.mine = prefs.keys || {}; KEYS.at = prefs.keysAt; store.set('keys', KEYS.mine); store.set('keysAt', KEYS.at); }
+}
+// The ones that stay as they are.
+const KEYS_FIXED = {
+  lib: [['Return', 'Read the PDF'], ['↑ ↓', 'Previous or next publication'], ['Letters', 'Jump to publications starting with them, in the sorted column'],
+    ['/ or ⌘F', 'Search'], ['⌘-click, ⇧-click', 'Select several publications'], ['⌘A', 'Select all shown'], ['Esc', 'Stop selecting, or close a window'], ['?', 'This list']],
+  pdf: [['⌘F', 'Search in the paper'], ['⌘S', 'Save the marks now'], ['+ −', 'Zoom in or out'], ['Esc', 'Put the tool down; with none on, close the paper']],
+};
 function openShortcuts() {
   sheet = { mode: 'help' };
-  showSheet(`<h2>Keyboard shortcuts</h2><p class="sheet-note">With several publications selected, the copy shortcuts copy all of them.</p>` +
-    `<table class="keys"><tbody>${SHORTCUTS.map(([k, d]) => `<tr><th><kbd>${esc(k)}</kbd></th><td>${esc(d)}</td></tr>`).join('')}</tbody></table>`, 'Close');
+  KEYS.listen = null;
+  const rows = scope => KEY_ACTS.filter(a => a.scope === scope).map(a =>
+    `<tr><th><button type="button" class="key-set" data-key-id="${a.id}" title="Change it"><kbd>${esc(keyHint(a.id))}</kbd></button></th><td>${esc(a.label)}${KEYS.mine[a.id] ? ' <span class="key-mine">yours</span>' : ''}</td></tr>`).join('') +
+    KEYS_FIXED[scope].map(([k, d]) => `<tr><th><kbd>${esc(k)}</kbd></th><td>${esc(d)}</td></tr>`).join('');
+  showSheet(`<h2>Keyboard shortcuts</h2><p class="sheet-note">Click a shortcut in a box to change it, then press the keys you want. With several publications selected, the copy shortcuts copy all of them.</p>` +
+    `<h3 class="keys-h">In the library</h3><table class="keys"><tbody>${rows('lib')}</tbody></table>` +
+    `<h3 class="keys-h">Reading a paper</h3><table class="keys"><tbody>${rows('pdf')}</tbody></table>` +
+    (Object.keys(KEYS.mine).length ? `<p><button type="button" class="btn" data-keys-reset>Back to the usual shortcuts</button></p>` : ''), 'Close');
   $('#sheetCancel').hidden = true;
+}
+$('#sheetBody').addEventListener('click', ev => {
+  if (!sheet || sheet.mode !== 'help') return;
+  if (ev.target.closest('[data-keys-reset]')) { KEYS.mine = {}; keysSave(); openShortcuts(); return; }
+  const b = ev.target.closest('[data-key-id]');
+  if (!b) return;
+  $('#sheetBody').querySelectorAll('.key-set.listening').forEach(x => { x.classList.remove('listening'); x.innerHTML = `<kbd>${esc(keyHint(x.dataset.keyId))}</kbd>`; });
+  KEYS.listen = b.dataset.keyId;
+  b.classList.add('listening');
+  b.innerHTML = '<kbd>Press keys…</kbd>';
+  sheetMsg('');
+});
+// While waiting for the new keys: Esc gives up; a combination already in
+// use, or the browser's, is refused, with why.
+document.addEventListener('keydown', ev => {
+  if (!KEYS.listen || !sheet || sheet.mode !== 'help') return;
+  ev.preventDefault();
+  ev.stopImmediatePropagation();
+  if (/^(Shift|Alt|Control|Meta|OS)(Left|Right)?$/.test(ev.code) || /^(Shift|Alt|Control|Meta)$/.test(ev.key)) return;
+  const id = KEYS.listen, a = KEY_ACTS.find(x => x.id === id);
+  if (ev.key === 'Escape') { KEYS.listen = null; openShortcuts(); return; }
+  const combo = comboOf(ev);
+  let why = '';
+  if (ev.metaKey) why = '⌘ shortcuts belong to the browser. Try ⌥ or ⌃ instead.';
+  else if (a.scope === 'lib' && !ev.altKey && !ev.ctrlKey) why = 'In the library, letters on their own jump through the list, so add ⌥ or ⌃.';
+  else {
+    const other = KEY_ACTS.find(x => x.id !== id && x.scope === a.scope && keyOf(x.id) === combo);
+    if (other) why = keyLabel(combo) + ' is already for “' + other.label + '”.';
+    const fixed = KEYS_FIXED[a.scope].some(([k]) => k === keyLabel(combo)) || ['Escape', 'Enter', 'Tab'].includes(ev.code) || /^Arrow/.test(ev.code);
+    if (!why && fixed) why = keyLabel(combo) + ' is already taken.';
+  }
+  if (why) { sheetMsg(why, true); return; }
+  KEYS.listen = null;
+  if (combo === a.def) delete KEYS.mine[id]; else KEYS.mine[id] = combo;
+  keysSave();
+  openShortcuts();
+  toast(a.label + ': ' + keyLabel(combo), 2500);
+}, true);
+// What a reader shortcut does.
+function runPdfKey(id) {
+  const tog = t => { if (gs) setTool(V.tool === t ? 'read' : t); };
+  if (id === 'quote') showQuote().then(sel => { if (sel) quoteCopy(); else toast('Select a passage to quote first', 1800); });
+  else if (id === 'closeTab') { if (PTABS.active >= 0) closePaperTab(PTABS.active); }
+  else if (id === 'markup') { if (gs) setTool(V.tool === 'highlight' ? 'read' : 'markup'); }
+  else if (id === 'lines') { if (gs) setTool(LINE_TOOLS.has(V.tool) ? 'read' : 'lines'); }
+  else if (id === 'bookmark') { if (V.doc) toggleBookmark(V.viewer.currentPageNumber); }
+  else tog(id);
 }
 
 $('#keysBtn').addEventListener('click', openShortcuts);
@@ -11729,7 +12246,7 @@ const msFileRow = (x, sub) => `<button type="button" class="ms-file" data-ms-ope
 function openMsCheck() {
   sheet = { mode: 'mscheck' };
   const recent = MS.recent.filter(x => x.id);
-  showSheet(`<h2>Check a manuscript’s citations</h2>` +
+  showSheet(`<h2>Cite Check</h2>` +
     `<p class="sheet-note">LibLande reads the manuscript, without changing it: every citation should have its reference, and every reference a citation.</p>` +
     (gs && recent.length ? `<div class="ms-group"><div class="ms-gh">${ICON.history}Checked lately</div>` +
       recent.map(x => msFileRow(x, msAgo(x.at) + (x.todo ? ` · <b class="ms-todo">${x.todo} to fix</b>` : ' · all in order'))).join('') + `</div>` : '') +
@@ -11941,6 +12458,9 @@ let toastTimer;
 // action: {label, run}, a button in the message (such as Undo).
 function toast(msg, ms = 1800, action) {
   const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  // (Reading a paper: above the markup toolbar when it's at the bottom.)
+  const pal = !$('#viewer').hidden && $('#vPalette'), pr = pal && !pal.hidden && pal.getBoundingClientRect();
+  t.style.bottom = pr && pr.height && pr.top > innerHeight * 0.6 ? (innerHeight - pr.top + 10) + 'px' : '';
   t.classList.toggle('has-action', !!action);
   if (action) {
     const b = document.createElement('button');
@@ -12040,6 +12560,9 @@ document.addEventListener('keydown', ev => {
     if ((ev.metaKey || ev.ctrlKey) && ev.key === 's') { ev.preventDefault(); saveMarkup().then(keptNote); return; }
     if ((ev.metaKey || ev.ctrlKey) && ev.key === 'f') { ev.preventDefault(); openFind(); return; }
     if ((ev.metaKey || ev.ctrlKey) && ev.key === 'g') { ev.preventDefault(); runFind('again', ev.shiftKey); return; }
+    // (Your shortcuts first: see KEY_ACTS.)
+    const mine = !typing && KEY_ACTS.find(a => a.scope === 'pdf' && keyIs(ev, a.id));
+    if (mine) { ev.preventDefault(); runPdfKey(mine.id); return; }
     if (typing || ev.metaKey || ev.ctrlKey || ev.altKey) return;
     // Escape: a tool that's on is put down (back to reading); with none on,
     // the paper is closed. (A selected mark, or an open panel, goes first.)
@@ -12049,14 +12572,6 @@ document.addEventListener('keydown', ev => {
     else if (ev.key === 'Escape' && !$('#vpPanel').hidden) hidePanel();
     else if ((ev.key === '+' || ev.key === '=') && V.doc) V.viewer.increaseScale();
     else if (ev.key === '-' && V.doc) V.viewer.decreaseScale();
-    else if (ev.key === 'h' && gs) setTool(V.tool === 'highlight' ? 'read' : 'markup');
-    else if (ev.key === 'u' && gs) setTool(LINE_TOOLS.has(V.tool) ? 'read' : 'lines');
-    else if (ev.key === 'b' && V.doc) toggleBookmark(V.viewer.currentPageNumber);
-    else if (ev.key === 'p' && gs) setTool(V.tool === 'pen' ? 'read' : 'pen');
-    else if (ev.key === 'e' && gs) setTool(V.tool === 'eraser' ? 'read' : 'eraser');
-    else if (ev.key === 't' && gs) setTool(V.tool === 'text' ? 'read' : 'text');
-    else if (ev.key === 'c' && gs) setTool(V.tool === 'comment' ? 'read' : 'comment');
-    else if (ev.key === 'v' && gs) setTool(V.tool === 'select' ? 'read' : 'select');
     return;
   }
   const tag = (ev.target.tagName || '').toLowerCase();
@@ -12071,16 +12586,13 @@ document.addEventListener('keydown', ev => {
     return;
   }
   if ((ev.key === 'f' && (ev.metaKey || ev.ctrlKey)) || ev.key === '/') { ev.preventDefault(); openSearch(true); return; }
-  // Option shortcuts (by physical key, since Option changes the letter typed).
-  if (ev.altKey && !ev.metaKey && !ev.ctrlKey) {
-    const act = { KeyA: 'apa', KeyS: 'short', KeyB: 'bibtex', KeyK: 'key' }[ev.code];
-    if (act) { ev.preventDefault(); copyAs(act); return; }
-    if (ev.code === 'KeyE') {
-      ev.preventDefault();
-      const e = state.selKey && BYKEY.get(state.selKey);
-      if (e && gs) openEdit(e);
-      return;
-    }
+  // Your shortcuts (by physical key, since Option changes the letter typed).
+  const mine = KEY_ACTS.find(a => a.scope === 'lib' && keyIs(ev, a.id));
+  if (mine) {
+    ev.preventDefault();
+    if (mine.id === 'edit') { const e = state.selKey && BYKEY.get(state.selKey); if (e && gs) openEdit(e); }
+    else copyAs({ copyApa: 'apa', copyShort: 'short', copyBib: 'bibtex', copyKey: 'key' }[mine.id]);
+    return;
   }
   if (ev.key === '?' && !ev.metaKey && !ev.ctrlKey) { ev.preventDefault(); openShortcuts(); return; }
   const inList = !document.activeElement || document.activeElement === document.body || $('#listwrap').contains(document.activeElement);
@@ -12145,7 +12657,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-07.06</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-07.08</small>`;
 };
 
 function gunzipJSON(bytes) {
@@ -12268,6 +12780,9 @@ if (!gs) {
     if (status.prefs) {
       recentMerge(status.prefs);
       msMerge(status.prefs);
+      smartMerge(status.prefs);
+      keysMerge(status.prefs);
+      progressMerge(status.prefs);
       if (notDupsMerge(status.prefs) && ENTRIES.length) { findDups(); refresh(false); }
       if (ENTRIES.length) renderGroups();
     }
@@ -12298,7 +12813,7 @@ if (!gs) {
       await show(lib, false);
       cache.put(lib);
     }
-  })().then(seedReading).then(() => { setTimeout(uploadKept, 3000); fetchAheadSoon(20000); }).catch(err => {
+  })().then(seedReading).then(() => { setTimeout(uploadKept, 3000); fetchAheadSoon(20000); refreshSaved(); }).catch(err => {
     if (ENTRIES.length) toast('Couldn\u2019t check for updates: ' + errText(err), 5000);
     else showError(err);
   });
