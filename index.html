@@ -1002,6 +1002,13 @@ body.is-offline .fileicon:not(.saved), body.is-offline .pdf:not(.saved) { opacit
 #smartBar .rl-count { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
 #smartBar .rl-count .i { width: 15px; height: 15px; flex: none; }
 #smartBar code { font: 12.5px var(--mono, ui-monospace, monospace); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quotes-ex p { font-size: 13px; margin: 8px 0; overflow-wrap: anywhere; }
+/* Dark pages: the pages' colours turned round (hues kept). */
+.viewer.dark-pages #vPages .canvasWrapper, .viewer.dark-pages #vPeekPages .canvasWrapper { filter: invert(1) hue-rotate(180deg); }
+.viewer.dark-pages #vPages .page, .viewer.dark-pages #vPeekPages .page { background: #111; }
+#vDarkBtn[aria-pressed="true"] { color: var(--accent); }
+.set-group { display: grid; gap: 6px; padding: 12px 0; border-top: 1px solid var(--line); }
+.set-sync { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 14px; padding: 2px 0; cursor: pointer; }
 /* Quote: the bar by a passage selected while reading. */
 .quote-bar { position: fixed; z-index: 62; display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 10px;
   background: var(--panel); box-shadow: 0 6px 20px rgba(0, 0, 0, .22); font: 500 13.5px var(--ui); color: var(--text); }
@@ -1650,6 +1657,7 @@ try {
     <span class="v-page" id="vPage"></span>
     <div class="v-tools">
       <button type="button" class="tb-btn" id="vFindBtn" aria-label="Search in this paper" title="Search in this paper (&#x2318;F)" aria-pressed="false"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg></button>
+      <button type="button" class="tb-btn" id="vDarkBtn" aria-pressed="false" aria-label="Dark pages" title="Dark pages: light on dark"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg></button>
       <button type="button" class="tb-btn" id="vFit" aria-label="Fit the page to the screen" title="Fit the page to the screen"><svg class="i" viewBox="0 0 24 24"><path d="M4 9V5a1 1 0 0 1 1-1h4M15 4h4a1 1 0 0 1 1 1v4M20 15v4a1 1 0 0 1-1 1h-4M9 20H5a1 1 0 0 1-1-1v-4"/><rect x="8" y="8" width="8" height="8" rx="1"/></svg></button>
       <button type="button" class="tb-btn v-split" id="vSplitBtn" aria-pressed="false" aria-label="Split screen" title="Split screen: a second view of this paper below, to scroll on its own"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4" width="17" height="16" rx="2"/><path d="M3.5 12h17"/><path d="M11 8h2M11 16h2" opacity=".55"/></svg></button>
       <button type="button" class="tb-btn v-zoomctl" id="vZoomOut" aria-label="Zoom out" title="Zoom out">&#x2212;</button>
@@ -1721,6 +1729,23 @@ try {
         <div class="set-text"><span class="set-name">Theme</span><span class="hint">Colours and type. Light, Dark or Auto is at the foot of the sidebar.</span></div>
         <div class="theme-picks" id="themePicks" role="radiogroup" aria-label="Theme"></div>
       </div>
+      <div class="set-row">
+        <div class="set-text"><label for="darkPagesBox">Dark pages when reading</label><span class="hint">The paper&#x2019;s pages in light on dark, on this device (the moon in the reader does the same).</span></div>
+        <span class="switch"><input type="checkbox" role="switch" id="darkPagesBox"><span aria-hidden="true"></span></span>
+      </div>
+      <div class="set-group">
+        <div class="set-text"><span class="set-name">Shared with your other devices</span><span class="hint">Turned off, it stays on this device only.</span></div>
+        <label class="set-sync"><span>Where you are in each paper</span><span class="switch"><input type="checkbox" role="switch" data-sync="position"><span aria-hidden="true"></span></span></label>
+        <label class="set-sync"><span>Reading progress</span><span class="switch"><input type="checkbox" role="switch" data-sync="progress"><span aria-hidden="true"></span></span></label>
+        <label class="set-sync"><span>Recently viewed</span><span class="switch"><input type="checkbox" role="switch" data-sync="recent"><span aria-hidden="true"></span></span></label>
+        <label class="set-sync"><span>Saved searches</span><span class="switch"><input type="checkbox" role="switch" data-sync="smart"><span aria-hidden="true"></span></span></label>
+        <label class="set-sync"><span>Cite Check&#x2019;s manuscripts and dismissed findings</span><span class="switch"><input type="checkbox" role="switch" data-sync="cite"><span aria-hidden="true"></span></span></label>
+        <label class="set-sync"><span>Keyboard shortcuts</span><span class="switch"><input type="checkbox" role="switch" data-sync="keys"><span aria-hidden="true"></span></span></label>
+      </div>
+      <div class="set-row" id="quotesRow">
+        <div class="set-text"><span class="set-name">Curly quotes in abstracts</span><span class="hint">Straight double quotes (") in abstracts become curly ones (&#x201c; &#x201d;), so BibDesk stops warning about them.</span></div>
+        <button type="button" class="btn" id="quotesGo">Change&#x2026;</button>
+      </div>
       <div class="set-files">
         <div class="set-file"><span class="set-name">.bib file</span><span id="curBib"></span></div>
         <div class="set-file"><span class="set-name">Papers folder</span><span id="curPapers"></span></div>
@@ -1742,7 +1767,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-07.12</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-07.14</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1757,7 +1782,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-07.12';
+      l.querySelector('small').textContent = 'Version 2026-10-07.14';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1769,7 +1794,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-07.12): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-07.14): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -2041,7 +2066,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-07.12`;
+    `<br>LibLande version 2026-10-07.14`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -2107,6 +2132,36 @@ function rlTag(e) {
 // share of its pages ({key: {p, at}}; page 1 alone doesn't count). Kept
 // with your preferences (the 300 read most lately), for every device.
 const PROGRESS = store.get('progress', {});
+// What's shared with your other devices (through your preferences): each
+// can be kept to this device instead, in Settings.
+const SYNC = Object.assign({ progress: true, position: true, cite: true, smart: true, keys: true, recent: true }, store.get('sync', {}));
+// Where you are in each paper ({file id: {page, at, dev}}), for opening it
+// there on another device; dev tells this device's from the others'.
+const POS = store.get('positions', {});
+const DEVICE = store.get('deviceId', null) || (() => { const d = Math.random().toString(36).slice(2, 10); store.set('deviceId', d); return d; })();
+function notePosition(page) {
+  if (!V.file || !page) return;
+  POS[V.file.id] = { page, at: Date.now(), dev: DEVICE };
+  clearTimeout(notePosition.t);
+  notePosition.t = setTimeout(savePositions, 8000);
+}
+function savePositions() {
+  clearTimeout(notePosition.t);
+  notePosition.t = 0;
+  const keep = Object.entries(POS).sort((a, b) => b[1].at - a[1].at).slice(0, 150);
+  Object.keys(POS).forEach(k => { if (!keep.some(x => x[0] === k)) delete POS[k]; });
+  store.set('positions', POS);
+  if (gs && SYNC.position) google.script.run.withFailureHandler(() => {}).savePrefs({ positions: POS });
+}
+function positionsMerge(prefs) {
+  if (!SYNC.position) return;
+  Object.entries((prefs && prefs.positions) || {}).forEach(([k, v]) => { if (!POS[k] || POS[k].at < v.at) POS[k] = v; });
+  store.set('positions', POS);
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden && notePosition.t) savePositions(); });
+// The page to open a paper at, if the latest place in it was on another
+// device.
+const elsewhere = fileId => { const x = SYNC.position && POS[fileId]; return x && x.dev !== DEVICE && x.page > 1 ? x : null; };
 function noteProgress(page, total) {
   const e = V.entry;
   if (!e || !total || page < 2) return;
@@ -2120,10 +2175,11 @@ function saveProgress() {
   const keep = Object.entries(PROGRESS).sort((a, b) => b[1].at - a[1].at).slice(0, 300);
   Object.keys(PROGRESS).forEach(k => { if (!keep.some(x => x[0] === k)) delete PROGRESS[k]; });
   store.set('progress', PROGRESS);
-  if (gs) google.script.run.withFailureHandler(() => {}).savePrefs({ progress: PROGRESS });
+  if (gs && SYNC.progress) google.script.run.withFailureHandler(() => {}).savePrefs({ progress: PROGRESS });
   if (ENTRIES.length) paint();
 }
 function progressMerge(prefs) {
+  if (!SYNC.progress) return;
   Object.entries((prefs && prefs.progress) || {}).forEach(([k, v]) => { if (!PROGRESS[k] || PROGRESS[k].p < v.p) PROGRESS[k] = v; });
   store.set('progress', PROGRESS);
 }
@@ -3550,7 +3606,7 @@ function recentSave() {
   clearTimeout(RECENT.saveT);
   RECENT.saveT = setTimeout(() => {
     if (!gs || !window.google || !google.script || !google.script.run) return;
-    google.script.run.withFailureHandler(() => {}).savePrefs({ recentSeen: RECENT.seen.slice(0, 60), recentClosed: RECENT.closed.slice(0, 20) });
+    if (SYNC.recent) google.script.run.withFailureHandler(() => {}).savePrefs({ recentSeen: RECENT.seen.slice(0, 60), recentClosed: RECENT.closed.slice(0, 20) });
   }, 4000);
 }
 const nowSec = () => Math.round(Date.now() / 1000);
@@ -3566,6 +3622,7 @@ function noteClosed(k, fileId) {
 }
 // Lists from your account join this device's: the latest of each wins.
 function recentMerge(prefs) {
+  if (!SYNC.recent) return;
   const join = (a, b, key, when) => {
     const m = new Map();
     [...(a || []), ...(b || [])].forEach(x => { const k = key(x); if (!m.has(k) || when(m.get(k)) < when(x)) m.set(k, x); });
@@ -4462,6 +4519,7 @@ function ensureViewer(lib, VL) {
     if (RAIL.lastPage && e.pageNumber !== RAIL.lastPage) showPagePill(e.pageNumber, viewer.pagesCount);
     RAIL.lastPage = e.pageNumber;
     noteProgress(e.pageNumber, viewer.pagesCount);
+    notePosition(e.pageNumber);
   });
   bus.on('pagesloaded', e => { $('#vPage').textContent = viewer.currentPageNumber + ' / ' + e.pagesCount; RAIL.lastPage = viewer.currentPageNumber; railSoon(); });
   bus.on('scalechanging', () => railSoon());
@@ -4635,6 +4693,20 @@ async function openReader(entry, file, pos) {
     const bmLoaded = loadBookmarks(doc);
     V.viewer.setDocument(doc);
     V.link.setDocument(doc);
+    // (Where you left it on another device: there, once its pages are laid
+    // out, after this device's own place for it.)
+    const far = elsewhere(file.id);
+    if (far) {
+      const once = () => {
+        V.bus.off('pagesinit', once);
+        setTimeout(() => {
+          if (V.doc !== doc) return;
+          V.viewer.currentPageNumber = Math.min(far.page, doc.numPages);
+          toast('Opened at page ' + far.page + ', where you left off on another device', 3500);
+        }, 80);
+      };
+      V.bus.on('pagesinit', once);
+    }
     closeLinkMenu(); PEEK.token++; $('#vPeek').hidden = true; peekForget();
     vStatus('');
     if (kept) {
@@ -7815,6 +7887,8 @@ async function quoteLetters(range) {
     const st = f ? (f.i ? 1 : 0) + (f.b ? 2 : 0) : 0;
     for (const c of node.data.slice(from, to)) out.push({ c, s: st });
   }
+  // (The text of the pages, to tell a hyphenated word from a broken one.)
+  const pageText = norm([...pages.keys()].map(pg => (pg.querySelector('.textLayer') || {}).innerText || '').join('\n'));
   // The tidying: soft hyphens out, ligatures spelled out, a word broken at
   // a line's end joined, spaces and line ends as single spaces, quotation
   // marks inside made single.
@@ -7832,7 +7906,16 @@ async function quoteLetters(range) {
       if (j < L.length && L[j].c === '\n') {
         j++;
         while (j < L.length && /\s/.test(L[j].c)) j++;
-        if (j < L.length && /\p{Ll}/u.test(L[j].c)) { i = j - 1; continue; }
+        if (j < L.length && /\p{Ll}/u.test(L[j].c)) {
+          // (Kept, as "sense-data", when the page has the word so elsewhere.)
+          let a = i - 1, b = j;
+          while (a > 0 && /\p{L}/u.test(L[a - 1].c)) a--;
+          while (b < L.length - 1 && /\p{L}/u.test(L[b + 1].c)) b++;
+          const word = L.slice(a, i).map(x => x.c).join('') + '-' + L.slice(j, b + 1).map(x => x.c).join('');
+          if (pageText.includes(norm(word))) joined.push(L[i]);
+          i = j - 1;
+          continue;
+        }
       }
     }
     joined.push(L[i]);
@@ -7901,6 +7984,14 @@ function quoteSelection() {
   const pa = +a.closest('.page').dataset.pageNumber, pb = +b.closest('.page').dataset.pageNumber;
   return { text, from: Math.min(pa, pb), to: Math.max(pa, pb), rect: r.getBoundingClientRect(), range: r.cloneRange() };
 }
+// Dark pages: kept for this device.
+function setDarkPages(on) {
+  store.set('darkPages', !!on);
+  $('#viewer').classList.toggle('dark-pages', !!on);
+  $('#vDarkBtn').setAttribute('aria-pressed', String(!!on));
+}
+setDarkPages(store.get('darkPages', false));
+$('#vDarkBtn').addEventListener('click', () => setDarkPages(!$('#viewer').classList.contains('dark-pages')));
 function hideQuote() { if (QUOTE.el) QUOTE.el.hidden = true; QUOTE.sel = null; }
 function quoteDismiss() {
   if (QUOTE.el && QUOTE.el.contains(document.activeElement)) document.activeElement.blur();
@@ -8588,7 +8679,7 @@ const sidePhone = () => window.innerWidth < 600;
 function resetSide() {
   SIDE.token++;
   if (SIDE.io) SIDE.io.disconnect();
-  Object.assign(SIDE, { io: null, thumbs: [], queue: [], busy: false, marks: null, outline: null });
+  Object.assign(SIDE, { io: null, thumbs: [], queue: [], busy: false, marks: null, outline: null, pp: null });
   $('#vSideBody').replaceChildren();
 }
 function toggleSide(open) {
@@ -8853,21 +8944,28 @@ function textInQuads(items, qp) {
     const xs = [qp[i], qp[i + 2], qp[i + 4], qp[i + 6]], ys = [qp[i + 1], qp[i + 3], qp[i + 5], qp[i + 7]];
     rects.push([Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]);
   }
-  const out = [];
+  const out = [], used = new Set();
   for (const [x0, y0, x1, y1] of rects) {
     const line = [];
     for (const it of items) {
-      if (!it.str || !it.transform) continue;
+      // (A line's words once, though the boxes of two lines overlap.)
+      if (!it.str || !it.transform || used.has(it)) continue;
       const x = it.transform[4], y = it.transform[5], w = it.width || 0, h = it.height || Math.hypot(it.transform[2], it.transform[3]);
       const cy = y + h / 2;
       if (cy < y0 || cy > y1 || x + w < x0 || x > x1 || w <= 0) continue;
       const a = Math.max(0, Math.round((x0 - x) / w * it.str.length)), b = Math.min(it.str.length, Math.round((x1 - x) / w * it.str.length));
-      if (b > a) line.push([x, it.str.slice(a, b)]);
+      if (b > a) { line.push([x, it.str.slice(a, b)]); used.add(it); }
     }
     line.sort((p, q) => p[0] - q[0]);
     out.push(line.map(p => p[1]).join(''));
   }
-  return out.join(' ').replace(/\s+/g, ' ').trim();
+  return joinBroken(out.join(' ').replace(/\s+/g, ' ').trim(), items.map(it => (it.str || '') + (it.hasEOL ? '\n' : '')).join(''));
+}
+// A word broken at a line's end ("na- ture"), joined: "nature", or
+// "sense-data" when the page has it so elsewhere, unbroken.
+function joinBroken(t, pageText) {
+  const page = norm(pageText || '');
+  return t.replace(/(\p{L}+)[-\u2010] (\p{Ll}+)/gu, (m, a, b) => page.includes(norm(a + '-' + b)) ? a + '-' + b : a + b);
 }
 async function collectMarks(doc, my) {
   const marks = [];
@@ -8920,7 +9018,9 @@ async function showMarks() {
   if (my !== SIDE.token || SIDE.tab !== 'marks') return;
   const unsaved = V.dirty || V.drawing ? `<p class="v-side-note">New marks appear here once they\u2019re saved.</p>` : '';
   if (!SIDE.marks.length) { body.innerHTML = unsaved + `<p class="v-side-note">This paper has no annotations yet.</p>`; return; }
-  let h = unsaved + `<div class="v-marks">`, last = 0;
+  const worded = SIDE.marks.filter(m => m.text || m.note).length;
+  let h = unsaved + (worded ? `<div class="v-marks-acts"><button type="button" class="btn" data-marks-copy title="Every highlight and note, by page, with the reference">${ICON.copy}<span>Copy summary</span></button>` +
+    (gs ? `<button type="button" class="btn" data-marks-notes title="Added to the publication\u2019s Notes">${ICON.pencil}<span>Add to notes</span></button>` : '') + `</div>` : '') + `<div class="v-marks">`, last = 0;
   for (const m of SIDE.marks) {
     if (m.page !== last) { h += `<div class="v-marks-page">Page ${m.page}</div>`; last = m.page; }
     h += `<button type="button" class="v-mark" data-page="${m.page}"${m.y != null ? ` data-y="${m.y}"` : ''}>` +
@@ -8930,7 +9030,30 @@ async function showMarks() {
       (m.note ? `<span class="v-mark-note">${esc(m.note)}</span>` : '') + `</span></button>`;
   }
   body.innerHTML = h + `</div>`;
+  // (The journal's page numbers, for the summary: worked out now, so the
+  // copy is at once on the click.)
+  SIDE.pp = SIDE.pp || new Map();
+  for (const n of new Set(SIDE.marks.map(m => m.page))) if (!SIDE.pp.has(n)) SIDE.pp.set(n, (await printedPage(n)).page);
 }
+// A paper's highlights and notes as text: by page (the journal's), the
+// kind, the words marked, the comment; the reference first, when asked.
+function marksSummary(withRef) {
+  const list = (SIDE.marks || []).filter(m => m.text || m.note), pg = n => (SIDE.pp && SIDE.pp.get(n)) || String(n);
+  const ref = apaCitation(V.entry);
+  const text = (withRef ? ref.text + '\n\n' : '') + list.map(m => 'p. ' + pg(m.page) + ' \u2014 ' + m.name +
+    (m.text ? ': \u201c' + m.text + '\u201d' : '') + (m.note ? (m.text ? '\n    Note: ' : ': ') + m.note : '')).join('\n');
+  const html = (withRef ? '<p>' + ref.html + '</p>' : '') + '<ul>' + list.map(m => `<li><b>p. ${esc(pg(m.page))}</b> ${esc(m.name)}` +
+    (m.text ? `: \u201c${esc(m.text)}\u201d` : '') + (m.note ? (m.text ? '<br>' : ': ') + `<i>${esc(m.note)}</i>` : '') + '</li>').join('') + '</ul>';
+  return { text, html, n: list.length };
+}
+$('#vSideBody').addEventListener('click', ev => {
+  if (ev.target.closest('[data-marks-copy]')) { const s = marksSummary(true); copy(s.text, 'Copied ' + s.n + ' highlight' + (s.n === 1 ? '' : 's') + ' and notes, with the reference', s.html); return; }
+  if (ev.target.closest('[data-marks-notes]') && V.entry) {
+    const e = BYKEY.get(V.entry.k) || V.entry, s = marksSummary(false), was = rawOf(e, 'annote').trim();
+    const head = 'Highlights and notes (' + new Date().toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' }) + '):\n';
+    quickSet(e, { annote: (was ? was + '\n\n' : '') + head + s.text }, 'Added ' + s.n + ' highlight' + (s.n === 1 ? '' : 's') + ' and notes to the Notes');
+  }
+});
 
 // Outline: the PDF's table of contents, as a tree.
 async function showOutline() {
@@ -10837,7 +10960,7 @@ async function saveAdd() {
 $('#sheetForm').addEventListener('submit', ev => {
   ev.preventDefault();
   if (!sheet || $('#sheetSave').disabled) return;
-  if (sheet.mode === 'edit') saveEdit(); else if (sheet.mode === 'forth') saveForth(); else if (sheet.mode === 'join') saveJoin(); else if (sheet.mode === 'apply') runApply(); else if (sheet.mode === 'export') runExport(); else if (sheet.mode === 'export-save') saveExport(); else if (sheet.mode === 'help' || sheet.mode === 'triage' || sheet.mode === 'msreport') closeSheet(); else if (sheet.mode === 'mscheck') runMsCheck(); else if (sheet.mode === 'smart') saveSmart(); else if (sheet.mode === 'bulk') saveBulk(); else if (sheet.mode === 'attach') { const a = sheet, mode = ($('#sheetBody').querySelector('[name=attachMode]:checked') || {}).value; closeSheet(); runAttach(a.entry, a.file, mode === 'replace'); } else saveAdd();
+  if (sheet.mode === 'edit') saveEdit(); else if (sheet.mode === 'forth') saveForth(); else if (sheet.mode === 'join') saveJoin(); else if (sheet.mode === 'apply') runApply(); else if (sheet.mode === 'export') runExport(); else if (sheet.mode === 'export-save') saveExport(); else if (sheet.mode === 'help' || sheet.mode === 'triage' || sheet.mode === 'msreport') closeSheet(); else if (sheet.mode === 'mscheck') runMsCheck(); else if (sheet.mode === 'smart') saveSmart(); else if (sheet.mode === 'bulk') saveBulk(); else if (sheet.mode === 'quotes') saveQuotes(); else if (sheet.mode === 'attach') { const a = sheet, mode = ($('#sheetBody').querySelector('[name=attachMode]:checked') || {}).value; closeSheet(); runAttach(a.entry, a.file, mode === 'replace'); } else saveAdd();
 });
 $('#sheetCancel').addEventListener('click', closeSheet);
 $('#sheetBody').addEventListener('click', ev => { const x = ev.target.closest('[data-sheet-cancel]'); if (x && !x.disabled) closeSheet(); });
@@ -11255,6 +11378,53 @@ function bulkReading() {
   toast('Added ' + list.length + ' to your reading list, in Later', 3000);
 }
 
+/* ---- curly quotes in abstracts */
+// Straight double quotes in abstracts made curly: opening after a space,
+// a bracket or a dash (or at the start), closing otherwise. Not \" (a
+// LaTeX accent, as G\"{o}del).
+function curlyQuotes(v) {
+  return v.replace(/(^|[\s\S])"/g, (m, before, at) => {
+    if (before === '\\') return m;
+    return before + (at === 0 && !before || /[\s(\[{\u2014\u2013-]/.test(before) ? '\u201c' : '\u201d');
+  });
+}
+function openQuotes() {
+  const list = ENTRIES.filter(e => !e.ib && /(^|[^\\])"/.test(rawOf(e, 'abstract')));
+  sheet = { mode: 'quotes', list };
+  if (!list.length) { showSheet(`<h2>Curly quotes in abstracts</h2><p class="sheet-note">No abstract has straight double quotes. Nothing to change.</p>`, 'Close'); $('#sheetCancel').hidden = true; sheet.mode = 'help'; return; }
+  const show = e => { const v = rawOf(e, 'abstract'), i = v.search(/(^|[^\\])"/); const a = Math.max(0, i - 50), b = Math.min(v.length, i + 70); return v.slice(a, b); };
+  showSheet(`<h2>Curly quotes in abstracts</h2>` +
+    `<p class="sheet-note">${list.length} abstract${list.length === 1 ? ' has' : 's have'} straight double quotes ("). They\u2019ll become curly (\u201c \u201d), in one save to your .bib file, with a backup first. Nothing else changes, and LaTeX accents such as G\\"{o}del are left as they are.</p>` +
+    `<div class="quotes-ex">${list.slice(0, 3).map(e => `<p><b>${esc(e.f.title || e.k)}</b><br><span class="ms-dim">\u2026${esc(show(e))}\u2026</span><br>\u2192 \u2026${esc(curlyQuotes(show(e)))}\u2026</p>`).join('')}</div>`,
+    'Change ' + list.length + ' abstract' + (list.length === 1 ? '' : 's'));
+}
+async function saveQuotes() {
+  const s = sheet;
+  const todo = s.list.map(e => ({ e, v: curlyQuotes(rawOf(e, 'abstract')) })).filter(x => x.v !== rawOf(x.e, 'abstract'));
+  if (!todo.length) { closeSheet(); return; }
+  sheetBusy(true);
+  const t0 = Date.now();
+  let step = '';
+  const tell = () => { if (step && sheet === s) sheetMsg(step + '\u2026 (' + Math.round((Date.now() - t0) / 1000) + ' s)'); };
+  const clock = setInterval(tell, 1000);
+  try {
+    const now = bibdeskTime();
+    const res = await callServer('saveEntries', { items: todo.map(x => ({ key: x.e.k, set: { abstract: x.v }, expectHash: x.e.h || null })), modified: now, backupName: fileTime(), onStep: t => { step = t; tell(); } });
+    if (res.stamp) lastBibStamp = res.stamp;
+    let done = 0;
+    todo.forEach(x => { if (!res.hashes[x.e.k]) return; x.e.h = res.hashes[x.e.k]; setFields(x.e, { abstract: x.v, 'date-modified': now }); done++; });
+    init(DATA, true);
+    afterWrite();
+    closeSheet();
+    const skipped = (res.skipped || []).length;
+    toast('Changed the quotes in ' + done + ' abstract' + (done === 1 ? '' : 's') + (skipped ? '; ' + skipped + ' left as they were (changed elsewhere since LibLande read them)' : ''), skipped ? 7000 : 4000);
+  } catch (err) {
+    if (sheet === s) sheetMsg(errText(err), true);
+  } finally {
+    clearInterval(clock);
+    if (sheet === s) sheetBusy(false);
+  }
+}
 /* ------------------------------------------------------------ forthcoming: updates */
 /* ---- saved searches: groups that fill themselves */
 // Kept with your preferences ({at, list: [{name, q}]}), so your other
@@ -11263,11 +11433,11 @@ const SMART = store.get('smart', { at: 0, list: [] });
 function smartSave() {
   SMART.at = Date.now();
   store.set('smart', SMART);
-  if (gs) google.script.run.withFailureHandler(() => {}).savePrefs({ smart: SMART });
+  if (gs && SYNC.smart) google.script.run.withFailureHandler(() => {}).savePrefs({ smart: SMART });
   renderGroups();
 }
 function smartMerge(prefs) {
-  const x = prefs && prefs.smart;
+  const x = SYNC.smart && prefs && prefs.smart;
   if (x && x.at > SMART.at) { SMART.at = x.at; SMART.list = x.list || []; store.set('smart', SMART); }
 }
 function renderSmartBar() {
@@ -11494,7 +11664,7 @@ async function renameEntry(e, newKey) {
     store.set('recentSeen', RECENT.seen);
     const pairs = [...NOT_DUPS].map(p => p.split('|').map(k => (k === old ? newKey : k))).map(([a, b]) => pairOf(a, b));
     NOT_DUPS.clear(); pairs.forEach(p => NOT_DUPS.add(p)); store.set('notDups', [...NOT_DUPS]);
-    google.script.run.withFailureHandler(() => {}).savePrefs({ recentSeen: RECENT.seen.slice(0, 60), notDups: [...NOT_DUPS] });
+    google.script.run.withFailureHandler(() => {}).savePrefs(SYNC.recent ? { recentSeen: RECENT.seen.slice(0, 60), notDups: [...NOT_DUPS] } : { notDups: [...NOT_DUPS] });
     if (res.reading) setReading(res.reading);
     if (state.selKey === old) state.selKey = newKey;
     if (res.queued) e.offline = true;
@@ -11926,10 +12096,10 @@ function keysSave() {
   KEYS.at = Date.now();
   store.set('keys', KEYS.mine);
   store.set('keysAt', KEYS.at);
-  if (gs) google.script.run.withFailureHandler(() => {}).savePrefs({ keys: KEYS.mine, keysAt: KEYS.at });
+  if (gs && SYNC.keys) google.script.run.withFailureHandler(() => {}).savePrefs({ keys: KEYS.mine, keysAt: KEYS.at });
 }
 function keysMerge(prefs) {
-  if (prefs && prefs.keysAt > KEYS.at) { KEYS.mine = prefs.keys || {}; KEYS.at = prefs.keysAt; store.set('keys', KEYS.mine); store.set('keysAt', KEYS.at); }
+  if (SYNC.keys && prefs && prefs.keysAt > KEYS.at) { KEYS.mine = prefs.keys || {}; KEYS.at = prefs.keysAt; store.set('keys', KEYS.mine); store.set('keysAt', KEYS.at); }
 }
 // The ones that stay as they are.
 const KEYS_FIXED = {
@@ -12339,10 +12509,10 @@ const msDoc = x => x.id || 'file:' + x.name;
 function msSave() {
   store.set('msRecent', MS.recent);
   store.set('msHidden', MS.hidden);
-  if (gs) google.script.run.withFailureHandler(() => {}).savePrefs({ msRecent: MS.recent, msHidden: MS.hidden });
+  if (gs && SYNC.cite) google.script.run.withFailureHandler(() => {}).savePrefs({ msRecent: MS.recent, msHidden: MS.hidden });
 }
 function msMerge(prefs) {
-  if (!prefs) return;
+  if (!prefs || !SYNC.cite) return;
   const m = new Map();
   [...MS.recent, ...(prefs.msRecent || [])].forEach(x => { const k = msDoc(x); if (!m.has(k) || m.get(k).at < x.at) m.set(k, x); });
   MS.recent = [...m.values()].sort((a, b) => b.at - a.at).slice(0, 12);
@@ -12793,7 +12963,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-07.12</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-07.14</small>`;
 };
 
 function gunzipJSON(bytes) {
@@ -12919,6 +13089,7 @@ if (!gs) {
       smartMerge(status.prefs);
       keysMerge(status.prefs);
       progressMerge(status.prefs);
+      positionsMerge(status.prefs);
       if (notDupsMerge(status.prefs) && ENTRIES.length) { findDups(); refresh(false); }
       if (ENTRIES.length) renderGroups();
     }
@@ -13042,6 +13213,9 @@ if (!gs) {
       STYLE_WAS = store.get('style', 'liblande');
       renderThemePicks();
       $('#directBox').checked = DIRECT;
+      $('#darkPagesBox').checked = !!store.get('darkPages', false);
+      $('#setup').querySelectorAll('[data-sync]').forEach(b => { b.checked = SYNC[b.dataset.sync] !== false; });
+      $('#quotesRow').hidden = !DIRECT;
       $('#directHint').textContent = directHint(DIRECT);
       $('#curBib').textContent = st.bibName || '';
       $('#curPapers').textContent = st.papersName || '';
@@ -13057,6 +13231,13 @@ if (!gs) {
     $('#setup').hidden = true;
   };
   $('#directBox').addEventListener('change', ev => { $('#directHint').textContent = directHint(ev.target.checked); });
+  // (These take effect at once, on this device.)
+  $('#darkPagesBox').addEventListener('change', ev => setDarkPages(ev.target.checked));
+  $('#setup').querySelectorAll('[data-sync]').forEach(b => b.addEventListener('change', () => {
+    SYNC[b.dataset.sync] = b.checked;
+    store.set('sync', SYNC);
+  }));
+  $('#quotesGo').addEventListener('click', () => { closeSettings(); openQuotes(); });
   $('#changeLinks').addEventListener('click', () => {
     $('#linkFields').hidden = false;
     $('#changeLinks').hidden = true;
