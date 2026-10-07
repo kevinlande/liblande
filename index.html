@@ -929,6 +929,54 @@ details.d-sec[open] summary { margin-bottom: 8px; }
 /* (Above the viewer, which covers the page.) */
 .menu-list.link-menu { z-index: 90; }
 .recent-menu { width: min(360px, calc(100vw - 16px)); max-height: 70vh; overflow-y: auto; }
+/* A manuscript's citations checked: the totals and copy buttons, then a
+   section for each kind of finding, each a row with the reference in full
+   and small buttons. */
+.ms-link { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); padding: 0 10px; }
+.ms-link:focus-within { border-color: var(--accent); }
+.ms-link .i { flex: none; width: 16px; height: 16px; color: var(--muted); }
+.ms-link input { flex: 1; min-width: 0; border: 0 !important; background: none; outline: none; padding: 9px 0; }
+.ms-pick { cursor: pointer; align-self: flex-start; }
+.ms-stats { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 2px 0 4px; color: var(--muted); font-size: 13.5px; }
+.ms-stat { display: inline-flex; align-items: center; gap: 5px; }
+.ms-stat .i { width: 15px; height: 15px; }
+.ms-stat b { color: var(--text); font-variant-numeric: tabular-nums; }
+.ms-note { display: flex; gap: 8px; align-items: flex-start; margin: 4px 0; font-size: 13px; color: var(--muted); }
+.ms-note .i { flex: none; width: 16px; height: 16px; margin-top: 1px; }
+.ms-good { color: var(--text); } .ms-good .i { color: var(--accent); }
+.ms-top { margin: 6px 0 8px; flex-wrap: wrap; }
+.ms-sec { border-top: 1px solid var(--line); }
+.ms-sec > summary { display: flex; align-items: center; gap: 8px; padding: 11px 0; cursor: pointer; list-style: none; font-weight: 600; font-size: 14px; }
+.ms-sec > summary::-webkit-details-marker { display: none; }
+.ms-sec > summary > .i { flex: none; width: 17px; height: 17px; }
+.ms-sec > summary > .i:last-child { width: 15px; height: 15px; margin-left: auto; color: var(--muted); transform: rotate(-90deg); transition: transform .15s; }
+.ms-sec[open] > summary > .i:last-child { transform: none; }
+.ms-bad > summary > .i:first-child { color: #c4554d; }
+.ms-warn > summary > .i:first-child { color: #b8860b; }
+.ms-good > summary > .i:first-child { color: var(--accent); }
+.ms-ct { min-width: 22px; padding: 1px 7px; border-radius: 10px; background: var(--side-hover); color: var(--muted); font-size: 12px; font-weight: 600; text-align: center; font-variant-numeric: tabular-nums; }
+.ms-list { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 2px; }
+.ms-item { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border-radius: 8px; background: var(--side-hover); }
+.ms-main { flex: 1; min-width: 0; display: grid; gap: 3px; }
+.ms-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
+.ms-cite { font-weight: 600; font-size: 13.5px; }
+.ms-n { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.ms-hint { color: var(--accent); font-size: 12.5px; }
+.ms-ref { font-size: 14px; }
+.ms-ref p { margin: 0; }
+.ms-msg { font-size: 13px; }
+.ms-fix { font-weight: 600; }
+.ms-dim, .ms-raw { color: var(--muted); font-size: 13px; }
+.ms-acts { flex: none; display: flex; gap: 4px; }
+.ms-ib { width: 30px; height: 30px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 7px; background: var(--bg); color: var(--muted); cursor: pointer; padding: 0; }
+.ms-ib:hover { color: var(--text); border-color: var(--accent); }
+.ms-ib .i { width: 15px; height: 15px; }
+@media (pointer: coarse) { .ms-ib { width: 36px; height: 36px; } }
+.ms-ref, .ms-raw, .ms-msg { overflow-wrap: anywhere; }
+@media (max-width: 600px) {
+  .ms-item { flex-direction: column; gap: 6px; }
+  .ms-acts { align-self: flex-end; }
+}
 .recent-menu button { display: grid; gap: 1px; }
 .recent-menu .rc-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .recent-menu .rc-sub { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1623,7 +1671,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-06.09</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-07.04</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1638,7 +1686,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-06.09';
+      l.querySelector('small').textContent = 'Version 2026-10-07.04';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1650,7 +1698,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-06.09): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-07.04): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -1711,6 +1759,10 @@ const ICON = {
   x: '<svg class="i" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7L7 17"/></svg>',
   bookmark: '<svg class="i" viewBox="0 0 24 24"><path d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1z"/></svg>',
   search: '<svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg>',
+  plus: '<svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
+  citecheck: '<svg class="i" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M8.5 14.5l2.3 2.3 4.7-4.8"/></svg>',
+  alert: '<svg class="i" viewBox="0 0 24 24"><path d="M12 4l9 16H3z"/><path d="M12 10v4.5M12 17.2v.3"/></svg>',
+  quote: '<svg class="i" viewBox="0 0 24 24"><path d="M5 17c2.5-.4 4-2.2 4-5V7H5v5h3"/><path d="M14 17c2.5-.4 4-2.2 4-5V7h-4v5h3"/></svg>',
 };
 const TYPE_NAMES = { article: 'Journal article', incollection: 'Book chapter', inbook: 'Book section', book: 'Book',
   inproceedings: 'Conference paper', conference: 'Conference paper', proceedings: 'Proceedings', phdthesis: 'PhD thesis',
@@ -1918,7 +1970,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-06.09`;
+    `<br>LibLande version 2026-10-07.04`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -2477,11 +2529,14 @@ function grpBtn(id, label, count, icon) {
 function renderGroups() {
   const inboxCount = ENTRIES.filter(e => e.ib).length;
   let h = `<div class="sec"><div class="sec-h">Library</div>${grpBtn('all', 'Library', ENTRIES.length, ICON.lib)}` +
+    (RECENT.seen.length || state.group === 'recent' ? grpBtn('recent', 'Recently viewed', groupItems('recent').length, ICON.history) : '') +
     (inboxCount || state.group === 'inbox' ? grpBtn('inbox', 'Inbox', inboxCount, ICON.inbox) : '') +
     (PENDING.length || state.group === 'pending' ? grpBtn('pending', 'Pending edits', ENTRIES.filter(e => e.pend).length, ICON.clock) : '') +
     (DUPS.size || state.group === 'dups' ? grpBtn('dups', 'Possible duplicates', DUPS.size, ICON.copy) : '') +
     ((n => (n || state.group === 'forth' ? grpBtn('forth', 'Forthcoming', n, ICON.forth) : ''))(ENTRIES.filter(isForthcoming).length)) +
-    (RECENT.seen.length || state.group === 'recent' ? grpBtn('recent', 'Recently viewed', groupItems('recent').length, ICON.history) : '') + `</div>`;
+    `</div>` +
+    // (Tools: not lists, so no count.)
+    `<div class="sec"><div class="sec-h">Tools</div><button type="button" class="grp" data-tool="mscheck">${ICON.citecheck}<span class="nm">Check a manuscript\u2019s citations</span></button></div>`;
   if (GROUPS.some(g => !(gs && g === readingGroup())) || gs) {
     h += `<div class="sec"><div class="sec-row"><div class="sec-h">Static groups</div>` +
       (gs ? `<button type="button" class="sec-add" data-new-group title="New static group" aria-label="New static group"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>` : '') + `</div>`;
@@ -2514,6 +2569,7 @@ $('#groups').addEventListener('click', ev => {
   if (ev.target.closest('.ng-row')) return;
   const t = ev.target.closest('[data-toggle]');
   if (t) { const k = t.dataset.toggle; state[k] = !state[k]; store.set(k, state[k]); renderGroups(); return; }
+  if (ev.target.closest('[data-tool="mscheck"]')) { closeDrawer(); openMsCheck(); return; }
   const b = ev.target.closest('.grp');
   if (!b) return;
   setGroup(b.dataset.g);
@@ -10339,7 +10395,7 @@ async function saveAdd() {
 $('#sheetForm').addEventListener('submit', ev => {
   ev.preventDefault();
   if (!sheet || $('#sheetSave').disabled) return;
-  if (sheet.mode === 'edit') saveEdit(); else if (sheet.mode === 'forth') saveForth(); else if (sheet.mode === 'join') saveJoin(); else if (sheet.mode === 'apply') runApply(); else if (sheet.mode === 'export') runExport(); else if (sheet.mode === 'export-save') saveExport(); else if (sheet.mode === 'help' || sheet.mode === 'triage') closeSheet(); else if (sheet.mode === 'attach') { const a = sheet, mode = ($('#sheetBody').querySelector('[name=attachMode]:checked') || {}).value; closeSheet(); runAttach(a.entry, a.file, mode === 'replace'); } else saveAdd();
+  if (sheet.mode === 'edit') saveEdit(); else if (sheet.mode === 'forth') saveForth(); else if (sheet.mode === 'join') saveJoin(); else if (sheet.mode === 'apply') runApply(); else if (sheet.mode === 'export') runExport(); else if (sheet.mode === 'export-save') saveExport(); else if (sheet.mode === 'help' || sheet.mode === 'triage' || sheet.mode === 'msreport') closeSheet(); else if (sheet.mode === 'mscheck') runMsCheck(); else if (sheet.mode === 'attach') { const a = sheet, mode = ($('#sheetBody').querySelector('[name=attachMode]:checked') || {}).value; closeSheet(); runAttach(a.entry, a.file, mode === 'replace'); } else saveAdd();
 });
 $('#sheetCancel').addEventListener('click', closeSheet);
 $('#sheetBody').addEventListener('click', ev => { const x = ev.target.closest('[data-sheet-cancel]'); if (x && !x.disabled) closeSheet(); });
@@ -11267,6 +11323,421 @@ function openShortcuts() {
 
 $('#keysBtn').addEventListener('click', openShortcuts);
 
+/* ------------------------------------------------------------ manuscript check */
+// A manuscript's citations checked: a Google Doc, or a Word file from Google
+// Drive or this device, read (never changed). Each APA author-date citation
+// in the text is matched to the References section and to the library, and
+// each reference to a citation. MS.last keeps the last report, to show again.
+const MS = { last: null };
+const MS_YEAR = String.raw`(?:\d{4}[a-z]?|n\.\s?d\.|in press|forthcoming)`;
+const MS_PART = String.raw`(?:van|von|de|der|den|du|da|di|del|della|des|la|le|ten|ter)`;
+const MS_NAME = String.raw`(?:${MS_PART}\s+)*\p{Lu}[\p{L}\p{M}'’\-‐-―]*(?:\s+${MS_PART}\s+\p{Lu}[\p{L}\p{M}'’\-‐-―]*)?`;
+const MS_YEAR_ONLY = new RegExp('^' + MS_YEAR + '$', 'iu');
+const MS_REFS_HEAD = /^\s*(?:[\dIVX]+\.?\s*)?(references|reference list|bibliography|works cited|literature cited)\s*:?\s*$/i;
+const MS_AFTER_REFS = /^\s*(?:[\dIVX]+\.?\s*)?(appendix|appendices|footnotes|endnotes|notes|tables?|figures?|figure captions|supplementary materials?)\b[^.]{0,60}$/i;
+// Words that can stand before "(2020)" without being an author.
+const MS_NOT_NAME = /^(?:In|See|The|This|That|These|Those|Table|Tables|Figure|Fig\.|Section|Chapter|Part|Experiment|Study|Studies|Appendix|Note|Since|Until|Before|After|During|From|Published|Accepted|Received|Revised|Year|Edition|Spring|Summer|Fall|Autumn|Winter|January|February|March|April|May|June|July|August|September|October|November|December)$/;
+const MS_LEAD = /^(?:(?:e\.g\.|i\.e\.|cf\.|see also|see|but see|also|and|for (?:a |an )?(?:review|discussion|overview|summary)s?(?: of [^,]+)?,? see|reviewed in|as reviewed in|as in|in)[,:]?\s+)+/i;
+
+// A surname as matched (no accents, case or punctuation), and a year.
+const msKey = s => norm(s).replace(/[^a-z]/g, '');
+function msYear(y) {
+  const t = norm(y).replace(/\s+/g, ' ').trim();
+  const yk = /^n\. ?d\.$/.test(t) ? 'nd' : /in press|forthcoming/.test(t) ? 'forth' : t;
+  const m = /^(\d{4})([a-z]?)$/.exec(yk);
+  return m ? { yk, base: m[1], suf: m[2] } : { yk, base: yk, suf: '' };
+}
+// "Smith & Lee", "Smith et al.", "Smith, Lee, and Park": the surnames.
+function msNames(seg) {
+  let s = seg.replace(/['’]s?$/u, '').replace(/\s+/g, ' ').trim().replace(/,$/, '');
+  const etal = /\s+et al\.?$/i.test(s);
+  if (etal) s = s.replace(/\s+et al\.?$/i, '');
+  const names = s.split(/\s*,\s*(?:&|and)?\s*|\s+(?:&|and)\s+/).map(x => x.trim()).filter(Boolean);
+  return { names, keys: names.map(msKey), etal };
+}
+
+// The manuscript split: the text, and the entries under the last heading
+// such as References (to an appendix or the end).
+function msSplit(paras) {
+  let h = -1;
+  paras.forEach((p, i) => { if (MS_REFS_HEAD.test(p)) h = i; });
+  if (h < 0) return { body: paras, refs: null };
+  let end = paras.length;
+  for (let i = h + 1; i < paras.length; i++) if (MS_AFTER_REFS.test(paras[i])) { end = i; break; }
+  return { body: paras.slice(0, h).concat(paras.slice(end)), refs: paras.slice(h + 1, end).map(s => s.replace(/\s+/g, ' ').trim()).filter(s => s.length > 15) };
+}
+
+// The APA citations in a text: in parentheses, (Smith, 2020; see also Lee &
+// Park, 2019a, p. 4), and in its sentences, Smith and Lee (2020) or Smith
+// et al.'s (2021). One for each year cited.
+function msCites(text) {
+  const out = [];
+  const yearsRe = new RegExp(String.raw`^(.+?),?\s+(${MS_YEAR}(?:\s*,\s*${MS_YEAR})*)(?=\s*(?:,|$))`, 'iu');
+  const onlyYears = new RegExp(String.raw`^\s*${MS_YEAR}(?:\s*[,;]\s*${MS_YEAR})*\s*(?:,.*)?$`, 'iu');
+  const tail = new RegExp(String.raw`(${MS_NAME}(?:\s+et al\.?)?|${MS_NAME}\s+(?:and|&)\s+${MS_NAME}|(?:${MS_NAME},\s+)+${MS_NAME},?\s+(?:and|&)\s+${MS_NAME})(?:['’]s?)?\s*$`, 'u');
+  const add = (who, year, said, at) => out.push(Object.assign({ who: who.replace(/['’]s?$/u, '').trim(), year, said, at }, msNames(who), msYear(year)));
+  const paren = /\(([^()]{1,500})\)/g;
+  let m;
+  while ((m = paren.exec(text))) {
+    const inner = m[1], at = m.index;
+    if (!/\d{4}|n\.\s?d\.|in press|forthcoming/i.test(inner)) continue;
+    if (onlyYears.test(inner)) {
+      const t = tail.exec(text.slice(Math.max(0, at - 160), at));
+      if (!t || MS_NOT_NAME.test(t[1])) continue;
+      inner.split(/[,;]/).map(s => s.trim()).filter(s => MS_YEAR_ONLY.test(s)).forEach(y => add(t[1], y, t[1].trim() + ' (' + inner + ')', at));
+      continue;
+    }
+    for (let part of inner.split(';')) {
+      part = part.trim().replace(MS_LEAD, '');
+      const p = yearsRe.exec(part);
+      if (!p) continue;
+      const who = p[1].trim().replace(/,$/, '');
+      if (!/^(?:\p{Lu}|(?:van|von|de|der|den|du|da|di|del|la|le)\s)/u.test(who) || !/^[\p{L}\p{M}'’\-‐-―.,&\s]+$/u.test(who) || who.length > 150) continue;
+      p[2].split(',').map(s => s.trim()).forEach(y => add(who, y, part.replace(/\s+/g, ' '), at));
+    }
+  }
+  return out;
+}
+
+// A reference-list entry: its authors' surnames, year, title and DOI.
+function msRef(raw) {
+  const s = raw.replace(/\s+/g, ' ').trim();
+  const doi = ((/\b10\.\d{4,9}\/[^\s<>"]+/.exec(s) || [''])[0]).replace(/[.,;]+$/, '');
+  const m = new RegExp(String.raw`^(.*?)\s*\(\s*(${MS_YEAR})(?:\s*,[^)]*)?\)\s*\.?\s*(.*)$`, 'iu').exec(s);
+  if (!m) return Object.assign({ raw: s, names: [], keys: [], title: '', doi, unread: true }, msYear(''));
+  const who = m[1].replace(/\s*\((?:Eds?|Trans)\.\)\s*\.?$/i, '').replace(/[,\s]+$/, '');
+  const toks = who.split(/\s*,\s*(?:&|and)?\s*|\s+(?:&|and)\s+/).map(x => x.replace(/^[.\s]+/, '').trim()).filter(Boolean);
+  const initials = t => /^(?:\p{Lu}(?:\.|$)[\s\-‐]*)+$/u.test(t) || /^(?:Jr|Sr|II|III|IV)\.?$/.test(t);
+  const names = toks.some(initials) ? toks.filter(t => !initials(t))
+    : toks.length > 1 && toks.length % 2 === 0 ? toks.filter((t, i) => i % 2 === 0) : [who];
+  const title = ((/^(.+?[.?!])(?:\s|$)/.exec(m[3]) || [, m[3]])[1] || '').replace(/\.$/, '');
+  return Object.assign({ raw: s, names, keys: names.map(msKey), title, doi }, msYear(m[2]));
+}
+
+// How alike two titles are: the same, one the start of the other, or most
+// words shared.
+function msTitleLike(a, b) {
+  const x = plainTitle(a), y = plainTitle(b);
+  if (!x || !y) return 0;
+  if (x === y) return 1;
+  if (Math.min(x.length, y.length) >= 20 && (x.startsWith(y) || y.startsWith(x))) return 0.9;
+  const w = s => new Set(norm(s).split(/[^a-z0-9]+/).filter(t => t.length > 3));
+  const A = w(a), B = w(b);
+  if (!A.size || !B.size) return 0;
+  let n = 0;
+  A.forEach(t => { if (B.has(t)) n++; });
+  return n / Math.max(A.size, B.size);
+}
+function msLev(a, b) {
+  const d = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    let prev = d[0];
+    d[0] = i;
+    for (let j = 1; j <= b.length; j++) { const t = d[j]; d[j] = Math.min(d[j] + 1, d[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1)); prev = t; }
+  }
+  return d[b.length];
+}
+
+// The library by first author's (or editor's) surname.
+function msLibrary() {
+  const by = new Map();
+  for (const e of ENTRIES) {
+    const ns = e.a && e.a.length ? e.a : (e.e || []);
+    if (!ns.length) continue;
+    const k = msKey(ns[0][0]);
+    if (!by.has(k)) by.set(k, []);
+    by.get(k).push(e);
+  }
+  return by;
+}
+const msLibYear = e => { const y = String(e.f.year || ''); return FORTH_RE.test(y) ? 'forth' : (/\d{4}/.exec(y) || ['nd'])[0]; };
+const msLibKeys = e => (e.a && e.a.length ? e.a : (e.e || [])).map(n => msKey(n[0]));
+// The publication in the library a citation or reference is to: by DOI,
+// then first author and year (and second author, and title, to choose),
+// then first author and title (a year that differs is noted).
+function msFind(lib, x) {
+  if (x.doi) {
+    const d = norm(x.doi);
+    const hit = ENTRIES.find(e => e.f.doi && norm(e.f.doi).replace(/^https?:\/\/(dx\.)?doi\.org\//, '') === d);
+    if (hit) return { e: hit };
+  }
+  if (!x.keys || !x.keys.length) return null;
+  const all = lib.get(x.keys[0]) || [];
+  let c = all.filter(e => msLibYear(e) === x.base);
+  if (x.keys.length >= 2 && !x.etal) { const two = c.filter(e => msLibKeys(e)[1] === x.keys[1]); if (two.length || x.title) c = two; }
+  if (x.title && c.length > 1) {
+    const best = c.map(e => [e, msTitleLike(e.f.title, x.title)]).sort((a, b) => b[1] - a[1]);
+    if (best[0][1] > 0.5) c = [best[0][0]];
+  }
+  if (c.length) return { e: c[0], many: c.length > 1 ? c.length : 0 };
+  if (x.title) {
+    const best = all.map(e => [e, msTitleLike(e.f.title, x.title)]).sort((a, b) => b[1] - a[1])[0];
+    if (best && best[1] >= 0.75) return { e: best[0], yearDiffers: msLibYear(best[0]) };
+  }
+  return null;
+}
+
+// The check itself. paras: the manuscript's paragraphs; notes: its
+// footnotes and endnotes (cited from too).
+function msCheck(paras, notes) {
+  const { body, refs } = msSplit(paras);
+  const cites = msCites(body.concat(notes || []).join('\n'));
+  const lib = msLibrary();
+  const R = (refs || []).map(msRef);
+  // The works cited: one for each first author (and second, when two are
+  // named), and year.
+  const works = new Map();
+  for (const c of cites) {
+    const id = c.keys[0] + (c.keys.length === 2 && !c.etal ? '+' + c.keys[1] : '') + (c.etal ? '+' : '') + '|' + c.yk;
+    if (!works.has(id)) works.set(id, Object.assign({}, c, { n: 0, refs: [] }));
+    works.get(id).n++;
+  }
+  const W = [...works.values()];
+  const named = (r, i) => r.keys[i] ? r.names[i] : '';
+  const flags = [];
+  for (const w of W) {
+    let c = R.filter(r => r.keys[0] === w.keys[0] && r.base === w.base);
+    if (w.keys.length >= 2 && !w.etal) c = c.filter(r => r.keys[1] === w.keys[1]);
+    if (w.suf) { const s = c.filter(r => r.suf === w.suf); if (s.length) c = s; }
+    w.refs = c;
+    w.lib = msFind(lib, c.length === 1 ? Object.assign({}, c[0], { etal: w.etal }) : w);
+    if (c.length > 1) flags.push({ w, msg: 'matches ' + c.length + ' references (' + c.map(r => r.yk).join(', ') + '): give the year its letter' });
+    if (c.length !== 1) continue;
+    const r = c[0], n = r.keys.length;
+    // (short: the same without the names, for beside the corrected citation.)
+    if (w.etal && n < 3) flags.push({ w, msg: '“et al.” is for three or more authors; this work has ' + n + ': ' + (n === 2 ? named(r, 0) + ' & ' + named(r, 1) : named(r, 0)), short: '“et al.” is for three or more authors; this work has ' + n });
+    else if (!w.etal && w.keys.length === 1 && n === 2) flags.push({ w, msg: 'two authors: cite both, ' + named(r, 0) + ' & ' + named(r, 1), short: 'Two authors: cite both' });
+    else if (!w.etal && w.keys.length === 1 && n >= 3) flags.push({ w, msg: 'three or more authors: ' + named(r, 0) + ' et al. (APA 7)', short: 'Three or more authors: “et al.” (APA 7)' });
+    if (!w.suf && r.suf) flags.push({ w, msg: 'the reference is ' + r.yk + ': cite it with the letter' });
+  }
+  // References: cited or not, in the library or not.
+  for (const r of R) {
+    r.cited = W.some(w => w.refs.includes(r));
+    r.lib = r.unread ? null : msFind(lib, r);
+    if (r.lib && r.lib.yearDiffers) flags.push({ r, msg: 'your library has ' + r.lib.yearDiffers + ' for “' + (r.lib.e.f.title || r.lib.e.k) + '”' });
+  }
+  // A citation with no reference: perhaps a misspelling of one.
+  const missing = refs ? W.filter(w => !w.refs.length) : [];
+  for (const w of missing) {
+    const near = R.find(r => r.base === w.base && r.keys[0] && r.keys[0] !== w.keys[0] && msLev(r.keys[0], w.keys[0]) <= 2);
+    if (near) w.near = near.names[0];
+  }
+  return { cites: cites.length, works: W, refs: refs ? R : null, missing, uncited: R.filter(r => !r.cited && !r.unread), unread: R.filter(r => r.unread),
+    notInLib: R.filter(r => !r.unread && !r.lib), noLib: refs ? [] : W.filter(w => !w.lib), flags, ok: W.filter(w => w.refs.length === 1 && w.lib) };
+}
+
+/* ---------- reading the manuscript */
+// A Word file's paragraphs (and its footnotes' and endnotes'), as text;
+// deleted tracked changes and field codes (Zotero's, say) left out.
+async function msDocx(bytes, name) {
+  let zip;
+  try { zip = await (await loadJSZip()).loadAsync(bytes); } catch (err) { throw new Error('LibLande couldn’t open ' + name + ' as a Word file (.docx).'); }
+  const W = 'http:\/\/schemas.openxmlformats.org/wordprocessingml/2006/main';
+  const paras = async path => {
+    const f = zip.file(path);
+    if (!f) return [];
+    const d = new DOMParser().parseFromString(await f.async('string'), 'application/xml');
+    return [...d.getElementsByTagNameNS(W, 'p')].map(p => {
+      let s = '';
+      const walk = n => {
+        for (const c of n.childNodes) {
+          if (c.nodeType !== 1) continue;
+          const l = c.localName;
+          if (l === 't') s += c.textContent;
+          else if (l === 'tab') s += '\t';
+          else if (l === 'br' || l === 'cr') s += '\n';
+          else if (l === 'del' || l === 'delText' || l === 'instrText' || l === 'p') continue;
+          else walk(c);
+        }
+      };
+      walk(p);
+      return s;
+    });
+  };
+  const body = await paras('word/document.xml');
+  if (!zip.file('word/document.xml')) throw new Error(name + ' isn’t a Word document.');
+  return { name, paras: body, notes: (await paras('word/footnotes.xml')).concat(await paras('word/endnotes.xml')) };
+}
+async function msFromFile(file) {
+  if (/\.docx$/i.test(file.name)) return msDocx(new Uint8Array(await file.arrayBuffer()), file.name);
+  if (/\.(txt|md|text)$/i.test(file.name)) return { name: file.name, paras: (await file.text()).split(/\r?\n/) };
+  if (/\.doc$/i.test(file.name)) throw new Error('An older Word file (.doc) can’t be read from this device. Save it as .docx (in Word: File › Save As), or put it in Google Drive and paste its link.');
+  throw new Error('Choose a Word file (.docx), or paste the link to a Google Doc.');
+}
+// A file's id from its Google Docs or Drive link (or the id itself).
+function msDriveId(link) {
+  const s = String(link || '').trim();
+  const m = /\/d\/([A-Za-z0-9_-]{20,})/.exec(s) || /[?&]id=([A-Za-z0-9_-]{20,})/.exec(s) || /^([A-Za-z0-9_-]{25,})$/.exec(s);
+  return m ? m[1] : null;
+}
+async function msFromDrive(link) {
+  const id = msDriveId(link);
+  if (!id) throw new Error('That doesn’t look like a link to a Google Doc or a file in Google Drive.');
+  const api = 'https:\/\/www.googleapis.com/drive/v3/files/';
+  const get = async (url, opts = {}) => {
+    const go = async token => fetch(url, Object.assign({}, opts, { headers: Object.assign({ Authorization: 'Bearer ' + token }, opts.headers || {}) }));
+    let r = await go(await driveToken());
+    if (r.status === 401) r = await go(await driveToken(true));
+    if (r.status === 404) throw new Error('Google Drive can’t find that file (or it isn’t shared with your account).');
+    if (!r.ok) throw new Error('Google Drive didn’t send the file (error ' + r.status + ').');
+    return r;
+  };
+  const m = await (await get(api + encodeURIComponent(id) + '?fields=name,mimeType&supportsAllDrives=true')).json();
+  const text = async fid => (await (await get(api + encodeURIComponent(fid) + '/export?mimeType=text%2Fplain')).text()).split(/\r?\n/);
+  if (m.mimeType === 'application/vnd.google-apps.document') return { name: m.name, paras: await text(id) };
+  if (/wordprocessingml/.test(m.mimeType) || /\.docx$/i.test(m.name)) {
+    return msDocx(new Uint8Array(await (await get(api + encodeURIComponent(id) + '?alt=media&supportsAllDrives=true')).arrayBuffer()), m.name);
+  }
+  if (/^text\//.test(m.mimeType)) return { name: m.name, paras: (await (await get(api + encodeURIComponent(id) + '?alt=media')).text()).split(/\r?\n/) };
+  if (/msword|rtf|opendocument\.text/.test(m.mimeType) || /\.(doc|rtf|odt)$/i.test(m.name)) {
+    // An older Word file: Google converts a copy to a Google Doc, which is
+    // read, then deleted.
+    const copy = await (await get(api + encodeURIComponent(id) + '/copy?fields=id&supportsAllDrives=true', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: m.name + ' (LibLande’s temporary copy)', mimeType: 'application/vnd.google-apps.document' }) })).json();
+    try { return { name: m.name, paras: await text(copy.id) }; } finally { get(api + encodeURIComponent(copy.id), { method: 'DELETE' }).catch(() => {}); }
+  }
+  throw new Error('LibLande reads Google Docs and Word files; ' + m.name + ' is neither.');
+}
+
+/* ---------- the panels */
+function openMsCheck() {
+  sheet = { mode: 'mscheck' };
+  showSheet(`<h2>Check a manuscript’s citations</h2>` +
+    `<p class="sheet-note">LibLande reads the manuscript, without changing it, and checks its APA citations against its References and your library: every citation should have its reference, and every reference a citation.</p>` +
+    (gs ? `<div class="fld"><label for="msLink">A Google Doc, or a Word file in Google Drive</label>` +
+      `<div class="ms-link">${ICON.link}<input id="msLink" type="url" placeholder="Paste its link" autocapitalize="off" autocorrect="off" spellcheck="false"></div></div>` : '') +
+    `<div class="fld"><label>${gs ? 'Or a' : 'A'} Word file on this device</label>` +
+    `<label class="btn ms-pick">${ICON.doc}<span id="msFileName">Choose a .docx file…</span>` +
+    `<input id="msFile" type="file" accept=".docx,.txt,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain" hidden></label></div>` +
+    (MS.last ? `<p><button type="button" class="btn" data-ms-last>${ICON.history}<span>The last report: ${esc(MS.last.name)}</span></button></p>` : ''), 'Check');
+  $('#msFile').addEventListener('change', ev => {
+    const f = ev.target.files[0];
+    $('#msFileName').textContent = f ? f.name : 'Choose a .docx file…';
+    if (f && $('#msLink')) $('#msLink').value = '';
+  });
+}
+async function runMsCheck() {
+  const s = sheet;
+  const link = $('#msLink') ? $('#msLink').value.trim() : '', file = $('#msFile') && $('#msFile').files[0];
+  if (!link && !file) { sheetMsg(gs ? 'Paste a link, or choose a Word file.' : 'Choose a Word file.', true); return; }
+  sheetBusy(true);
+  sheetMsg('Reading the manuscript\u2026');
+  try {
+    const doc = file ? await msFromFile(file) : await msFromDrive(link);
+    if (sheet !== s) return;
+    const rep = Object.assign(msCheck(doc.paras, doc.notes), { name: doc.name });
+    MS.last = rep;
+    showMsReport(rep);
+  } catch (err) {
+    if (sheet === s) sheetMsg(errText(err), true);
+  } finally {
+    if (sheet === s) sheetBusy(false);
+  }
+}
+// An in-text citation from a reference's surnames and year: (A, 2020),
+// (A & B, 2020), (A et al., 2020).
+const msInText = (names, year) => '(' + (names.length === 1 ? names[0] : names.length === 2 ? names[0] + ' & ' + names[1] : names[0] + ' et al.') + ', ' + year + ')';
+// The References section the manuscript should have: every work cited, in
+// APA style from the library where it's there, otherwise as the manuscript
+// has it, in alphabetical order. Works cited with neither are counted.
+function msReferences(rep) {
+  const seen = new Set(), items = [];
+  let left = 0;
+  for (const w of rep.works) {
+    if (w.lib) { if (!seen.has(w.lib.e.k)) { seen.add(w.lib.e.k); const r = apaCitation(w.lib.e); items.push({ text: r.text, html: r.html }); } }
+    else if (w.refs.length === 1) { if (!seen.has(w.refs[0].raw)) { seen.add(w.refs[0].raw); items.push({ text: w.refs[0].raw, html: esc(w.refs[0].raw) }); } }
+    else left++;
+  }
+  items.sort((a, b) => norm(a.text).localeCompare(norm(b.text)));
+  return { items, left };
+}
+function showMsReport(rep) {
+  sheet = { mode: 'msreport', rep };
+  // (Each finding: what the text says, the reference in full, and its
+  // buttons. ref: an index into rep.refs; w: one of rep.works.)
+  const ib = (attr, icon, label) => `<button type="button" class="ms-ib" ${attr} aria-label="${esc(label)}" title="${esc(label)}">${icon}</button>`;
+  const cite = w => `<span class="ms-cite">${esc(w.who + ', ' + w.year)}</span>` + (w.n > 1 ? `<span class="ms-n">×${w.n}</span>` : '');
+  const full = (e, raw) => `<div class="apa-refs ms-ref"><p>${e ? apaCitation(e).html : esc(raw)}</p></div>`;
+  const item = (head, body, acts) => `<li class="ms-item"><div class="ms-main">${head ? `<div class="ms-head">${head}</div>` : ''}${body}</div>` +
+    (acts ? `<div class="ms-acts">${acts}</div>` : '') + `</li>`;
+  const libActs = (e, k) => ib(`data-ms-ref="${k}"`, ICON.copy, 'Copy the APA reference') + ib(`data-ms-show="${esc(e.k)}"`, ICON.lib, 'Show in the library');
+  const sec = (key, icon, title, list, open, extra) => list.length ? `<details class="ms-sec ms-${key}"${open ? ' open' : ''}><summary>${icon}<span>${esc(title)}</span><span class="ms-ct">${list.length}</span>${ICON.chev}</summary>` +
+    (extra || '') + `<ul class="ms-list">${list.join('')}</ul></details>` : '';
+  const refIx = r => rep.refs.indexOf(r);
+  // What each button acts on, by number.
+  const acts = [];
+  const act = v => { acts.push(v); return acts.length - 1; };
+
+  const missing = rep.missing.map(w => item(cite(w) + (w.near ? `<span class="ms-hint">perhaps ${esc(w.near)}?</span>` : ''),
+    w.lib ? full(w.lib.e) : `<div class="ms-dim">Not in your library either.</div>`,
+    w.lib ? libActs(w.lib.e, act({ e: w.lib.e })) : ''));
+  const uncited = rep.uncited.map(r => {
+    const e = r.lib && r.lib.e, intext = e ? apaInText(e).text : msInText(r.names, r.yk === 'forth' ? 'in press' : r.yk === 'nd' ? 'n.d.' : r.yk);
+    return item('', full(e, r.raw), ib(`data-ms-cite="${act({ text: intext })}"`, ICON.quote, 'Copy the in-text citation ' + intext) + (e ? libActs(e, act({ e })) : ''));
+  });
+  const flags = rep.flags.map(f => {
+    const e = f.w && f.w.lib && f.w.lib.e, fix = e && f.short ? apaInText(e).text : '', said = fix ? f.short : f.msg;
+    return item(f.w ? cite(f.w) : '', `<div class="ms-msg">${esc(said.charAt(0).toUpperCase() + said.slice(1))}${fix ? `: <span class="ms-fix">${esc(fix)}</span>` : '.'}</div>` + (f.r ? full(f.r.lib && f.r.lib.e, f.r.raw) : ''),
+      fix ? ib(`data-ms-cite="${act({ text: fix })}"`, ICON.quote, 'Copy ' + fix) : '');
+  });
+  const noLib = rep.noLib.map(w => item(cite(w), `<div class="ms-dim">Not in your library.</div>`, ''));
+  const notInLib = rep.notInLib.map(r => item('', full(null, r.raw), gs ? ib(`data-ms-add="${refIx(r)}"`, ICON.plus, 'Add to your library') : ''));
+  const unread = rep.unread.map(r => item('', `<div class="ms-raw">${esc(r.raw)}</div>`, ''));
+  const ok = rep.ok.map(w => item(cite(w), full(w.lib.e), libActs(w.lib.e, act({ e: w.lib.e }))));
+  sheet.acts = acts;
+
+  const W = rep.works.length, N = rep.refs ? rep.refs.length : 0, R = msReferences(rep);
+  const fine = rep.refs && !rep.missing.length && !rep.uncited.length && !rep.flags.length;
+  const stat = (icon, n, what) => `<span class="ms-stat">${icon}<b>${n}</b> ${what}</span>`;
+  showSheet(`<h2>${esc(rep.name)}</h2>` +
+    `<div class="ms-stats">${stat(ICON.quote, rep.cites, rep.cites === 1 ? 'citation' : 'citations')}${stat(ICON.read, W, W === 1 ? 'work cited' : 'works cited')}` +
+      (rep.refs ? stat(ICON.type, N, N === 1 ? 'reference' : 'references') : '') + `</div>` +
+    (rep.refs ? '' : `<p class="ms-note">${ICON.alert}<span>No References section was found (a heading such as “References”), so the citations are checked against your library only.</span></p>`) +
+    (fine ? `<p class="ms-note ms-good">${ICON.check}<span>Every citation has its reference, and every reference is cited.</span></p>` : '') +
+    `<div class="actions ms-top">` +
+      (R.items.length ? `<button type="button" class="btn primary" data-ms-allrefs title="Every work cited, in APA style, in order; references never cited are left out">${ICON.copy}<span>Copy References (${R.items.length})</span></button>` : '') +
+      (rep.missing.some(w => w.lib) ? `<button type="button" class="btn" data-ms-missing>${ICON.copy}<span>Copy missing (${rep.missing.filter(w => w.lib).length})</span></button>` : '') +
+      `<button type="button" class="btn" data-ms-again>${ICON.doc}<span>Check another</span></button></div>` +
+    (R.left ? `<p class="ms-note">${ICON.alert}<span>${R.left} cited work${R.left === 1 ? ' is' : 's are'} in neither the References nor your library, so Copy References leaves ${R.left === 1 ? 'it' : 'them'} out.</span></p>` : '') +
+    sec('bad', ICON.alert, 'Cited, but missing from the References', missing, true) +
+    sec('bad', ICON.quote, 'In the References, but never cited', uncited, true) +
+    sec('warn', ICON.pencil, 'Worth a look', flags, true) +
+    sec('warn', ICON.lib, 'Cited, but not in your library', noLib, true) +
+    sec('warn', ICON.lib, 'References not in your library', notInLib, !rep.missing.length && !rep.uncited.length) +
+    sec('warn', ICON.doc, 'References LibLande couldn’t read', unread, false) +
+    sec('good', ICON.check, 'All in order', ok, false), 'Done');
+  $('#sheetCancel').hidden = true;
+}
+$('#sheetBody').addEventListener('click', ev => {
+  if (!sheet) return;
+  if (ev.target.closest('[data-ms-last]') && MS.last) { showMsReport(MS.last); return; }
+  if (ev.target.closest('[data-ms-again]')) { openMsCheck(); return; }
+  if (sheet.mode !== 'msreport') return;
+  const rep = sheet.rep, A = sheet.acts || [];
+  const show = ev.target.closest('[data-ms-show]');
+  if (show) { closeSheet(); showTwin(show.dataset.msShow); return; }
+  const one = ev.target.closest('[data-ms-ref]');
+  if (one) { const r = apaCitation(A[+one.dataset.msRef].e); copy(r.text, 'Copied the APA reference', r.html); return; }
+  const c = ev.target.closest('[data-ms-cite]');
+  if (c) { const t = A[+c.dataset.msCite].text; copy(t, 'Copied ' + t); return; }
+  // (Pasted into Word or a Google Doc with APA's hanging indent.)
+  const refsCopy = list => copy(list.map(r => r.text).join('\n\n'), 'Copied ' + list.length + ' APA reference' + (list.length === 1 ? '' : 's'),
+    list.map(r => '<p style="margin:0 0 0 0.5in;text-indent:-0.5in">' + r.html + '</p>').join(''));
+  if (ev.target.closest('[data-ms-allrefs]')) { refsCopy(msReferences(rep).items); return; }
+  if (ev.target.closest('[data-ms-missing]')) { refsCopy(apaOrder(rep.missing.filter(w => w.lib).map(w => w.lib.e)).map(apaCitation)); return; }
+  const add = ev.target.closest('[data-ms-add]');
+  if (add) {
+    // The Add panel, with the reference's DOI looked up, or its title and
+    // year filled in.
+    const r = rep.refs[+add.dataset.msAdd];
+    openAdd();
+    if (r.doi) { $('#doiLookup').value = r.doi; lookupIntoForm(); return; }
+    const t = $('#fld-title'), y = $('#fld-year');
+    if (t) t.value = r.title;
+    if (y && /^\d{4}$/.test(r.base)) y.value = r.base;
+  }
+});
+
 /* ------------------------------------------------------------ clipboard + toast */
 let toastTimer;
 // action: {label, run}, a button in the message (such as Undo).
@@ -11476,7 +11947,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-06.09</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-07.04</small>`;
 };
 
 function gunzipJSON(bytes) {
@@ -11836,6 +12307,6 @@ if (!gs) {
 // insides, when the test page asks for them.
 if (window.LIBLANDE_TEST) window.LL = { V, BM, JOURNAL, LOCAL, AUTO, saveMarkup, setTool, combineMarks, makeZip, MARK_ERASER: () => MARK.eraserSize,
   lib: () => ({ ENTRIES, BYKEY, DATA, VERSION_OF, VERSIONS, NESTED, state }), init, refresh, isForthcoming, forthChanges, parseBibtexEntry,
-  oldLineMarks, convertOldLines, fetchAhead, PTABS, renderPaperTabs, openPdf, loadPdfJs, addStreamIteration };
+  oldLineMarks, convertOldLines, fetchAhead, PTABS, renderPaperTabs, openPdf, loadPdfJs, addStreamIteration, msCheck, msCites, msRef, msDocx };
 })();
 </script>
