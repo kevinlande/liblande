@@ -279,8 +279,6 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .setup-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
 .sheet .setup-card { width: min(680px, 100%); margin-top: 2vh; }
 /* On a desktop, Edit fills the details pane under the list instead. */
-.sheet.docked { position: static; inset: auto; z-index: auto; flex: 1 1 0; min-height: 0; padding: 0 24px 24px; justify-items: stretch; overscroll-behavior: contain; }
-.sheet.docked .setup-card { width: auto; max-width: 900px; margin: 0; }
 .sheet-note { font-size: 13px; }
 /* Adding and editing: the title between Cancel and Add (or Save), in a row
    flush with the top of the screen that stays there while the form
@@ -1625,7 +1623,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-06.08</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-06.09</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1640,7 +1638,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-06.08';
+      l.querySelector('small').textContent = 'Version 2026-10-06.09';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1652,7 +1650,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-06.08): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-06.09): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -1920,7 +1918,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-06.08`;
+    `<br>LibLande version 2026-10-06.09`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -3386,12 +3384,6 @@ const ago = t => {
   return new Date(t * 1000).toLocaleDateString([], { month: 'short', day: 'numeric' });
 };
 function renderDetail() {
-  // Editing in the details pane: choosing another publication closes the
-  // form if nothing has changed; otherwise the selection stays put.
-  if (sheet && sheet.mode === 'edit' && $('#sheet').classList.contains('docked') && state.selKey !== sheet.entry.k) {
-    if (sheetSnapshot() === sheet.snap) closeSheet();
-    else { state.selKey = sheet.entry.k; paint(); toast('Save or cancel your edits first', 2500); return; }
-  }
   if (state.picking && state.picked.size && !phoneMQ.matches) { detailEl.innerHTML = selectionHTML(); return; }
   const e = state.selKey && BYKEY.get(state.selKey);
   watchSeen(e && !state.picking ? e.k : null);
@@ -9809,7 +9801,6 @@ function addDetailKeyword(e, v, input) {
 const starButtons = r => [1, 2, 3, 4, 5].map(i => `<button type="button" data-star="${i}" aria-label="${i} star${i > 1 ? 's' : ''}">${i <= r ? '\u2605' : '\u2606'}</button>`).join('');
 
 function showSheet(html, saveLabel) {
-  undockSheet();
   // (Never busy to start with, whatever the last one was left as.)
   sheetBusy(false);
   // (On an iPad or computer, a panel over the library; a phone's fills the
@@ -9850,33 +9841,7 @@ function sheetBusy(on) {
     else if (!on && b.classList.contains('busy')) { b.classList.remove('busy'); b.textContent = b.dataset.label; }
   });
 }
-function closeSheet() { $('#sheet').hidden = true; sheet = null; undockSheet(); }
-// On a desktop, the Edit form goes in the details pane (under the list),
-// in place of the details; it goes back to covering the page on a phone.
-function dockSheet() {
-  const sh = $('#sheet');
-  if (phoneMQ.matches || sh.classList.contains('docked')) return;
-  sh.classList.add('docked');
-  detailEl.after(sh);
-  detailEl.hidden = true;
-  sh.scrollTop = 0;
-  // (Moving the form loses the focus.)
-  const first = $('#sheetBody').querySelector('input[type="text"], textarea');
-  if (first && !coarseMQ.matches) first.focus();
-}
-function undockSheet() {
-  const sh = $('#sheet');
-  if (!sh.classList.contains('docked')) return;
-  sh.classList.remove('docked');
-  document.body.insertBefore(sh, $('#setup'));
-  detailEl.hidden = false;
-}
-// What's in the form now, to tell whether it has been changed.
-function sheetSnapshot() {
-  const b = $('#sheetBody'), stars = $('#starsEdit');
-  return [...b.querySelectorAll('input, textarea, select')].map(el => (el.type === 'checkbox' ? el.checked : el.value)).join('\u0001') +
-    '\u0002' + [...b.querySelectorAll('.kw-chip')].map(c => c.dataset.kw).join('\u0001') + '\u0002' + (stars ? stars.dataset.rating : '');
-}
+function closeSheet() { $('#sheet').hidden = true; sheet = null; }
 
 // The top row of the Add and Edit forms: Cancel, the title, and the button
 // that saves (which submits the form).
@@ -9907,7 +9872,6 @@ function openEdit(e) {
     row.append(doi);
     row.insertAdjacentHTML('beforeend', `<button type="button" class="btn" id="editDoiGo" title="Fill in the empty fields from the DOI">Fill in</button>`);
   }
-  sheet.snap = sheetSnapshot();
 }
 // Edit's Fill in: puts what Crossref has into the form's empty fields
 // (adding any the form doesn't show), without saving; nothing already
@@ -11372,7 +11336,6 @@ const onLayout = () => {
 };
 phoneMQ.addEventListener('change', onLayout);
 phoneMQ.addEventListener('change', renderTabs);
-phoneMQ.addEventListener('change', () => { if (phoneMQ.matches) undockSheet(); });
 tabletMQ.addEventListener('change', onLayout);
 coarseMQ.addEventListener('change', onLayout);
 window.addEventListener('resize', () => requestAnimationFrame(paint));
@@ -11513,7 +11476,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-06.08</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-06.09</small>`;
 };
 
 function gunzipJSON(bytes) {
