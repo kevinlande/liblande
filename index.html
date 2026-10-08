@@ -1767,7 +1767,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-07.14</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-08.02</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1782,7 +1782,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-07.14';
+      l.querySelector('small').textContent = 'Version 2026-10-08.02';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1794,7 +1794,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-07.14): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-08.02): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -2066,7 +2066,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-07.14`;
+    `<br>LibLande version 2026-10-08.02`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -2839,17 +2839,26 @@ function setGroup(id) {
 //   author:lee  title:"mental imagery"  kw:perception  journal:mind
 //   year:2020  year:2020-2024  year:>2019  year:forthcoming
 //   type:article  group:favorites  has:pdf  has:doi  is:read  is:unread  rating:4
+// In quotation marks (straight or curly, as iPhones type them), words are
+// found only whole and together: "lande" is Lande, not Landes. Otherwise a
+// name is found from the start of a word, and other words anywhere.
 const SEARCH_FIELDS = { author: 'author', a: 'author', au: 'author', title: 'title', t: 'title', ti: 'title', kw: 'kw', k: 'kw', keyword: 'kw',
   journal: 'venue', j: 'venue', venue: 'venue', in: 'venue', year: 'year', y: 'year', type: 'type', group: 'group', g: 'group', has: 'has', is: 'is',
   rating: 'rating', key: 'key' };
 function searchFilter(q, field) {
-  const tests = [], re = /(-)?(?:([a-z]+):)?(?:"([^"]+)"|(\S+))/gi;
+  const tests = [], re = /(-)?(?:([a-z]+):)?(?:["\u201c\u201d]([^"\u201c\u201d]+)["\u201c\u201d]?|(\S+))/gi;
+  // Words as a test of text: whole (quoted), from a word's start, or anywhere.
+  const edge = '[^\\p{L}\\p{N}]', reOf = (v, whole) => new RegExp('(^|' + edge + ')' + v.replace(/[\\^$.*+?()[\]{}|/]/g, '\\$&') + (whole ? '(?=$|' + edge + ')' : ''), 'u');
   let m;
   while ((m = re.exec(q || ''))) {
     let name = m[2] && SEARCH_FIELDS[m[2].toLowerCase()];
-    const raw = m[3] || m[4], v = norm(raw);
+    const raw = m[3] || m[4], v = norm(raw), whole = m[3] !== undefined;
+    const has = whole ? (() => { const w = reOf(v, true); return x => w.test(x); })() : x => x.includes(v);
     let test;
-    if (!name) { const t = norm((m[2] ? m[2] + ':' : '') + raw); test = e => searchText(e, field).includes(t); }
+    if (!name) {
+      const t = norm((m[2] ? m[2] + ':' : '') + raw), w = whole && reOf(t, true);
+      test = w ? e => w.test(searchText(e, field)) : e => searchText(e, field).includes(t);
+    }
     else if (name === 'year') {
       const r = /^(\d{4})?\s*-\s*(\d{4})?$/.exec(v), gt = /^>=?(\d{4})$/.exec(v), lt = /^<=?(\d{4})$/.exec(v);
       if (FORTH_RE.test(v) || v === 'forth') test = e => FORTH_RE.test(e.f.year || '');
@@ -2858,13 +2867,14 @@ function searchFilter(q, field) {
       else if (lt) test = e => e.yearN && e.yearN < +lt[1] + (v[1] === '=' ? 1 : 0);
       else test = e => String(e.f.year || '').startsWith(raw);
     }
-    else if (name === 'author') test = e => searchText(e, 'sAuthor').includes(v);
-    else if (name === 'title') test = e => searchText(e, 'sTitle').includes(v);
-    else if (name === 'kw') test = e => e.kw.some(k => norm(k).includes(v));
-    else if (name === 'venue') test = e => norm(e.venue).includes(v);
+    // A name from the start of a word: lande is Lande, not Flanders.
+    else if (name === 'author') { const w = reOf(v, whole); test = e => w.test(searchText(e, 'sAuthor')); }
+    else if (name === 'title') test = e => has(searchText(e, 'sTitle'));
+    else if (name === 'kw') test = e => e.kw.some(k => has(norm(k)));
+    else if (name === 'venue') test = e => has(norm(e.venue));
     else if (name === 'type') test = e => e.t === v || norm(TYPE_NAMES[e.t] || '').includes(v);
-    else if (name === 'group') test = e => (e.groups || []).some(g => norm(g).includes(v));
-    else if (name === 'key') test = e => norm(e.k).includes(v);
+    else if (name === 'group') test = e => (e.groups || []).some(g => has(norm(g)));
+    else if (name === 'key') test = e => whole ? norm(e.k) === v : norm(e.k).includes(v);
     else if (name === 'rating') test = e => e.rating >= (parseInt(v, 10) || 0);
     else if (name === 'has') test = v === 'pdf' || v === 'file' ? e => readablePdfs(e).length || (e.files || []).length > 0 : v === 'doi' ? e => !!e.f.doi : v === 'notes' ? e => !!(e.f.annote || '').trim() : e => !!(e.f[v] || '').toString().trim();
     else if (name === 'is') test = v === 'read' ? e => e.f.read === '1' : v === 'unread' ? e => e.f.read !== '1' : v === 'inbox' ? e => !!e.ib : () => true;
@@ -11452,7 +11462,7 @@ function openSmart(x) {
     `<p class="sheet-note">A saved search is a group in the sidebar that fills itself: whatever matches, now and later.</p>` +
     `<div class="fld"><label for="smartName">Name</label><input id="smartName" type="text" value="${esc(x ? x.name : state.q.trim())}"></div>` +
     `<div class="fld"><label for="smartQ">Search for</label><input id="smartQ" type="text" autocapitalize="off" autocorrect="off" spellcheck="false" value="${esc(x ? x.q : state.q.trim())}"></div>` +
-    `<p class="sheet-note">Words can name a field: <code>author:lee</code> <code>year:2020-2024</code> <code>kw:perception</code> <code>journal:mind</code> <code>type:book</code> <code>has:pdf</code> <code>is:unread</code>; start one with \u2212 to leave it out.</p>`, x ? 'Save' : 'Save search');
+    `<p class="sheet-note">Words can name a field: <code>author:lee</code> <code>year:2020-2024</code> <code>kw:perception</code> <code>journal:mind</code> <code>type:book</code> <code>has:pdf</code> <code>is:unread</code>; start one with \u2212 to leave it out. Words in quotation marks are found only whole: <code>author:"lande"</code>.</p>`, x ? 'Save' : 'Save search');
   $('#smartName').focus();
 }
 function saveSmart() {
@@ -12963,7 +12973,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-07.14</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-08.02</small>`;
 };
 
 function gunzipJSON(bytes) {
