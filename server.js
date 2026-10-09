@@ -17,7 +17,7 @@
   window.LIBLANDE_PAGES = true;
   // (Which version each part of the app is from: index.html checks they
   // match. build.py fills it in.)
-  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-10-08.02';
+  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-10-08.05';
   const CLIENT_ID = '789682218462-98mjugngb46ttd01ucp9dcj71ufspjgn.apps.googleusercontent.com';
   // Google Drive (your .bib, papers and LibLande folder): all it needs.
   const SCOPE = 'https://www.googleapis.com/auth/drive';
@@ -63,11 +63,15 @@
       },
       error_callback: err => {
         asking = false;
-        bar((err && err.type === 'popup_closed' ? 'Sign-in was closed' : 'Sign-in didn’t finish') + '. Tap to try again.');
+        bar(!navigator.onLine ? OFFLINE_BAR : (err && err.type === 'popup_closed' ? 'Sign-in was closed' : 'Sign-in didn’t finish') + '. Tap to try again.');
       },
     });
   }
+  // (Offline, Google's window can't open: it would only show Safari's
+  // "not connected" page. Back online, a tap asks again.)
+  const OFFLINE_BAR = 'You\u2019re offline. LibLande will reconnect to Google Drive when you\u2019re back online.';
   function ask() {
+    if (!navigator.onLine) { bar(OFFLINE_BAR); return; }
     makeClient();
     if (!client || asking) return;
     asking = true;
@@ -100,12 +104,23 @@
   // page of a paper, where Google's window would interrupt a stroke; the
   // bar, or a tap anywhere else, does it then.)
   function onTap(ev) {
-    if (asking) return;
+    if (asking || !navigator.onLine) return;
     const onPage = ev.target && ev.target.closest && ev.target.closest('#vPages, #vPeekPages');
     if (waiters.length || (!onPage && token && age() > RENEW_AFTER)) ask();
   }
   document.addEventListener('click', onTap, true);
   document.addEventListener('keydown', onTap, true);
+  // Gone offline while waiting to sign in: what's waiting goes ahead with
+  // the old token (and finds itself offline, so what's kept on this device
+  // answers), and the bar says why. Back online: asked for again if needed.
+  window.addEventListener('offline', () => {
+    const old = token || store.get('token', null);
+    if (waiters.length && old) { const w = waiters; waiters = []; w.forEach(f => f(old.value)); }
+    if (barEl && !barEl.hidden) bar(waiters.length ? OFFLINE_BAR : null);
+  });
+  window.addEventListener('online', () => {
+    if (barEl && !barEl.hidden && barEl.textContent === OFFLINE_BAR) bar(waiters.length || !valid() ? (email ? 'Tap anywhere to reconnect to Google Drive' : 'Sign in with Google to open your library') : null);
+  });
 
   // The bar: what's needed, at the top of the screen.
   let barEl = null;

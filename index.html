@@ -785,6 +785,7 @@ button.fileicon { border: 0; background: none; cursor: pointer; }
 .citekey-edit { border: 0; background: none; padding: 2px 4px; color: var(--faint); cursor: pointer; display: inline-flex; align-items: center; }
 .citekey-edit:hover { color: var(--accent); }
 .citekey-edit .i { width: 14px; height: 14px; }
+.key-fld { font-family: var(--mono, ui-monospace, monospace); }
 .citekey-input { font: 12.5px var(--mono, ui-monospace, monospace); padding: 3px 8px; border: 1px solid var(--accent); border-radius: 6px; background: var(--bg); color: var(--text); min-width: 16ch; outline: none; }
 /* Forthcoming: Crossref's updates, to tick. */
 .fu-item { padding: 8px 0; border-top: 1px solid var(--line); display: grid; gap: 4px; }
@@ -1254,6 +1255,8 @@ a.ms-ib { text-decoration: none; }
 .viewer[data-markup="highlight"] .highlightEditor, .viewer[data-markup="pen"] .inkEditor.selectedEditor { cursor: pointer !important; }
 .viewer.pencil .annotationEditorLayer, .viewer.pencil .annotationEditorLayer .inkEditorCanvas, .viewer.pencil .textLayer.highlighting { touch-action: pan-x pan-y !important; }
 .viewer[data-markup="highlight"][data-hl="free"] .textLayer span, .viewer[data-markup="highlight"][data-hl="free"] .textLayer br { pointer-events: none !important; }
+.viewer[data-markup="comment"][data-ck="free"] .textLayer span, .viewer[data-markup="comment"][data-ck="free"] .textLayer br { pointer-events: none !important; }
+.viewer[data-markup="comment"][data-ck="note"] .v-scroll .page { cursor: copy; }
 .viewer[data-markup="eraser"] .v-scroll, .viewer[data-markup="eraser"] .v-scroll * { cursor: var(--eraser-cursor, cell) !important; }
 .eraser-ring { position: fixed; left: 0; top: 0; z-index: 7; pointer-events: none; border-radius: 50%; border: 1.5px solid rgba(40, 40, 40, .75); box-shadow: 0 0 0 1px rgba(255, 255, 255, .85), inset 0 0 0 1px rgba(255, 255, 255, .6); background: rgba(255, 255, 255, .12); will-change: transform; transition: opacity .5s ease; }
 .eraser-ring.fading { opacity: 0; }
@@ -1304,6 +1307,13 @@ a.ms-ib { text-decoration: none; }
 .viewer.pencil .annotationEditorLayer .freeTextEditor .internal[contenteditable="true"] { min-width: 280px; min-height: 2.8em; }
 /* Underlines and strike-throughs: LibLande draws the line (see drawLines). */
 .ll-lines { position: absolute; inset: 0; pointer-events: none; }
+/* A note pinned to a spot on the page (LibLande's own, or one from another
+   app): a small speech bubble in the note's colour. */
+.ll-note-icon, .annotationLayer .textAnnotation { border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,.35); cursor: pointer; }
+.ll-note-icon { position: absolute; inset: 0; display: grid; place-items: center; background: var(--c, #ffd84a); pointer-events: auto; }
+.ll-note-icon svg { width: 72%; height: 72%; fill: rgba(0,0,0,.55); }
+.annotationLayer .textAnnotation { background: #ffd84a url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='rgba(0,0,0,.55)' d='M5 4.5h14A1.5 1.5 0 0 1 20.5 6v9a1.5 1.5 0 0 1-1.5 1.5h-7l-4.5 3.5v-3.5H5A1.5 1.5 0 0 1 3.5 15V6A1.5 1.5 0 0 1 5 4.5z'/%3E%3C/svg%3E") center / 72% no-repeat; }
+.annotationLayer .textAnnotation img { visibility: hidden; }
 .ll-lines i { position: absolute; height: max(1px, calc(var(--scale-factor, 1) * var(--th, 1) * 1px)); transform: translateY(-50%); background: var(--c, #d92d20); border-radius: 1px; }
 /* The Pencil's hover preview (see hoverPreview). */
 .v-hover { position: fixed; left: 0; top: 0; z-index: 30; pointer-events: none; transform: translate(-50%, -50%); border-radius: 50%; }
@@ -1767,7 +1777,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-08.02</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-08.05</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1782,7 +1792,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-08.02';
+      l.querySelector('small').textContent = 'Version 2026-10-08.05';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1794,7 +1804,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-08.02): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-08.05): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -2066,7 +2076,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-08.02`;
+    `<br>LibLande version 2026-10-08.05`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -4271,10 +4281,29 @@ function addStreamIteration() {
   RS.prototype[Symbol.asyncIterator] = RS.prototype.values;
 }
 addStreamIteration();
+// PDF.js itself, with a fix: a second touch (a palm, another finger) just
+// as a pen or freehand stroke ends finds the stroke already gone, and PDF.js
+// 6 throws "null is not an object (evaluating 'DrawingEditor.#sl.isCancellable')".
+// So it's loaded from a copy in which a stroke that's gone is skipped; as it
+// is if a later PDF.js doesn't have that code, or the copy can't be made.
+const pdfJsFix = src => src.replace(/if\((\w+)\.#(\w+)\.isCancellable\(\)\)\{\1\.#\2\./g, 'if($1.#$2?.isCancellable()){$1.#$2.');
+async function importPdfJs() {
+  try {
+    const r = await fetch(PDFJS + 'pdf.min.mjs');
+    if (r.ok) {
+      const src = await r.text(), fixed = pdfJsFix(src);
+      if (fixed !== src) {
+        const url = URL.createObjectURL(new Blob([fixed], { type: 'text/javascript' }));
+        try { return await import(url); } finally { URL.revokeObjectURL(url); }
+      }
+    }
+  } catch (err) { console.warn(err); }
+  return import(PDFJS + 'pdf.min.mjs');
+}
 function loadPdfJs() {
   if (!pdfjsReady) {
     pdfjsReady = (async () => {
-      const lib = await import(PDFJS + 'pdf.min.mjs');
+      const lib = await importPdfJs();
       // A worker from another site isn't allowed, so start it from a copy.
       const r = await fetch(PDFJS + 'pdf.worker.min.mjs');
       if (!r.ok) throw new Error('worker ' + r.status);
@@ -4441,6 +4470,9 @@ const MARK = {
   hlMode: store.get('hlMode', 'text'),
   // The markup tool's kind: highlight, free (highlight), underline, strike.
   markKind: store.get('hlMode', 'text') === 'free' ? 'free' : 'highlight',
+  // The comment tool's kind: 'text' (on the words dragged across), 'free'
+  // (on a freehand highlight), 'note' (pinned to a spot on the page).
+  commentKind: store.get('commentKind', 'text'),
   // The underline button's kind: underline or strike.
   lineKind: store.get('lineKind', store.get('markKind', '') === 'strike' ? 'strike' : 'underline'),
   lineColor: store.get('lineColor', '#d92d20'),
@@ -5614,6 +5646,7 @@ function hoverPreview() {
   if (t === 'pen') { w = h = Math.max(3, MARK.penSize * css); }
   else if (t === 'eraser') { kind = 'ring'; w = h = MARK.eraserSize * 2; color = ''; }
   else if (t === 'text') { kind = 'bar'; w = 2; h = Math.max(10, MARK.textSize * css); }
+  else if (t === 'comment' && MARK.commentKind === 'free') { w = h = Math.max(6, 12 * css); soft = true; }
   else if (t === 'comment') { w = h = 10; color = 'var(--accent)'; }
   else if (t === 'highlight' && MARK.markKind === 'free') { w = h = Math.max(6, 12 * css); soft = true; }
   else if (t === 'highlight' || t === 'underline' || t === 'strike') {
@@ -5686,6 +5719,7 @@ function setTool(tool) {
   if (!$('#vComment').hidden) closeComment(true);
   $('#viewer').dataset.markup = tool;
   $('#viewer').dataset.hl = MARK.hlMode;
+  $('#viewer').dataset.ck = MARK.commentKind;
   // (Nothing stays picked up under the eraser: a mark just drawn with the
   // pen is still selected, and would move with the Pencil.)
   if (tool === 'eraser' && V.ui) { try { V.ui.unselectAll(); } catch (err) { /* nothing selected */ } }
@@ -5695,7 +5729,8 @@ function setTool(tool) {
   paletteOptions();
   if (!V.viewer || !V.doc) return;
   const T = V.lib.AnnotationEditorType;
-  const mode = tool === 'highlight' ? T.HIGHLIGHT : tool === 'text' ? T.FREETEXT : tool === 'read' ? T.NONE : T.INK;
+  // (A freehand comment is drawn by PDF.js's highlighter.)
+  const mode = tool === 'highlight' || (tool === 'comment' && MARK.commentKind === 'free') ? T.HIGHLIGHT : tool === 'text' ? T.FREETEXT : tool === 'read' ? T.NONE : T.INK;
   try {
     // The pen and the eraser share PDF.js's ink mode; strokes drawn with
     // the pen only become marks the eraser can find once PDF.js commits
@@ -5733,7 +5768,7 @@ function applyMarkParams() {
   const P = V.lib.AnnotationEditorParamsType;
   const param = (type, value) => V.bus.dispatch('switchannotationeditorparams', { source: null, type, value });
   if (V.tool === 'pen') { param(P.INK_COLOR, MARK.penColor); param(P.INK_THICKNESS, MARK.penSize); param(P.INK_OPACITY, 1); }
-  if (V.tool === 'highlight') param(P.HIGHLIGHT_COLOR, MARK.hlColor);
+  if (V.tool === 'highlight' || V.tool === 'comment') param(P.HIGHLIGHT_COLOR, MARK.hlColor);
   if (V.tool === 'text') { param(P.FREETEXT_COLOR, MARK.textColor); param(P.FREETEXT_SIZE, MARK.textSize); }
 }
 const KIND_ICONS = {
@@ -5743,6 +5778,13 @@ const KIND_ICONS = {
   strike: '<svg class="i" viewBox="0 0 24 24"><path d="M16.5 7.5C16 5.6 14.3 4.5 12 4.5c-2.8 0-4.5 1.5-4.5 3.4 0 4.2 9.4 2.6 9.4 7.4 0 2.2-2 3.7-4.9 3.7-2.6 0-4.6-1.3-5-3.3"/><path d="M4 12h16"/></svg>',
 };
 const KINDS = [['highlight', 'Highlight text'], ['free', 'Freehand highlight'], ['underline', 'Underline'], ['strike', 'Strike through']];
+// The comment tool's kinds, in the order its kind button goes through them.
+const COMMENT_ICONS = {
+  text: '<svg class="i" viewBox="0 0 24 24"><path d="M5 4.5h14A1.5 1.5 0 0 1 20.5 6v9a1.5 1.5 0 0 1-1.5 1.5h-7l-4.5 3.5v-3.5H5A1.5 1.5 0 0 1 3.5 15V6A1.5 1.5 0 0 1 5 4.5z"/><path d="M7.5 9h9M7.5 12h6"/></svg>',
+  free: '<svg class="i" viewBox="0 0 24 24"><path d="M5 4.5h14A1.5 1.5 0 0 1 20.5 6v9a1.5 1.5 0 0 1-1.5 1.5h-7l-4.5 3.5v-3.5H5A1.5 1.5 0 0 1 3.5 15V6A1.5 1.5 0 0 1 5 4.5z"/><path d="M7 12c1.5-3 3-3 4-1s2.5 2 5-2"/></svg>',
+  note: '<svg class="i" viewBox="0 0 24 24"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0C18.5 15.4 12 21 12 21z"/><circle cx="12" cy="10" r="2.3"/></svg>',
+};
+const COMMENT_KINDS = [['text', 'Comment on text'], ['free', 'Comment on a freehand highlight'], ['note', 'Note pinned to a spot on the page']];
 // The style button shows the tool's colour (or the eraser's size); it opens
 // a small panel beside the toolbar with the tool's choices, so the toolbar
 // itself stays one row (or one column) of buttons.
@@ -5752,13 +5794,15 @@ function toolColor() {
 }
 function altKind() {
   const t = V.tool;
+  if (t === 'comment') { const i = COMMENT_KINDS.findIndex(([k]) => k === MARK.commentKind); return 'c:' + COMMENT_KINDS[(i + 1) % COMMENT_KINDS.length][0]; }
   if (t === 'highlight') return MARK.markKind === 'free' ? 'highlight' : 'free';
   if (t === 'underline') return 'strike';
   if (t === 'strike') return 'underline';
   return null;
 }
 function setKind(kind) {
-  if (kind === 'underline' || kind === 'strike') { MARK.lineKind = kind; store.set('lineKind', kind); setTool(kind); }
+  if (kind.startsWith('c:')) { MARK.commentKind = kind.slice(2); store.set('commentKind', MARK.commentKind); setTool('comment'); }
+  else if (kind === 'underline' || kind === 'strike') { MARK.lineKind = kind; store.set('lineKind', kind); setTool(kind); }
   else { MARK.markKind = kind; MARK.hlMode = kind === 'free' ? 'free' : 'text'; store.set('hlMode', MARK.hlMode); setTool('highlight'); }
 }
 function paletteOptions() {
@@ -5771,8 +5815,8 @@ function paletteOptions() {
   const alt = altKind(), kb = $('#vpKind');
   kb.hidden = !alt;
   if (alt) {
-    const name = KINDS.find(([k]) => k === alt)[1];
-    kb.innerHTML = KIND_ICONS[alt];
+    const ck = alt.startsWith('c:') && alt.slice(2), name = ck ? COMMENT_KINDS.find(([k]) => k === ck)[1] : KINDS.find(([k]) => k === alt)[1];
+    kb.innerHTML = ck ? COMMENT_ICONS[ck] : KIND_ICONS[alt];
     kb.title = 'Switch to ' + name.toLowerCase();
     kb.setAttribute('aria-label', kb.title);
   }
@@ -5795,6 +5839,7 @@ function renderPanel() {
   } else if (t === 'text') {
     h += sw(PEN_COLORS, MARK.textColor) + `<div class="vpp-row">` + TEXT_SIZES.map((z, i) => `<button type="button" class="vp-size vp-tsize${z === MARK.textSize ? ' on' : ''}" data-tsize="${z}" title="${['Small', 'Medium', 'Large'][i]} text" aria-label="${['Small', 'Medium', 'Large'][i]} text" style="font-size:${10 + i * 4}px">A</button>`).join('') + `</div>`;
   } else if (t === 'comment') {
+    h += `<div class="vpp-row">` + COMMENT_KINDS.map(([k, n]) => `<button type="button" class="vp-mode${MARK.commentKind === k ? ' on' : ''}" data-ckind="${k}" title="${n}" aria-label="${n}">${COMMENT_ICONS[k]}</button>`).join('') + `</div>`;
     h += sw(HL_COLORS, MARK.hlColor);
   } else if (t === 'eraser') {
     h += `<div class="vpp-row"><button type="button" class="vp-mode${MARK.eraserMode === 'part' ? ' on' : ''}" data-ermode="part" title="Rub out parts of marks" aria-label="Rub out parts of marks"><svg class="i" viewBox="0 0 24 24"><path d="M4 15c3-6 5-6 7-2"/><path d="M15 11c2-2 3-3 5-5" stroke-dasharray="2 3"/></svg></button>` +
@@ -5866,6 +5911,8 @@ $('#vpPanel').addEventListener('click', ev => {
   if (z) { MARK.penSize = +z.dataset.size; store.set('penSize', MARK.penSize); }
   const ts = ev.target.closest('[data-tsize]');
   if (ts) { MARK.textSize = +ts.dataset.tsize; store.set('textSize', MARK.textSize); }
+  const ck = ev.target.closest('[data-ckind]');
+  if (ck) setKind('c:' + ck.dataset.ckind);
   const em = ev.target.closest('[data-ermode]');
   if (em) { MARK.eraserMode = em.dataset.ermode; store.set('eraserMode', MARK.eraserMode); }
   const es = ev.target.closest('[data-ersize]');
@@ -5877,7 +5924,7 @@ $('#vpPanel').addEventListener('click', ev => {
 });
 // The tools' colours, sizes and kinds are kept on this device and with your
 // Google account (so they survive LibLande being updated).
-const TOOL_PREFS = ['penColor', 'penSize', 'hlColor', 'hlMode', 'lineKind', 'lineColor', 'textColor', 'textSize', 'eraserMode', 'eraserSize'];
+const TOOL_PREFS = ['penColor', 'penSize', 'hlColor', 'hlMode', 'commentKind', 'lineKind', 'lineColor', 'textColor', 'textSize', 'eraserMode', 'eraserSize'];
 let toolPrefsTimer = 0;
 function saveToolPrefs() {
   clearTimeout(toolPrefsTimer);
@@ -5892,7 +5939,7 @@ function applyToolPrefs(tools) {
   if (!tools) return;
   TOOL_PREFS.forEach(k => { if (tools[k] != null) { MARK[k] = tools[k]; store.set(k, tools[k]); } });
   MARK.markKind = MARK.hlMode === 'free' ? 'free' : 'highlight';
-  if (V.viewer) { paletteOptions(); applyMarkParams(); }
+  if (V.viewer) { if (V.tool === 'comment') setTool('comment'); paletteOptions(); applyMarkParams(); }
 }
 // (The Delete button comes only for a selection that lasts: a new mark is
 // selected for an instant as it's made, and the toolbar would flicker.)
@@ -6405,6 +6452,94 @@ function decorateLine(ed) {
   ed.div.classList.add('ll-line', 'll-' + kind);
   drawLines(ed.div, d.rect, Array.from(d.quadPoints), rgbHex(d.color), kind);
 }
+/* ---- notes pinned to a spot */
+// PDF.js can't make the PDF Text marks (sticky notes) other readers make
+// either. So a note is a small highlight square with a fill too faint to
+// see, NOTE_OPACITY saying what it is, and a speech bubble drawn over it;
+// it takes its comment as any mark does. Every save turns it into a real
+// Text note (realLines); a Text note in the PDF, from any app, becomes
+// LibLande's when tapped (takeOverNote).
+const NOTE_OPACITY = 0.03, NOTE_PT = 16;
+const isNoteOpacity = op => op != null && Math.abs(op - NOTE_OPACITY) < 0.004;
+const NOTE_KIND = new WeakMap();
+function isNoteEd(ed) {
+  if (!ed || !ed.div || !ed.div.classList.contains('highlightEditor')) return false;
+  if (NOTE_KIND.has(ed)) return NOTE_KIND.get(ed);
+  let k = false;
+  try { const d = ed.serialize(); k = !!d && isNoteOpacity(d.opacity); } catch (err) { k = false; }
+  NOTE_KIND.set(ed, k);
+  return k;
+}
+const NOTE_BUBBLE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4.5h14A1.5 1.5 0 0 1 20.5 6v9a1.5 1.5 0 0 1-1.5 1.5h-7l-4.5 3.5v-3.5H5A1.5 1.5 0 0 1 3.5 15V6A1.5 1.5 0 0 1 5 4.5z"/></svg>';
+function decorateNote(ed) {
+  if (!isNoteEd(ed)) return;
+  ed.div.classList.add('ll-note');
+  let i = ed.div.querySelector(':scope > .ll-note-icon');
+  if (!i) { i = document.createElement('i'); i.className = 'll-note-icon'; i.innerHTML = NOTE_BUBBLE; ed.div.append(i); }
+  let c = null;
+  try { const d = ed.serialize(); c = d && d.color; } catch (err) { c = null; }
+  i.style.setProperty('--c', c ? rgbHex(c) : '#ffd84a');
+}
+// A note centred on a spot on the screen.
+async function noteMark(page, x, y) {
+  const pv = V.viewer.getPageView(+page.dataset.pageNumber - 1), half = NOTE_PT / 2 * pv.viewport.scale;
+  const [b] = toPdfBoxes(page, [{ left: x - half, right: x + half, top: y - half, bottom: y + half }]);
+  if (!b) return null;
+  const ed = await addMark(page, {
+    annotationType: V.lib.AnnotationEditorType.HIGHLIGHT, color: hexRgb(MARK.hlColor), opacity: NOTE_OPACITY,
+    quadPoints: Float32Array.from([b.xl, b.yt, b.xr, b.yt, b.xl, b.yb, b.xr, b.yb]), rect: [b.xl, b.yb, b.xr, b.yt],
+  });
+  if (ed) { NOTE_KIND.set(ed, true); decorateLines(); }
+  return ed;
+}
+// A Text note in the PDF made LibLande's, in its place, with its comment.
+async function takeOverNote(page, id) {
+  if (!V.doc || !V.ui) return null;
+  const idx = +page.dataset.pageNumber - 1, layer = V.ui.getLayer(idx);
+  if (!layer) return null;
+  let a = null;
+  try { a = (await (await V.doc.getPage(idx + 1)).getAnnotations()).find(x => x.id === id); } catch (err) { a = null; }
+  if (!a || a.subtype !== 'Text' || !a.rect) return null;
+  // (Other apps' notes are drawn the same size whatever their rectangle.)
+  const x0 = Math.min(a.rect[0], a.rect[2]), y1 = Math.max(a.rect[1], a.rect[3]), x1 = x0 + NOTE_PT, y0 = y1 - NOTE_PT;
+  const ed = await layer.deserialize({
+    annotationType: V.lib.AnnotationEditorType.HIGHLIGHT, color: a.color && a.color.length >= 3 ? Array.from(a.color) : [255, 216, 74], opacity: NOTE_OPACITY,
+    quadPoints: Float32Array.from([x0, y1, x1, y1, x0, y0, x1, y0]), boxes: null, pageIndex: idx, rect: [x0, y0, x1, y1], rotation: 0,
+  });
+  if (!ed) return null;
+  NOTE_KIND.set(ed, true);
+  ed.annotationElementId = a.id;
+  ed._initialData = { color: [-1, -1, -1] };
+  putMark(layer, ed);
+  TAKEN.add(a.id);
+  const note = a.contentsObj && a.contentsObj.str;
+  if (note) { try { ed.comment = note; } catch (err) { /* without it */ } }
+  const sec = page.querySelector(`.annotationLayer [data-annotation-id="${CSS.escape(a.id)}"]`);
+  if (sec) sec.style.display = 'none';
+  try { V.doc.annotationStorage.resetModifiedIds(); } catch (err) { /* older PDF.js */ }
+  markDrawing();
+  decorateLines();
+  return ed;
+}
+// A tap on a note (reading, or with the comment tool) opens its comment.
+// (Caught first, before the page's own handling of taps.)
+const noteTarget = ev => ev.target.closest && ev.target.closest('#vPages') ? ev.target.closest('.ll-note-icon, .annotationLayer .textAnnotation') : null;
+window.addEventListener('pointerdown', ev => {
+  if ((V.tool !== 'read' && V.tool !== 'comment') || !noteTarget(ev)) return;
+  ev.stopPropagation();
+  ev.preventDefault();
+}, true);
+window.addEventListener('click', async ev => {
+  if (V.tool !== 'read' && V.tool !== 'comment') return;
+  const hit = noteTarget(ev), mine = hit && hit.matches('.ll-note-icon') ? hit : null, theirs = hit && !mine ? hit : null;
+  if (!hit) return;
+  ev.stopPropagation();
+  ev.preventDefault();
+  const anchor = (mine || theirs).getBoundingClientRect();
+  if (mine) { const ed = V.ui && V.ui.getEditor(mine.closest('.highlightEditor').id); if (ed) openComment(ed, false, anchor); return; }
+  const ed = await takeOverNote(theirs.closest('.page'), theirs.dataset.annotationId);
+  if (ed) openComment(ed, false, anchor); else toast('That note can\u2019t be opened here.', 3000);
+}, true);
 // (After any change: a new mark, an undo, a new colour.)
 let LINE_DECOR = 0;
 function decorateLines() {
@@ -6412,7 +6547,7 @@ function decorateLines() {
   LINE_DECOR = requestAnimationFrame(() => {
     LINE_DECOR = 0;
     if (!V.ui) return;
-    document.querySelectorAll('#vPages .annotationEditorLayer > .highlightEditor').forEach(div => decorateLine(V.ui.getEditor(div.id)));
+    document.querySelectorAll('#vPages .annotationEditorLayer > .highlightEditor').forEach(div => { const ed = V.ui.getEditor(div.id); decorateLine(ed); decorateNote(ed); });
   });
 }
 async function lineMarks(page, bars, kind) {
@@ -6547,6 +6682,12 @@ function pageDrawn(n) {
 }
 // A PDF mark (pdf-lib dict d) made an Underline or StrikeOut over the
 // lines in quads, with an appearance (the line, drawn) any reader can show.
+// A note as a PDF Text note: other readers draw their own icon for it.
+function makeNoteMark(N, d) {
+  d.set(N('Subtype'), N('Text'));
+  d.set(N('Name'), N('Comment'));
+  ['QuadPoints', 'AP', 'CA'].forEach(k => d.delete(N(k)));
+}
 function makeLineMark(ctx, N, d, kind, q, c, rect) {
   const f = v => (+v).toFixed(2);
   let ops = (c.length === 3 ? c.map(f).join(' ') : '0 0 0') + ' RG 0 J\n';
@@ -6650,7 +6791,7 @@ const OLD_LINES_SEEN = new Set(store.get('oldLinesSeen', []));
 // reader can draw. A file without any comes back as it was.
 async function realLines(bytes) {
   const text = new TextDecoder('latin1').decode(bytes);
-  if (!/\/CA 0\.0[12]\b/.test(text)) return bytes;
+  if (!/\/CA 0\.0[123]\b/.test(text)) return bytes;
   const { PDFDocument, PDFName, PDFDict, PDFArray, PDFNumber } = await loadPdfLib();
   let pdf;
   try { pdf = await PDFDocument.load(bytes, { updateMetadata: false, throwOnInvalidObject: false }); } catch (err) { return bytes; }
@@ -6664,6 +6805,7 @@ async function realLines(bytes) {
       const d = annots.lookupMaybe(i, PDFDict);
       if (!d || d.get(N('Subtype')) !== N('Highlight')) continue;
       const ca = d.lookupMaybe(N('CA'), PDFNumber), kind = lineKindOf(ca && ca.asNumber());
+      if (ca && isNoteOpacity(ca.asNumber())) { makeNoteMark(N, d); n++; continue; }
       if (!kind) continue;
       const q = nums(d.lookupMaybe(N('QuadPoints'), PDFArray)), c = nums(d.lookupMaybe(N('C'), PDFArray)), rect = nums(d.lookupMaybe(N('Rect'), PDFArray));
       makeLineMark(ctx, N, d, kind, q, c, rect);
@@ -6728,11 +6870,11 @@ function openComment(ed, isNew, anchor) {
   const text = commentText(ed);
   ta.value = text;
   $('#vCommentDelete').hidden = isNew || !text;
-  const what = ed.div && ed.div.classList.contains('inkEditor') ? 'drawing' : ed.div && ed.div.classList.contains('freeTextEditor') ? 'text box' : 'highlight';
+  const what = ed.div && ed.div.classList.contains('inkEditor') ? 'drawing' : ed.div && ed.div.classList.contains('freeTextEditor') ? 'text box' : isNoteEd(ed) ? 'note' : 'highlight';
   $('#vCommentRemove').title = 'Delete ' + what;
   $('#vCommentRemove').setAttribute('aria-label', 'Delete ' + what);
   // (A note that's only a comment goes with its comment.)
-  $('#vCommentRemove').hidden = isNew || COMMENT_MARKS.has(ed);
+  $('#vCommentRemove').hidden = isNew || COMMENT_MARKS.has(ed) || isNoteEd(ed);
   // Next to the mark, kept on screen.
   const r = anchor || (ed.div && ed.div.isConnected ? ed.div.getBoundingClientRect() : { left: 80, bottom: 120, top: 100 });
   const w = Math.min(320, window.innerWidth - 24), h = 190;
@@ -6902,7 +7044,45 @@ $('#vCommentText').addEventListener('keydown', ev => {
   };
   const schedule = () => { if (!frame) frame = requestAnimationFrame(draw); };
   const clear = () => { range = null; anchor = null; page = null; preview.className = 'hl-preview'; Array.from(preview.children).forEach(d => { d.hidden = true; }); };
-  const ours = ev => TEXT_TOOLS.has(V.tool) && !(ev.pointerType === 'touch' && V.pencil);
+  const pen = ev => !(ev.pointerType === 'touch' && V.pencil);
+  const ck = () => (V.tool === 'comment' ? MARK.commentKind : '');
+  const ours = ev => TEXT_TOOLS.has(V.tool) && ck() !== 'free' && ck() !== 'note' && pen(ev);
+  // A note: a tap puts one there (or opens the one tapped). A freehand
+  // comment: PDF.js draws the highlight, then its comment opens.
+  let noteAt = null, freeBefore = null;
+  sc.addEventListener('pointerdown', ev => {
+    const k = ck();
+    if ((k !== 'note' && k !== 'free') || ev.button > 0 || !pen(ev)) return;
+    if (ev.target.closest('.editToolbar, .note-pin, #vComment')) return;
+    const wasOpen = !$('#vComment').hidden;
+    if (wasOpen) closeComment(true);
+    const ed = markAt(ev.clientX, ev.clientY);
+    if (ed || k === 'note') { ev.stopPropagation(); ev.preventDefault(); }
+    if (ed) { openComment(ed, false); return; }
+    if (k === 'note') {
+      const page = pageOf(document.elementsFromPoint(ev.clientX, ev.clientY).find(el => el.closest && el.closest('.page .canvasWrapper, .page .textLayer, .page .annotationEditorLayer')));
+      noteAt = page && !wasOpen ? { x: ev.clientX, y: ev.clientY, page } : null;
+      return;
+    }
+    freeBefore = new Set([...document.querySelectorAll('#vPages .annotationEditorLayer > .highlightEditor')].map(d => d.id));
+  }, true);
+  sc.addEventListener('pointerup', async ev => {
+    const at = noteAt, before = freeBefore;
+    noteAt = null; freeBefore = null;
+    if (at && ck() === 'note' && Math.hypot(ev.clientX - at.x, ev.clientY - at.y) < 10) {
+      ev.stopPropagation();
+      const ed = await noteMark(at.page, at.x, at.y);
+      if (ed) { COMMENT_MARKS.add(ed); openComment(ed, true); }
+    }
+    if (before && ck() === 'free') {
+      for (let i = 0; i < 15; i++) {
+        await new Promise(r => setTimeout(r, 40));
+        const div = [...document.querySelectorAll('#vPages .annotationEditorLayer > .highlightEditor')].find(d => !before.has(d.id));
+        const ed = div && V.ui && V.ui.getEditor(div.id);
+        if (ed) { COMMENT_MARKS.add(ed); openComment(ed, true); return; }
+      }
+    }
+  }, true);
   sc.addEventListener('pointerdown', ev => {
     if (!ours(ev) || ev.button > 0) return;
     // (Not a mark's toolbar or its colours: those are PDF.js's.)
@@ -7441,13 +7621,14 @@ async function refreshPins(n) {
   for (const ed of eds) {
     if (ed.annotationElementId) taken.add(ed.annotationElementId);
     const text = commentText(ed);
-    if (!text || ed.deleted) continue;
+    if (!text || ed.deleted || isNoteEd(ed)) continue;
     pins.push({ top: (ed.y || 0) * h, text, ed });
   }
   for (const a of await pageComments(pv)) {
     if (taken.has(a.id)) continue;
     const sec = page.querySelector(`.annotationLayer [data-annotation-id="${CSS.escape(a.id)}"]`);
     if (sec && (sec.hidden || sec.style.display === 'none')) continue;
+    if (sec && a.subtype === 'Text') continue;
     const vp = pv.viewport, top = Math.min(vp.convertToViewportPoint(a.rect[0], a.rect[1])[1], vp.convertToViewportPoint(a.rect[2], a.rect[3])[1]);
     pins.push({ top, text: a.contentsObj.str, annot: a });
   }
@@ -8988,14 +9169,15 @@ async function collectMarks(doc, my) {
     const onPage = [];
     for (const a of anns) {
       let text = '';
-      if (a.quadPoints && a.quadPoints.length) {
+      const note = a.subtype === 'Highlight' && isNoteOpacity(a.opacity);
+      if (a.quadPoints && a.quadPoints.length && !note) {
         items = items || (await page.getTextContent()).items;
         text = textInQuads(items, a.quadPoints);
       }
       const c = a.color;
       onPage.push({
         page: n, y: a.rect ? a.rect[3] : null,
-        name: a.it === 'InkHighlight' ? 'Highlight' : MARK_NAMES[a.subtype],
+        name: note ? 'Note' : a.it === 'InkHighlight' ? 'Highlight' : MARK_NAMES[a.subtype],
         color: c && c.length >= 3 ? `rgb(${c[0]},${c[1]},${c[2]})` : null,
         text, note: (a.contentsObj && a.contentsObj.str) || '',
       });
@@ -10484,7 +10666,11 @@ function openEdit(e) {
   let h = sheetHead('Edit publication', 'Save');
   h += `<div class="fld-row rate-row"><div class="rate"><span class="lbl">Rating</span><div class="stars-edit" id="starsEdit" data-rating="${rating}">${starButtons(rating)}</div></div>` +
     `<label class="check"><input type="checkbox" id="readBox"${e.f.read === '1' ? ' checked' : ''}> Read</label></div>`;
-  h += `<div class="fields-grid">${fieldsHtml(formFieldNames(e.t, n => rawOf(e, n)), n => rawOf(e, n))}</div>`;
+  // The cite key: changed with the rest (only straight into the .bib).
+  const keyOk = DIRECT && !e.ib;
+  const keyFld = `<div class="fld"><label for="editKey">Cite key</label><input id="editKey" class="key-fld" type="text" value="${esc(e.k)}" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"` +
+    (keyOk ? '' : ` disabled title="${e.ib ? 'Move it into your library to change its cite key' : 'To change cite keys, turn on \u201cSave changes straight to your .bib file\u201d in Settings'}"`) + `></div>`;
+  h += `<div class="fields-grid">${keyFld}${fieldsHtml(formFieldNames(e.t, n => rawOf(e, n)), n => rawOf(e, n))}</div>`;
   h += keywordEditor(splitKw(rawOf(e, 'keywords')));
   if (!e.ib && GROUPS.length) {
     h += `<fieldset class="fld grp-fieldset"><legend>Static groups</legend><div class="grp-checks">` +
@@ -10820,19 +11006,32 @@ async function saveEdit() {
     if (cb.checked && !was) add.push(cb.dataset.group);
     if (!cb.checked && was) remove.push(cb.dataset.group);
   });
-  if (!Object.keys(set).length && !add.length && !remove.length) { closeSheet(); toast('No changes to save', 1800); return; }
+  const keyBox = $('#editKey'), newKey = keyBox && !keyBox.disabled ? keyBox.value.trim() : e.k, rename = newKey !== e.k;
+  if (!Object.keys(set).length && !add.length && !remove.length && !rename) { closeSheet(); toast('No changes to save', 1800); return; }
+  if (rename) {
+    const why = keyProblem(newKey, e);
+    if (why) { sheetMsg(why, true); keyBox.focus(); return; }
+  }
   if ('title' in set && !set.title) { sheetMsg('A publication needs a title.', true); return; }
   const bad = Object.keys(set).find(n => !balanced(set[n]));
   if (bad) { sheetMsg('The ' + (FIELD_LABELS[bad] || bad) + ' field has unbalanced braces { }. Check it and try again.', true); return; }
   sheetBusy(true);
   sheetMsg('Saving\u2026');
+  const s = sheet;
+  let saved = false;
   try {
-    const done = await writeEdit(e, set, add, remove, closeSheet);
-    toast(done, 2500);
+    const changed = Object.keys(set).length || add.length || remove.length;
+    const done = changed ? await writeEdit(e, set, add, remove, rename ? null : closeSheet) : '';
+    saved = true;
+    if (!rename) { toast(done, 2500); return; }
+    sheetMsg('Changing the cite key\u2026');
+    const old = e.k, res = await renameCore(e, newKey);
+    if (sheet === s) closeSheet();
+    renameSaid(old, newKey, res);
   } catch (err) {
-    sheetMsg(errText(err), true);
+    if (sheet === s) sheetMsg((saved ? 'The other changes were saved, but the cite key wasn\u2019t: ' : '') + errText(err), true);
   } finally {
-    sheetBusy(false);
+    if (sheet === s) sheetBusy(false);
   }
 }
 // Saves changed fields (and static groups) of a publication: as a pending
@@ -11658,12 +11857,35 @@ function editKey(e) {
   });
   input.addEventListener('blur', () => finish(false));
 }
+// Why a cite key won't do ('' if it will).
+function keyProblem(k, e) {
+  if (!k) return 'A publication needs a cite key.';
+  if (/[\s,{}()"#%'=\\~]/.test(k)) return 'A cite key can\u2019t have spaces or any of , { } ( ) " # % \' = \\ ~ in it.';
+  const other = ENTRIES.find(x => x !== e && x.k.toLowerCase() === k.toLowerCase());
+  if (other) return k + ' is already the cite key of \u201c' + (other.f.title || other.k) + '\u201d.';
+  return '';
+}
 async function renameEntry(e, newKey) {
-  const old = e.k;
+  const old = e.k, why = keyProblem(newKey, e);
+  if (why) { toast(why, 5000); renderDetail(); return; }
   toast('Changing the cite key\u2026', 0);
   try {
+    renameSaid(old, newKey, await renameCore(e, newKey));
+  } catch (err) {
+    toast('Couldn\u2019t change the cite key: ' + errText(err), 6000);
+    renderDetail();
+  }
+}
+function renameSaid(old, newKey, res) {
+  toast('Cite key changed to ' + newKey + (res.queued ? ' on this device; it goes to ' + DATA.source + ' when you\u2019re back online.' : '.') + ' Documents that cite ' + old + ' need the new key.', 7000);
+  if (!res.queued) afterWrite();
+}
+// The new key, in the .bib and here too: the entry, its groups, links to
+// it, what was viewed. Throws if it couldn't.
+async function renameCore(e, newKey) {
+  const old = e.k;
+  {
     const res = await callServer('renameKey', { key: old, newKey, expectHash: e.h || null, backupName: fileTime() });
-    // Here too: the entry, its groups, links to it, what was viewed.
     e.k = newKey; e.h = res.hash;
     if (res.gh) DATA.gh = res.gh;
     (DATA.groups || []).forEach(g => { g.keys = g.keys.map(k => (k === old ? newKey : k)); });
@@ -11679,11 +11901,7 @@ async function renameEntry(e, newKey) {
     if (state.selKey === old) state.selKey = newKey;
     if (res.queued) e.offline = true;
     init(DATA, true);
-    toast('Cite key changed to ' + newKey + (res.queued ? ' on this device; it goes to ' + DATA.source + ' when you\u2019re back online.' : '.') + ' Documents that cite ' + old + ' need the new key.', 7000);
-    if (!res.queued) afterWrite();
-  } catch (err) {
-    toast('Couldn\u2019t change the cite key: ' + errText(err), 6000);
-    renderDetail();
+    return res;
   }
 }
 
@@ -12973,7 +13191,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-08.02</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-08.05</small>`;
 };
 
 function gunzipJSON(bytes) {
@@ -13346,8 +13564,8 @@ if (!gs) {
 }
 // For the test suite (_test/suite.html) only: a few of the reader's
 // insides, when the test page asks for them.
-if (window.LIBLANDE_TEST) window.LL = { V, BM, JOURNAL, LOCAL, AUTO, saveMarkup, setTool, combineMarks, makeZip, MARK_ERASER: () => MARK.eraserSize,
-  lib: () => ({ ENTRIES, BYKEY, DATA, VERSION_OF, VERSIONS, NESTED, state }), init, refresh, isForthcoming, forthChanges, parseBibtexEntry,
+if (window.LIBLANDE_TEST) window.LL = { V, BM, JOURNAL, LOCAL, AUTO, saveMarkup, setTool, MARK, PDFJS, pdfJsFix, combineMarks, makeZip, MARK_ERASER: () => MARK.eraserSize,
+  lib: () => ({ ENTRIES, BYKEY, DATA, VERSION_OF, VERSIONS, NESTED, state }), init, refresh, openEdit, isForthcoming, forthChanges, parseBibtexEntry,
   oldLineMarks, convertOldLines, fetchAhead, PTABS, renderPaperTabs, openPdf, loadPdfJs, addStreamIteration, msCheck, msCites, msRef, msDocx, MS, msVisible };
 })();
 </script>
