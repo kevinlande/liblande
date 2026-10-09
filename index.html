@@ -1776,7 +1776,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-08.08</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-09.01</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1791,7 +1791,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-08.08';
+      l.querySelector('small').textContent = 'Version 2026-10-09.01';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1803,7 +1803,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-08.08): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-09.01): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -2075,7 +2075,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-08.08`;
+    `<br>LibLande version 2026-10-09.01`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -3567,7 +3567,7 @@ async function fillFromDoi(e) {
     if (balanced(r.fields[n])) set[n] = r.fields[n];
   });
   const names = Object.keys(set);
-  if (!names.length) { toast('Nothing to fill in: Crossref has nothing this entry is missing.', 3500); return; }
+  if (!names.length) { toast('Nothing to fill in: ' + (r.source || 'Crossref') + ' has nothing this entry is missing.', 3500); return; }
   const list = names.map(n => { const l = FIELD_LABELS[n] || n; return l === l.toUpperCase() ? l : l.toLowerCase(); });
   const said = list.length > 1 ? list.slice(0, -1).join(', ') + ' and ' + list[list.length - 1] : list[0];
   quickSet(now, set, 'Filled in the ' + said + ' from the DOI');
@@ -10672,8 +10672,8 @@ async function lookupIntoEdit() {
     });
     const said = filled.map(l => (l === l.toUpperCase() ? l : l.toLowerCase()));
     sheetMsg(filled.length
-      ? 'Filled in the ' + (said.length > 1 ? said.slice(0, -1).join(', ') + ' and ' + said[said.length - 1] : said[0]) + ' from Crossref. Check them, then save.'
-      : 'Nothing to fill in: Crossref has nothing for the empty fields.');
+      ? 'Filled in the ' + (said.length > 1 ? said.slice(0, -1).join(', ') + ' and ' + said[said.length - 1] : said[0]) + ' from ' + (r.source || 'Crossref') + '. Check them, then save.'
+      : 'Nothing to fill in: ' + (r.source || 'Crossref') + ' has nothing for the empty fields.');
   } catch (err) {
     sheetMsg(errText(err), true);
   } finally {
@@ -10685,7 +10685,7 @@ function openAdd(pdf) {
   sheet = { mode: 'add', pdf: null };
   const h = sheetHead('Add a publication', 'Add to library') +
     `<div class="fld"><label for="doiLookup">From a DOI or BibTeX</label><div class="doi-row">` +
-    `<input id="doiLookup" type="text" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="A DOI, or paste a BibTeX entry">` +
+    `<input id="doiLookup" type="text" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="A DOI or arXiv ID, or paste a BibTeX entry">` +
     `<button type="button" class="btn" id="doiGo">Fill in</button>` +
     (navigator.clipboard && navigator.clipboard.readText ? `<button type="button" class="btn" id="bibPaste" title="Fill in from the DOI or BibTeX entry you copied">Paste</button>` : '') +
     `</div></div>` +
@@ -10831,7 +10831,7 @@ async function lookupIntoForm() {
     renderAddFields(r.fields);
     const have = r.fields.doi && ENTRIES.find(x => (x.f.doi || '').toLowerCase() === r.fields.doi.toLowerCase());
     sheetMsg(have ? 'Already in your library: \u201c' + (have.f.title || have.k) + '\u201d. You can still add it.'
-      : 'Filled in from Crossref. Check the details, then add it.', !!have);
+      : 'Filled in from ' + (r.source || 'Crossref') + '. Check the details, then add it.', !!have);
   } catch (err) {
     sheetMsg(errText(err), true);
   } finally {
@@ -13144,7 +13144,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-08.08</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-09.01</small>`;
 };
 
 function gunzipJSON(bytes) {

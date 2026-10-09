@@ -17,7 +17,7 @@
   window.LIBLANDE_PAGES = true;
   // (Which version each part of the app is from: index.html checks they
   // match. build.py fills it in.)
-  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-10-08.08';
+  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-10-09.01';
   const CLIENT_ID = '789682218462-98mjugngb46ttd01ucp9dcj71ufspjgn.apps.googleusercontent.com';
   // Google Drive (your .bib, papers and LibLande folder): all it needs.
   const SCOPE = 'https://www.googleapis.com/auth/drive';
@@ -561,21 +561,64 @@
   }
 
   /* ------------------------------------------------------------ DOI lookup */
-  // Details for a DOI from Crossref, as BibTeX fields (as Code.gs's).
+  // Details for a DOI from Crossref, as BibTeX fields (as Code.gs's); a DOI
+  // Crossref doesn't have (arXiv's, Zenodo's, a dataset's) from DataCite.
+  // An arXiv ID or link counts as arXiv's DOI for it.
+  const ARXIV_ID = /^(?:arxiv:\s*|https?:\/\/(?:www\.)?arxiv\.org\/(?:abs|pdf)\/)?(\d{4}\.\d{4,5}|[a-z-]+(?:\.[A-Z]{2})?\/\d{7})(?:v\d+)?(?:\.pdf)?$/i;
+  function doiOf(input) {
+    const v = String(input || '').trim();
+    const ax = ARXIV_ID.exec(v);
+    if (ax) return '10.48550/arXiv.' + ax[1];
+    return v.replace(/^https?:\/\/(dx\.)?doi\.org\//i, '').replace(/^doi:\s*/i, '');
+  }
   async function lookupDoi(input) {
-    const doi = String(input || '').trim().replace(/^https?:\/\/(dx\.)?doi\.org\//i, '').replace(/^doi:\s*/i, '');
+    const doi = doiOf(input);
     if (!/^10\.\d{4,9}\/\S+$/.test(doi)) {
-      throw new Error('That doesn\u2019t look like a DOI. A DOI starts with 10., like 10.1111/phpr.70141.');
+      throw new Error('That doesn\u2019t look like a DOI. A DOI starts with 10., like 10.1111/phpr.70141 (or give an arXiv ID, like 2301.01234).');
     }
+    const path = doi.split('/').map(encodeURIComponent).join('/');
+    const unreachable = who => new Error(navigator.onLine ? who + ' can\u2019t be reached just now. Try again, or fill in the details yourself.' : 'You\u2019re offline.');
     let res;
-    try {
-      res = await fetch('https://api.crossref.org/works/' + doi.split('/').map(encodeURIComponent).join('/'));
-    } catch (e) {
-      throw new Error(navigator.onLine ? 'Crossref can\u2019t be reached just now. Try again, or fill in the details yourself.' : 'You\u2019re offline.');
+    // (arXiv's go straight to DataCite.)
+    if (!/^10\.48550\//.test(doi)) {
+      try { res = await fetch('https://api.crossref.org/works/' + path); } catch (e) { throw unreachable('Crossref'); }
+      if (res.ok) return crossrefFields((await res.json()).message, doi);
+      if (res.status !== 404) throw new Error('The DOI lookup didn\u2019t work (error ' + res.status + '). Try again, or fill in the details yourself.');
     }
-    if (res.status === 404) throw new Error('Crossref has no publication with that DOI.');
-    if (!res.ok) throw new Error('The DOI lookup didn\u2019t work (error ' + res.status + '). Try again, or fill in the details yourself.');
-    const w = (await res.json()).message;
+    try { res = await fetch('https://api.datacite.org/dois/' + path); } catch (e) { throw unreachable('DataCite (where arXiv\u2019s DOIs are)'); }
+    if (res.status === 404) throw new Error('Neither Crossref nor DataCite has a publication with that DOI.');
+    if (!res.ok) throw new Error('The DOI lookup didn\u2019t work (DataCite error ' + res.status + '). Try again, or fill in the details yourself.');
+    return dataciteFields((await res.json()).data.attributes, doi);
+  }
+  const tidyFields = f => { Object.keys(f).forEach(k => { f[k] = String(f[k] || '').replace(/[{}]/g, '').trim(); if (!f[k]) delete f[k]; }); return f; };
+  // DataCite's record: a preprint (arXiv's) as @misc published by arXiv,
+  // with its arXiv ID as the eprint.
+  function dataciteFields(a, doi) {
+    const titles = a.titles || [], main = titles.find(t => !t.titleType) || titles[0] || {}, sub = titles.find(t => t.titleType === 'Subtitle');
+    const people = list => (list || []).map(p => p.familyName ? (p.givenName ? p.familyName + ', ' + p.givenName : p.familyName) : (p.name || ''))
+      .filter(Boolean).join(' and ');
+    const general = ((a.types || {}).resourceTypeGeneral || '').toLowerCase();
+    const type = { journalarticle: 'article', book: 'book', bookchapter: 'incollection', conferencepaper: 'inproceedings', dissertation: 'phdthesis', report: 'techreport' }[general] || 'misc';
+    const date = ((a.dates || []).find(d => /^(issued|available|submitted)$/i.test(d.dateType)) || {}).date || '';
+    const m = /^\d{4}-(\d{2})/.exec(date);
+    const publisher = typeof a.publisher === 'object' && a.publisher ? a.publisher.name : a.publisher;
+    const abs = ((a.descriptions || []).find(d => d.descriptionType === 'Abstract') || {}).description || '';
+    const arxiv = /^10\.48550\/arxiv\.(.+)$/i.exec(doi);
+    const f = {
+      title: (main.title || '') + (sub && sub.title ? ': ' + sub.title : ''),
+      author: people(a.creators),
+      year: a.publicationYear ? String(a.publicationYear) : date.slice(0, 4),
+      month: m ? 'Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec'.split(' ')[+m[1] - 1] || '' : '',
+      doi: a.doi || doi,
+      url: arxiv ? 'https://arxiv.org/abs/' + arxiv[1] : a.url || '',
+      publisher: publisher || '',
+      abstract: abs.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
+    };
+    if (arxiv) { f.eprint = arxiv[1]; f.archiveprefix = 'arXiv'; }
+    if (type === 'article') f.journal = ((a.container || {}).title) || '';
+    return { type, fields: tidyFields(f), source: 'DataCite' };
+  }
+  function crossrefFields(w, doi) {
     const types = { 'journal-article': 'article', 'book-chapter': 'incollection', 'book-section': 'incollection',
       'book-part': 'incollection', 'book': 'book', 'monograph': 'book', 'edited-book': 'book', 'reference-book': 'book',
       'proceedings-article': 'inproceedings', 'dissertation': 'phdthesis', 'report': 'techreport', 'posted-content': 'unpublished' };
@@ -607,8 +650,7 @@
     }
     if (w.page) f.pages = String(w.page).replace(/-/g, '--');
     if (w.abstract) f.abstract = w.abstract.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').replace(/^\s*Abstract\s*/i, '').trim();
-    Object.keys(f).forEach(k => { f[k] = String(f[k] || '').replace(/[{}]/g, '').trim(); if (!f[k]) delete f[k]; });
-    return { type, fields: f };
+    return { type, fields: tidyFields(f), source: 'Crossref' };
   }
 
   /* ------------------------------------------------------------ building */
