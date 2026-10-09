@@ -19,7 +19,7 @@
  */
 (function (root) {
   'use strict';
-  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).builder = '2026-10-08.06';
+  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).builder = '2026-10-08.08';
   const FOLDER = 'application/vnd.google-apps.folder';
   const DATA_FOLDER = 'LibLande', LIBRARY_FILE = 'library.json.gz', INDEX_FILE = 'file-index.json',
     SETTINGS_FILE = 'settings.json', INBOX_FOLDER = 'Inbox', INBOX_FILE = 'LibLande inbox.bib';
@@ -376,10 +376,13 @@
       return { built: true, id: saved.id, stamp: Date.parse(saved.modifiedTime), entries: out.entries, gz: out.gz };
     }
 
+    // (null: no such file, or one that isn't JSON. One that's there but
+    // can't be read throws, so it's never taken for an empty one.)
     async function readJson(folderId, name) {
       const f = await named(folderId, name, 'id');
       if (!f) return null;
-      try { return JSON.parse(await text(f.id)); } catch (e) { return null; }
+      const raw = await text(f.id);
+      try { return JSON.parse(raw); } catch (e) { return null; }
     }
 
     return { look, build, settings, updateSettings, dataFolder, named, meta, text, textAt, remember, noteFile, readJson, writeFile, listAll };

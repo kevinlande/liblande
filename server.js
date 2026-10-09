@@ -17,7 +17,7 @@
   window.LIBLANDE_PAGES = true;
   // (Which version each part of the app is from: index.html checks they
   // match. build.py fills it in.)
-  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-10-08.06';
+  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-10-08.08';
   const CLIENT_ID = '789682218462-98mjugngb46ttd01ucp9dcj71ufspjgn.apps.googleusercontent.com';
   // Google Drive (your .bib, papers and LibLande folder): all it needs.
   const SCOPE = 'https://www.googleapis.com/auth/drive';
@@ -192,7 +192,9 @@
   async function readJson(folderId, name) {
     const f = await fileIn(folderId, name);
     if (!f) return null;
-    try { return await (await drive('files/' + encodeURIComponent(f.id) + '?alt=media')).json(); } catch (e) { return null; }
+    // (As builder.readJson: a file that can't be read throws.)
+    const raw = await (await drive('files/' + encodeURIComponent(f.id) + '?alt=media')).text();
+    try { return JSON.parse(raw); } catch (e) { return null; }
   }
   // LibLande's folder in My Drive (the one with the library in it).
   let dataId = store.get('dataFolder', null);
@@ -234,8 +236,12 @@
       const w = await builder.look({ daily: true });
       if (!w.configured) return { configured: false };
       const started = startBuild(w);
+      // (The pending edits and the reading list as last known if they
+      // can't be read just now: never an empty list in their place.)
+      const known = value => err => { console.warn(err); return value(); };
       const [pending, reading, prefs, papersName, token] = await Promise.all([
-        builder.readJson(w.folder, PENDING_FILE), builder.readJson(w.folder, READING_FILE), loadPrefs(w.s),
+        builder.readJson(w.folder, PENDING_FILE).catch(known(() => ({ edits: offlineLists.known.pending }))),
+        builder.readJson(w.folder, READING_FILE).catch(known(() => offlineLists.known.reading)), loadPrefs(w.s),
         folderName(w.s.papersId || (w.bib.parents && w.bib.parents[0])), getToken()]);
       if (running) await Promise.race([running, new Promise(r => setTimeout(r, 60 * 1000))]);
       const r = reading || {};
@@ -518,7 +524,10 @@
   let prefsMemo = null, prefsWaiting = {}, prefsTimer = null;
   async function loadPrefs(settings) {
     if (prefsMemo) return Object.assign({}, prefsMemo, prefsWaiting);
-    const saved = await builder.readJson(await dataFolder(), PREFS_FILE);
+    // (Not readable just now: none this time, and asked again next time,
+    // rather than the old ones in settings.json taken for them.)
+    let saved;
+    try { saved = await builder.readJson(await dataFolder(), PREFS_FILE); } catch (e) { console.warn('Preferences:', e.message); return Object.assign({}, prefsWaiting); }
     prefsMemo = saved || (settings && settings.prefs) || {};
     return Object.assign({}, prefsMemo, prefsWaiting);
   }

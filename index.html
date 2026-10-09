@@ -1776,7 +1776,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-08.06</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-08.08</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1791,7 +1791,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-08.06';
+      l.querySelector('small').textContent = 'Version 2026-10-08.08';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1803,7 +1803,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-08.06): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-08.08): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -2075,7 +2075,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-08.06`;
+    `<br>LibLande version 2026-10-08.08`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -2221,6 +2221,15 @@ function rlOp(req, message) {
   if (message) toast(message, 2200);
   RL_QUEUE.ops.push(req);
   scheduleReadingSave();
+  if (req.op === 'done') markRead(req.key);
+}
+// Done with a paper on the list: it's marked Read too (its read field, as
+// BibDesk has it), unless it already is.
+function markRead(key) {
+  const e = BYKEY.get(key);
+  if (!e || e.f.read === '1') return;
+  writeEdit(e, { read: '1' }, [], []).then(() => { if (state.selKey === e.k) renderDetail(); })
+    .catch(err => toast('Couldn\u2019t mark it as read: ' + errText(err), 5000));
 }
 function scheduleReadingSave(now) {
   clearTimeout(RL_QUEUE.timer);
@@ -13135,7 +13144,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-08.06</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-08.08</small>`;
 };
 
 function gunzipJSON(bytes) {

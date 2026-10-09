@@ -18,7 +18,7 @@
  */
 (function (root) {
   'use strict';
-  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).edits = '2026-10-08.06';
+  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).edits = '2026-10-08.08';
   const FOLDER = 'application/vnd.google-apps.folder';
   const UPLOAD = 'https://www.googleapis.com/upload/drive/v3/';
   const PENDING_FILE = 'pending-edits.json', READING_FILE = 'reading-list.json',
@@ -345,7 +345,9 @@
       for (let attempt = 0; attempt < 3; attempt++) {
         const f = await B.named(folder, name, 'id,modifiedTime');
         let value = blank();
-        if (f) { try { value = Object.assign(blank(), JSON.parse(await B.text(f.id))); } catch (e) { /* as blank */ } }
+        // (A file that can't be read stops the change: written over, it
+        // would lose what's in it. Only one that isn't JSON counts as blank.)
+        if (f) { const raw = await B.text(f.id); try { value = Object.assign(blank(), JSON.parse(raw)); } catch (e) { /* as blank */ } }
         const result = await change(value);
         if (result === false) return value;
         if (f) {
