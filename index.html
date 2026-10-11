@@ -730,16 +730,21 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .col-menu .linkish { margin: 4px 8px 4px; font-size: 12.5px; }
 .rows { position: relative; }
 .row { position: absolute; left: 0; right: 0; cursor: default; font-size: 13px; }
-/* Behind a row being swiped: what letting go will do, in colour once past
-   the line. */
-.swipe-bg { position: absolute; left: 0; right: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 18px; background: var(--side-hover); color: var(--muted); font: 600 13px var(--ui); pointer-events: none; }
-.swipe-act { display: inline-flex; align-items: center; gap: 7px; }
-.swipe-act .i { width: 18px; height: 18px; }
-.swipe-bg:not(.to-right) .swipe-act.right, .swipe-bg.to-right .swipe-act.left { visibility: hidden; }
+/* Behind a row being swiped (as in Mail): the action, in its colour once
+   the swipe is far enough to leave it open, deeper once far enough to do
+   it; a row left open has the action as a button. */
+.swipe-bg { position: absolute; left: 0; right: 0; display: flex; align-items: center; justify-content: space-between; background: var(--side-hover); color: var(--muted); font: 600 13px var(--ui); pointer-events: none; transition: background-color .18s, color .18s; }
+.swipe-act { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; width: 104px; height: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; font-size: 11.5px; }
+.swipe-act .i { width: 20px; height: 20px; transition: transform .18s; }
+.swipe-bg:not(.to-right) .swipe-act.right, .swipe-bg.to-right .swipe-act.left { display: none; }
 .swipe-act.left { margin-left: auto; }
-.swipe-bg.go-right { background: var(--accent); color: #fff; }
-.swipe-bg.go-left { background: #3d8a5f; color: #fff; }
-.swipe-bg.go-right .swipe-act .i, .swipe-bg.go-left .swipe-act .i { transform: scale(1.12); transition: transform .15s; }
+.swipe-bg.shown.to-right { background: color-mix(in srgb, var(--accent) 70%, var(--bg)); color: #fff; }
+.swipe-bg.shown:not(.to-right) { background: color-mix(in srgb, #3d8a5f 75%, var(--bg)); color: #fff; }
+.swipe-bg.full.to-right { background: var(--accent); }
+.swipe-bg.full:not(.to-right) { background: #3d8a5f; }
+.swipe-bg.full .swipe-act .i { transform: scale(1.15); }
+.swipe-bg.open { pointer-events: auto; }
+.swipe-bg.open .swipe-act { cursor: pointer; }
 .row.odd { background: var(--stripe); }
 .row > span { padding: 0 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row .c-file { padding: 0; display: flex; justify-content: center; }
@@ -967,6 +972,8 @@ details.d-sec[open] summary { margin-bottom: 8px; }
 .v-palette[data-edge="top"].leaving, .v-palette[data-edge="top"].entering { translate: 0 -70px; }
 .v-palette[data-edge="bottom"].leaving, .v-palette[data-edge="bottom"].entering { translate: 0 70px; }
 .v-palette.leaving, .vp-show.leaving { pointer-events: none; }
+/* Going away: slower, and eased at both ends, so it's seen to go. */
+.v-palette.leaving, .vp-show.leaving { transition: opacity .42s ease .08s, scale .5s cubic-bezier(.45, 0, .25, 1), translate .5s cubic-bezier(.45, 0, .25, 1); }
 @media (prefers-reduced-motion: reduce) { .v-palette, .vp-show { transition: none; } }
 @media (prefers-reduced-motion: reduce) { .v-top { transition: none; } }
 .v-title { flex: 1; min-width: 0; font: 600 14.5px/1.3 var(--serif); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1871,7 +1878,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-11.16</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-11.18</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1886,7 +1893,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-11.16';
+      l.querySelector('small').textContent = 'Version 2026-10-11.18';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1898,7 +1905,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-11.16): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-11.18): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -2170,7 +2177,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-11.16`;
+    `<br>LibLande version 2026-10-11.18`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -6360,7 +6367,7 @@ function fadeShown(el, show) {
   } else if (!el.hidden) {
     if (matchMedia('(prefers-reduced-motion: reduce)').matches || $('#viewer').hidden) { el.hidden = true; return; }
     el.classList.add('leaving');
-    el.fadeTimer = setTimeout(() => { el.hidden = true; el.classList.remove('leaving'); }, 340);
+    el.fadeTimer = setTimeout(() => { el.hidden = true; el.classList.remove('leaving'); }, 520);
   }
 }
 function showPalette() {
@@ -6368,7 +6375,7 @@ function showPalette() {
   fadeShown($('#vPalette'), gs && open);
   // (Tucked away: the small button comes once the toolbar is on its way.)
   clearTimeout(pill.waitTimer);
-  if (gs && !open && pill.hidden && !$('#vPalette').hidden) pill.waitTimer = setTimeout(() => fadeShown(pill, store.get('paletteOpen', true) === false), 160);
+  if (gs && !open && pill.hidden && !$('#vPalette').hidden) pill.waitTimer = setTimeout(() => fadeShown(pill, store.get('paletteOpen', true) === false), 300);
   else fadeShown(pill, gs && !open);
   placePalette();
   paletteState();
@@ -13708,7 +13715,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-11.16</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-11.18</small>`;
 };
 
 function gunzipJSON(bytes) {
@@ -13899,13 +13906,16 @@ if (!gs) {
       .finally(() => { btn.classList.remove('busy'); $('#pull').classList.remove('busy'); });
   });
 
-  // Swipe a row (touch): right for Up next (Later, if it's there already;
-  // added, if it isn't on the list), left for Done (Mark as read, if it
-  // isn't on the list). The action shows behind the row as it moves, and
-  // happens past the line.
+  // Swipe a row, as in Mail: right for Up next (Later, if it's there
+  // already; added, if it isn't on the list), left for Done (Mark as read,
+  // if it isn't on the list). The row follows the finger (or, on a
+  // computer, two fingers on the trackpad), the action behind it. A long
+  // swipe (past 40% of the row) does it; a short one leaves the row open
+  // with the action as a button, until a tap or a scroll elsewhere.
   (() => {
-    const list = $('#list'), FAR = 84;
-    let sw = null;
+    const list = $('#list'), REVEAL = 56, OPEN = 104;
+    const FULL = row => Math.max(150, row.clientWidth * 0.4);
+    let sw = null, opened = null, quiet = 0, ignoring = false;
     const acts = e => {
       if (!gs || e.ib) return {};
       const x = RL.get(e.k), read = e.f.read === '1';
@@ -13918,97 +13928,144 @@ if (!gs) {
       const bg = document.createElement('div');
       bg.className = 'swipe-bg';
       bg.style.top = row.style.top; bg.style.height = row.style.height;
-      const side = (d, x) => x ? `<span class="swipe-act ${d}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true">${RL_ICONS[x.icon]}</svg>${esc(x.label)}</span>` : '';
+      const side = (d, x) => x ? `<button type="button" class="swipe-act ${d}" data-swipe="${d}" tabindex="-1"><svg class="i" viewBox="0 0 24 24" aria-hidden="true">${RL_ICONS[x.icon]}</svg>${esc(x.label)}</button>` : '';
       bg.innerHTML = side('right', a.right) + side('left', a.left);
       row.before(bg);
       return bg;
     };
-    const end = () => {
-      if (!sw) return;
-      const { row, bg, dx, e, a, on } = sw;
-      sw = null;
-      if (!on) return;
-      list._swiped = true;
-      setTimeout(() => { list._swiped = false; }, 400);
-      const act = dx >= FAR ? a.right : dx <= -FAR ? a.left : null;
-      row.style.transition = 'transform .22s cubic-bezier(.2, .8, .2, 1)';
-      row.style.transform = '';
-      setTimeout(() => { row.style.transition = row.style.background = ''; bg.remove(); }, 240);
-      if (!act) return;
+    const run = (act, e) => {
       if (act.id === 'add') rlAdd(e.k);
       else if (act.id === 'next' || act.id === 'later') rlMove(e.k, act.id);
       else if (act.id === 'done') rlDone(e.k);
       else if (act.id === 'read') quickSet(e, { read: '1' }, 'Marked as read');
     };
-    list.addEventListener('touchstart', ev => {
-      sw = null;
-      if (ev.touches.length !== 1 || state.picking) return;
-      const row = ev.target.closest('#list .row, #list .card');
+    const settle = (row, bg, x) => {
+      row.style.transition = 'transform .32s cubic-bezier(.32, .72, 0, 1)';
+      row.style.transform = x ? `translateX(${x}px)` : '';
+      if (!x) setTimeout(() => { if (row.style.transform) return; row.style.transition = row.style.background = ''; bg.remove(); }, 340);
+    };
+    const close = () => {
+      if (!opened) return;
+      const o = opened;
+      opened = null;
+      o.bg.classList.remove('open');
+      settle(o.row, o.bg, 0);
+    };
+    // Where the row is drawn for a swipe this far: with resistance past the
+    // line, and barely at all the way with no action.
+    const follow = dx => {
+      const full = FULL(sw.row), none = (dx > 0 && !sw.a.right) || (dx < 0 && !sw.a.left);
+      let x = none ? dx / 6 : Math.abs(dx) > full ? Math.sign(dx) * (full + (Math.abs(dx) - full) * 0.4) : dx;
+      sw.dx = none ? 0 : dx;
+      sw.row.style.transform = `translateX(${x}px)`;
+      sw.bg.classList.toggle('to-right', dx > 0);
+      sw.bg.classList.toggle('shown', Math.abs(sw.dx) >= REVEAL);
+      sw.bg.classList.toggle('full', Math.abs(sw.dx) >= full);
+    };
+    const begin = (row, wheel) => {
       const e = row && state.view[+row.dataset.i];
-      if (!e) return;
+      if (!e) return false;
       const a = acts(e);
-      if (!a.left && !a.right) return;
-      sw = { row, e, a, x0: ev.touches[0].clientX, y0: ev.touches[0].clientY, dx: 0, on: false, bg: null };
+      if (!a.left && !a.right) return false;
+      if (opened && opened.row !== row) close();
+      // (An open row swiped again: from where it is.)
+      const from = opened && opened.row === row ? opened.x : 0;
+      const bg = opened && opened.row === row ? opened.bg : bgFor(row, a);
+      opened = null;
+      bg.classList.remove('open');
+      sw = { row, e, a, bg, dx: from, base: from, on: true, wheel, acc: from, peak: 0, fall: 0, last: 0 };
+      row.style.transition = '';
+      row.style.background = 'var(--bg)';
+      return true;
+    };
+    const release = () => {
+      if (!sw) return;
+      const { row, bg, dx, e, a } = sw;
+      sw = null;
+      list._swiped = true;
+      setTimeout(() => { list._swiped = false; }, 400);
+      const act = dx > 0 ? a.right : dx < 0 ? a.left : null;
+      if (act && Math.abs(dx) >= FULL(row)) { bg.classList.add('full'); settle(row, bg, 0); run(act, e); return; }
+      if (act && Math.abs(dx) >= REVEAL) {
+        const x = Math.sign(dx) * OPEN;
+        bg.classList.add('open', 'shown');
+        bg.classList.remove('full');
+        bg.classList.toggle('to-right', dx > 0);
+        opened = { row, bg, e, act, x };
+        settle(row, bg, x);
+        return;
+      }
+      settle(row, bg, 0);
+    };
+    // The open row's button: the action; anything else closes it.
+    list.addEventListener('click', ev => {
+      const b = ev.target.closest('.swipe-bg.open [data-swipe]');
+      if (b && opened) { ev.stopPropagation(); const o = opened; close(); run(o.act, o.e); return; }
+      if (list._swiped) { ev.stopPropagation(); ev.preventDefault(); list._swiped = false; return; }
+      if (opened && !ev.target.closest('.swipe-bg')) { ev.stopPropagation(); ev.preventDefault(); close(); }
+    }, true);
+    list.addEventListener('scroll', () => { if (opened) close(); }, { passive: true });
+    document.addEventListener('pointerdown', ev => { if (opened && !list.contains(ev.target)) close(); }, true);
+
+    // Touch.
+    let t0 = null;
+    list.addEventListener('touchstart', ev => {
+      t0 = null;
+      if (ev.touches.length !== 1 || state.picking || sw) return;
+      const row = ev.target.closest('#list .row, #list .card');
+      if (!row) return;
+      t0 = { row, x: ev.touches[0].clientX, y: ev.touches[0].clientY };
     }, { passive: true });
     list.addEventListener('touchmove', ev => {
-      if (!sw || sw.wheel) return;
-      const t = ev.touches[0], dx = t.clientX - sw.x0, dy = t.clientY - sw.y0;
-      if (!sw.on) {
+      if (!t0 && !(sw && !sw.wheel)) return;
+      const t = ev.touches[0];
+      if (!sw) {
+        const dx = t.clientX - t0.x, dy = t.clientY - t0.y;
         // (A scroll, not a swipe: let it be.)
-        if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) { sw = null; return; }
+        if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) { t0 = null; return; }
         if (Math.abs(dx) < 12 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
-        sw.on = true;
-        sw.bg = bgFor(sw.row, sw.a);
-        sw.row.style.background = 'var(--bg)';
+        if (!begin(t0.row, false)) { t0 = null; return; }
+        sw.x0 = t.clientX;
       }
       ev.preventDefault();
-      // (No action that way: it barely moves. Past the line, it slows.)
-      let x = dx;
-      if ((x > 0 && !sw.a.right) || (x < 0 && !sw.a.left)) x = x / 6;
-      else if (Math.abs(x) > FAR) x = Math.sign(x) * (FAR + (Math.abs(x) - FAR) * 0.35);
-      sw.dx = (x > 0 && !sw.a.right) || (x < 0 && !sw.a.left) ? 0 : dx;
-      sw.row.style.transform = `translateX(${x}px)`;
-      sw.bg.classList.toggle('go-right', dx >= FAR && !!sw.a.right);
-      sw.bg.classList.toggle('go-left', dx <= -FAR && !!sw.a.left);
-      sw.bg.classList.toggle('to-right', dx > 0);
+      follow(sw.base + t.clientX - sw.x0);
     }, { passive: false });
-    list.addEventListener('touchend', end);
-    list.addEventListener('touchcancel', () => { if (sw) { sw.dx = 0; end(); } });
-    // A trackpad (a computer): a two-finger swipe sideways over a row comes
-    // as sideways scrolling; the row follows it, the same way, and the
-    // action is taken when the fingers stop. (Not the browser's back swipe.)
-    let wt = 0;
-    const follow = dx => {
-      let x = dx;
-      if ((x > 0 && !sw.a.right) || (x < 0 && !sw.a.left)) x = x / 6;
-      else if (Math.abs(x) > FAR) x = Math.sign(x) * (FAR + (Math.abs(x) - FAR) * 0.35);
-      sw.dx = (dx > 0 && !sw.a.right) || (dx < 0 && !sw.a.left) ? 0 : dx;
-      sw.row.style.transform = `translateX(${x}px)`;
-      sw.bg.classList.toggle('go-right', dx >= FAR && !!sw.a.right);
-      sw.bg.classList.toggle('go-left', dx <= -FAR && !!sw.a.left);
-      sw.bg.classList.toggle('to-right', dx > 0);
-    };
+    list.addEventListener('touchend', () => { t0 = null; if (sw && !sw.wheel) release(); });
+    list.addEventListener('touchcancel', () => { t0 = null; if (sw && !sw.wheel) { sw.dx = 0; release(); } });
+
+    // A trackpad: a two-finger swipe sideways comes as sideways scrolling.
+    // The row follows it; when the fingers lift (the scrolling then coasts
+    // on, ever slower, which isn't counted) or stop, it's let go.
     list.addEventListener('wheel', ev => {
-      if (Math.abs(ev.deltaX) <= Math.abs(ev.deltaY) && !(sw && sw.wheel)) return;
-      if (!sw || !sw.wheel) {
-        if (state.picking || Math.abs(ev.deltaX) < 2) return;
-        const row = ev.target.closest('#list .row, #list .card');
-        const e = row && state.view[+row.dataset.i];
-        if (!e) return;
-        const a = acts(e);
-        if (!a.left && !a.right) return;
-        sw = { row, e, a, dx: 0, acc: 0, on: true, wheel: true, bg: bgFor(row, a) };
-        row.style.background = 'var(--bg)';
+      const sideways = Math.abs(ev.deltaX) > Math.abs(ev.deltaY);
+      if (ignoring) {
+        if (sideways) ev.preventDefault();
+        clearTimeout(quiet);
+        quiet = setTimeout(() => { ignoring = false; }, 180);
+        return;
       }
+      if (!sw) {
+        if (!sideways || state.picking || Math.abs(ev.deltaX) < 3) { if (opened && !sideways) close(); return; }
+        if (!begin(ev.target.closest('#list .row, #list .card'), true)) return;
+      } else if (!sw.wheel) return;
       ev.preventDefault();
-      // (The row goes the way the fingers do: the scroll is the other way.)
-      sw.acc -= ev.deltaX * (ev.deltaMode === 1 ? 16 : 1);
+      const d = -ev.deltaX * (ev.deltaMode === 1 ? 16 : 1), m = Math.abs(d);
+      // Lifted: the deltas fall away steadily from their peak (momentum).
+      sw.fall = m < sw.last ? sw.fall + 1 : 0;
+      sw.last = m;
+      sw.peak = Math.max(sw.peak, m);
+      if (sw.peak > 6 && sw.fall >= 3 && m < sw.peak * 0.6) {
+        release();
+        ignoring = true;
+        clearTimeout(quiet);
+        quiet = setTimeout(() => { ignoring = false; }, 180);
+        return;
+      }
+      sw.acc += d;
       follow(sw.acc);
-      clearTimeout(wt);
-      wt = setTimeout(end, 140);
+      clearTimeout(quiet);
+      quiet = setTimeout(() => { if (sw && sw.wheel) release(); }, 160);
     }, { passive: false });
-    // (A swipe isn't a tap on the row.)
-    list.addEventListener('click', ev => { if (list._swiped) { ev.stopPropagation(); ev.preventDefault(); list._swiped = false; } }, true);
   })();
 
   // Pull to refresh: drag the top of the list down and let go.
