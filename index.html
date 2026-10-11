@@ -1869,7 +1869,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-11.13</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-11.14</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1884,7 +1884,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-11.13';
+      l.querySelector('small').textContent = 'Version 2026-10-11.14';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1896,7 +1896,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-11.13): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-11.14): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -2168,7 +2168,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-11.13`;
+    `<br>LibLande version 2026-10-11.14`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -6469,6 +6469,17 @@ function tuckPalette(open) {
   $('#vPalette').addEventListener('pointerdown', ev => {
     f = ev.target.closest('#vpGrip') ? null : { x: ev.clientX, y: ev.clientY, t: performance.now(), id: ev.pointerId };
   }, true);
+  // (A flick can start a little way out from it too, on the page: with a
+  // finger, so a Pencil stroke near it isn't taken for one.)
+  const NEAR = 48;
+  $('#vScroll').addEventListener('pointerdown', ev => {
+    const p = $('#vPalette');
+    if (p.hidden || ev.pointerType !== 'touch' || ev.target.closest('#vPalette')) return;
+    const r = p.getBoundingClientRect();
+    if (ev.clientX >= r.left - NEAR && ev.clientX <= r.right + NEAR && ev.clientY >= r.top - NEAR && ev.clientY <= r.bottom + NEAR) {
+      f = { x: ev.clientX, y: ev.clientY, t: performance.now(), id: ev.pointerId, near: true };
+    }
+  }, true);
   window.addEventListener('pointerup', ev => {
     const s = f;
     f = null;
@@ -6476,9 +6487,11 @@ function tuckPalette(open) {
     const dx = ev.clientX - s.x, dy = ev.clientY - s.y, edge = paletteEdge();
     if (performance.now() - s.t > QUICK || toward(edge, dx, dy) < FLICK || across(edge, dx, dy) > toward(edge, dx, dy) * 0.8) return;
     // (Not the tap on whatever button the flick began on.)
-    const stop = e => { e.stopPropagation(); e.preventDefault(); };
-    window.addEventListener('click', stop, { capture: true, once: true });
-    setTimeout(() => window.removeEventListener('click', stop, true), 400);
+    if (!s.near) {
+      const stop = e => { e.stopPropagation(); e.preventDefault(); };
+      window.addEventListener('click', stop, { capture: true, once: true });
+      setTimeout(() => window.removeEventListener('click', stop, true), 400);
+    }
     tuckPalette(false);
   }, true);
   // In from the edge: a swipe starting at the edge of the page area, while
@@ -13690,7 +13703,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-11.13</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-11.14</small>`;
 };
 
 function gunzipJSON(bytes) {
