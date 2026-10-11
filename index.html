@@ -964,12 +964,19 @@ details.d-sec[open] summary { margin-bottom: 8px; }
 .v-palette, .vp-show { transition: opacity .2s ease, transform .2s, scale .22s cubic-bezier(.2, .8, .2, 1); }
 /* Coming and going: they fade and grow in, and shrink away. */
 .v-palette.entering, .vp-show.entering, .v-palette.leaving, .vp-show.leaving { opacity: 0; scale: .85; }
+/* Flicked away (or brought back): it slides to (or from) its edge. */
+.v-palette[data-edge="left"].leaving, .v-palette[data-edge="left"].entering { translate: -60px 0; }
+.v-palette[data-edge="right"].leaving, .v-palette[data-edge="right"].entering { translate: 60px 0; }
+.v-palette[data-edge="top"].leaving, .v-palette[data-edge="top"].entering { translate: 0 -50px; }
+.v-palette[data-edge="bottom"].leaving, .v-palette[data-edge="bottom"].entering { translate: 0 50px; }
 .v-palette.leaving, .vp-show.leaving { pointer-events: none; }
 @media (prefers-reduced-motion: reduce) { .v-palette, .vp-show { transition: none; } }
 @media (prefers-reduced-motion: reduce) { .v-top { transition: none; } }
 .v-title { flex: 1; min-width: 0; font: 600 14.5px/1.3 var(--serif); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .v-page, .v-zoom { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .v-zoom { min-width: 40px; text-align: center; }
+button.v-zoom { height: 28px; padding: 0 6px; border: 1px solid transparent; border-radius: 7px; background: none; cursor: pointer; font-family: inherit; }
+button.v-zoom:hover { background: var(--side-hover); color: var(--text); }
 .v-tools { display: flex; align-items: center; gap: 2px; }
 .v-bar .btn { min-height: 30px; padding: 4px 10px; }
 .v-bar .btn:disabled { opacity: .5; }
@@ -1584,7 +1591,7 @@ a.ms-ib { text-decoration: none; }
   .sheet.compact .fld > label, .sheet.compact .fld > .lbl { padding-top: 4px; }
   .sheet.compact #sheetBody > .check { margin-left: 0; }
   .sheet.compact .fld > .add-pdf-name { grid-column: auto; }
-  .v-title, .v-zoom, .v-bar .btn span, .v-lib span { display: none; }
+  .v-title, .v-bar .btn span, .v-lib span { display: none; }
   /* Edit as just the pencil. */
   .d-edit span { display: none; }
   .d-edit { padding-left: 10px; padding-right: 10px; }
@@ -1752,10 +1759,9 @@ try {
     <div class="v-tools">
       <button type="button" class="tb-btn" id="vFindBtn" aria-label="Search in this paper" title="Search in this paper (&#x2318;F)" aria-pressed="false"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg></button>
       <button type="button" class="tb-btn" id="vDarkBtn" aria-pressed="false" aria-label="Dark pages" title="Dark pages: light on dark"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg></button>
-      <button type="button" class="tb-btn" id="vFit" aria-label="Fit the page to the screen" title="Fit the page to the screen"><svg class="i" viewBox="0 0 24 24"><path d="M4 9V5a1 1 0 0 1 1-1h4M15 4h4a1 1 0 0 1 1 1v4M20 15v4a1 1 0 0 1-1 1h-4M9 20H5a1 1 0 0 1-1-1v-4"/><rect x="8" y="8" width="8" height="8" rx="1"/></svg></button>
       <button type="button" class="tb-btn v-split" id="vSplitBtn" aria-pressed="false" aria-label="Split screen" title="Split screen: a second view of this paper below, to scroll on its own"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4" width="17" height="16" rx="2"/><path d="M3.5 12h17"/><path d="M11 8h2M11 16h2" opacity=".55"/></svg></button>
       <button type="button" class="tb-btn v-zoomctl" id="vZoomOut" aria-label="Zoom out" title="Zoom out">&#x2212;</button>
-      <span class="v-zoom v-zoomctl" id="vZoomLevel">100%</span>
+      <button type="button" class="v-zoom" id="vZoomLevel" title="Fit the page to the screen" aria-label="Zoom 100%: tap to fit the page to the screen">100%</button>
       <button type="button" class="tb-btn v-zoomctl" id="vZoomIn" aria-label="Zoom in" title="Zoom in">+</button>
       <details class="menu" id="vShare"><summary class="btn" title="Share a copy to another app"><svg class="i" viewBox="0 0 24 24"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg><span>Share</span><svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></summary><div class="menu-list" role="menu"><button type="button" role="menuitem" data-vshare="0">PDF as is</button><button type="button" role="menuitem" data-vshare="1">Clean copy (no annotations)</button><a role="menuitem" id="vDrive" href="#" target="_blank" rel="noopener">Open in Google Drive</a></div></details>
       <button type="button" class="tb-btn net-badge" id="vNetBadge" data-net hidden aria-live="polite"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 18.5h9.8a3.7 3.7 0 0 0 .6-7.35A5.6 5.6 0 0 0 7.2 9.6a4.45 4.45 0 0 0 .3 8.9z"/><path class="net-slash" d="M4 4l16 16"/></svg><span class="net-n"></span></button>
@@ -1861,7 +1867,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-11.07</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-11.10</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1876,7 +1882,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-11.07';
+      l.querySelector('small').textContent = 'Version 2026-10-11.10';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1888,7 +1894,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-11.07): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-11.10): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -2160,7 +2166,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-11.07`;
+    `<br>LibLande version 2026-10-11.10`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -4930,10 +4936,8 @@ function ensureViewer(lib, VL) {
   });
   bus.on('scalechanging', e => {
     $('#vZoomLevel').textContent = Math.round(e.scale * 100) + '%';
-    const fit = e.presetValue === 'page-fit';
-    $('#vFit').setAttribute('aria-pressed', String(fit));
-    $('#vFit').title = fit ? 'Fit the page width' : 'Fit the page to the screen';
-    $('#vFit').setAttribute('aria-label', $('#vFit').title);
+    zoomLabel(e.presetValue);
+
   });
   const findCount = (mc, state) => {
     const el = $('#vFindCount');
@@ -5330,6 +5334,10 @@ function placePaperTabs() {
   else bar.after(wrap);
 }
 window.addEventListener('resize', () => requestAnimationFrame(() => { if (!$('#viewer').hidden) { placePaperTabs(); tabsMore(); } }));
+// (And whenever the bar's buttons change: Save, the bookmark, the offline
+// cloud come and go, and with them the room for the tabs. Decided only at
+// opening, the tabs could stay on their own row with room in the bar.)
+if (window.ResizeObserver) new ResizeObserver(() => requestAnimationFrame(() => { if (!$('#viewer').hidden) { placePaperTabs(); tabsMore(); } })).observe($('#viewer .v-tools'));
 // The tabs out of sight at each end of the strip, as buttons over its
 // ends: a tap lists them.
 const TABS_OUT = { left: [], right: [] };
@@ -6451,7 +6459,7 @@ $('#vPalette').addEventListener('click', ev => {
   }
   const act = ev.target.closest('#vpUndo, #vpRedo, #vpDelete');
   if (act && V.bus) V.bus.dispatch('editingaction', { source: null, name: { vpUndo: 'undo', vpRedo: 'redo', vpDelete: 'delete' }[act.id] });
-  if (ev.target.closest('#vpMin')) { hidePanel(); store.set('paletteOpen', false); showPalette(); }
+  if (ev.target.closest('#vpMin')) tuckPalette(false);
 });
 // On a phone, More shows the less-used tools in the toolbar until one is
 // picked (or More is pressed again).
@@ -6460,9 +6468,64 @@ $('#vpMore').addEventListener('click', () => {
   $('#vpMore').setAttribute('aria-expanded', String(open));
   placePanel();
 });
+// Swipes: a quick flick of the toolbar towards its edge tucks it away; a
+// swipe in from that edge brings it back. Its edge: the side it's docked
+// at, else the top or bottom, whichever it's nearer. (The grip still moves
+// it; a flick isn't a tap on the button it started on.)
+function paletteEdge() {
+  const p = $('#vPalette'), dock = p.dataset.dock;
+  if (dock) return dock;
+  const r = (p.hidden ? $('#vpShow') : p).getBoundingClientRect();
+  if (!r.height) return store.get('paletteSnap', 'bottom') === 'top' ? 'top' : 'bottom';
+  return r.top + r.height / 2 < innerHeight / 2 ? 'top' : 'bottom';
+}
+function tuckPalette(open) {
+  $('#vPalette').dataset.edge = paletteEdge();
+  if (!open) hidePanel();
+  store.set('paletteOpen', open);
+  showPalette();
+}
+(() => {
+  const FLICK = 40, QUICK = 400, EDGE = 28;
+  const toward = (edge, dx, dy) => ({ left: -dx, right: dx, top: -dy, bottom: dy })[edge];
+  const across = (edge, dx, dy) => (edge === 'left' || edge === 'right' ? Math.abs(dy) : Math.abs(dx));
+  let f = null;
+  $('#vPalette').addEventListener('pointerdown', ev => {
+    f = ev.target.closest('#vpGrip') ? null : { x: ev.clientX, y: ev.clientY, t: performance.now(), id: ev.pointerId };
+  }, true);
+  window.addEventListener('pointerup', ev => {
+    const s = f;
+    f = null;
+    if (!s || s.id !== ev.pointerId || $('#vPalette').hidden) return;
+    const dx = ev.clientX - s.x, dy = ev.clientY - s.y, edge = paletteEdge();
+    if (performance.now() - s.t > QUICK || toward(edge, dx, dy) < FLICK || across(edge, dx, dy) > toward(edge, dx, dy) * 0.8) return;
+    // (Not the tap on whatever button the flick began on.)
+    const stop = e => { e.stopPropagation(); e.preventDefault(); };
+    window.addEventListener('click', stop, { capture: true, once: true });
+    setTimeout(() => window.removeEventListener('click', stop, true), 400);
+    tuckPalette(false);
+  }, true);
+  // In from the edge: a swipe starting at the edge of the page area, while
+  // the toolbar's tucked away.
+  let e0 = null;
+  $('#vScroll').addEventListener('pointerdown', ev => {
+    e0 = null;
+    if (!gs || !$('#vPalette').hidden || ev.pointerType === 'mouse') return;
+    const r = $('#vScroll').getBoundingClientRect(), edge = paletteEdge();
+    const d = { left: ev.clientX - r.left, right: r.right - ev.clientX, top: ev.clientY - Math.max(r.top, $('#vTop').getBoundingClientRect().bottom), bottom: r.bottom - ev.clientY }[edge];
+    if (d >= 0 && d <= EDGE) e0 = { x: ev.clientX, y: ev.clientY, t: performance.now(), id: ev.pointerId, edge };
+  }, true);
+  window.addEventListener('pointermove', ev => {
+    if (!e0 || e0.id !== ev.pointerId) return;
+    const dx = ev.clientX - e0.x, dy = ev.clientY - e0.y, away = -toward(e0.edge, dx, dy);
+    if (performance.now() - e0.t > 700) { e0 = null; return; }
+    if (away >= FLICK && across(e0.edge, dx, dy) < away) { e0 = null; tuckPalette(true); }
+  }, true);
+  window.addEventListener('pointerup', () => { e0 = null; }, true);
+})();
 $('#vpShow').addEventListener('click', ev => {
   if ($('#vpShow').dataset.dragged) { delete $('#vpShow').dataset.dragged; return; }
-  store.set('paletteOpen', true); showPalette();
+  tuckPalette(true);
 });
 // On a phone: the toolbar follows the finger (moved, not re-laid out, so it
 // keeps up), then glides to the top or the bottom, whichever is nearer.
@@ -10470,10 +10533,18 @@ const zoomBy = (factor, x, y) => {
 $('#vClose').addEventListener('click', closeReader);
 $('#vZoomIn').addEventListener('click', () => { if (V.doc) V.viewer.increaseScale(); });
 $('#vZoomOut').addEventListener('click', () => { if (V.doc) V.viewer.decreaseScale(); });
-// Fit: the whole page on screen, or (pressed again) the page's width.
-$('#vFit').addEventListener('click', () => {
+// The zoom level is also the fit button: each tap goes on to the next of
+// the whole page, the page's width, and actual size (100%).
+const FITS = [['page-fit', 'the whole page'], ['page-width', 'the page\u2019s width'], ['page-actual', 'actual size']];
+function zoomLabel(preset) {
+  const b = $('#vZoomLevel'), i = FITS.findIndex(([v]) => v === preset), next = FITS[(i + 1) % FITS.length];
+  b.title = 'Fit ' + next[1] + (i >= 0 ? ' (now: ' + FITS[i][1] + ')' : '');
+  b.setAttribute('aria-label', 'Zoom ' + b.textContent + ': tap to fit ' + next[1]);
+}
+$('#vZoomLevel').addEventListener('click', () => {
   if (!V.doc) return;
-  V.viewer.currentScaleValue = V.viewer.currentScaleValue === 'page-fit' ? 'page-width' : 'page-fit';
+  const i = FITS.findIndex(([v]) => v === V.viewer.currentScaleValue);
+  V.viewer.currentScaleValue = FITS[(i + 1) % FITS.length][0];
 });
 
 // Search in the paper with PDF.js's find controller: every match is
@@ -13643,7 +13714,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-11.07</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-11.10</small>`;
 };
 
 function gunzipJSON(bytes) {
