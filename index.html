@@ -1776,7 +1776,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-11.01</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-11.02</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1791,7 +1791,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-11.01';
+      l.querySelector('small').textContent = 'Version 2026-10-11.02';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1803,7 +1803,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-11.01): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-11.02): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -2075,7 +2075,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-11.01`;
+    `<br>LibLande version 2026-10-11.02`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -2171,14 +2171,81 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && not
 // The page to open a paper at, if the latest place in it was on another
 // device.
 const elsewhere = fileId => { const x = SYNC.position && POS[fileId]; return x && x.dev !== DEVICE && x.page > 1 ? x : null; };
+// A paper ends where its references start: reaching that page is 100%
+// (the pages before it count towards it), so a paper read through doesn't
+// stall at 85% for its reference list. Found once per PDF (endPage) and
+// remembered; without one (a scan, say), the whole PDF counts.
 function noteProgress(page, total) {
   const e = V.entry;
   if (!e || !total || page < 2) return;
-  const p = Math.min(100, Math.round(page / total * 100)), old = PROGRESS[e.k];
+  const end = V.endPage && V.endPage <= total ? V.endPage : total;
+  const p = Math.min(100, Math.round(page / end * 100)), old = PROGRESS[e.k];
   if (old && old.p >= p) return;
   PROGRESS[e.k] = { p, at: Date.now() };
   clearTimeout(noteProgress.t);
   noteProgress.t = setTimeout(saveProgress, 4000);
+}
+// The page a paper's reference list starts on (0: none found): from the
+// PDF's outline, or else a line on its own reading References,
+// Bibliography, Works Cited or the like, in the second half of the PDF
+// (so a mention earlier on doesn't count). Spaced-out capitals
+// ("R E F E R E N C E S") count too.
+const REF_HEAD = /^(?:[\dIVX]+\.?\s*)?(?:references?|bibliography|works cited|literature cited|reference list|cited works|references and notes|notes and references)\s*:?$/i;
+const refHeading = line => {
+  let t = String(line || '').replace(/\s+/g, ' ').trim();
+  if (/^(?:[A-Z] )+[A-Z]$/.test(t)) t = t.replace(/ /g, '');
+  return t.length < 40 && REF_HEAD.test(t);
+};
+const END_PAGES = store.get('endPages', {});
+async function findEndPage(doc) {
+  const n = doc.numPages;
+  if (n < 3) return 0;
+  // The outline, if the PDF has one.
+  try {
+    const flat = [], walk = list => (list || []).forEach(it => { flat.push(it); walk(it.items); });
+    walk(await doc.getOutline());
+    for (const it of flat) {
+      if (!refHeading(it.title)) continue;
+      let dest = it.dest;
+      if (typeof dest === 'string') dest = await doc.getDestination(dest);
+      if (Array.isArray(dest) && dest[0]) {
+        const at = (typeof dest[0] === 'object' ? await doc.getPageIndex(dest[0]) : dest[0]) + 1;
+        if (at > 1) return at;
+      }
+    }
+  } catch (err) { /* the text, then */ }
+  for (let i = Math.max(2, Math.floor(n / 2) + 1); i <= n; i++) {
+    let items;
+    try { items = (await (await doc.getPage(i)).getTextContent()).items; } catch (err) { continue; }
+    let line = '';
+    for (const it of items) {
+      line += it.str || '';
+      if (it.hasEOL) { if (refHeading(line)) return i; line = ''; }
+    }
+    if (refHeading(line)) return i;
+  }
+  return 0;
+}
+// Once the paper is open: its end page (remembered for each PDF), then the
+// page you're on counted again against it.
+async function endPageFor(doc, file) {
+  if (!file || !file.id) return;
+  let at = END_PAGES[file.id];
+  if (at == null) {
+    // (After the pages are drawn: the reading comes first.)
+    await new Promise(r => setTimeout(r, 2500));
+    if (doc !== V.doc) return;
+    at = await findEndPage(doc);
+    // (Closed meanwhile: looked for again next time.)
+    if (doc !== V.doc) return;
+    const keys = Object.keys(END_PAGES);
+    if (keys.length > 800) keys.slice(0, keys.length - 800).forEach(k => delete END_PAGES[k]);
+    END_PAGES[file.id] = at;
+    store.set('endPages', END_PAGES);
+  }
+  if (doc !== V.doc) return;
+  V.endPage = at || 0;
+  if (V.viewer) noteProgress(V.viewer.currentPageNumber, V.viewer.pagesCount);
 }
 function saveProgress() {
   const keep = Object.entries(PROGRESS).sort((a, b) => b[1].at - a[1].at).slice(0, 300);
@@ -4602,7 +4669,11 @@ function ensureViewer(lib, VL) {
     noteProgress(e.pageNumber, viewer.pagesCount);
     notePosition(e.pageNumber);
   });
-  bus.on('pagesloaded', e => { $('#vPage').textContent = viewer.currentPageNumber + ' / ' + e.pagesCount; RAIL.lastPage = viewer.currentPageNumber; railSoon(); });
+  bus.on('pagesloaded', e => {
+    $('#vPage').textContent = viewer.currentPageNumber + ' / ' + e.pagesCount; RAIL.lastPage = viewer.currentPageNumber; railSoon();
+    V.endPage = 0;
+    endPageFor(V.doc, V.file).catch(err => console.warn('Where the references start:', err));
+  });
   bus.on('scalechanging', () => railSoon());
   // (PDF.js 6 calls it editingstateschanged; 5, annotationeditorstateschanged.)
   const onEditingStates = e => {
@@ -13178,7 +13249,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-11.01</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-11.02</small>`;
 };
 
 function gunzipJSON(bytes) {
@@ -13551,7 +13622,7 @@ if (!gs) {
 }
 // For the test suite (_test/suite.html) only: a few of the reader's
 // insides, when the test page asks for them.
-if (window.LIBLANDE_TEST) window.LL = { V, BM, JOURNAL, LOCAL, AUTO, saveMarkup, setTool, MARK, PDFJS, pdfJsFix, combineMarks, makeZip, MARK_ERASER: () => MARK.eraserSize,
+if (window.LIBLANDE_TEST) window.LL = { V, BM, JOURNAL, LOCAL, AUTO, saveMarkup, setTool, MARK, PDFJS, pdfJsFix, findEndPage, refHeading, combineMarks, makeZip, MARK_ERASER: () => MARK.eraserSize,
   lib: () => ({ ENTRIES, BYKEY, DATA, VERSION_OF, VERSIONS, NESTED, state }), init, refresh, openEdit, isForthcoming, forthChanges, parseBibtexEntry,
   oldLineMarks, convertOldLines, fetchAhead, PTABS, renderPaperTabs, openPdf, loadPdfJs, addStreamIteration, msCheck, msCites, msRef, msDocx, MS, msVisible };
 })();
