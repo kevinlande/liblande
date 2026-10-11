@@ -1776,7 +1776,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-09.01</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-11.01</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1791,7 +1791,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-09.01';
+      l.querySelector('small').textContent = 'Version 2026-10-11.01';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1803,7 +1803,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-09.01): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-11.01): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -2075,7 +2075,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-09.01`;
+    `<br>LibLande version 2026-10-11.01`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -4289,12 +4289,46 @@ function addStreamIteration() {
   RS.prototype[Symbol.asyncIterator] = RS.prototype.values;
 }
 addStreamIteration();
-// PDF.js itself, with a fix: a second touch (a palm, another finger) just
-// as a pen or freehand stroke ends finds the stroke already gone, and PDF.js
-// 6 throws "null is not an object (evaluating 'DrawingEditor.#sl.isCancellable')".
-// So it's loaded from a copy in which a stroke that's gone is skipped; as it
-// is if a later PDF.js doesn't have that code, or the copy can't be made.
-const pdfJsFix = src => src.replace(/if\((\w+)\.#(\w+)\.isCancellable\(\)\)\{\1\.#\2\./g, 'if($1.#$2?.isCancellable()){$1.#$2.');
+// PDF.js itself, with fixes to its drawing (the pen and the freehand
+// highlighter, which share one drawing under way):
+// - A second touch (a palm, another finger) just as a stroke ends finds the
+//   stroke already gone, and PDF.js 6 throws "null is not an object
+//   (evaluating 'DrawingEditor.#sl.isCancellable')": a stroke that's gone
+//   is skipped.
+// - PDF.js hears a stroke's end (the lift) on the window, last, and on the
+//   page's layer: one of LibLande's own handlers that stops the lift (a
+//   drawing moved with a long press, say) left the stroke "under way". The
+//   layer then ignored the next stroke; PDF.js refused strokes of the other
+//   kind (it took the Pencil for a palm); and a pen stroke after a freehand
+//   highlight threw "DrawingEditor.#sl.startNew is not a function". So
+//   PDF.js hears the lift first (on the window, capturing); the layer only
+//   ignores a press while something else is really touching the screen
+//   (POINTERS_DOWN); and a new stroke with nothing else touching the screen
+//   starts afresh, the stale one's listeners, drawing and pointer kind
+//   cleared.
+// Loaded as it is if a later PDF.js doesn't have that code, or the copy
+// can't be made.
+const POINTERS_DOWN = new Map();
+window.addEventListener('pointerdown', ev => { POINTERS_DOWN.set(ev.pointerId, Date.now()); }, true);
+['pointerup', 'pointercancel'].forEach(t => window.addEventListener(t, ev => { POINTERS_DOWN.delete(ev.pointerId); }, true));
+// (Anything else touching the screen? One down over a minute ago without
+// a lift counts as lifted: iPadOS doesn't always say.)
+window.__llOthersDown = id => { const now = Date.now(); for (const [p, t] of POINTERS_DOWN) if (p !== id && now - t < 60000) return true; return false; };
+function pdfJsFix(src) {
+  let out = src.replace(/if\((\w+)\.#(\w+)\.isCancellable\(\)\)\{\1\.#\2\./g, 'if($1.#$2?.isCancellable()){$1.#$2.');
+  out = out.replace(/(window\.addEventListener\("pointer(?:up|cancel)",(\w+)=>\{CurrentPointers\.isSamePointerIdOrRemove\(\2\.pointerId\)&&this\._endDraw(?:ingSession\(\)|\(\2\))\},\{signal:\w+)\}/g, '$1,capture:!0}');
+  out = out.replace(/(pointerdown\((\w+)\)\{this\.#\w+\.getMode\(\)===\w+\.HIGHLIGHT&&this\.enableTextSelection\(\);)if\(this\.#(\w+)\)\{this\.#\3=!1;return\}/,
+    '$1if(this.#$3&&globalThis.__llOthersDown&&!globalThis.__llOthersDown($2.pointerId))this.#$3=!1;if(this.#$3){this.#$3=!1;return}');
+  // The drawing's private fields, by what they hold (named differently in each build).
+  const clean = /static _cleanup\(\w+\)\{if\(\w+\)\{this\._currentDrawId=-1;this\._currentParent=null;(\w+)\.#(\w+)=null;\1\.#(\w+)=null;\1\.#(\w+)=null;[^}]*\}if\(\1\.#(\w+)\)\{/.exec(out);
+  const start = /static startDrawing\((\w+),(\w+),(\w+),(\w+)\)\{/.exec(out);
+  if (clean && start && /CurrentPointers\.clearPointerType\(\)/.test(out)) {
+    const [, C, sl, al, ol, rl] = clean, ev = start[4];
+    const fresh = `if(!globalThis.__llOthersDown||!globalThis.__llOthersDown(${ev}.pointerId)){if(${C}.#${rl}){${C}.#${rl}.abort();${C}.#${rl}=null}CurrentPointers.clearPointerIds();CurrentPointers.clearPointerType();const _ll=${C}.#${sl};if(_ll&&(typeof _ll.startNew!=="function"||!this._currentParent)){${C}.#${sl}=null;${C}.#${al}=null;${C}.#${ol}=null}}`;
+    out = out.slice(0, start.index + start[0].length) + fresh + out.slice(start.index + start[0].length);
+  }
+  return out;
+}
 async function importPdfJs() {
   try {
     const r = await fetch(PDFJS + 'pdf.min.mjs');
@@ -13144,7 +13178,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-09.01</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-11.01</small>`;
 };
 
 function gunzipJSON(bytes) {
