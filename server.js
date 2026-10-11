@@ -17,7 +17,7 @@
   window.LIBLANDE_PAGES = true;
   // (Which version each part of the app is from: index.html checks they
   // match. build.py fills it in.)
-  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-10-11.06';
+  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-10-11.07';
   const CLIENT_ID = '789682218462-98mjugngb46ttd01ucp9dcj71ufspjgn.apps.googleusercontent.com';
   // Google Drive (your .bib, papers and LibLande folder): all it needs.
   const SCOPE = 'https://www.googleapis.com/auth/drive';
@@ -238,7 +238,10 @@
       const started = startBuild(w);
       // (The pending edits and the reading list as last known if they
       // can't be read just now: never an empty list in their place.)
-      const known = value => err => { console.warn(err); return value(); };
+      // (Said in the status, with when they were last read, so the page
+      // can say it's showing an older copy.)
+      let stale = false;
+      const known = value => err => { console.warn(err); stale = true; return value(); };
       const [pending, reading, prefs, papersName, token] = await Promise.all([
         builder.readJson(w.folder, PENDING_FILE).catch(known(() => ({ edits: offlineLists.known.pending }))),
         builder.readJson(w.folder, READING_FILE).catch(known(() => offlineLists.known.reading)), loadPrefs(w.s),
@@ -260,7 +263,9 @@
         prefs,
       };
       if (buildErr) { st.error = buildErr; buildErr = null; }
-      offlineLists.update(st);
+      // (The reading list says when it's from, if it's an older copy.)
+      if (stale) st.reading = Object.assign({}, st.reading, { staleAt: offlineLists.at || 0 });
+      else offlineLists.update(st);
       // The library just built here.
       if (lastBuilt && !(st.stamp > lastBuilt.stamp)) { st.stamp = lastBuilt.stamp; st.libraryId = lastBuilt.id; }
       return st;
@@ -419,6 +424,7 @@
   function keepForLater(name, args) {
     outbox.push({ name, args, at: Date.now() });
     store.set('outbox', outbox);
+    window.dispatchEvent(new CustomEvent('liblande-waiting', { detail: { waiting: outbox.length } }));
   }
   // (Made in Drive first: anything kept from before, so the order holds.)
   function later(name, offline) {
@@ -442,11 +448,15 @@
   // or an answer), with the changes kept here made to them.
   const offlineLists = {
     known: store.get('lists', { pending: [], reading: { items: [], done: [], seeded: false, syncedKeys: null } }),
+    // (When they were last read from Drive.)
+    at: store.get('listsAt', null),
     update(res) {
       if (!res) return;
       if (Array.isArray(res.pending)) this.known.pending = res.pending;
       if (res.reading) this.known.reading = res.reading;
       store.set('lists', this.known);
+      this.at = Date.now();
+      store.set('listsAt', this.at);
     },
     pending(req) {
       const set = req.set || {};
@@ -476,6 +486,9 @@
       return JSON.parse(JSON.stringify(d));
     },
   };
+  // The lists as last known, for the page to show before Drive answers
+  // (or when it can't): an older copy, with when it's from.
+  window.liblandeKnownLists = () => JSON.parse(JSON.stringify({ reading: offlineLists.known.reading, pending: offlineLists.known.pending, at: offlineLists.at }));
   // Back online: the kept changes made in Drive, in order. Two edits to the
   // same publication were both checked against how it was before either;
   // the second is checked against what the first made it. One that can't

@@ -511,6 +511,14 @@ body:has(#sheet:not([hidden])) .pick-bar { visibility: hidden; }
 .c-added.stale, .m .stale { color: var(--warn); }
 .rl-list-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 6px 12px; background: var(--accent-soft); border-bottom: 1px solid var(--line); font-size: 13px; }
 .rl-list-bar .rl-count { flex: 1 1 auto; min-width: 0; font-weight: 600; }
+/* Continue reading: a card across the top of the reading list. */
+.rl-continue { flex: 1 1 100%; display: flex; align-items: center; gap: 10px; min-width: 0; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--text); text-align: left; cursor: pointer; font: inherit; }
+.rl-continue:hover { border-color: var(--accent); }
+.rl-continue > .i { flex: none; width: 22px; height: 22px; padding: 5px; border-radius: 50%; background: var(--accent); color: #fff; fill: currentColor; stroke: none; box-sizing: content-box; }
+.rl-c-text { flex: 1 1 auto; min-width: 0; display: grid; }
+.rl-c-head { font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--accent); }
+.rl-c-title { font: 600 14px/1.3 var(--serif); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rl-c-meta { flex: none; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .rl-list-bar .btn { min-height: 28px; padding: 3px 12px; font-size: 13px; }
 .rl-list-bar select { height: 28px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); color: var(--text); font: 13px var(--ui); padding: 0 6px; }
 .rl-list-bar label { display: inline-flex; align-items: center; gap: 6px; }
@@ -600,6 +608,11 @@ body:has(#sheet:not([hidden])) .pick-bar { visibility: hidden; }
 .tb-tabs #recentBtn { flex: none; height: 28px; padding: 0 6px; margin-left: 2px; }
 .tab-scroll { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 2px; overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
 .tab-scroll::-webkit-scrollbar { display: none; }
+/* Lists out of sight at an end of the strip: a button over that end with
+   how many (as the open papers' tabs have); a tap lists them. */
+.tab-scroll-wrap { position: relative; flex: 1 1 auto; min-width: 0; display: flex; align-items: center; }
+.tab-scroll-wrap .v-tabs-more.left { padding-left: 4px; }
+.tab-scroll-wrap .v-tabs-more.right { padding-right: 4px; }
 .tab-scroll:not(:empty) { border-left: 1px solid var(--line); padding-left: 4px; margin-left: 2px; }
 @media (max-width: 699px) {
   .tab { font-size: 13.5px; padding: 5px 6px; max-width: 150px; }
@@ -717,6 +730,16 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .col-menu .linkish { margin: 4px 8px 4px; font-size: 12.5px; }
 .rows { position: relative; }
 .row { position: absolute; left: 0; right: 0; cursor: default; font-size: 13px; }
+/* Behind a row being swiped: what letting go will do, in colour once past
+   the line. */
+.swipe-bg { position: absolute; left: 0; right: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 18px; background: var(--side-hover); color: var(--muted); font: 600 13px var(--ui); pointer-events: none; }
+.swipe-act { display: inline-flex; align-items: center; gap: 7px; }
+.swipe-act .i { width: 18px; height: 18px; }
+.swipe-bg:not(.to-right) .swipe-act.right, .swipe-bg.to-right .swipe-act.left { visibility: hidden; }
+.swipe-act.left { margin-left: auto; }
+.swipe-bg.go-right { background: var(--accent); color: #fff; }
+.swipe-bg.go-left { background: #3d8a5f; color: #fff; }
+.swipe-bg.go-right .swipe-act .i, .swipe-bg.go-left .swipe-act .i { transform: scale(1.12); transition: transform .15s; }
 .row.odd { background: var(--stripe); }
 .row > span { padding: 0 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row .c-file { padding: 0; display: flex; justify-content: center; }
@@ -771,7 +794,7 @@ button.fileicon { border: 0; background: none; cursor: pointer; }
 .d-cite { color: var(--text); font-size: 13px; line-height: 1.35; font-variant-numeric: tabular-nums; }
 /* Each piece has a bracket and a label under it, drawn by CSS so that
    selecting and copying the line takes only the citation. */
-.cs { display: inline-block; position: relative; min-width: 17px; max-width: 100%; margin: 0 1px; padding-bottom: 14px; text-align: center; vertical-align: baseline; }
+.cs { display: inline-block; position: relative; min-width: 17px; max-width: 100%; margin: 0; padding-bottom: 14px; text-align: center; vertical-align: baseline; }
 .cs-wide { text-align: left; margin-left: 0; }
 .cs[data-f] { cursor: text; border-radius: 3px; }
 @media (hover: hover) { .cs[data-f]:not(.editing):hover { background: var(--accent-soft); } }
@@ -850,6 +873,11 @@ button.fileicon { border: 0; background: none; cursor: pointer; }
 .menu-list { position: absolute; z-index: 20; top: calc(100% + 4px); left: 0; min-width: 170px; padding: 4px; display: grid; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); box-shadow: var(--shadow); }
 .menu.right .menu-list { left: auto; right: 0; }
 .menu-list button { border: 0; background: none; text-align: left; padding: 8px 10px; border-radius: 6px; font-size: 13.5px; color: var(--text); }
+.act-more .menu-list { min-width: 210px; }
+.act-more .menu-list > a, .act-more .menu-list > button { display: flex; align-items: center; gap: 9px; }
+.act-more .menu-list .i { width: 17px; height: 17px; flex: none; }
+.act-more .menu-list span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.act-more > summary .i circle { fill: currentColor; stroke: none; }
 .menu-list button:hover, .menu-list button:focus-visible { background: var(--accent-soft); }
 .menu-list a { display: block; padding: 8px 10px; border-radius: 6px; font-size: 13.5px; color: var(--text); text-decoration: none; }
 .menu-list a:hover, .menu-list a:focus-visible { background: var(--accent-soft); }
@@ -900,6 +928,13 @@ details.d-sec[open] summary { margin-bottom: 8px; }
    with tabs out of sight, the strip fades and a button says how many are
    past it (a tap lists them, to go to one). */
 .v-tabs-wrap { position: relative; flex: none; }
+/* In the bar (a few papers open, and room): no row of their own. */
+.v-tabs-inline .v-title { display: none; }
+.v-tabs-inline .v-bar > .v-tabs-wrap { flex: 1 1 auto; min-width: 0; align-self: stretch; display: flex; align-items: center; }
+.v-tabs-inline .v-bar .v-tabs { flex: 1 1 auto; min-width: 0; padding: 0 2px; background: none; border: 0; }
+.v-tabs-inline .v-bar .v-tab { min-width: 92px; }
+.v-tabs-inline .v-bar .v-tab[aria-selected="true"] { min-width: 120px; }
+.v-tabs-inline .v-bar .v-tabs-more { bottom: 0; }
 .v-tabs-more { position: absolute; top: 0; bottom: 1px; z-index: 1; display: flex; align-items: center; gap: 1px; border: 0; cursor: pointer;
   color: var(--text); font: 700 11.5px var(--ui); font-variant-numeric: tabular-nums; padding: 0 8px; }
 .v-tabs-more[hidden] { display: none; }
@@ -1014,6 +1049,16 @@ details.d-sec[open] summary { margin-bottom: 8px; }
 .fileicon.saved::after { content: ''; position: absolute; right: 3px; bottom: 3px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 1.5px var(--bg); }
 .pdf.saved::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-right: 4px; vertical-align: 1px; }
 body.is-offline .fileicon:not(.saved), body.is-offline .pdf:not(.saved) { opacity: .3; }
+/* Offline, or changes waiting to go to Drive: a small cloud in the
+   toolbars (struck through offline), with how many are waiting. */
+.rl-stale { font-size: 12px; color: var(--muted); margin-left: 10px; }
+.rl-stale::before { content: '\00b7'; margin-right: 10px; }
+.net-badge { gap: 5px; color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.net-badge .net-slash { display: none; }
+.net-badge.off .net-slash { display: inline; }
+.net-badge.off { color: #b2662b; }
+.net-badge .net-n:empty { display: none; }
+.toolbar .tb-btn.net-badge { width: auto; padding: 0 7px; }
 .pick-ib { padding: 6px 9px; } .pick-ib .i { width: 17px; height: 17px; }
 .bulk-kws { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
 .bulk-kw { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
@@ -1067,7 +1112,9 @@ a.ms-ib { text-decoration: none; }
 .ms-ctx mark { background: var(--accent-soft); color: var(--text); border-radius: 3px; padding: 0 2px; }
 .ms-more > summary { cursor: pointer; font-size: 12px; color: var(--accent); }
 .ms-more .ms-ctx { margin-top: 4px; }
-.grp .ms-todo-ct { background: #c4554d; color: #fff; border-radius: 9px; padding: 0 6px; font-weight: 600; }
+/* (A count like the others: what's left to fix in the manuscript checked
+   last, not an alarm.) */
+.grp .ms-todo-ct { color: var(--muted); }
 .grp .ms-ok-ct .i { width: 14px; height: 14px; color: var(--accent); display: block; }
 @media (max-width: 600px) {
   .ms-item { flex-direction: column; gap: 6px; }
@@ -1169,7 +1216,13 @@ a.ms-ib { text-decoration: none; }
 .v-marks-page { padding: 12px 12px 4px; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--faint); }
 .v-mark { display: flex; gap: 8px; align-items: flex-start; width: 100%; text-align: left; border: 0; background: none; padding: 6px 12px; color: var(--text); }
 .v-mark:hover { background: var(--accent-soft); }
-.v-mark-sw { flex: none; width: 10px; height: 10px; border-radius: 3px; margin-top: 3px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .15); }
+.v-mark-sw { flex: none; width: 12px; height: 12px; border-radius: 3px; margin-top: 2px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .15); }
+/* Colour chips over the list: all, or one colour. */
+.v-mark-cols { display: flex; flex-wrap: wrap; gap: 5px; padding: 8px 10px 4px; }
+.v-mark-col { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border: 1px solid var(--line); border-radius: 999px; background: none; color: var(--muted); font: 12px var(--ui); cursor: pointer; }
+.v-mark-col i { width: 10px; height: 10px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .18); }
+.v-mark-col span { font-variant-numeric: tabular-nums; opacity: .75; }
+.v-mark-col.on { border-color: var(--accent); background: var(--accent-soft); color: var(--text); }
 .v-mark-body { display: grid; gap: 2px; min-width: 0; }
 .v-mark-kind { font-size: 11.5px; color: var(--muted); }
 .v-mark-text { font-size: 12.5px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
@@ -1209,6 +1262,12 @@ a.ms-ib { text-decoration: none; }
 }
 .v-bar .tb-btn[aria-pressed="true"] { color: var(--accent); background: var(--accent-soft); }
 .v-find { display: flex; align-items: center; gap: 4px; padding: 6px 8px; padding-left: calc(8px + env(safe-area-inset-left, 0px)); padding-right: calc(8px + env(safe-area-inset-right, 0px)); background: var(--panel); border-bottom: 1px solid var(--line); }
+/* On wider screens, search floats as a small box at the top right, over
+   the page, rather than taking a row. */
+@media (min-width: 700px) {
+  .v-find { position: absolute; top: calc(100% + 8px); right: calc(14px + env(safe-area-inset-right, 0px)); z-index: 30; width: min(440px, calc(100% - 28px)); padding: 6px 6px 6px 8px; border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }
+  .v-find input { max-width: none; }
+}
 .v-find input { flex: 1 1 auto; min-width: 0; max-width: 420px; height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font: 15px var(--ui); }
 .v-find input:focus { border-color: var(--accent); outline: none; }
 .v-find-count { font-size: 12.5px; color: var(--muted); white-space: nowrap; min-width: 64px; padding: 0 4px; font-variant-numeric: tabular-nums; }
@@ -1609,7 +1668,8 @@ try {
         <svg class="i" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg><span id="backLabel">Groups</span>
       </button>
       <button type="button" class="tb-btn tb-reader" id="readerBtn" hidden title="Back to your open papers" aria-label="Back to your open papers"><svg class="i" viewBox="0 0 24 24"><path d="M2 5h6a4 4 0 0 1 4 4v11a3 3 0 0 0-3-3H2z"/><path d="M22 5h-6a4 4 0 0 0-4 4v11a3 3 0 0 1 3-3h7z"/></svg><span class="ct" id="readerCt"></span></button>
-      <div class="tb-title tb-tabs" id="tabs" role="tablist" aria-label="Open lists"><button type="button" class="tab pinned" role="tab" data-tab="all" aria-selected="true"><span class="nm">Library</span><span class="ct"></span></button><button type="button" class="tb-btn" id="recentBtn" aria-label="Recently viewed" title="Recently viewed"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.8 12a8.2 8.2 0 1 0 2.4-5.8"/><path d="M3.5 3.8v4.4h4.4"/><path d="M12 8v4.2l2.8 1.8"/></svg></button><div class="tab-scroll" id="tabScroll"></div></div>
+      <div class="tb-title tb-tabs" id="tabs" role="tablist" aria-label="Open lists"><button type="button" class="tab pinned" role="tab" data-tab="all" aria-selected="true"><span class="nm">Library</span><span class="ct"></span></button><button type="button" class="tb-btn" id="recentBtn" aria-label="Recently viewed" title="Recently viewed"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.8 12a8.2 8.2 0 1 0 2.4-5.8"/><path d="M3.5 3.8v4.4h4.4"/><path d="M12 8v4.2l2.8 1.8"/></svg></button><div class="tab-scroll-wrap"><div class="tab-scroll" id="tabScroll"></div><button type="button" class="v-tabs-more left" id="tabLeft" hidden></button><button type="button" class="v-tabs-more right" id="tabRight" hidden></button></div></div>
+      <button type="button" class="tb-btn net-badge" id="netBadge" data-net hidden aria-live="polite"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 18.5h9.8a3.7 3.7 0 0 0 .6-7.35A5.6 5.6 0 0 0 7.2 9.6a4.45 4.45 0 0 0 .3 8.9z"/><path class="net-slash" d="M4 4l16 16"/></svg><span class="net-n"></span></button>
       <button type="button" class="tb-btn pending-btn" id="pendingBtn" hidden title="Apply pending edits to your .bib file"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg><span>0 pending</span></button>
       <button type="button" class="tb-btn select-btn" id="selectBtn" title="Select several publications to export or copy" aria-label="Select several publications" aria-pressed="false"><svg class="i" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><path d="M5.5 7l1.5 1.5 2.5-3"/><path d="M14 7h7M14 17h7"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/></svg></button>
       <button type="button" class="tb-btn tb-more" id="moreBtn" aria-label="More" title="More" aria-haspopup="menu" aria-expanded="false"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="18" cy="12" r="1.4"/></svg></button>
@@ -1697,10 +1757,10 @@ try {
       <button type="button" class="tb-btn v-zoomctl" id="vZoomOut" aria-label="Zoom out" title="Zoom out">&#x2212;</button>
       <span class="v-zoom v-zoomctl" id="vZoomLevel">100%</span>
       <button type="button" class="tb-btn v-zoomctl" id="vZoomIn" aria-label="Zoom in" title="Zoom in">+</button>
-      <details class="menu" id="vShare"><summary class="btn" title="Share a copy to another app"><svg class="i" viewBox="0 0 24 24"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg><span>Share</span><svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></summary><div class="menu-list" role="menu"><button type="button" role="menuitem" data-vshare="0">PDF as is</button><button type="button" role="menuitem" data-vshare="1">Clean copy (no annotations)</button></div></details>
+      <details class="menu" id="vShare"><summary class="btn" title="Share a copy to another app"><svg class="i" viewBox="0 0 24 24"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg><span>Share</span><svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></summary><div class="menu-list" role="menu"><button type="button" role="menuitem" data-vshare="0">PDF as is</button><button type="button" role="menuitem" data-vshare="1">Clean copy (no annotations)</button><a role="menuitem" id="vDrive" href="#" target="_blank" rel="noopener">Open in Google Drive</a></div></details>
+      <button type="button" class="tb-btn net-badge" id="vNetBadge" data-net hidden aria-live="polite"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 18.5h9.8a3.7 3.7 0 0 0 .6-7.35A5.6 5.6 0 0 0 7.2 9.6a4.45 4.45 0 0 0 .3 8.9z"/><path class="net-slash" d="M4 4l16 16"/></svg><span class="net-n"></span></button>
       <button type="button" class="btn v-save" id="vSave" hidden title="Changes save on their own; this saves them now (&#x2318;S)" aria-label="Save"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h11l3 3v12a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/><path d="M8 4v5h7V4M8 20v-6h8v6"/></svg><svg class="i ok" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span>Save</span></button>
       <details class="menu right" id="vRLMenu" hidden><summary class="tb-btn" id="vRL" aria-label="Reading list" title="Reading list"><svg class="i" viewBox="0 0 24 24"><path d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1z"/></svg></summary><div class="menu-list" role="menu" id="vRLList"></div></details>
-      <a class="tb-btn" id="vDrive" href="#" target="_blank" rel="noopener" aria-label="Open in Google Drive" title="Open in Google Drive"><svg class="i" viewBox="0 0 24 24"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></a>
     </div>
   </header>
   <div class="v-tabs-wrap"><nav class="v-tabs" id="vTabs" role="tablist" aria-label="Open papers"></nav><button type="button" class="v-tabs-more left" id="vTabsLeft" hidden></button><button type="button" class="v-tabs-more right" id="vTabsRight" hidden></button></div>
@@ -1801,7 +1861,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-11.06</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-11.07</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1816,7 +1876,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-11.06';
+      l.querySelector('small').textContent = 'Version 2026-10-11.07';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1828,7 +1888,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-11.06): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-11.07): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -2100,7 +2160,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-11.06`;
+    `<br>LibLande version 2026-10-11.07`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -2193,6 +2253,7 @@ function savePositions() {
   Object.keys(POS).forEach(k => { if (!keep.some(x => x[0] === k)) delete POS[k]; });
   store.set('positions', POS);
   if (gs && SYNC.position) google.script.run.withFailureHandler(() => {}).savePrefs({ positions: POS });
+  if (ENTRIES.length) renderRLBar();
 }
 function positionsMerge(prefs) {
   if (!SYNC.position) return;
@@ -2391,9 +2452,61 @@ function renderRLBar() {
   if (bar.hidden) return;
   const n = upNextCount(), all = READING.items.length;
   bar.querySelector('.rl-count').textContent = all ? n + ' up next \u00b7 ' + (all - n) + ' later' : 'Nothing to read yet';
+  // An older copy (Drive couldn't be reached): when it's from.
+  let old = bar.querySelector('.rl-stale');
+  if (READING.staleAt) {
+    if (!old) { old = document.createElement('span'); old.className = 'rl-stale'; bar.querySelector('.rl-count').after(old); }
+    const d = new Date(READING.staleAt), today = d.toDateString() === new Date().toDateString();
+    old.textContent = 'Your list as of ' + (today ? '' : d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ', ') + d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    old.title = 'Google Drive couldn\u2019t be reached, so this is the list as LibLande last had it. It updates once Drive can be reached.';
+  } else if (old) old.remove();
+  // Continue reading: the paper on the list you were in last (past its
+  // first page, not yet read through), a tap from where you left it.
+  let card = bar.querySelector('.rl-continue');
+  const c = continueCandidate();
+  if (!c) { if (card) card.remove(); return; }
+  if (!card) { card = document.createElement('button'); card.type = 'button'; card.className = 'rl-continue'; bar.prepend(card); }
+  card.dataset.key = c.e.k; card.dataset.file = c.f.id; card.dataset.page = c.page;
+  const prog = progressText(c.e);
+  card.innerHTML = `<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>` +
+    `<span class="rl-c-text"><span class="rl-c-head">Continue reading</span><span class="rl-c-title">${esc(c.e.f.title || c.e.k)}</span></span>` +
+    `<span class="rl-c-meta">p. ${c.page}${prog ? ' \u00b7 ' + esc(prog) : ''}</span>`;
+  card.title = 'Open \u201c' + (c.e.f.title || c.e.k) + '\u201d at page ' + c.page;
   $('#rlTriage').hidden = !all;
 }
 $('#rlTriage').addEventListener('click', () => openTriage());
+// The paper to continue: of those on the list, the one whose place in it
+// was noted last (on any device), past page 1 and not yet read through.
+function continueCandidate() {
+  const byFile = new Map();
+  READING.items.forEach(x => { const e = BYKEY.get(x.key); (e && e.files || []).forEach(f => { if (f.id) byFile.set(f.id, [e, f]); }); });
+  let best = null;
+  Object.entries(POS).forEach(([id, p]) => {
+    const hit = byFile.get(id);
+    if (!hit || !p || p.page < 2 || (best && best.at >= p.at)) return;
+    const pr = PROGRESS[hit[0].k];
+    if (pr && pr.p >= 100) return;
+    best = { e: hit[0], f: hit[1], page: p.page, at: p.at };
+  });
+  return best;
+}
+$('#rlBar').addEventListener('click', ev => {
+  const card = ev.target.closest('.rl-continue');
+  if (!card) return;
+  const e = BYKEY.get(card.dataset.key), f = e && (e.files || []).find(x => x.id === card.dataset.file), page = +card.dataset.page;
+  if (!e || !f) return;
+  openPaper(e, f);
+  // (Once it's open, at the page: unless it's already further on.)
+  const t0 = Date.now();
+  const go = () => {
+    if (V.file && V.file.id === f.id && V.viewer && V.viewer.pagesCount) {
+      setTimeout(() => { if (V.file && V.file.id === f.id && V.viewer.currentPageNumber < page) V.viewer.currentPageNumber = Math.min(page, V.viewer.pagesCount); }, 120);
+      return;
+    }
+    if (Date.now() - t0 < 20000) setTimeout(go, 150);
+  };
+  go();
+});
 
 // Triage: the list one paper at a time, oldest first within Up next, then Later.
 function openTriage() {
@@ -2868,7 +2981,12 @@ function grpBtn(id, label, count, icon) {
 // The checker's row: how much is left to fix in the manuscript checked last.
 const msToolLast = () => (MS.recent && MS.recent[0]) || null;
 const msToolTitle = () => { const x = msToolLast(); return ' title="' + esc('Check a manuscript\u2019s citations' + (x ? ' \u2014 ' + x.name + ': ' + (x.todo ? x.todo + ' to fix' : 'all in order') : '')) + '"'; };
-const msToolCount = () => { const x = msToolLast(); return !x ? '' : x.todo ? '<span class="ct ms-todo-ct">' + x.todo + '</span>' : '<span class="ct ms-ok-ct">' + ICON.check + '</span>'; };
+// (Only for a check in the last two weeks: an old one's count is stale.)
+const msToolCount = () => {
+  const x = msToolLast();
+  if (!x || Date.now() - (x.at || 0) > 14 * 86400000) return '';
+  return x.todo ? '<span class="ct ms-todo-ct">' + x.todo + '</span>' : '<span class="ct ms-ok-ct">' + ICON.check + '</span>';
+};
 function renderGroups() {
   const inboxCount = ENTRIES.filter(e => e.ib).length;
   let h = `<div class="sec"><div class="sec-h">Library</div>${grpBtn('all', 'Library', ENTRIES.length, ICON.lib)}` +
@@ -2964,7 +3082,62 @@ function renderTabs() {
     else if (r.right > b.right) box.scrollLeft += r.right - b.right + 8;
   }
   fitToolbar();
+  foldTabs();
 }
+// Lists whose tabs are out of sight at an end of the strip: a button over
+// that end says how many, and a tap lists them (as the open papers' tabs).
+const LIB_OUT = { left: [], right: [] };
+function foldTabs() {
+  const box = $('#tabScroll'), L = $('#tabLeft'), Rb = $('#tabRight'), b = box.getBoundingClientRect();
+  LIB_OUT.left = []; LIB_OUT.right = [];
+  const room = box.scrollWidth - box.clientWidth;
+  if (room > 1) {
+    const atStart = box.scrollLeft < 2, atEnd = box.scrollLeft > room - 2;
+    box.querySelectorAll('.tab').forEach(t => {
+      const r = t.getBoundingClientRect();
+      if (!atStart && r.left < b.left + 24) LIB_OUT.left.push(t.dataset.tab);
+      else if (!atEnd && r.right > b.right - 24) LIB_OUT.right.push(t.dataset.tab);
+    });
+  }
+  const chev = d => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>`;
+  const set = (el, ids, side) => {
+    el.hidden = !ids.length;
+    if (!ids.length) return;
+    el.innerHTML = side === 'left' ? chev('M15 6l-6 6 6 6') + `<b>${ids.length}</b>` : `<b>${ids.length}</b>` + chev('M9 6l6 6-6 6');
+    el.title = ids.length + ' more open list' + (ids.length > 1 ? 's' : '') + ' to the ' + side + ': ' + ids.map(groupName).join(', ');
+    el.setAttribute('aria-label', el.title);
+  };
+  set(L, LIB_OUT.left, 'left'); set(Rb, LIB_OUT.right, 'right');
+}
+$('#tabScroll').addEventListener('scroll', () => requestAnimationFrame(foldTabs), { passive: true });
+function libTabsMenu(side) {
+  const was = $('#tabsMenu');
+  closeTabsMenu();
+  if (was && was.dataset.side === 'lib-' + side) return;
+  const ids = LIB_OUT[side];
+  if (!ids.length) return;
+  const btn = side === 'left' ? $('#tabLeft') : $('#tabRight');
+  const m = document.createElement('div');
+  m.className = 'menu-list pdf-menu link-menu recent-menu';
+  m.id = 'tabsMenu';
+  m.dataset.side = 'lib-' + side;
+  m.setAttribute('role', 'menu');
+  m.innerHTML = '<div class="menu-head">Open lists ' + (side === 'left' ? 'to the left' : 'to the right') + '</div>' + ids.map(id =>
+    `<button type="button" role="menuitem" data-tl="${esc(id)}"><span class="rc-title">${esc(groupName(id))}</span><span class="rc-sub">${(groupItems(id) || []).length.toLocaleString()} publications</span></button>`).join('');
+  document.body.appendChild(m);
+  const r = btn.getBoundingClientRect();
+  const x = side === 'left' ? r.left : r.right - m.offsetWidth;
+  m.style.left = Math.max(8, Math.min(window.innerWidth - m.offsetWidth - 8, x)) + 'px';
+  m.style.top = (r.bottom + 6) + 'px';
+  m.addEventListener('click', ev => {
+    const b = ev.target.closest('[data-tl]');
+    if (!b) return;
+    closeTabsMenu();
+    setGroup(b.dataset.tl);
+  });
+}
+$('#tabLeft').addEventListener('click', ev => { ev.stopPropagation(); libTabsMenu('left'); });
+$('#tabRight').addEventListener('click', ev => { ev.stopPropagation(); libTabsMenu('right'); });
 // On a phone, the toolbar folds Select, then Add, into the More menu until
 // the tabs fit.
 function fitToolbar() {
@@ -2981,7 +3154,7 @@ function fitToolbar() {
   tb.classList.add('fold-sel');
   if (over() && !$('#addBtn').hidden) tb.classList.add('fold-add');
 }
-window.addEventListener('resize', () => requestAnimationFrame(fitToolbar));
+window.addEventListener('resize', () => requestAnimationFrame(() => { if (ENTRIES.length) renderTabs(); else fitToolbar(); }));
 function closeTab(id) {
   const i = TABS.indexOf(id);
   if (i < 0) return;
@@ -3412,7 +3585,7 @@ async function refreshSaved() {
   } catch (err) { /* none kept */ }
 }
 const refreshSavedSoon = (ms = 2500) => { clearTimeout(refreshSaved.t); refreshSaved.t = setTimeout(refreshSaved, ms); };
-const showOnline = () => { document.body.classList.toggle('is-offline', !navigator.onLine); };
+const showOnline = () => { document.body.classList.toggle('is-offline', !navigator.onLine); setTimeout(netBadge, 0); };
 window.addEventListener('online', showOnline);
 window.addEventListener('offline', showOnline);
 showOnline();
@@ -3609,7 +3782,9 @@ function venueHTML(e) {
     case 'article': {
       s = seg('journal', f.journal && `<i>${esc(f.journal)}</i>`, 'Journal', 'cs-wide');
       let vn = seg('volume', f.volume && `<i>${esc(f.volume)}</i>`, 'Vol.');
-      if (f.number) vn += f.volume ? '(' + seg('number', esc(f.number), 'No.') + ')' : 'no. ' + seg('number', esc(f.number), 'No.');
+      // (The brackets in the number's own box, so a one-digit number sits
+      // close to them: "43(4)", not "43( 4 )".)
+      if (f.number) vn += f.volume ? seg('number', '(' + esc(f.number) + ')', 'No.') : 'no. ' + seg('number', esc(f.number), 'No.');
       s = join([s, vn], ', ');
       if (f.pages) s += (vn ? ': ' : s ? ', ' : '') + seg('pages', esc(f.pages), pagesLabel);
       break;
@@ -3869,7 +4044,8 @@ function renderDetail() {
   const people = e.a && e.a.length ? e.a : e.e || [];
   if (people.length) {
     h += `<div class="d-authors">` + people.map((n, j) =>
-      `<button data-author="${esc(nameKey(n))}" title="Find publications by ${esc(nameKey(n))}">${esc(fullName(n))}</button>${j < people.length - 1 ? ',' : ''}`).join(' ') +
+      // (Each name with its comma, so the comma isn't spaced off from it.)
+      `<span class="d-au"><button data-author="${esc(nameKey(n))}" title="Find publications by ${esc(nameKey(n))}">${esc(fullName(n))}</button>${j < people.length - 1 ? ',' : ''}</span>`).join(' ') +
       (!e.a && e.e ? ' <span class="d-venue">(Eds.)</span>' : '') + `</div>`;
   }
   const v = venueHTML(e);
@@ -3898,11 +4074,11 @@ function renderDetail() {
         `<button type="button" role="menuitem" data-share="${j}" data-clean="0">PDF as is</button>` +
         `<button type="button" role="menuitem" data-share="${j}" data-clean="1">Clean copy (no annotations)</button>`).join('')));
   }
+  // Less used: Google Drive, Attach, the DOI and other links, in a "More"
+  // menu at the end.
+  const more = [];
   if (readable.length) {
-    const drive = fl => `<a role="menuitem" href="${esc(driveUrl(fl))}" target="_blank" rel="noopener" title="${esc(fl.p)}"><span class="fname">${fl.id ? '' : 'Find: '}${fname(fl)}</span></a>`;
-    btns.push(files.length === 1
-      ? `<a class="btn" href="${esc(driveUrl(files[0]))}" target="_blank" rel="noopener" title="Open in Google Drive">${ICON.drive}<span>Drive</span></a>`
-      : menu('', `${ICON.drive}<span>Drive</span>`, 'Open in Google Drive', files.map(drive).join('')));
+    files.forEach(fl => more.push(`<a role="menuitem" href="${esc(driveUrl(fl))}" target="_blank" rel="noopener" title="${esc(fl.p)}">${ICON.drive}<span>${files.length === 1 ? 'Open in Google Drive' : (fl.id ? '' : 'Find: ') + fname(fl)}</span></a>`));
   } else {
     // Not openable here (not found in Drive, or the page isn't running in
     // a server): links to Google Drive.
@@ -3912,19 +4088,24 @@ function renderDetail() {
     });
   }
   if (gs && DIRECT && !e.ib) {
-    btns.push(`<button type="button" class="btn${e.files ? '' : ' primary act-read'}" data-attach title="Attach a PDF (or drop one here)">${ICON.clip}<span>Attach</span></button>`);
+    // (With no PDF yet, attaching one is the main thing to do: a button.)
+    if (e.files) more.push(`<button type="button" role="menuitem" data-attach title="Attach a PDF (or drop one here)">${ICON.clip}<span>Attach a PDF\u2026</span></button>`);
+    else btns.push(`<button type="button" class="btn primary act-read" data-attach title="Attach a PDF (or drop one here)">${ICON.clip}<span>Attach</span></button>`);
   }
   if (gs) btns.push(`<button type="button" class="btn" data-rl="add"${RL.has(e.k) ? ' hidden' : ''} title="Add to reading list" aria-label="Add to reading list">${ICON.bookmark}<span>Reading list</span></button>`);
-  if (f.doi) btns.push(`<a class="btn" href="https:\/\/doi.org/${esc(f.doi.replace(/^https?:\/\/(dx\.)?doi\.org[/]/i, ''))}" target="_blank" rel="noopener" title="Open the DOI link">${ICON.link}<span>DOI</span></a>`);
+  if (f.doi) more.push(`<a role="menuitem" href="https:\/\/doi.org/${esc(f.doi.replace(/^https?:\/\/(dx\.)?doi\.org[/]/i, ''))}" target="_blank" rel="noopener" title="Open the DOI link">${ICON.link}<span>DOI</span></a>`);
   const doiish = u => /doi\.org[/]/i.test(u);
   (e.u || []).filter(u => safeUrl(u) && !(f.doi && doiish(u))).slice(0, 3).forEach(u => {
     let host = u; try { host = new URL(u).hostname.replace(/^www\./, ''); } catch {}
-    btns.push(`<a class="btn" href="${esc(u)}" target="_blank" rel="noopener" title="${esc(u)}">${ICON.link}<span>${esc(host)}</span></a>`);
+    more.push(`<a role="menuitem" href="${esc(u)}" target="_blank" rel="noopener" title="${esc(u)}">${ICON.link}<span>${esc(host)}</span></a>`);
   });
   btns.push(`<details class="menu"><summary class="btn" title="Copy the citation">${ICON.copy}<span>Copy</span>${ICON.chev}</summary>` +
     `<div class="menu-list" role="menu"><button type="button" role="menuitem" data-copy="bibtex">BibTeX<kbd>${esc(keyHint('copyBib'))}</kbd></button>` +
     `<button type="button" role="menuitem" data-copy="apa">APA (long)<kbd>${esc(keyHint('copyApa'))}</kbd></button>` +
     `<button type="button" role="menuitem" data-copy="apa-short">APA (short)<kbd>${esc(keyHint('copyShort'))}</kbd></button></div></details>`);
+  if (more.length) btns.push(`<details class="menu act-more"><summary class="btn" title="More: ${more.length > 1 ? 'Google Drive, Attach, links' : 'more'}" aria-label="More">` +
+    `<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="18" cy="12" r="1.4"/></svg></summary>` +
+    `<div class="menu-list" role="menu">${more.join('')}</div></details>`);
   h += `<div class="actions">${btns.join('')}</div>`;
   // Thumbnails go in line here, or (on a wide pane) in a column on the
   // right; both are drawn and the CSS shows one.
@@ -4364,6 +4545,9 @@ document.addEventListener('toggle', ev => {
 }, true);
 document.addEventListener('click', ev => {
   document.querySelectorAll('details.menu[open]').forEach(d => { if (!d.contains(ev.target)) d.open = false; });
+  // (An item chosen: its menu closes, once the item has done its work.)
+  const item = ev.target.closest && ev.target.closest('details.menu[open] .menu-list [role^="menuitem"]');
+  if (item) { const d = item.closest('details.menu'); setTimeout(() => { d.open = false; }, 0); }
 });
 document.addEventListener('keydown', ev => {
   if (ev.key === 'Escape') document.querySelectorAll('details.menu[open]').forEach(d => { d.open = false; });
@@ -4861,6 +5045,7 @@ async function openReader(entry, file, pos) {
   $('#vFindBtn').setAttribute('aria-pressed', 'false');
   $('#vFindCount').textContent = '';
   $('#viewer').hidden = false;
+  requestAnimationFrame(placePaperTabs);
   resetSide();
   clearBack();
   resetBookmarks();
@@ -5043,6 +5228,8 @@ async function closeReader() {
   rememberTab();
   hidePanel();
   $('#viewer').hidden = true;
+  // (Where you were, kept now: the reading list's Continue card shows it.)
+  if (notePosition.t) savePositions();
   renderPaperTabs();
   const r = await saveNow();
   if (!r) toast('Your marks on this paper aren\u2019t saved yet. Open it again to save them.', 6000);
@@ -5120,9 +5307,29 @@ function renderPaperTabs() {
   $('#modeSeg [data-mode="viewer"]').disabled = !n;
   saveTabs();
   const on = nav.querySelector('[aria-selected="true"]');
+  placePaperTabs();
   if (on && !$('#viewer').hidden) on.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   tabsMore();
 }
+// A slimmer header: with a few papers open, their tabs go in the bar itself
+// (in place of the title, which the tab shows), if they fit there; else on
+// a row of their own. Not on a phone.
+function placePaperTabs() {
+  const v = $('#viewer'), bar = v.querySelector('.v-bar'), wrap = v.querySelector('.v-tabs-wrap'), nav = $('#vTabs');
+  if (v.hidden) return;
+  // (Decided by the room the bar has beside its buttons, each tab at its
+  // narrowest; moved only when that changes, as a move loses the strip's
+  // place.)
+  const n = nav.querySelectorAll('.v-tab').length;
+  let room = bar.clientWidth - 24;
+  [...bar.children].forEach(c => { if (c !== wrap && !c.classList.contains('v-title') && c.offsetParent !== null) room -= c.offsetWidth + 6; });
+  const inline = n >= 2 && !phoneMQ.matches && room >= n * 96 + 32;
+  if (inline === v.classList.contains('v-tabs-inline') && (wrap.parentNode === bar) === inline) return;
+  v.classList.toggle('v-tabs-inline', inline);
+  if (inline) bar.insertBefore(wrap, $('#vPage'));
+  else bar.after(wrap);
+}
+window.addEventListener('resize', () => requestAnimationFrame(() => { if (!$('#viewer').hidden) { placePaperTabs(); tabsMore(); } }));
 // The tabs out of sight at each end of the strip, as buttons over its
 // ends: a tap lists them.
 const TABS_OUT = { left: [], right: [] };
@@ -5241,6 +5448,7 @@ function showViewer() {
   const t = PTABS.list[PTABS.active];
   if (!V.doc || !V.file || V.file.id !== t.fileId) { loadActiveTab(); return; }
   $('#viewer').hidden = false;
+  requestAnimationFrame(placePaperTabs);
   renderPaperTabs();
   refit();
   allRibbons();
@@ -5692,7 +5900,12 @@ const JOURNAL = {
   },
   get(id) { return this.run('readonly', st => st.get(id)); },
   // A paper's copy, and the file it was opened from (see localSave).
-  drop(id) { LOCAL.openKept = null; return this.run('readwrite', st => { st.delete('open:' + id); return st.delete(id); }); },
+  drop(id) {
+    LOCAL.openKept = null;
+    const done = this.run('readwrite', st => { st.delete('open:' + id); return st.delete(id); });
+    done.then(() => netBadge(), () => {});
+    return done;
+  },
   // The changes as a whole file, put back together if kept in two parts.
   async load(id) {
     const j = await this.get(id);
@@ -5753,6 +5966,7 @@ async function localSave() {
       return st.put(entry, file.id);
     });
     if (withOpen) LOCAL.openKept = doc;
+    netBadge();
   } catch (err) {
     console.warn('Keeping the changes on this device failed:', err);
   } finally { LOCAL.busy = false; }
@@ -9028,7 +9242,7 @@ const sidePhone = () => window.innerWidth < 600;
 function resetSide() {
   SIDE.token++;
   if (SIDE.io) SIDE.io.disconnect();
-  Object.assign(SIDE, { io: null, thumbs: [], queue: [], busy: false, marks: null, outline: null, pp: null });
+  Object.assign(SIDE, { io: null, thumbs: [], queue: [], busy: false, marks: null, outline: null, pp: null, colour: null });
   $('#vSideBody').replaceChildren();
 }
 function toggleSide(open) {
@@ -9368,10 +9582,20 @@ async function showMarks() {
   if (my !== SIDE.token || SIDE.tab !== 'marks') return;
   const unsaved = V.dirty || V.drawing ? `<p class="v-side-note">New marks appear here once they\u2019re saved.</p>` : '';
   if (!SIDE.marks.length) { body.innerHTML = unsaved + `<p class="v-side-note">This paper has no annotations yet.</p>`; return; }
-  const worded = SIDE.marks.filter(m => m.text || m.note).length;
-  let h = unsaved + (worded ? `<div class="v-marks-acts"><button type="button" class="btn" data-marks-copy title="Every highlight and note, by page, with the reference">${ICON.copy}<span>Copy summary</span></button>` +
+  // By colour: a chip for each colour used (with how many), to see only
+  // those; the summary, then, is of those too.
+  const cols = new Map();
+  SIDE.marks.forEach(m => { const c = markColour(m); if (c) cols.set(c.key, Object.assign(cols.get(c.key) || { n: 0 }, c, { n: ((cols.get(c.key) || {}).n || 0) + 1 })); });
+  if (SIDE.colour && !cols.has(SIDE.colour)) SIDE.colour = null;
+  const chips = cols.size > 1 ? `<div class="v-mark-cols" role="group" aria-label="Show marks of one colour">` +
+    `<button type="button" class="v-mark-col${SIDE.colour ? '' : ' on'}" data-mcol="" aria-pressed="${!SIDE.colour}">All <span>${SIDE.marks.length}</span></button>` +
+    [...cols.values()].sort((a, b) => b.n - a.n).map(c => `<button type="button" class="v-mark-col${SIDE.colour === c.key ? ' on' : ''}" data-mcol="${esc(c.key)}" aria-pressed="${SIDE.colour === c.key}" title="${esc(c.name)}">` +
+      `<i style="background:${c.css}"></i>${esc(c.name)} <span>${c.n}</span></button>`).join('') + `</div>` : '';
+  const shown = SIDE.colour ? SIDE.marks.filter(m => (markColour(m) || {}).key === SIDE.colour) : SIDE.marks;
+  const worded = shown.filter(m => m.text || m.note).length;
+  let h = unsaved + chips + (worded ? `<div class="v-marks-acts"><button type="button" class="btn" data-marks-copy title="Every highlight and note, by page, with the reference">${ICON.copy}<span>Copy summary</span></button>` +
     (gs ? `<button type="button" class="btn" data-marks-notes title="Added to the publication\u2019s Notes">${ICON.pencil}<span>Add to notes</span></button>` : '') + `</div>` : '') + `<div class="v-marks">`, last = 0;
-  for (const m of SIDE.marks) {
+  for (const m of shown) {
     if (m.page !== last) { h += `<div class="v-marks-page">Page ${m.page}</div>`; last = m.page; }
     h += `<button type="button" class="v-mark" data-page="${m.page}"${m.y != null ? ` data-y="${m.y}"` : ''}>` +
       `<span class="v-mark-sw" style="background:${m.color || 'var(--faint)'}"></span><span class="v-mark-body">` +
@@ -9387,8 +9611,28 @@ async function showMarks() {
 }
 // A paper's highlights and notes as text: by page (the journal's), the
 // kind, the words marked, the comment; the reference first, when asked.
+// A mark's colour: its key (rounded), how to show it, and its name (the
+// nearest of the highlighter's, else "Other").
+function markColour(m) {
+  const x = /rgb\((\d+),\s*(\d+),\s*(\d+)\)/.exec(m.color || '');
+  if (!x) return null;
+  const rgb = x.slice(1, 4).map(Number);
+  let best = null, d = Infinity;
+  HL_COLORS.concat(PEN_COLORS).forEach(([name, hex]) => {
+    const c = hexRgb(hex), e = Math.abs(c[0] - rgb[0]) + Math.abs(c[1] - rgb[1]) + Math.abs(c[2] - rgb[2]);
+    if (e < d) { d = e; best = name; }
+  });
+  const name = d < 90 ? best : 'Other';
+  return { key: name === 'Other' ? rgb.map(v => Math.round(v / 32)).join('-') : name, name, css: m.color };
+}
+$('#vSideBody').addEventListener('click', ev => {
+  const b = ev.target.closest('[data-mcol]');
+  if (!b) return;
+  SIDE.colour = b.dataset.mcol || null;
+  showMarks();
+});
 function marksSummary(withRef) {
-  const list = (SIDE.marks || []).filter(m => m.text || m.note), pg = n => (SIDE.pp && SIDE.pp.get(n)) || String(n);
+  const list = (SIDE.marks || []).filter(m => (m.text || m.note) && (!SIDE.colour || (markColour(m) || {}).key === SIDE.colour)), pg = n => (SIDE.pp && SIDE.pp.get(n)) || String(n);
   const ref = apaCitation(V.entry);
   const text = (withRef ? ref.text + '\n\n' : '') + list.map(m => 'p. ' + pg(m.page) + ' \u2014 ' + m.name +
     (m.text ? ': \u201c' + m.text + '\u201d' : '') + (m.note ? (m.text ? '\n    Note: ' : ': ') + m.note : '')).join('\n');
@@ -11471,8 +11715,36 @@ function overlayOffline(data) {
     });
   });
 }
+// The cloud in the toolbars: offline (struck through), or changes kept
+// on this device and waiting to go to Drive: library changes (server.js's
+// outbox) and papers whose marks are kept here (JOURNAL). A tap says what
+// that means.
+const NET = { changes: 0, papers: 0 };
+async function netBadge() {
+  NET.changes = window.liblandeOutbox ? window.liblandeOutbox().length : 0;
+  try { NET.papers = ((await JOURNAL.run('readonly', st => st.getAllKeys())) || []).filter(k => !String(k).startsWith('open:')).length; } catch (err) { NET.papers = 0; }
+  const off = !navigator.onLine, n = NET.changes + NET.papers;
+  document.querySelectorAll('[data-net]').forEach(b => {
+    b.hidden = !gs || (!off && !n);
+    b.classList.toggle('off', off);
+    b.querySelector('.net-n').textContent = n ? String(n) : '';
+    b.title = netText();
+    b.setAttribute('aria-label', b.title);
+  });
+}
+const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many);
+function netText() {
+  const parts = [NET.changes && plural(NET.changes, 'change to your library', 'changes to your library'), NET.papers && 'marks on ' + plural(NET.papers, 'paper', 'papers')].filter(Boolean);
+  const waiting = parts.length ? parts.join(' and ') + (NET.changes + NET.papers === 1 && !NET.papers ? ' is' : ' are') + ' kept on this device' : '';
+  if (!navigator.onLine) return 'You\u2019re offline. ' + (waiting ? waiting.charAt(0).toUpperCase() + waiting.slice(1) + ', and go to Google Drive when you\u2019re back online.' : 'Changes you make are kept on this device until you\u2019re back online. Papers saved for offline reading open as usual.');
+  return waiting ? waiting.charAt(0).toUpperCase() + waiting.slice(1) + ', waiting to go to Google Drive (they go on their own, soon).' : 'Everything is saved to Google Drive.';
+}
+document.addEventListener('click', ev => { if (ev.target.closest('[data-net]')) toast(netText(), 6000); });
+window.addEventListener('liblande-waiting', netBadge);
+setInterval(() => { if (!document.hidden && gs) netBadge(); }, 20000);
 // Back online: what was kept on this device has gone to Drive (or couldn't).
 window.addEventListener('liblande-outbox', ev => {
+  netBadge();
   const d = ev.detail || {}, n = d.saved || 0, failed = d.failed || [];
   let msg = n ? n + ' change' + (n === 1 ? '' : 's') + ' made offline ' + (n === 1 ? 'is' : 'are') + ' now saved to Google Drive.' : '';
   if (failed.length) {
@@ -13144,9 +13416,6 @@ let toastTimer;
 // action: {label, run}, a button in the message (such as Undo).
 function toast(msg, ms = 1800, action) {
   const t = $('#toast'); t.textContent = msg; t.classList.add('show');
-  // (Reading a paper: above the markup toolbar when it's at the bottom.)
-  const pal = !$('#viewer').hidden && $('#vPalette'), pr = pal && !pal.hidden && pal.getBoundingClientRect();
-  t.style.bottom = pr && pr.height && pr.top > innerHeight * 0.6 ? (innerHeight - pr.top + 10) + 'px' : '';
   t.classList.toggle('has-action', !!action);
   if (action) {
     const b = document.createElement('button');
@@ -13157,6 +13426,29 @@ function toast(msg, ms = 1800, action) {
   }
   clearTimeout(toastTimer);
   if (ms) toastTimer = setTimeout(() => t.classList.remove('show'), ms);
+  placeToast();
+  clearInterval(placeToast.t);
+  placeToast.t = setInterval(() => { if (t.classList.contains('show')) placeToast(); else clearInterval(placeToast.t); }, 400);
+}
+// A message stays clear of what's along the bottom while reading: the
+// markup toolbar (wherever it's been moved), the button it tucks into,
+// "Back to page", the "Finished it?" bar. It sits above the highest of
+// them that's under it (looked at again while it shows, as they move).
+function placeToast() {
+  const t = $('#toast');
+  if ($('#viewer').hidden) { t.style.bottom = ''; return; }
+  t.style.bottom = '';
+  const tr = t.getBoundingClientRect(), H = innerHeight;
+  let lift = 0;
+  document.querySelectorAll('#vPalette, .vp-show, #vBack, #rlPrompt, #quoteBar').forEach(el => {
+    if (!el || el.hidden || !el.offsetParent) return;
+    const r = el.getBoundingClientRect();
+    if (!r.width || r.top < H * 0.45) return;
+    // (Only one that's under the message, side to side.)
+    if (r.right < tr.left - 6 || r.left > tr.right + 6) return;
+    lift = Math.max(lift, H - r.top + 10);
+  });
+  if (lift) t.style.bottom = lift + 'px';
 }
 function copy(text, msg, html) {
   const fallback = () => {
@@ -13351,7 +13643,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-11.06</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-11.07</small>`;
 };
 
 function gunzipJSON(bytes) {
@@ -13456,6 +13748,10 @@ if (!gs) {
       DIRECT = store.get('direct', false);
       $('#settingsBtn').hidden = false; $('#addBtn').hidden = false;
       await show(cached, false);
+      // The reading list as last known, too, until Drive answers (it says
+      // when it's from; offline, it's all there is).
+      const known = window.liblandeKnownLists && window.liblandeKnownLists();
+      if (known && known.reading && known.at) setReading(Object.assign({}, known.reading, { staleAt: known.at }));
     }
     stage(gs ? 'Checking Google Drive' : 'Loading');
     statusReq = callServer('getStatus');
@@ -13537,6 +13833,85 @@ if (!gs) {
       .catch(err => toast('Refresh failed: ' + errText(err), 5000))
       .finally(() => { btn.classList.remove('busy'); $('#pull').classList.remove('busy'); });
   });
+
+  // Swipe a row (touch): right for Up next (Later, if it's there already;
+  // added, if it isn't on the list), left for Done (Mark as read, if it
+  // isn't on the list). The action shows behind the row as it moves, and
+  // happens past the line.
+  (() => {
+    const list = $('#list'), FAR = 84;
+    let sw = null;
+    const acts = e => {
+      if (!gs || e.ib) return {};
+      const x = RL.get(e.k), read = e.f.read === '1';
+      return {
+        right: x ? (x.list === 'next' ? { id: 'later', label: 'Later', icon: 'plus' } : { id: 'next', label: 'Up next', icon: 'plus' }) : { id: 'add', label: 'Up next', icon: 'plus' },
+        left: x ? { id: 'done', label: 'Done', icon: 'check' } : read ? null : { id: 'read', label: 'Mark read', icon: 'check' },
+      };
+    };
+    const bgFor = (row, a) => {
+      const bg = document.createElement('div');
+      bg.className = 'swipe-bg';
+      bg.style.top = row.style.top; bg.style.height = row.style.height;
+      const side = (d, x) => x ? `<span class="swipe-act ${d}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true">${RL_ICONS[x.icon]}</svg>${esc(x.label)}</span>` : '';
+      bg.innerHTML = side('right', a.right) + side('left', a.left);
+      row.before(bg);
+      return bg;
+    };
+    const end = () => {
+      if (!sw) return;
+      const { row, bg, dx, e, a, on } = sw;
+      sw = null;
+      if (!on) return;
+      list._swiped = true;
+      setTimeout(() => { list._swiped = false; }, 400);
+      const act = dx >= FAR ? a.right : dx <= -FAR ? a.left : null;
+      row.style.transition = 'transform .22s cubic-bezier(.2, .8, .2, 1)';
+      row.style.transform = '';
+      setTimeout(() => { row.style.transition = row.style.background = ''; bg.remove(); }, 240);
+      if (!act) return;
+      if (act.id === 'add') rlAdd(e.k);
+      else if (act.id === 'next' || act.id === 'later') rlMove(e.k, act.id);
+      else if (act.id === 'done') rlDone(e.k);
+      else if (act.id === 'read') quickSet(e, { read: '1' }, 'Marked as read');
+    };
+    list.addEventListener('touchstart', ev => {
+      sw = null;
+      if (ev.touches.length !== 1 || state.picking) return;
+      const row = ev.target.closest('#list .row, #list .card');
+      const e = row && state.view[+row.dataset.i];
+      if (!e) return;
+      const a = acts(e);
+      if (!a.left && !a.right) return;
+      sw = { row, e, a, x0: ev.touches[0].clientX, y0: ev.touches[0].clientY, dx: 0, on: false, bg: null };
+    }, { passive: true });
+    list.addEventListener('touchmove', ev => {
+      if (!sw) return;
+      const t = ev.touches[0], dx = t.clientX - sw.x0, dy = t.clientY - sw.y0;
+      if (!sw.on) {
+        // (A scroll, not a swipe: let it be.)
+        if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) { sw = null; return; }
+        if (Math.abs(dx) < 12 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+        sw.on = true;
+        sw.bg = bgFor(sw.row, sw.a);
+        sw.row.style.background = 'var(--bg)';
+      }
+      ev.preventDefault();
+      // (No action that way: it barely moves. Past the line, it slows.)
+      let x = dx;
+      if ((x > 0 && !sw.a.right) || (x < 0 && !sw.a.left)) x = x / 6;
+      else if (Math.abs(x) > FAR) x = Math.sign(x) * (FAR + (Math.abs(x) - FAR) * 0.35);
+      sw.dx = (x > 0 && !sw.a.right) || (x < 0 && !sw.a.left) ? 0 : dx;
+      sw.row.style.transform = `translateX(${x}px)`;
+      sw.bg.classList.toggle('go-right', dx >= FAR && !!sw.a.right);
+      sw.bg.classList.toggle('go-left', dx <= -FAR && !!sw.a.left);
+      sw.bg.classList.toggle('to-right', dx > 0);
+    }, { passive: false });
+    list.addEventListener('touchend', end);
+    list.addEventListener('touchcancel', () => { if (sw) { sw.dx = 0; end(); } });
+    // (A swipe isn't a tap on the row.)
+    list.addEventListener('click', ev => { if (list._swiped) { ev.stopPropagation(); ev.preventDefault(); list._swiped = false; } }, true);
+  })();
 
   // Pull to refresh: drag the top of the list down and let go.
   (() => {
@@ -13724,7 +14099,7 @@ if (!gs) {
 }
 // For the test suite (_test/suite.html) only: a few of the reader's
 // insides, when the test page asks for them.
-if (window.LIBLANDE_TEST) window.LL = { V, BM, JOURNAL, LOCAL, AUTO, saveMarkup, setTool, MARK, PDFJS, pdfJsFix, findEndPage, refHeading, combineMarks, makeZip, MARK_ERASER: () => MARK.eraserSize,
+if (window.LIBLANDE_TEST) window.LL = { V, BM, JOURNAL, LOCAL, AUTO, saveMarkup, setTool, setReading, renderRLBar, netBadge, placeToast, POS, MARK, PDFJS, pdfJsFix, findEndPage, refHeading, combineMarks, makeZip, MARK_ERASER: () => MARK.eraserSize,
   lib: () => ({ ENTRIES, BYKEY, DATA, VERSION_OF, VERSIONS, NESTED, state }), init, refresh, openEdit, isForthcoming, forthChanges, parseBibtexEntry,
   oldLineMarks, convertOldLines, fetchAhead, PTABS, renderPaperTabs, openPdf, loadPdfJs, addStreamIteration, msCheck, msCites, msRef, msDocx, MS, msVisible };
 })();
