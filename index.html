@@ -522,8 +522,33 @@ body:has(#sheet:not([hidden])) .pick-bar { visibility: hidden; }
 .rl-prompt { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); z-index: 70; display: flex; align-items: center; gap: 10px; max-width: calc(100% - 32px); padding: 8px 10px 8px 14px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); box-shadow: 0 6px 24px rgba(0,0,0,.18); font-size: 13.5px; }
 .rl-prompt span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rl-prompt .btn { min-height: 30px; padding: 3px 12px; font-size: 13px; flex: none; }
+#vRL { cursor: pointer; }
 #vRL.on { color: var(--accent); }
 #vRL.on svg { fill: currentColor; }
+#vRLMenu .menu-list { min-width: 230px; }
+#vRLMenu .menu-list button[aria-checked="true"]::after { content: '\2713'; float: right; margin-left: 14px; color: var(--accent); }
+#vRLMenu .faint { color: var(--faint); font-size: 12px; }
+#vRLMenu .menu-list button.suggest { color: var(--accent); }
+#vRLMenu .menu-list button { display: flex; align-items: center; gap: 9px; }
+#vRLMenu .menu-list button .i { width: 18px; height: 18px; flex: none; }
+#vRLMenu .menu-list button .i.blank { visibility: hidden; }
+#vRLMenu .menu-list kbd, #vRLMenu .menu-list button[aria-checked="true"]::after { margin-left: auto; }
+/* What was just done, shown at the bookmark: its icon grows in and fades
+   (and the bookmark itself gives a small pop). */
+#vRL { position: relative; overflow: visible; }
+.vrl-burst { position: absolute; left: 50%; top: 50%; width: 26px; height: 26px; margin: -13px 0 0 -13px; pointer-events: none; color: var(--accent); animation: vrl-burst .75s ease-out forwards; }
+.vrl-burst svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.vrl-burst.filled circle, .vrl-burst.filled .bm { fill: currentColor; }
+.vrl-burst.filled .mark { stroke: var(--panel); }
+@keyframes vrl-burst { 0% { opacity: 0; transform: scale(.5); } 30% { opacity: 1; transform: scale(1.18); } 55% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: translateY(-14px) scale(.9); } }
+#vRL.pop svg { animation: vrl-pop .4s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes vrl-pop { 0% { transform: scale(1); } 45% { transform: scale(1.28); } 100% { transform: scale(1); } }
+/* Read through (100%) but not yet done or read: the bookmark glows, a few
+   slow, soft pulses, then a faint steady glow, until it is. */
+#vRL.ready { color: var(--accent); box-shadow: 0 0 6px 1px color-mix(in srgb, var(--accent) 30%, transparent); animation: vrl-glow 2.4s ease-in-out 2; }
+@keyframes vrl-glow { 0%, 100% { box-shadow: 0 0 6px 1px color-mix(in srgb, var(--accent) 30%, transparent); } 50% { box-shadow: 0 0 10px 3px color-mix(in srgb, var(--accent) 45%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .vrl-burst { animation-duration: .01s; } #vRL.pop svg, #vRL.ready { animation: none; } }
+#vRLMenu .menu-list hr { border: 0; border-top: 1px solid var(--line); margin: 4px 2px; }
 .linkish { border: 0; background: none; color: var(--accent); padding: 4px 2px; font-size: 13px; }
 .pick-bar .btn { min-height: 28px; padding: 3px 12px; font-size: 13px; }
 .pickbox { width: 18px; height: 18px; border: 1.5px solid var(--faint); border-radius: 50%; display: inline-grid; place-items: center; flex: none; }
@@ -1674,7 +1699,7 @@ try {
       <button type="button" class="tb-btn v-zoomctl" id="vZoomIn" aria-label="Zoom in" title="Zoom in">+</button>
       <details class="menu" id="vShare"><summary class="btn" title="Share a copy to another app"><svg class="i" viewBox="0 0 24 24"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg><span>Share</span><svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></summary><div class="menu-list" role="menu"><button type="button" role="menuitem" data-vshare="0">PDF as is</button><button type="button" role="menuitem" data-vshare="1">Clean copy (no annotations)</button></div></details>
       <button type="button" class="btn v-save" id="vSave" hidden title="Changes save on their own; this saves them now (&#x2318;S)" aria-label="Save"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h11l3 3v12a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/><path d="M8 4v5h7V4M8 20v-6h8v6"/></svg><svg class="i ok" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span>Save</span></button>
-      <button type="button" class="tb-btn" id="vRL" hidden aria-label="Reading list" title="Add to reading list"><svg class="i" viewBox="0 0 24 24"><path d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1z"/></svg></button>
+      <details class="menu right" id="vRLMenu" hidden><summary class="tb-btn" id="vRL" aria-label="Reading list" title="Reading list"><svg class="i" viewBox="0 0 24 24"><path d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1z"/></svg></summary><div class="menu-list" role="menu" id="vRLList"></div></details>
       <a class="tb-btn" id="vDrive" href="#" target="_blank" rel="noopener" aria-label="Open in Google Drive" title="Open in Google Drive"><svg class="i" viewBox="0 0 24 24"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></a>
     </div>
   </header>
@@ -1776,7 +1801,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-11.02</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-11.06</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1791,7 +1816,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-11.02';
+      l.querySelector('small').textContent = 'Version 2026-10-11.06';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1803,7 +1828,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-11.02): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-11.06): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -2075,7 +2100,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-11.02`;
+    `<br>LibLande version 2026-10-11.06`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -2103,17 +2128,24 @@ function readingOrder() {
   return by(true).concat(by(false));
 }
 let readingJSON = '';
+// Reading-list changes waiting to be saved, and those on their way.
+const RL_QUEUE = { ops: [], sending: [], push: [], pull: [], timer: 0, busy: null };
 function setReading(d) {
   if (d) {
     const json = JSON.stringify(d);
     if (json === readingJSON) return;
     readingJSON = json;
     READING = d;
+    // (The list as saved, from the server: changes made here that haven't
+    // reached it yet, still waiting or on their way, are made again on top,
+    // so they don't flicker back. Saving one after another is fine.)
+    RL_QUEUE.sending.concat(RL_QUEUE.ops).forEach(readingLocal);
   } else {
     readingJSON = JSON.stringify(READING);
   }
   RL = new Map(READING.items.map(x => [x.key, x]));
   if (!ENTRIES.length) return;
+  if (V.entry && !$('#viewer').hidden) syncReaderRL();
   fetchAheadSoon();
   // Only the parts that show the reading list: the To read count, the
   // list's tags, and the reading-list line on the open publication.
@@ -2182,6 +2214,7 @@ function noteProgress(page, total) {
   const p = Math.min(100, Math.round(page / end * 100)), old = PROGRESS[e.k];
   if (old && old.p >= p) return;
   PROGRESS[e.k] = { p, at: Date.now() };
+  if (p >= 100) syncReaderRL();
   clearTimeout(noteProgress.t);
   noteProgress.t = setTimeout(saveProgress, 4000);
 }
@@ -2276,12 +2309,11 @@ function readingLocal(req) {
     if (x) x.list = req.list;
   } else if (req.op === 'remove' || req.op === 'done') {
     d.items = d.items.filter(x => x.key !== req.key);
-    if (req.op === 'done') d.done.unshift({ key: req.key, at: now });
+    if (req.op === 'done') { d.done = d.done.filter(x => x.key !== req.key); d.done.unshift({ key: req.key, at: now }); }
   }
 }
 // Changes show at once and are saved together, a moment after the
 // last one, so a run of them (in Triage, say) is one save of the .bib.
-const RL_QUEUE = { ops: [], push: [], pull: [], timer: 0, busy: null };
 function rlOp(req, message) {
   readingLocal(req);
   setReading();
@@ -2295,7 +2327,7 @@ function rlOp(req, message) {
 function markRead(key) {
   const e = BYKEY.get(key);
   if (!e || e.f.read === '1') return;
-  writeEdit(e, { read: '1' }, [], []).then(() => { if (state.selKey === e.k) renderDetail(); })
+  writeEdit(e, { read: '1' }, [], []).then(() => { if (state.selKey === e.k) renderDetail(); if (V.entry && V.entry.k === e.k) syncReaderRL(); })
     .catch(err => toast('Couldn\u2019t mark it as read: ' + errText(err), 5000));
 }
 function scheduleReadingSave(now) {
@@ -2306,7 +2338,9 @@ async function flushReading() {
   if (RL_QUEUE.busy) { await RL_QUEUE.busy; }
   if (!RL_QUEUE.ops.length && !RL_QUEUE.push.length && !RL_QUEUE.pull.length) return;
   const req = { ops: RL_QUEUE.ops.splice(0), push: RL_QUEUE.push.splice(0), pull: RL_QUEUE.pull.splice(0), backupName: fileTime() };
+  RL_QUEUE.sending = req.ops;
   RL_QUEUE.busy = callServer('readingOps', req).then(res => {
+    RL_QUEUE.sending = [];
     if (res.pending) setPending(res.pending);
     if (res.gh) {
       DATA.gh = res.gh;
@@ -2316,7 +2350,7 @@ async function flushReading() {
     setReading(res.reading);
   }).catch(err => {
     toast('Couldn\u2019t save your reading list: ' + errText(err), 6000);
-  }).finally(() => { RL_QUEUE.busy = null; });
+  }).finally(() => { RL_QUEUE.busy = null; RL_QUEUE.sending = []; });
   return RL_QUEUE.busy;
 }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') scheduleReadingSave(true); });
@@ -2420,19 +2454,85 @@ $('#rlPrompt').addEventListener('click', ev => {
   if (b.dataset.act === 'done') rlDone(bar.dataset.key);
 });
 
-// Reader toolbar: add to or take off the reading list.
+// Reader toolbar: the bookmark (filled while the paper's on your reading
+// list) opens a short menu: Up next or Later, Done (read, and off the
+// list), take it off; or, off the list, add it, and mark it read or unread.
 function syncReaderRL() {
-  const b = $('#vRL');
-  b.hidden = !gs || !V.entry;
-  if (b.hidden) return;
-  const on = RL.has(V.entry.k);
-  b.classList.toggle('on', on);
-  b.title = on ? 'On your reading list (tap to take it off)' : 'Add to reading list';
+  const m = $('#vRLMenu'), b = $('#vRL');
+  m.hidden = !gs || !V.entry;
+  if (m.hidden) { m.open = false; return; }
+  const e = BYKEY.get(V.entry.k) || V.entry, x = RL.get(e.k), read = e.f.read === '1';
+  b.classList.toggle('on', !!x);
+  // (Read through, and still on the list or unread: done with it?)
+  const ready = PROGRESS[e.k] && PROGRESS[e.k].p >= 100 && (!!x || !read);
+  b.classList.toggle('ready', !!ready);
+  b.title = ready ? 'You\u2019ve read to the end: mark it ' + (x ? 'done' : 'read') + '?'
+    : x ? 'On your reading list, in ' + (x.list === 'next' ? 'Up next' : 'Later') : read ? 'Reading list (you\u2019ve read this one)' : 'Reading list';
+  const item = (act, icon, label, checked) => `<button type="button" role="${checked == null ? 'menuitem' : 'menuitemradio'}" data-vrl="${act}"${checked == null ? '' : ` aria-checked="${checked}"`}>` +
+    (icon ? `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${RL_ICONS[icon]}</svg>` : '<svg class="i blank" viewBox="0 0 24 24" aria-hidden="true"></svg>') + `<span>${label}</span></button>`;
+  const kbd = `<kbd>${esc(keyHint('done'))}</kbd>`;
+  const suggest = h => (ready ? h.replace('<button type="button"', '<button type="button" class="suggest"') : h);
+  $('#vRLList').innerHTML = x
+    ? item('next', '', 'Up next', x.list === 'next') + item('later', '', 'Later', x.list !== 'next') + '<hr>' +
+      suggest(item('done', 'check', 'Done <span class="faint">(mark read, off the list)</span>').replace('</button>', kbd + '</button>')) + item('remove', 'minus', 'Take off the reading list')
+    : item('add', 'plus', 'Add to reading list') + '<hr>' +
+      (read ? item('unread', 'circle', 'Mark as unread') : suggest(item('read', 'check', 'Mark as read').replace('</button>', kbd + '</button>')));
 }
-$('#vRL').addEventListener('click', () => {
+// The menu's icons: a bookmark with + or −, a circled check, a circle.
+const RL_ICONS = {
+  plus: '<path class="bm" d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1z"/><path class="mark" d="M12 7.5v6M9 10.5h6"/>',
+  minus: '<path class="bm" d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1z"/><path class="mark" d="M9 10.5h6"/>',
+  check: '<circle cx="12" cy="12" r="8.5"/><path class="mark" d="M8.2 12.3l2.6 2.6 5-5.4"/>',
+  circle: '<circle cx="12" cy="12" r="8.5"/>',
+};
+// What was just done, at the bookmark: its icon (filled), growing in and
+// fading; the bookmark pops when the paper goes on or off the list.
+function rlBurst(icon, pop) {
+  const m = $('#vRLMenu');
+  if (m.hidden) return;
+  // (On the bookmark itself: a closed menu shows nothing else.)
+  const el = document.createElement('span');
+  el.className = 'vrl-burst' + (icon === 'circle' ? '' : ' filled');
+  el.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${RL_ICONS[icon]}</svg>`;
+  $('#vRL').appendChild(el);
+  el.addEventListener('animationend', () => el.remove());
+  setTimeout(() => el.remove(), 1200);
+  if (pop) {
+    const b = $('#vRL');
+    b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop');
+    setTimeout(() => b.classList.remove('pop'), 500);
+  }
+}
+// Done from the viewer (the menu, or its shortcut): on the list, done with
+// it (and so read); off it, read.
+function readerDone() {
   if (!V.entry) return;
-  if (RL.has(V.entry.k)) rlRemove(V.entry.k); else rlAdd(V.entry.k);
+  const e = BYKEY.get(V.entry.k) || V.entry;
+  $('#rlPrompt').hidden = true;
+  if (RL.has(e.k)) { rlDone(e.k); rlBurst('check', true); }
+  else if (e.f.read !== '1') { rlBurst('check'); quickSet(e, { read: '1' }, 'Marked as read').then(syncReaderRL); }
+}
+$('#vRLList').addEventListener('click', ev => {
+  const b = ev.target.closest('[data-vrl]');
+  if (!b || !V.entry) return;
+  const e = BYKEY.get(V.entry.k) || V.entry, act = b.dataset.vrl;
+  $('#vRLMenu').open = false;
+  if (act === 'next' || act === 'later') { if (RL.get(e.k).list !== act) rlMove(e.k, act); }
+  else if (act === 'done' || act === 'read') readerDone();
+  else if (act === 'remove') { rlRemove(e.k); rlBurst('minus', true); }
+  else if (act === 'add') { rlAdd(e.k); rlBurst('plus', true); }
+  else if (act === 'unread') { rlBurst('circle'); quickSet(e, { read: '0' }, 'Marked as unread').then(syncReaderRL); }
   syncReaderRL();
+});
+// (Kept on screen: the bookmark is at the toolbar's far end.)
+$('#vRLMenu').addEventListener('toggle', () => {
+  const list = $('#vRLList');
+  list.style.transform = '';
+  if (!$('#vRLMenu').open) return;
+  syncReaderRL();
+  const r = list.getBoundingClientRect(), W = document.documentElement.clientWidth;
+  const dx = r.right > W - 8 ? W - 8 - r.right : r.left < 8 ? 8 - r.left : 0;
+  if (dx) list.style.transform = 'translateX(' + Math.round(dx) + 'px)';
 });
 
 // The first time, fill the list from BibDesk's "Reading List" static group.
@@ -9963,7 +10063,7 @@ function barsHidden(on) {
   if (on === v.classList.contains('bars-hidden')) return;
   v.classList.toggle('bars-hidden', on);
 }
-const keepBars = () => !TOUCH_UI.matches || !$('#vFind').hidden || sideOpen() || !$('#vComment').hidden || !$('#vpPanel').hidden || $('#vShare').open || V.selected;
+const keepBars = () => !TOUCH_UI.matches || !$('#vFind').hidden || sideOpen() || !$('#vComment').hidden || !$('#vpPanel').hidden || $('#vShare').open || $('#vRLMenu').open || V.selected;
 // (Scrolling leaves them as they are: only a tap hides or shows them.)
 // The link within the paper nearest a point, if one is within reach (px).
 // (Not links to websites: a near miss shouldn't open another page.)
@@ -12357,6 +12457,7 @@ const KEY_ACTS = [
   { id: 'edit', scope: 'lib', def: 'Alt+KeyE', label: 'Edit the publication' },
   { id: 'quote', scope: 'pdf', def: 'Alt+KeyQ', label: 'Copy the selected passage as a quotation, with its citation' },
   { id: 'closeTab', scope: 'pdf', def: 'Alt+KeyW', label: 'Close the paper’s tab' },
+  { id: 'done', scope: 'pdf', def: 'Alt+KeyD', label: 'Done with the paper (marked read, and off your reading list)' },
   { id: 'markup', scope: 'pdf', def: 'KeyH', label: 'Highlighter' },
   { id: 'lines', scope: 'pdf', def: 'KeyU', label: 'Underline and strike-through' },
   { id: 'pen', scope: 'pdf', def: 'KeyP', label: 'Pen' },
@@ -12447,6 +12548,7 @@ function runPdfKey(id) {
   const tog = t => { if (gs) setTool(V.tool === t ? 'read' : t); };
   if (id === 'quote') showQuote().then(sel => { if (sel) quoteCopy(); else toast('Select a passage to quote first', 1800); });
   else if (id === 'closeTab') { if (PTABS.active >= 0) closePaperTab(PTABS.active); }
+  else if (id === 'done') readerDone();
   else if (id === 'markup') { if (gs) setTool(V.tool === 'highlight' ? 'read' : 'markup'); }
   else if (id === 'lines') { if (gs) setTool(LINE_TOOLS.has(V.tool) ? 'read' : 'lines'); }
   else if (id === 'bookmark') { if (V.doc) toggleBookmark(V.viewer.currentPageNumber); }
@@ -13249,7 +13351,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-11.02</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-11.06</small>`;
 };
 
 function gunzipJSON(bytes) {
