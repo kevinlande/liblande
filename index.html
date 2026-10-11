@@ -710,6 +710,10 @@ body:has(#sheet:not([hidden])) .pick-bar { visibility: hidden; }
 .col-grip:hover::after, .col-grip.dragging::after { opacity: 1; }
 body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-select: none; -webkit-user-select: none; }
 .list { flex: 1; overflow-y: auto; position: relative; outline: none; overscroll-behavior: contain; }
+/* The list never scrolls sideways (a row swiped out past its edge made it
+   able to, and a swipe then scrolled it); fingers pan it up and down only,
+   leaving sideways moves to the swipe. */
+.list { overflow-x: hidden; touch-action: pan-y; }
 /* Choosing columns: the button at the end of the headings (or a right-click
    or long press on them). */
 .colhead .col-menu-btn { justify-content: center; padding: 4px 0; color: var(--faint); }
@@ -736,6 +740,8 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .swipe-bg { position: absolute; left: 0; right: 0; display: flex; align-items: center; justify-content: space-between; background: var(--side-hover); color: var(--muted); font: 600 13px var(--ui); pointer-events: none; transition: background-color .18s, color .18s; }
 .swipe-act { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; width: 104px; height: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; font-size: 11.5px; }
 .swipe-act .i { width: 20px; height: 20px; transition: transform .18s; }
+.swipe-bg.flat .swipe-act { flex-direction: row; gap: 6px; font-size: 12.5px; }
+.swipe-bg.flat .swipe-act .i { width: 16px; height: 16px; }
 .swipe-bg:not(.to-right) .swipe-act.right, .swipe-bg.to-right .swipe-act.left { display: none; }
 .swipe-act.left { margin-left: auto; }
 .swipe-bg.shown.to-right { background: color-mix(in srgb, var(--accent) 70%, var(--bg)); color: #fff; }
@@ -1878,7 +1884,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-11.18</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-11.20</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1893,7 +1899,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-11.18';
+      l.querySelector('small').textContent = 'Version 2026-10-11.20';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1905,7 +1911,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-11.18): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-11.20): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -2177,7 +2183,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-11.18`;
+    `<br>LibLande version 2026-10-11.20`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -13715,7 +13721,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-11.18</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-11.20</small>`;
 };
 
 function gunzipJSON(bytes) {
@@ -13926,7 +13932,8 @@ if (!gs) {
     };
     const bgFor = (row, a) => {
       const bg = document.createElement('div');
-      bg.className = 'swipe-bg';
+      // (A short row, as on a computer: the icon beside the label.)
+      bg.className = 'swipe-bg' + (row.offsetHeight < 44 ? ' flat' : '');
       bg.style.top = row.style.top; bg.style.height = row.style.height;
       const side = (d, x) => x ? `<button type="button" class="swipe-act ${d}" data-swipe="${d}" tabindex="-1"><svg class="i" viewBox="0 0 24 24" aria-hidden="true">${RL_ICONS[x.icon]}</svg>${esc(x.label)}</button>` : '';
       bg.innerHTML = side('right', a.right) + side('left', a.left);
@@ -14044,6 +14051,9 @@ if (!gs) {
         quiet = setTimeout(() => { ignoring = false; }, 180);
         return;
       }
+      // (Sideways scrolling over the list is never the list's: it doesn't
+      // scroll that way, nor go back a page.)
+      if (sideways) ev.preventDefault();
       if (!sw) {
         if (!sideways || state.picking || Math.abs(ev.deltaX) < 3) { if (opened && !sideways) close(); return; }
         if (!begin(ev.target.closest('#list .row, #list .card'), true)) return;
