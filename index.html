@@ -956,14 +956,16 @@ details.d-sec[open] summary { margin-bottom: 8px; }
    toolbar stays; its own button hides it.) --top-h is their height. */
 .v-top { position: absolute; z-index: 8; top: 0; left: 0; right: 0; transition: transform .3s cubic-bezier(.2, .8, .2, 1); will-change: transform; }
 .viewer.bars-hidden .v-top { transform: translateY(-100%); }
-.v-palette, .vp-show { transition: opacity .2s ease, transform .2s, scale .22s cubic-bezier(.2, .8, .2, 1); }
+/* Showing and hiding: an eased glide (as iOS's), the fade a touch quicker. */
+.v-palette, .vp-show { --glide: cubic-bezier(.32, .72, 0, 1); transition: opacity .26s ease, transform .2s, scale .34s var(--glide), translate .34s var(--glide); }
 /* Coming and going: they fade and grow in, and shrink away. */
-.v-palette.entering, .vp-show.entering, .v-palette.leaving, .vp-show.leaving { opacity: 0; scale: .85; }
+.v-palette.entering, .vp-show.entering, .v-palette.leaving, .vp-show.leaving { opacity: 0; scale: .9; }
 /* Flicked away (or brought back): it slides to (or from) its edge. */
-.v-palette[data-edge="left"].leaving, .v-palette[data-edge="left"].entering { translate: -60px 0; }
-.v-palette[data-edge="right"].leaving, .v-palette[data-edge="right"].entering { translate: 60px 0; }
-.v-palette[data-edge="top"].leaving, .v-palette[data-edge="top"].entering { translate: 0 -50px; }
-.v-palette[data-edge="bottom"].leaving, .v-palette[data-edge="bottom"].entering { translate: 0 50px; }
+.v-palette[data-edge].leaving, .v-palette[data-edge].entering { scale: .97; }
+.v-palette[data-edge="left"].leaving, .v-palette[data-edge="left"].entering { translate: -90px 0; }
+.v-palette[data-edge="right"].leaving, .v-palette[data-edge="right"].entering { translate: 90px 0; }
+.v-palette[data-edge="top"].leaving, .v-palette[data-edge="top"].entering { translate: 0 -70px; }
+.v-palette[data-edge="bottom"].leaving, .v-palette[data-edge="bottom"].entering { translate: 0 70px; }
 .v-palette.leaving, .vp-show.leaving { pointer-events: none; }
 @media (prefers-reduced-motion: reduce) { .v-palette, .vp-show { transition: none; } }
 @media (prefers-reduced-motion: reduce) { .v-top { transition: none; } }
@@ -1294,7 +1296,7 @@ a.ms-ib { text-decoration: none; }
 /* On a phone the toolbar sits at the bottom or the top, nowhere else. */
 .v-palette.at-top, .vp-show.at-top { bottom: auto; top: calc(var(--top-h, 48px) + 8px); }
 .viewer.bars-hidden .v-palette.at-top, .viewer.bars-hidden .vp-show.at-top { top: calc(env(safe-area-inset-top, 0px) + 8px); }
-.v-palette.at-top, .vp-show.at-top { transition: top .3s cubic-bezier(.2, .8, .2, 1), opacity .2s ease, scale .22s cubic-bezier(.2, .8, .2, 1); }
+.v-palette.at-top, .vp-show.at-top { transition: top .3s cubic-bezier(.2, .8, .2, 1), opacity .26s ease, scale .34s var(--glide), translate .34s var(--glide); }
 .vp-group { display: flex; align-items: center; gap: 2px; }
 .vp-group + .vp-group { border-left: 1px solid var(--line); padding-left: 4px; margin-left: 2px; }
 .v-palette button { width: 36px; height: 36px; border: 0; background: none; border-radius: 9px; display: grid; place-items: center; color: var(--text); padding: 0; }
@@ -1869,7 +1871,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-11.14</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-11.16</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -1884,7 +1886,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-11.14';
+      l.querySelector('small').textContent = 'Version 2026-10-11.16';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -1896,7 +1898,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-11.14): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-11.16): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -2168,7 +2170,7 @@ function init(data, again) {
   $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
     (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
     `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version 2026-10-11.14`;
+    `<br>LibLande version 2026-10-11.16`;
 
   if (!groupItems(state.group)) state.group = 'all';
   if (again) { renderGroups(); refresh(false); return; }
@@ -6358,13 +6360,16 @@ function fadeShown(el, show) {
   } else if (!el.hidden) {
     if (matchMedia('(prefers-reduced-motion: reduce)').matches || $('#viewer').hidden) { el.hidden = true; return; }
     el.classList.add('leaving');
-    el.fadeTimer = setTimeout(() => { el.hidden = true; el.classList.remove('leaving'); }, 200);
+    el.fadeTimer = setTimeout(() => { el.hidden = true; el.classList.remove('leaving'); }, 340);
   }
 }
 function showPalette() {
-  const open = store.get('paletteOpen', true);
+  const open = store.get('paletteOpen', true), pill = $('#vpShow');
   fadeShown($('#vPalette'), gs && open);
-  fadeShown($('#vpShow'), gs && !open);
+  // (Tucked away: the small button comes once the toolbar is on its way.)
+  clearTimeout(pill.waitTimer);
+  if (gs && !open && pill.hidden && !$('#vPalette').hidden) pill.waitTimer = setTimeout(() => fadeShown(pill, store.get('paletteOpen', true) === false), 160);
+  else fadeShown(pill, gs && !open);
   placePalette();
   paletteState();
   placePanel();
@@ -13703,7 +13708,7 @@ function stage(msg) {
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-11.14</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version 2026-10-11.16</small>`;
 };
 
 function gunzipJSON(bytes) {
@@ -13946,7 +13951,7 @@ if (!gs) {
       sw = { row, e, a, x0: ev.touches[0].clientX, y0: ev.touches[0].clientY, dx: 0, on: false, bg: null };
     }, { passive: true });
     list.addEventListener('touchmove', ev => {
-      if (!sw) return;
+      if (!sw || sw.wheel) return;
       const t = ev.touches[0], dx = t.clientX - sw.x0, dy = t.clientY - sw.y0;
       if (!sw.on) {
         // (A scroll, not a swipe: let it be.)
@@ -13969,6 +13974,39 @@ if (!gs) {
     }, { passive: false });
     list.addEventListener('touchend', end);
     list.addEventListener('touchcancel', () => { if (sw) { sw.dx = 0; end(); } });
+    // A trackpad (a computer): a two-finger swipe sideways over a row comes
+    // as sideways scrolling; the row follows it, the same way, and the
+    // action is taken when the fingers stop. (Not the browser's back swipe.)
+    let wt = 0;
+    const follow = dx => {
+      let x = dx;
+      if ((x > 0 && !sw.a.right) || (x < 0 && !sw.a.left)) x = x / 6;
+      else if (Math.abs(x) > FAR) x = Math.sign(x) * (FAR + (Math.abs(x) - FAR) * 0.35);
+      sw.dx = (dx > 0 && !sw.a.right) || (dx < 0 && !sw.a.left) ? 0 : dx;
+      sw.row.style.transform = `translateX(${x}px)`;
+      sw.bg.classList.toggle('go-right', dx >= FAR && !!sw.a.right);
+      sw.bg.classList.toggle('go-left', dx <= -FAR && !!sw.a.left);
+      sw.bg.classList.toggle('to-right', dx > 0);
+    };
+    list.addEventListener('wheel', ev => {
+      if (Math.abs(ev.deltaX) <= Math.abs(ev.deltaY) && !(sw && sw.wheel)) return;
+      if (!sw || !sw.wheel) {
+        if (state.picking || Math.abs(ev.deltaX) < 2) return;
+        const row = ev.target.closest('#list .row, #list .card');
+        const e = row && state.view[+row.dataset.i];
+        if (!e) return;
+        const a = acts(e);
+        if (!a.left && !a.right) return;
+        sw = { row, e, a, dx: 0, acc: 0, on: true, wheel: true, bg: bgFor(row, a) };
+        row.style.background = 'var(--bg)';
+      }
+      ev.preventDefault();
+      // (The row goes the way the fingers do: the scroll is the other way.)
+      sw.acc -= ev.deltaX * (ev.deltaMode === 1 ? 16 : 1);
+      follow(sw.acc);
+      clearTimeout(wt);
+      wt = setTimeout(end, 140);
+    }, { passive: false });
     // (A swipe isn't a tap on the row.)
     list.addEventListener('click', ev => { if (list._swiped) { ev.stopPropagation(); ev.preventDefault(); list._swiped = false; } }, true);
   })();
