@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-12.34';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-12.35';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -2276,11 +2276,12 @@ document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && $('#cite
 // 3 seconds after you chose it (not one shown on its own, like the first
 // in the list), or when you open its PDF. Papers closed in the reader are
 // kept too, to reopen. Both are kept on this device and with your account.
-// (Up to 500 kept; as many shown as you choose, by clicking the count in
-// the sidebar: on this device.)
-const RECENT_KEEP = 500;
-const recentShow = () => Math.max(1, Math.min(RECENT_KEEP, +store.get('recentShow', 100) || 100));
-const RECENT = { seen: store.get('recentSeen', []), closed: store.get('recentClosed', []), watch: null, timer: 0, saveT: 0, input: 0 };
+// (Kept small: up to 100 on a computer, 50 on an iPhone or iPad; as many
+// shown as you choose, by clicking the count in the sidebar, on this
+// device.)
+const RECENT_KEEP = matchMedia('(pointer: coarse)').matches ? 50 : 100;
+const recentShow = () => Math.max(1, Math.min(RECENT_KEEP, +store.get('recentShow', RECENT_KEEP) || RECENT_KEEP));
+const RECENT = { seen: store.get('recentSeen', []).slice(0, RECENT_KEEP), closed: store.get('recentClosed', []), watch: null, timer: 0, saveT: 0, input: 0 };
 ['pointerdown', 'keydown'].forEach(t => window.addEventListener(t, () => { RECENT.input = Date.now(); }, true));
 function recentSave() {
   store.set('recentSeen', RECENT.seen);
@@ -2288,7 +2289,7 @@ function recentSave() {
   clearTimeout(RECENT.saveT);
   RECENT.saveT = setTimeout(() => {
     if (!gs || !window.google || !google.script || !google.script.run) return;
-    if (SYNC.recent) google.script.run.withFailureHandler(() => {}).savePrefs({ recentSeen: RECENT.seen.slice(0, 200), recentClosed: RECENT.closed.slice(0, 20) });
+    if (SYNC.recent) google.script.run.withFailureHandler(() => {}).savePrefs({ recentSeen: RECENT.seen.slice(0, 100), recentClosed: RECENT.closed.slice(0, 20) });
   }, 4000);
 }
 const nowSec = () => Math.round(Date.now() / 1000);
