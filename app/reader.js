@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-12.25';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-12.26';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -98,6 +98,27 @@ function pdfJsFix(src) {
   }
   return out;
 }
+// And the page viewer, with a fix: in Safari (and older Chrome), PDF.js
+// tidies every text selection on the page, and one that ends at the very
+// start of something outside the paper (a click on Light, in the sidebar,
+// say) sent it up past the top of the page: "null is not an object
+// (evaluating 'anchor.previousSibling')". It stops at the top now.
+function pdfViewerFix(src) {
+  return src.replace(/while \(!(\w+)\.previousSibling\) \{\s*\1 = \1\.parentNode;\s*\}/, 'while (!$1.previousSibling) { $1 = $1.parentNode; if (!$1) return; }');
+}
+async function importPdfViewer() {
+  try {
+    const r = await fetch(PDFJS + 'pdf_viewer.mjs');
+    if (r.ok) {
+      const src = await r.text(), fixed = pdfViewerFix(src);
+      if (fixed !== src) {
+        const url = URL.createObjectURL(new Blob([fixed], { type: 'text/javascript' }));
+        try { return await import(url); } finally { URL.revokeObjectURL(url); }
+      }
+    }
+  } catch (err) { console.warn(err); }
+  return import(PDFJS + 'pdf_viewer.mjs');
+}
 async function importPdfJs() {
   try {
     const r = await fetch(PDFJS + 'pdf.min.mjs');
@@ -142,7 +163,7 @@ function loadPdfViewer() {
         // Not the .min.css: its minifier joins some selectors together
         // (":is(.a .b) canvas" becomes ":is(.a.b)canvas"), which breaks page sizing.
         fetch(PDFJS + 'pdf_viewer.css').then(r => (r.ok ? r.text() : '')),
-        import(PDFJS + 'pdf_viewer.mjs'),
+        importPdfViewer(),
       ]);
       const style = document.createElement('style');
       style.textContent = css.replace(/\.sidebar(?![\w-])/g, '.pdfjs-sidebar').replace(/url\((['"]?)images[/]/g, 'url($1' + PDFJS + 'images/');
