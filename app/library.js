@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-12.12';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-12.16';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -2059,14 +2059,18 @@ function renderDetail() {
   // A wide pane has two columns: the abstract comes straight after the
   // citation, then the keywords, with the PDF, the buttons and rating beside it.
   // A narrow one has one, with the buttons and then the abstract.
-  const wide = detailWide();
+  // (A book's cover: for a book, or a chapter with no PDF here, its book's.)
+  const hasPdf = gs && (e.files || []).some(fl => fl.id);
+  const cover = e.t === 'book' || !hasPdf ? coverFor(e) : null;
+  // (With no picture for the side, it has Edit and the buttons, named, in a column.)
+  const wide = detailWide(), stack = wide && !(hasPdf || cover);
   let h = '';
   h += `<div class="d-kicker"><span class="d-type">${esc(TYPE_NAMES[e.t] || e.t)}</span>` +
     `<button class="citekey" data-copy="key" title="Copy cite key"><span class="ck">${esc(e.k)}</span>${ICON.copy}</button>` +
     (gs && !e.ib ? `<button type="button" class="citekey-edit" data-rename title="Change the cite key" aria-label="Change the cite key">${ICON.pencil}</button>` : '') +
     (e.ib ? `<span class="pill">Inbox</span>` : '') +
     (e.offline ? `<span class="pill pend" title="Changed while offline: it goes to Google Drive when you\u2019re back online">On this device</span>` : '') +
-    (gs ? `<button type="button" class="btn d-edit" data-edit>${ICON.pencil}<span>Edit</span></button>` : '') + `</div>`;
+    (gs && !wide ? `<button type="button" class="btn d-edit" data-edit>${ICON.pencil}<span>Edit</span></button>` : '') + `</div>`;
   h += `<h1 class="d-title">${esc(f.title || '(untitled)')}</h1>`;
   const people = e.a && e.a.length ? e.a : e.e || [];
   if (people.length) {
@@ -2137,9 +2141,12 @@ function renderDetail() {
     `<div class="menu-list" role="menu">${more.join('')}</div></details>`);
   const acts = `<div class="actions">${btns.join('')}</div>`;
   // Thumbnails: in line in a narrow pane, at the top of the side column in a wide one.
-  const thumbs = gs && (e.files || []).some(fl => fl.id) ? e.files.map((fl, j) => fl.id
-    ? `<button type="button" class="thumb" data-read="${j}" title="Read ${esc(fl.n)}">${thumbBox(fl.id)}<span class="thumb-name">${esc(fl.n)}</span></button>`
+  // A book's first PDF shows its cover; with no PDF, the cover is shown on its own.
+  const first = hasPdf ? e.files.findIndex(fl => fl.id) : -1;
+  let thumbs = hasPdf ? e.files.map((fl, j) => fl.id
+    ? `<button type="button" class="thumb" data-read="${j}" title="Read ${esc(fl.n)}">${j === first && cover ? coverBox(cover) : thumbBox(fl.id)}<span class="thumb-name">${esc(fl.n)}</span></button>`
     : '').join('') : '';
+  if (!hasPdf && cover && wide) thumbs = `<div class="thumb cover-only">${coverBox(cover)}</div>`;
   let notices = '';
   const twins = DUPS.get(e.k);
   if (twins) {
@@ -2195,7 +2202,9 @@ function renderDetail() {
     `</tbody></table></details>`;
   if (wide) {
     h = `<div class="d-two"><div class="d-inner">${h}${notices}${abs}${chips}${body}${vers}${fields}</div>` +
-      `<aside class="d-side">${thumbs ? `<div class="thumbs t-side" aria-label="PDFs">${thumbs}</div>` : ''}${acts}${rl}${metaH}</aside></div>`;
+      // (Edit in the top corner, wherever the details are shown.)
+      `<aside class="d-side${stack ? ' d-stack' : ''}">${gs ? `<button type="button" class="btn d-edit" data-edit>${ICON.pencil}<span>Edit</span></button>` : ''}` +
+      `${thumbs ? `<div class="thumbs t-side" aria-label="PDFs">${thumbs}</div>` : ''}${acts}${rl}${metaH}</aside></div>`;
   } else {
     // (Rating and Read, looked at less than the abstract, after it.)
     h = `<div class="d-inner">${h}${rl}${acts}${thumbs ? `<div class="thumbs t-inline">${thumbs}</div>` : ''}${notices}${abs}${chips}${body}${metaH}${vers}${fields}</div>`;
@@ -2205,6 +2214,51 @@ function renderDetail() {
   detailEl.scrollTop = 0;
   $('#fieldsBox').addEventListener('toggle', ev => store.set('fieldsOpen', ev.target.open));
   loadThumbs();
+}
+
+// Book covers, from Open Library: found by ISBN, or else by title (which
+// must match) and author, and kept on this device (a miss is tried again
+// after a month). Chapters share their book's.
+const COVERS = store.get('covers', {}), COVER_WAIT = new Set();
+const coverBox = url => `<span class="thumb-img cover"><img src="${esc(url)}" alt="Cover" loading="lazy"></span>`;
+const mainTitle = t => norm(t).replace(/[{}\\]/g, '').split(/[:.?!]/)[0].replace(/&/g, 'and').replace(/[^a-z0-9]+/g, ' ').trim();
+function coverAsk(e) {
+  const f = e.f, book = e.t === 'book' || e.t === 'collection' || e.t === 'proceedings';
+  const title = book ? f.title : (e.t === 'incollection' || e.t === 'inbook') ? f.booktitle : '';
+  if (!title || !mainTitle(title)) return null;
+  const who = (book ? (e.a && e.a.length ? e.a : e.e) : e.e) || [];
+  const isbn = (f.isbn || '').split(/[,;\s]+/).map(x => x.replace(/[^0-9Xx]/g, '')).find(x => x.length === 10 || x.length === 13) || '';
+  return { key: isbn || mainTitle(title) + '|' + (who[0] ? norm(who[0][0]) : ''), isbn, title: mainTitle(title), who: who[0] ? norm(who[0][0]).split(/\s+/).pop() : '' };
+}
+function coverFor(e) {
+  const q = coverAsk(e);
+  if (!q) return null;
+  const c = COVERS[q.key];
+  if (c && (c.id || Date.now() - c.at < 30 * 86400000)) return c.id ? 'https:\/\/covers.openlibrary.org/b/id/' + c.id + '-M.jpg' : null;
+  findCover(q);
+  return null;
+}
+async function findCover(q) {
+  if (COVER_WAIT.has(q.key) || !navigator.onLine || (window.LIBLANDE_TEST && !window.LIBLANDE_COVERS_LIVE)) return;
+  COVER_WAIT.add(q.key);
+  try {
+    const ask = async p => {
+      const r = await fetch('https:\/\/openlibrary.org/search.json?' + new URLSearchParams({ ...p, limit: 5, fields: 'title,cover_i' }));
+      if (!r.ok) throw new Error('Open Library: ' + r.status);
+      return (await r.json()).docs || [];
+    };
+    const fits = d => d.cover_i && mainTitle(d.title) === q.title;
+    let hit = q.isbn ? (await ask({ isbn: q.isbn })).find(d => d.cover_i) : null;
+    if (!hit) hit = (await ask(q.who ? { title: q.title, author: q.who } : { title: q.title })).find(fits);
+    // (By title alone only for a title long enough not to be another book's.)
+    if (!hit && q.who && q.title.split(' ').length >= 3) hit = (await ask({ title: q.title })).find(fits);
+    COVERS[q.key] = { id: hit ? hit.cover_i : 0, at: Date.now() };
+    store.set('covers', COVERS);
+    const e = hit && state.selKey && BYKEY.get(state.selKey), now = e && coverAsk(e);
+    if (now && now.key === q.key && !detailEl.querySelector('.editing, [contenteditable="true"], textarea, input:focus')) {
+      const top = detailEl.scrollTop; renderDetail(); detailEl.scrollTop = top;
+    }
+  } catch {} finally { COVER_WAIT.delete(q.key); }
 }
 
 // Thumbnails come from Google Drive (getThumbnails)
@@ -2578,10 +2632,19 @@ function placeMenu(d) {
   if (!c || c.height < 200) c = { top: 0, bottom: window.innerHeight, right: window.innerWidth };
   const top = Math.max(c.top, 0) + 8, bottom = Math.min(c.bottom, window.innerHeight) - 8, right = Math.min(c.right, window.innerWidth) - 8;
   if (list.getBoundingClientRect().right > right) d.classList.add('right');
-  const s = d.getBoundingClientRect(), h = list.scrollHeight + 4, below = bottom - s.bottom, above = s.top - top;
+  const scrolls = clip && clip !== document.body && clip.scrollHeight > clip.clientHeight;
+  let s = d.getBoundingClientRect();
+  // (Its button out of sight, opened from the keyboard say: brought into view.)
+  if (scrolls && (s.bottom > bottom || s.top < top)) { clip.scrollTop += s.bottom > bottom ? s.bottom - bottom : s.top - top; s = d.getBoundingClientRect(); }
+  let h = list.scrollHeight + 4, below = bottom - s.bottom, above = s.top - top;
+  // (Room neither way, in a pane that scrolls: it scrolls to make room below.)
+  if (h > below && h > above && scrolls) {
+    const by = Math.min(h - below, clip.scrollHeight - clip.clientHeight - clip.scrollTop, Math.max(0, s.top - top));
+    if (by > 0) { clip.scrollTop += by; s = d.getBoundingClientRect(); below = bottom - s.bottom; above = s.top - top; }
+  }
   if (h > below && above > below) d.classList.add('up');
   const room = d.classList.contains('up') ? above : below;
-  if (h > room) { list.style.maxHeight = Math.max(120, room - 4) + 'px'; list.style.overflowY = 'auto'; }
+  if (h > room) { list.style.maxHeight = Math.max(80, room - 4) + 'px'; list.style.overflowY = 'auto'; }
 }
 document.addEventListener('toggle', ev => {
   const d = ev.target;

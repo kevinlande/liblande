@@ -425,6 +425,22 @@ body:has(#sheet:not([hidden])) .pick-bar { visibility: hidden; }
 .d-two .d-abstract { max-width: none; }
 .d-side { flex: none; width: 226px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; align-content: start; padding: 22px 24px 40px 12px; }
 .d-side .thumbs { display: flex; flex-direction: column; margin: 0; padding: 0; overflow: visible; }
+/* A book's cover: its own shape, not cropped to a page's. */
+.thumb-img.cover { height: auto; min-height: 60px; background: none; }
+.thumb-img.cover img { height: auto; object-fit: contain; background: none; }
+.t-inline .thumb-img.cover { height: 44px; }
+.t-inline .thumb-img.cover img { height: 100%; width: auto; }
+.thumb.cover-only { cursor: default; }
+/* No picture for the side: Edit, and under it the buttons in a column,
+   with their names. */
+.d-side.d-stack { width: 190px; gap: 12px; }
+.d-side.d-stack .actions { flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 6px; }
+.d-side.d-stack .actions > .btn, .d-side.d-stack .actions > .menu > summary { height: auto; min-height: 34px; padding: 6px 12px; justify-content: flex-start; }
+.d-side.d-stack .actions > .btn > span, .d-side.d-stack .actions > .menu > summary > span { position: static; width: auto; height: auto; overflow: hidden; clip-path: none; }
+.d-side.d-stack .actions > .menu > summary > svg:last-child:not(.dots):not(:first-child) { display: block; margin-left: auto; }
+.d-side > .d-edit { justify-content: center; margin: 0; min-height: 34px; padding: 6px 12px; font-size: 13.5px; }
+.d-side.d-stack > .d-edit { justify-content: flex-start; }
+.d-side.d-stack .actions > .btn, .d-side.d-stack .actions > .menu { flex: none; }
 /* The buttons: icons in one row (their names are tips, and for screen readers). */
 .d-side .actions { flex-wrap: nowrap; gap: 5px; }
 .d-side .actions > .btn, .d-side .actions > .menu { flex: 1 1 0; min-width: 0; }
