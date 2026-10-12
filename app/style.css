@@ -841,12 +841,15 @@ button.fileicon { border: 0; background: none; cursor: pointer; }
 .btn.primary:hover { filter: brightness(1.07); }
 .btn .sub { font-weight: 400; opacity: .75; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+/* The details' Share: the word too, but on a phone just the icon (the
+   word for screen readers). */
+@media (max-width: 699px) { .share-word { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } }
 /* Said to screen readers only (the icon is enough to see). */
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .menu { position: relative; }
 .menu > summary { list-style: none; }
 .menu > summary::-webkit-details-marker { display: none; }
-.menu > summary svg:last-child { width: 13px; height: 13px; opacity: .7; }
+.menu > summary svg:last-child:not(.dots) { width: 13px; height: 13px; opacity: .7; }
 .menu-list { position: absolute; z-index: 20; top: calc(100% + 4px); left: 0; min-width: 170px; padding: 4px; display: grid; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); box-shadow: var(--shadow); }
 .menu.right .menu-list { left: auto; right: 0; }
 .menu-list button { border: 0; background: none; text-align: left; padding: 8px 10px; border-radius: 6px; font-size: 13.5px; color: var(--text); }
@@ -1269,6 +1272,9 @@ a.ms-ib { text-decoration: none; }
 .v-palette { position: absolute; z-index: 5; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
   display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 2px; width: max-content; max-width: calc(100% - 16px);
   padding: 4px 6px 4px 2px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: 0 6px 24px rgba(0, 0, 0, .2); }
+/* (Nothing in the toolbar is text to select: a long press, holding a
+   tool for its other kind, made the iPad start selecting there.) */
+.v-palette, .v-palette *, .vp-show, .vp-panel, .vp-panel * { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .v-palette.placed, .vp-show.placed { bottom: auto; right: auto; transform: none; }
 /* On a phone the toolbar sits at the bottom or the top, nowhere else. */
 .v-palette.at-top, .vp-show.at-top { bottom: auto; top: calc(var(--top-h, 48px) + 8px); }
@@ -1581,10 +1587,13 @@ a.ms-ib { text-decoration: none; }
   .v-page { flex: 1; text-align: center; }
   .d-title { font-size: 22px; }
   /* A paper's buttons: Read PDF in words, the rest as icons. */
-  .d-inner > .actions { gap: 6px; flex-wrap: wrap; }
+  .d-inner > .actions { gap: 6px; flex-wrap: wrap; align-items: center; }
   .d-inner > .actions > .btn:not(.act-read) > span, .d-inner > .actions > .menu:not(.act-read) > summary > span,
-  .d-inner > .actions > .menu:not(.act-read) > summary > svg:last-child { display: none; }
-  .d-inner > .actions > .btn:not(.act-read), .d-inner > .actions > .menu:not(.act-read) > summary { padding: 6px 10px; }
+  .d-inner > .actions > .menu:not(.act-read) > summary > svg:last-child:not(.dots) { display: none; }
+  /* (All the same size: a square for each icon.) */
+  .d-inner > .actions > .btn:not(.act-read), .d-inner > .actions > .menu:not(.act-read) > summary { box-sizing: border-box; width: 46px; height: 42px; min-height: 0; padding: 0; justify-content: center; }
+  .d-inner > .actions > .menu { display: flex; }
+  .d-inner > .actions > .act-read, .d-inner > .actions > .menu.act-read > summary { box-sizing: border-box; height: 42px; min-height: 0; }
   .toolbar { --tb-gap: 4px; column-gap: var(--tb-gap); }
   .tb-title.tb-tabs { min-width: 0; }
 }

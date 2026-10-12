@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-12.03';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-12.06';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -2122,13 +2122,13 @@ function renderDetail() {
   if (readable.length === 1) {
     const [fl, j] = readable[0];
     btns.push(`<button type="button" class="btn primary act-read" data-read="${j}" title="${esc(fl.p)}">${ICON.read}<span>View</span></button>`);
-    btns.push(menu('', `${ICON.share}<span class="sr-only">Share</span>`, 'Share a copy to another app',
+    btns.push(menu('', `${ICON.share}<span class="share-word">Share</span>`, 'Share a copy to another app',
       `<button type="button" role="menuitem" data-share="${j}" data-clean="0">PDF as is</button>` +
       `<button type="button" role="menuitem" data-share="${j}" data-clean="1">Clean copy (no annotations)</button>`));
   } else if (readable.length > 1) {
     btns.push(menu('act-read', `${ICON.read}<span>View</span>`, 'Choose a PDF to view',
       readable.map(([fl, j]) => `<button type="button" role="menuitem" data-read="${j}" title="${esc(fl.p)}"><span class="fname">${fname(fl)}</span></button>`).join('')));
-    btns.push(menu('', `${ICON.share}<span class="sr-only">Share</span>`, 'Share a copy to another app',
+    btns.push(menu('', `${ICON.share}<span class="share-word">Share</span>`, 'Share a copy to another app',
       readable.map(([fl, j]) => `<div class="menu-head">${fname(fl)}</div>` +
         `<button type="button" role="menuitem" data-share="${j}" data-clean="0">PDF as is</button>` +
         `<button type="button" role="menuitem" data-share="${j}" data-clean="1">Clean copy (no annotations)</button>`).join('')));
@@ -2163,7 +2163,7 @@ function renderDetail() {
     `<button type="button" role="menuitem" data-copy="apa">APA (long)<kbd>${esc(keyHint('copyApa'))}</kbd></button>` +
     `<button type="button" role="menuitem" data-copy="apa-short">APA (short)<kbd>${esc(keyHint('copyShort'))}</kbd></button></div></details>`);
   if (more.length) btns.push(`<details class="menu act-more"><summary class="btn" title="More: ${more.length > 1 ? 'Google Drive, Attach, links' : 'more'}" aria-label="More">` +
-    `<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="18" cy="12" r="1.4"/></svg></summary>` +
+    `<svg class="i dots" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="18" cy="12" r="1.4"/></svg></summary>` +
     `<div class="menu-list" role="menu">${more.join('')}</div></details>`);
   h += `<div class="actions">${btns.join('')}</div>`;
   // Thumbnails go in line here, or (on a wide pane) in a column on the

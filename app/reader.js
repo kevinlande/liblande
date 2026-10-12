@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-12.03';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-12.06';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -1689,8 +1689,11 @@ function hidePanel() {
 // Hold the highlighter or the underline button (or right-click it) for its
 // other kind, picked up at once; a tap still picks it up or puts it down.
 (() => {
-  let hold = null;
+  let hold = null, swapped = 0;
   const swap = btn => {
+    swapped = Date.now();
+    // (Any selection the long press began goes.)
+    try { getSelection().removeAllRanges(); } catch (err) { /* none */ }
     if (V.tool === 'pen') endStrokes();
     const kind = altKindOf(btn);
     setKind(kind);
@@ -1713,7 +1716,9 @@ function hidePanel() {
     });
     b.addEventListener('pointermove', ev => { if (hold && Math.hypot(ev.clientX - hold.x, ev.clientY - hold.y) > 10) { clearTimeout(hold.t); hold = null; } });
     ['pointerup', 'pointercancel', 'pointerleave'].forEach(t => b.addEventListener(t, () => { if (hold) { clearTimeout(hold.t); hold = null; } }));
-    b.addEventListener('contextmenu', ev => { ev.preventDefault(); swap(btn); });
+    // (A long press can also send a right-click: not a second switch.)
+    b.addEventListener('contextmenu', ev => { ev.preventDefault(); if (Date.now() - swapped > 800) swap(btn); });
+    b.addEventListener('selectstart', ev => ev.preventDefault());
   });
 })();
 $('#vpStyle').addEventListener('click', () => {
