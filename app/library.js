@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-12.08';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-12.09';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -2039,6 +2039,13 @@ const ago = t => {
   if (s < 86400) return Math.round(s / 3600) + ' h ago';
   return new Date(t * 1000).toLocaleDateString([], { month: 'short', day: 'numeric' });
 };
+// Wide enough for the details' two columns. (Drawn again when the pane
+// grows or shrinks past it, unless something in it is being edited.)
+const detailWide = () => detailEl.clientWidth >= 700;
+new ResizeObserver(() => {
+  if (!detailEl.querySelector('.d-inner') || detailEl.querySelector('.editing, [contenteditable="true"], textarea, input:focus')) return;
+  if (!!detailEl.dataset.wide !== detailWide()) { const top = detailEl.scrollTop; renderDetail(); detailEl.scrollTop = top; }
+}).observe(detailEl);
 function renderDetail() {
   if (state.picking && state.picked.size && !phoneMQ.matches) { detailEl.innerHTML = selectionHTML(); return; }
   const e = state.selKey && BYKEY.get(state.selKey);
@@ -2049,7 +2056,11 @@ function renderDetail() {
     return;
   }
   const f = e.f;
-  let h = `<div class="d-inner">`;
+  // A wide pane has two columns: the abstract comes straight after the
+  // citation, with the PDF, the buttons, rating and keywords beside it.
+  // A narrow one has one, with the buttons and then the abstract.
+  const wide = detailWide();
+  let h = '';
   h += `<div class="d-kicker"><span class="d-type">${esc(TYPE_NAMES[e.t] || e.t)}</span>` +
     `<button class="citekey" data-copy="key" title="Copy cite key"><span class="ck">${esc(e.k)}</span>${ICON.copy}</button>` +
     (gs && !e.ib ? `<button type="button" class="citekey-edit" data-rename title="Change the cite key" aria-label="Change the cite key">${ICON.pencil}</button>` : '') +
@@ -2066,7 +2077,7 @@ function renderDetail() {
   }
   const v = venueHTML(e);
   if (v) h += `<div class="d-venue d-cite">${v}</div>`;
-  h += readingHTML(e);
+  const rl = readingHTML(e);
 
   const btns = [];
   // PDFs: with one, Read PDF, Share and Drive buttons; with several, each
@@ -2115,28 +2126,29 @@ function renderDetail() {
     let host = u; try { host = new URL(u).hostname.replace(/^www\./, ''); } catch {}
     more.push(`<a role="menuitem" href="${esc(u)}" target="_blank" rel="noopener" title="${esc(u)}">${ICON.link}<span>${esc(host)}</span></a>`);
   });
-  btns.push(`<details class="menu"><summary class="btn" title="Copy the citation">${ICON.copy}<span>Copy</span>${ICON.chev}</summary>` +
+  // Copy: straight after View (or whatever opens the paper).
+  const view = btns.findIndex(b => b.indexOf('act-read') >= 0);
+  btns.splice(view + 1, 0, `<details class="menu"><summary class="btn" title="Copy the citation">${ICON.copy}<span>Copy</span>${ICON.chev}</summary>` +
     `<div class="menu-list" role="menu"><button type="button" role="menuitem" data-copy="bibtex">BibTeX<kbd>${esc(keyHint('copyBib'))}</kbd></button>` +
     `<button type="button" role="menuitem" data-copy="apa">APA (long)<kbd>${esc(keyHint('copyApa'))}</kbd></button>` +
     `<button type="button" role="menuitem" data-copy="apa-short">APA (short)<kbd>${esc(keyHint('copyShort'))}</kbd></button></div></details>`);
   if (more.length) btns.push(`<details class="menu act-more"><summary class="btn" title="More: ${more.length > 1 ? 'Google Drive, Attach, links' : 'more'}" aria-label="More">` +
-    `<svg class="i dots" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="18" cy="12" r="1.4"/></svg></summary>` +
+    `<svg class="i dots" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="18" cy="12" r="1.4"/></svg>${wide ? '<span>More</span>' : ''}</summary>` +
     `<div class="menu-list" role="menu">${more.join('')}</div></details>`);
-  h += `<div class="actions">${btns.join('')}</div>`;
-  // Thumbnails go in line here, or (on a wide pane) in a column on the
-  // right; both are drawn and the CSS shows one.
+  const acts = `<div class="actions">${btns.join('')}</div>`;
+  // Thumbnails: in line in a narrow pane, at the top of the side column in a wide one.
   const thumbs = gs && (e.files || []).some(fl => fl.id) ? e.files.map((fl, j) => fl.id
     ? `<button type="button" class="thumb" data-read="${j}" title="Read ${esc(fl.n)}">${thumbBox(fl.id)}<span class="thumb-name">${esc(fl.n)}</span></button>`
     : '').join('') : '';
-  if (thumbs) h += `<div class="thumbs t-inline">${thumbs}</div>`;
+  let notices = '';
   const twins = DUPS.get(e.k);
   if (twins) {
-    h += `<div class="dup-note">${ICON.copy}<span>Possibly the same as ` + twins.map(x =>
+    notices += `<div class="dup-note">${ICON.copy}<span>Possibly the same as ` + twins.map(x =>
       `<button type="button" data-twin="${esc(x.k)}">${esc(x.authorsShort || x.k)}${x.f.year ? ' (' + esc(x.f.year) + ')' : ''}${x.ib ? ' in your inbox' : ''}</button>`).join(', ') +
       `. <button type="button" class="dup-no" data-notdup title="Stop showing ${twins.length === 1 ? 'these two' : 'these'} as possible duplicates">Not the same</button></span></div>`;
   }
   const missing = (e.files || []).filter(x => x.x);
-  if (missing.length) h += `<div class="warn">The linked file ${esc(missing[0].p)} wasn\u2019t found in your papers folder on Google Drive.</div>`;
+  if (missing.length) notices += `<div class="warn">The linked file ${esc(missing[0].p)} wasn\u2019t found in your papers folder on Google Drive.</div>`;
 
   const meta = [];
   // Rating and Read: set here with a click (a click on the current rating
@@ -2150,39 +2162,46 @@ function renderDetail() {
     if (f.read === '1') meta.push(`<span class="pill">Read</span>`);
   }
   if (e.added) meta.push(`<span>Added ${esc(e.added.slice(0, 10))}</span>`);
-  if (f['date-modified']) meta.push(`<span>Modified ${esc(f['date-modified'].slice(0, 10))}</span>`);
-  if (meta.length) h += `<div class="d-meta">${meta.join('')}</div>`;
+  const metaH = meta.length ? `<div class="d-meta">${meta.join('')}</div>` : '';
 
   if (e.ib) {
-    h += `<p class="inbox-note">Added in LibLande and waiting in your inbox. To move it into ${esc(DATA.source)}, open ` +
+    notices += `<p class="inbox-note">Added in LibLande and waiting in your inbox. To move it into ${esc(DATA.source)}, open ` +
       `LibLande \u203a Inbox \u203a LibLande inbox.bib in BibDesk and drag it into your library. Once it\u2019s there, it leaves the inbox.</p>`;
   }
   const kwAdd = gs ? `<span class="kw-add-wrap"><button type="button" class="chip kw-add" data-kw-add title="Add a keyword">+ Keyword</button></span>` : '';
+  let chips = '';
   if (e.kw.length || (e.groups && e.groups.length) || kwAdd) {
-    h += `<div class="chips">` +
+    chips = `<div class="chips">` +
       (e.groups || []).map(g => `<button class="chip grp-chip" data-goto="${esc('s:' + g)}">${esc(g)}</button>`).join('') +
       e.kw.map(k => `<button class="chip" data-goto="${esc('k:' + k)}">${esc(k)}</button>`).join('') + kwAdd + `</div>`;
   }
-  h += versionsHTML(e);
-  if (f.abstract) h += `<section class="d-sec"><h3>Abstract</h3><p class="d-abstract">${esc(f.abstract)}</p></section>`;
+  const vers = versionsHTML(e);
+  let body = '';
+  if (f.abstract) body += `<section class="d-sec"><h3>Abstract</h3><p class="d-abstract">${esc(f.abstract)}</p></section>`;
   // Notes: click to write or change them, right here.
-  if (gs) h += `<section class="d-sec d-notes"><h3>Notes</h3><div class="d-abstract notes-body${f.annote ? '' : ' notes-empty'}" data-notes>${f.annote ? esc(f.annote) : 'Add notes\u2026'}</div></section>`;
-  else if (f.annote) h += `<section class="d-sec"><h3>Notes</h3><p class="d-abstract">${esc(f.annote)}</p></section>`;
+  if (gs) body += `<section class="d-sec d-notes"><h3>Notes</h3><div class="d-abstract notes-body${f.annote ? '' : ' notes-empty'}" data-notes>${f.annote ? esc(f.annote) : 'Add notes\u2026'}</div></section>`;
+  else if (f.annote) body += `<section class="d-sec"><h3>Notes</h3><p class="d-abstract">${esc(f.annote)}</p></section>`;
 
-  const skip = new Set(['abstract', 'annote', 'keywords', 'date-added', 'date-modified', 'read', 'rating']);
+  const skip = new Set(['abstract', 'annote', 'keywords', 'date-added', 'read', 'rating']);
   // (Related: shown as Versions, when it names publications in the library.)
   if (VERSION_OF.has(e.k) || relatedKeys(e).every(k => BYKEY.has(k))) skip.add('related');
   const keys = Object.keys(f).filter(k => !skip.has(k)).sort((a, b) => {
     const ia = FIELD_ORDER.indexOf(a), ib = FIELD_ORDER.indexOf(b);
     return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b);
   });
-  h += `<details class="d-sec"${store.get('fieldsOpen', false) ? ' open' : ''} id="fieldsBox"><summary>All fields</summary><table class="fields"><tbody>` +
+  const fields = `<details class="d-sec"${store.get('fieldsOpen', false) ? ' open' : ''} id="fieldsBox"><summary>All fields</summary><table class="fields"><tbody>` +
     keys.map(k => `<tr><th>${esc(k)}</th><td>${safeUrl(f[k]) ? `<a href="${esc(f[k])}" target="_blank" rel="noopener">${esc(f[k])}</a>` : esc(f[k])}</td></tr>`).join('') +
     (e.files || []).map((x, j) => `<tr><th>file ${j + 1}</th><td>${esc(x.p)}</td></tr>`).join('') +
     `</tbody></table></details>`;
-  h += `</div>`;
-  if (thumbs) h = `<div class="d-wrap">${h}<aside class="thumbs t-side" aria-label="PDFs">${thumbs}</aside></div>`;
+  if (wide) {
+    h = `<div class="d-two"><div class="d-inner">${h}${notices}${body}${vers}${fields}</div>` +
+      `<aside class="d-side">${thumbs ? `<div class="thumbs t-side" aria-label="PDFs">${thumbs}</div>` : ''}${acts}${rl}${metaH}${chips}</aside></div>`;
+  } else {
+    // (Rating, Read and keywords, looked at less than the abstract, after it.)
+    h = `<div class="d-inner">${h}${rl}${acts}${thumbs ? `<div class="thumbs t-inline">${thumbs}</div>` : ''}${notices}${body}${metaH}${chips}${vers}${fields}</div>`;
+  }
   detailEl.innerHTML = h;
+  detailEl.dataset.wide = wide ? '1' : '';
   detailEl.scrollTop = 0;
   $('#fieldsBox').addEventListener('toggle', ev => store.set('fieldsOpen', ev.target.open));
   loadThumbs();

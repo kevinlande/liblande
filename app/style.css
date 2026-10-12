@@ -410,7 +410,6 @@ body:has(#sheet:not([hidden])) .pick-bar { visibility: hidden; }
 .pick-x .i { width: 16px; height: 16px; }
 .pick-count { flex: 1 1 auto; min-width: 0; font-weight: 600; }
 .thumbs { display: flex; gap: 14px; overflow-x: auto; margin: 16px 0 2px; padding: 2px 2px 6px; }
-.t-side { display: none; }
 /* In a narrow pane, each PDF is a compact row (small picture and name)
    rather than a large preview. */
 .t-inline { flex-direction: column; gap: 6px; margin: 12px 0 2px; overflow: visible; }
@@ -418,16 +417,22 @@ body:has(#sheet:not([hidden])) .pick-bar { visibility: hidden; }
 .t-inline .thumb-img { flex: none; width: 34px; height: 44px; border-radius: 4px; }
 .t-inline .thumb-img .i { width: 16px; height: 16px; }
 .t-inline .thumb-name { font-size: 13px; color: var(--text); -webkit-line-clamp: 1; }
-@media (min-width: 1000px) {
-  @container (min-width: 700px) {
-    .d-wrap { display: flex; align-items: flex-start; }
-    /* The details run all the way to the PDF column. */
-    .d-wrap > .d-inner { flex: 1 1 auto; min-width: 0; max-width: none; }
-    .d-wrap .d-abstract { max-width: none; }
-    .t-inline { display: none; }
-    .t-side { display: flex; flex-direction: column; flex: none; overflow: visible; margin: 0 0 0 auto; padding: 22px 24px 24px 8px; position: sticky; top: 0; }
-  }
-}
+/* A wide pane: two columns. The abstract follows the citation on the
+   left; the PDF, the buttons, the reading list, rating and keywords are in
+   a column on the right. */
+.d-two { display: flex; align-items: flex-start; }
+.d-two > .d-inner { flex: 1 1 auto; min-width: 0; max-width: none; padding-right: 8px; }
+.d-two .d-abstract { max-width: none; }
+.d-side { flex: none; width: 178px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; align-content: start; padding: 22px 24px 40px 12px; }
+.d-side .thumbs { display: flex; flex-direction: column; margin: 0; padding: 0; overflow: visible; }
+.d-side .actions { flex-direction: column; align-items: stretch; gap: 6px; }
+.d-side .actions > .btn, .d-side .actions > .menu > summary { box-sizing: border-box; width: 100%; }
+.d-side .actions > .menu > summary svg:last-child:not(.dots) { margin-left: auto; }
+.d-side .menu-list { left: auto; right: 0; }
+.d-side .rl-bar { margin: 0; }
+.d-side .rl-bar .seg { width: 100%; }
+.d-side .rl-bar .seg > button { flex: 1; }
+.d-side .d-meta { gap: 6px 12px; }
 .thumb { flex: none; width: 118px; display: grid; gap: 6px; align-content: start; border: 0; background: none; padding: 0; text-align: left; color: var(--muted); cursor: pointer; }
 .thumb-img { display: grid; place-items: center; width: 118px; height: 152px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
 .thumb-img img { width: 100%; height: 100%; object-fit: cover; object-position: top; background: #fff; }
