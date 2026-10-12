@@ -19,7 +19,7 @@
  */
 (function (root) {
   'use strict';
-  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).edits = '2026-10-12.32';
+  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).edits = '2026-10-12.33';
   const FOLDER = 'application/vnd.google-apps.folder';
   const UPLOAD = 'https://www.googleapis.com/upload/drive/v3/';
   const READING_FILE = 'reading-list.json',
@@ -637,6 +637,15 @@
         if (old) await patch(old.id, { trashed: true });
       }
       return { name: bib.name };
+    });
+    // A library taken off the list (not the one open). Its folder and
+    // files stay in Google Drive, and its reading list, put aside, comes
+    // back if it's added again.
+    F.forgetLibrary = req => serial(async () => {
+      const s = (await B.settings(true)) || {};
+      if (!req.bibId || req.bibId === s.bibId) throw new Error('That\u2019s the library you have open. Switch to another first.');
+      await B.updateSettings(x => { x.libraries = (x.libraries || []).filter(l => l.bibId !== req.bibId); });
+      return {};
     });
     // A new library: a folder in My Drive (named as asked, or with a number
     // if that's taken) with an empty .bib in it, BibDesk's way, then used.

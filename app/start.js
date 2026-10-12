@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-10-12.32';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-10-12.33';
 // On GitHub Pages, every part of the app must be from the same version: a
 // part kept from an older one (the offline copy, served when the network
 // was slow) lacks what this page needs. Then the kept copies go, and the
@@ -235,6 +235,14 @@ const errText = err => ((err && err.message) || String(err)).replace(/^(Exceptio
 let status = null, statusReq = null, STYLE_WAS = null;
 let showSetup = () => {};
 let switchLibraryTo = () => {}, openNewLibrary = () => {};
+// Settings' other libraries: Switch to each, or × to take it off the list.
+function renderLibOthers(st) {
+  $('#libOthers').innerHTML = (st.libraries || []).filter(l => l.bibId).map(l => {
+    const name = esc((l.name || 'another library').replace(/\.bib$/i, ''));
+    return `<div class="set-lib-row"><button type="button" class="set-lib" data-lib="${esc(l.bibId)}" data-papers="${esc(l.papersId || '')}">${ICON.lib}<span>Switch to <b>${name}</b></span></button>` +
+      `<button type="button" class="tb-btn set-lib-x" data-lib-forget="${esc(l.bibId)}" data-name="${name}" title="Take ${name} off the list (its files stay in Google Drive)" aria-label="Take ${name} off the list">${ICON.x}</button></div>`;
+  }).join('');
+}
 
 // Builds run in the background on Google's side (a big library takes a
 // minute or more). Poll until the build finishes, reporting progress.
@@ -682,8 +690,7 @@ if (RELOADING) {
       // (Other libraries: with the .bib file and folder, in Settings.)
       document.querySelector('#setupEdit .set-files').after($('#setLibs'));
       // (The libraries used before, to switch back to.)
-      $('#libOthers').innerHTML = (st.libraries || []).filter(l => l.bibId).map(l =>
-        `<button type="button" class="set-lib" data-lib="${esc(l.bibId)}" data-papers="${esc(l.papersId || '')}">${ICON.lib}<span>Switch to <b>${esc((l.name || 'another library').replace(/\.bib$/i, ''))}</b></span></button>`).join('');
+      renderLibOthers(st);
       $('#curPapers').textContent = st.papersName || '';
       $('#changeLinks').hidden = false;
     }
@@ -710,6 +717,28 @@ if (RELOADING) {
     $('#bibLink').focus();
   });
   $('#setClose').addEventListener('click', closeSettings);
+  // A library taken off the list: ×, then × again to be sure (its folder
+  // and files stay in Google Drive).
+  $('#libOthers').addEventListener('click', async ev => {
+    const x = ev.target.closest('[data-lib-forget]');
+    if (!x) return;
+    ev.stopPropagation();
+    if (!x.classList.contains('sure')) {
+      $('#libOthers').querySelectorAll('.sure').forEach(b => b.classList.remove('sure'));
+      x.classList.add('sure');
+      setupMsg('Click \u00d7 again to take ' + x.dataset.name + ' off the list. Its folder and files stay in your Google Drive.', 'status');
+      return;
+    }
+    x.disabled = true;
+    try {
+      status = await callServer('forgetLibrary', x.dataset.libForget);
+      delete LIB_COUNTS[x.dataset.libForget];
+      store.set('libCounts', LIB_COUNTS);
+      setLibraries(status);
+      renderLibOthers(status);
+      setupMsg(x.dataset.name + ' is off the list. To add it again, use a different .bib file and paste the link to its .bib.', 'status');
+    } catch (err) { setupMsg(errText(err), 'error'); x.disabled = false; }
+  }, true);
   // Another library: a new, empty one, or one used before. LibLande builds
   // it, as for new links, and opens it.
   // (From the sidebar, quiet: what's happening in a message at the foot.)

@@ -17,7 +17,7 @@
   window.LIBLANDE_PAGES = true;
   // (Which version each part of the app is from: index.html checks they
   // match. build.py fills it in.)
-  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-10-12.32';
+  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-10-12.33';
   const CLIENT_ID = '789682218462-98mjugngb46ttd01ucp9dcj71ufspjgn.apps.googleusercontent.com';
   // Google Drive (your .bib, papers and LibLande folder): all it needs.
   const SCOPE = 'https://www.googleapis.com/auth/drive';
@@ -307,6 +307,7 @@
       return Object.assign(await SERVER.getStatus(), { created: made });
     },
     copyToLibrary(req) { return edits.copyToLibrary(req); },
+    async forgetLibrary(bibId) { await edits.forgetLibrary({ bibId }); return SERVER.getStatus(); },
     async switchLibrary(bibId, papersId) {
       await edits.useLibrary({ bibId, papersId });
       lastBuilt = null; window.LIBLANDE_BUILT = null;
