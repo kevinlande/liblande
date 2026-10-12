@@ -229,6 +229,10 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
   text-align: left; color: var(--text);
 }
 .grp:hover { background: var(--side-hover); }
+/* Dragged to a new place in its section. */
+.sec[data-sec] > .grp { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.grp.dragging { position: relative; z-index: 5; background: var(--panel); box-shadow: 0 4px 14px rgba(0, 0, 0, .22); cursor: grabbing; }
+.sec.sorting .grp:not(.dragging) { pointer-events: none; }
 .grp .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .grp .ct { font-size: 12px; color: var(--faint); font-variant-numeric: tabular-nums; }
 .grp svg { color: var(--muted); }
@@ -1123,6 +1127,71 @@ body.is-offline .fileicon:not(.saved), body.is-offline .pdf:not(.saved) { opacit
 .ms-group { display: grid; gap: 4px; margin: 4px 0 8px; }
 .ms-gh { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin: 4px 0 2px; }
 .ms-gh .i { width: 14px; height: 14px; }
+/* New papers: the count in the sidebar, the kinds, and each paper. */
+.grp .ct.np-ct { min-width: 18px; padding: 0 6px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-weight: 600; text-align: center; }
+.np-head { display: flex; align-items: center; gap: 4px; }
+.setup-card .np-head h2 { flex: 1; min-width: 0; margin: 0; }
+.np-head .tb-btn { width: 38px; height: 38px; justify-content: center; padding: 0; }
+.np-head .tb-btn .i { width: 19px; height: 19px; }
+.np-head .tb-btn.spinning .i { animation: spin 1s linear infinite; }
+.np-status { margin-top: 0; }
+#npBody { position: relative; min-width: 0; }
+#sheetBody:has(#npBody) { min-width: 0; }
+#npBody.settling { transition: transform .25s cubic-bezier(.32, .72, 0, 1); }
+.np-pull { position: absolute; left: 50%; top: -40px; width: 28px; height: 28px; margin-left: -14px; display: grid; place-items: center; color: var(--muted); opacity: 0; transition: opacity .15s; }
+.np-pull .i { width: 20px; height: 20px; }
+#npBody.pulling .np-pull { opacity: .6; }
+#npBody.ready .np-pull { opacity: 1; color: var(--accent); }
+/* Papers that cite yours: set apart. */
+.np-item.cites { margin: 6px 0; padding: 12px 14px; border: 0; border-radius: 10px; background: color-mix(in srgb, var(--accent-soft) 45%, transparent); box-shadow: inset 2px 0 0 color-mix(in srgb, var(--accent) 60%, transparent); }
+.np-badge { display: inline-flex; align-items: center; gap: 5px; justify-self: start; padding: 0 8px 0 6px; border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); border-radius: 999px; color: var(--accent); font-size: 11.5px; font-weight: 600; }
+.np-badge .i { width: 13px; height: 13px; }
+/* The journals: one row, scrolled sideways or stepped through with the arrows. */
+.np-jrow { display: flex; align-items: center; gap: 2px; margin: 0 0 4px; }
+.np-jrow .tb-btn { flex: none; width: 30px; height: 30px; justify-content: center; padding: 0; }
+.np-jrow .tb-btn .i { width: 16px; height: 16px; transform: rotate(90deg); }
+.np-jrow .np-next .i { transform: rotate(-90deg); }
+.np-jrow .np-jadd .i { transform: none; }
+.np-jrow .np-jadd.on { color: var(--accent); }
+.np-jfind { margin: 0 0 8px; }
+.np-tabs.np-journals { flex: 1; min-width: 0; flex-wrap: nowrap; overflow-x: auto; margin: 0; padding: 2px 0; scrollbar-width: none; overscroll-behavior-x: contain; }
+.np-journals::-webkit-scrollbar { display: none; }
+.np-journals .np-tab { flex: none; font-size: 12.5px; padding: 3px 9px; white-space: nowrap; }
+.np-err { margin: 0; font-size: 13px; color: var(--warn); }
+.np-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 4px; }
+.np-tab { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px; background: none; color: var(--text); font-size: 13px; cursor: pointer; }
+.np-tab .ct { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.np-tab[aria-selected="true"] { background: var(--accent-soft); border-color: transparent; color: var(--accent); }
+.np-list { display: grid; }
+.np-item { display: grid; gap: 4px; padding: 12px 0; border-bottom: 1px solid var(--line); transition: opacity .18s, transform .18s; }
+.np-item.going { opacity: 0; transform: translateX(16px); }
+.np-item.fresh .np-why::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; background: var(--accent); vertical-align: 1px; }
+.np-why { font-size: 11.5px; font-weight: 600; letter-spacing: .02em; color: var(--accent); }
+.np-title { font: 600 15.5px/1.35 var(--serif); color: var(--text); text-decoration: none; }
+.np-title:hover { text-decoration: underline; text-underline-offset: 3px; }
+.np-meta { font-size: 13px; color: var(--muted); }
+.np-acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.np-acts .btn { min-height: 30px; padding: 3px 10px; font-size: 12.5px; }
+.np-acts .btn .i { width: 15px; height: 15px; }
+.np-acts .np-gone { margin-left: auto; color: var(--muted); }
+.np-none { padding: 16px 0; }
+.npf-sec { display: grid; gap: 8px; padding: 14px 0; border-top: 1px solid var(--line); }
+.npf-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.npf-row { display: flex; align-items: center; gap: 10px; font-size: 13.5px; }
+.npf-row select { flex: 1; min-width: 0; }
+.npf-sec .hint { margin: 0; font-size: 13px; }
+.npf-sec .linkish { justify-self: start; font-size: 13.5px; }
+.np-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.np-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px 2px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); font-size: 13px; }
+.np-chip button { display: grid; place-items: center; width: 20px; height: 20px; border: 0; border-radius: 50%; background: none; color: var(--muted); padding: 0; cursor: pointer; }
+.np-chip button:hover { background: var(--bg); color: var(--text); }
+.np-chip .i { width: 12px; height: 12px; }
+.npf-find { position: relative; }
+.npf-find input { width: 100%; box-sizing: border-box; }
+.npf-hits { display: grid; }
+.npf-hits button { display: grid; gap: 1px; padding: 7px 10px; border: 0; border-radius: 8px; background: none; color: var(--text); text-align: left; font-size: 13.5px; cursor: pointer; }
+.npf-hits button span { font-size: 12px; color: var(--muted); }
+.npf-hits button:hover { background: var(--accent-soft); }
 .ms-drive { display: grid; gap: 2px; max-height: 40vh; overflow-y: auto; }
 .ms-file { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; padding: 8px 10px; border: 0; border-radius: 8px; background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
 .ms-file:hover { background: var(--side-hover); }

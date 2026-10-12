@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-12.18';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-12.22';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -248,6 +248,7 @@ function init(data, again) {
 
   if (!groupItems(state.group)) state.group = 'all';
   sweepCovers();
+  npAuto();
   if (again) { renderGroups(); refresh(false); return; }
   $('#scope').value = state.scope;
   $('#sortSel').value = state.sort;
@@ -322,7 +323,7 @@ function rlTag(e) {
 const PROGRESS = store.get('progress', {});
 // What's shared with your other devices (through your preferences): each
 // can be kept to this device instead, in Settings.
-const SYNC = Object.assign({ progress: true, position: true, cite: true, smart: true, keys: true, recent: true }, store.get('sync', {}));
+const SYNC = Object.assign({ progress: true, position: true, cite: true, smart: true, keys: true, recent: true, alerts: true }, store.get('sync', {}));
 // Where you are in each paper ({file id: {page, at, dev}}), for opening it
 // there on another device; dev tells this device's from the others'.
 const POS = store.get('positions', {});
@@ -1008,17 +1009,18 @@ const msToolCount = () => {
 };
 function renderGroups() {
   const inboxCount = ENTRIES.filter(e => e.ib).length;
-  let h = `<div class="sec"><div class="sec-h">Library</div>${grpBtn('all', 'Library', ENTRIES.length, ICON.lib)}` +
+  let h = `<div class="sec" data-sec="lib"><div class="sec-h">Library</div>${grpBtn('all', 'Library', ENTRIES.length, ICON.lib)}` +
     (RECENT.seen.length || state.group === 'recent' ? grpBtn('recent', 'Recently viewed', groupItems('recent').length, ICON.history) : '') +
     (inboxCount || state.group === 'inbox' ? grpBtn('inbox', 'Inbox', inboxCount, ICON.inbox) : '') +
     (DUPS.size || state.group === 'dups' ? grpBtn('dups', 'Possible duplicates', DUPS.size, ICON.copy) : '') +
     ((n => (n || state.group === 'forth' ? grpBtn('forth', 'Forthcoming', n, ICON.forth) : ''))(ENTRIES.filter(isForthcoming).length)) +
     `</div>` +
     // (Tools: not lists, so no count.)
-    (SMART.list.length ? `<div class="sec"><div class="sec-h">Saved searches</div>` + SMART.list.map(x => grpBtn('q:' + x.name, x.name, groupItems('q:' + x.name).length, ICON.search)).join('') + `</div>` : '') +
-    `<div class="sec"><div class="sec-h">Tools</div><button type="button" class="grp" data-tool="mscheck" aria-label="Cite Check: check a manuscript\u2019s citations"${msToolTitle()}>${ICON.citecheck}<span class="nm">Cite Check</span>${msToolCount()}</button></div>`;
+    (SMART.list.length ? `<div class="sec" data-sec="q"><div class="sec-h">Saved searches</div>` + SMART.list.map(x => grpBtn('q:' + x.name, x.name, groupItems('q:' + x.name).length, ICON.search)).join('') + `</div>` : '') +
+    `<div class="sec" data-sec="tools"><div class="sec-h">Tools</div><button type="button" class="grp" data-tool="mscheck" aria-label="Cite Check: check a manuscript\u2019s citations"${msToolTitle()}>${ICON.citecheck}<span class="nm">Cite Check</span>${msToolCount()}</button>` +
+      (gs ? `<button type="button" class="grp" data-tool="newpapers" aria-label="New papers" title="New papers that cite yours, by authors you follow, like ones you choose, and in your journals">${ICON.bell}<span class="nm">New papers</span>${npToolCount()}</button>` : '') + `</div>`;
   if (GROUPS.some(g => !(gs && g === readingGroup())) || gs) {
-    h += `<div class="sec"><div class="sec-row"><div class="sec-h">Static groups</div>` +
+    h += `<div class="sec" data-sec="s"><div class="sec-row"><div class="sec-h">Static groups</div>` +
       (gs ? `<button type="button" class="sec-add" data-new-group title="New static group" aria-label="New static group"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>` : '') + `</div>`;
     if (NG.open) h += newGroupRow();
     for (const g of GROUPS) if (!(gs && g === readingGroup())) h += grpBtn('s:' + g.name, g.name, g.items.length, ICON.folder);
@@ -1039,9 +1041,102 @@ function renderGroups() {
   const hadFocus = document.activeElement && document.activeElement.id === 'kwfilter';
   const hadName = document.activeElement && document.activeElement.id === 'ngName';
   g.innerHTML = h;
+  applySideOrder(g);
   if (hadFocus) { const k = $('#kwfilter'); k.focus(); k.setSelectionRange(k.value.length, k.value.length); }
   if (hadName || NG.focus) { const n = $('#ngName'); if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); } NG.focus = false; }
 }
+// The sidebar in the order you like: in Library, Saved searches, Tools and
+// Static groups, drag an item up or down (on a phone or iPad, hold it a
+// moment first, so a plain swipe still scrolls). The order goes to your
+// other devices with your preferences; your .bib's groups aren't changed.
+// (New items go at the end of their section.)
+const SIDE_ORDER = Object.assign({ at: 0 }, store.get('sideOrder', {}));
+const sideId = b => b.dataset.g || 'tool:' + b.dataset.tool;
+function applySideOrder(root) {
+  root.querySelectorAll('.sec[data-sec]').forEach(sec => {
+    const want = SIDE_ORDER[sec.dataset.sec];
+    if (!want) return;
+    const at = id => { const i = want.indexOf(id); return i < 0 ? want.length : i; };
+    [...sec.children].filter(b => b.matches('.grp')).map((b, i) => [b, i])
+      .sort((x, y) => at(sideId(x[0])) - at(sideId(y[0])) || x[1] - y[1]).forEach(([b]) => sec.appendChild(b));
+  });
+}
+function sideOrderMerge(prefs) {
+  const x = prefs && prefs.sideOrder;
+  if (!x || (x.at || 0) <= SIDE_ORDER.at) return;
+  Object.keys(SIDE_ORDER).forEach(k => delete SIDE_ORDER[k]);
+  Object.assign(SIDE_ORDER, x);
+  store.set('sideOrder', SIDE_ORDER);
+}
+let sideDragged = false;
+(() => {
+  const g = $('#groups');
+  let d = null;
+  const items = () => [...d.sec.children].filter(x => x.matches('.grp'));
+  const start = () => {
+    d.on = true;
+    d.top0 = d.b.getBoundingClientRect().top;
+    d.b.classList.add('dragging');
+    d.sec.classList.add('sorting');
+    try { d.b.setPointerCapture(d.id); } catch (e) { /* the pointer's gone */ }
+    if (navigator.vibrate) navigator.vibrate(8);
+    const sel = window.getSelection && window.getSelection();
+    if (sel) sel.removeAllRanges();
+  };
+  const move = y => {
+    const sibs = items().filter(x => x !== d.b);
+    // (In front of the first item whose middle is below the pointer.)
+    const before = sibs.find(x => { const r = x.getBoundingClientRect(); return y < r.top + r.height / 2; });
+    if (before) { if (d.b.nextElementSibling !== before) d.sec.insertBefore(d.b, before); }
+    else if (sibs.length && sibs[sibs.length - 1].nextElementSibling !== d.b) sibs[sibs.length - 1].after(d.b);
+    d.b.style.transform = '';
+    d.b.style.transform = 'translateY(' + (y - d.y0 + d.top0 - d.b.getBoundingClientRect().top) + 'px)';
+  };
+  const stop = keep => {
+    if (!d) return;
+    clearTimeout(d.timer);
+    if (d.on) {
+      d.b.classList.remove('dragging');
+      d.b.style.transform = '';
+      d.sec.classList.remove('sorting');
+      if (keep) {
+        SIDE_ORDER[d.sec.dataset.sec] = items().map(sideId);
+        SIDE_ORDER.at = Date.now();
+        store.set('sideOrder', SIDE_ORDER);
+        if (gs) google.script.run.withFailureHandler(() => {}).savePrefs({ sideOrder: SIDE_ORDER });
+      } else applySideOrder(g);
+      // (The click that ends a drag doesn't open the item.)
+      sideDragged = true;
+      setTimeout(() => { sideDragged = false; }, 0);
+    }
+    d = null;
+  };
+  g.addEventListener('pointerdown', ev => {
+    if (d || (ev.pointerType === 'mouse' && ev.button !== 0)) return;
+    const b = ev.target.closest('.sec[data-sec] > .grp');
+    if (!b) return;
+    d = { b, sec: b.parentElement, id: ev.pointerId, x0: ev.clientX, y0: ev.clientY, touch: ev.pointerType !== 'mouse', on: false };
+    if (d.touch) d.timer = setTimeout(() => { if (d && !d.on) start(); }, 350);
+  });
+  g.addEventListener('pointermove', ev => {
+    if (!d || ev.pointerId !== d.id) return;
+    if (!d.on) {
+      const far = Math.hypot(ev.clientX - d.x0, ev.clientY - d.y0);
+      // (A finger that moves before the hold is scrolling.)
+      if (d.touch) { if (far > 8) stop(false); return; }
+      if (Math.abs(ev.clientY - d.y0) < 5) return;
+      start();
+    }
+    move(ev.clientY);
+  });
+  g.addEventListener('pointerup', ev => { if (d && ev.pointerId === d.id) stop(true); });
+  g.addEventListener('pointercancel', ev => { if (d && ev.pointerId === d.id) stop(false); });
+  // (While dragging with a finger, the sidebar doesn't scroll, and the hold
+  // doesn't bring up a menu.)
+  g.addEventListener('touchmove', ev => { if (d && d.on) ev.preventDefault(); }, { passive: false });
+  g.addEventListener('contextmenu', ev => { if (d) ev.preventDefault(); });
+  g.addEventListener('click', ev => { if (sideDragged) { ev.stopPropagation(); ev.preventDefault(); } }, true);
+})();
 $('#groups').addEventListener('click', ev => {
   if (ev.target.closest('[data-new-group]')) { NG.open ? closeNewGroup() : openNewGroup(); return; }
   if (ev.target.closest('[data-ng-go]')) { createNewGroup(); return; }
@@ -1050,6 +1145,7 @@ $('#groups').addEventListener('click', ev => {
   const t = ev.target.closest('[data-toggle]');
   if (t) { const k = t.dataset.toggle; state[k] = !state[k]; store.set(k, state[k]); renderGroups(); return; }
   if (ev.target.closest('[data-tool="mscheck"]')) { closeDrawer(); openMsCheck(); return; }
+  if (ev.target.closest('[data-tool="newpapers"]')) { closeDrawer(); openNewPapers(); return; }
   const b = ev.target.closest('.grp');
   if (!b) return;
   setGroup(b.dataset.g);

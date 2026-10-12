@@ -234,6 +234,7 @@ try {
         <label class="set-sync"><span>Recently viewed</span><span class="switch"><input type="checkbox" role="switch" data-sync="recent"><span aria-hidden="true"></span></span></label>
         <label class="set-sync"><span>Saved searches</span><span class="switch"><input type="checkbox" role="switch" data-sync="smart"><span aria-hidden="true"></span></span></label>
         <label class="set-sync"><span>Cite Check&#x2019;s manuscripts and dismissed findings</span><span class="switch"><input type="checkbox" role="switch" data-sync="cite"><span aria-hidden="true"></span></span></label>
+        <label class="set-sync"><span>New papers: what you follow, and what you dismiss</span><span class="switch"><input type="checkbox" role="switch" data-sync="alerts"><span aria-hidden="true"></span></span></label>
         <label class="set-sync"><span>Keyboard shortcuts</span><span class="switch"><input type="checkbox" role="switch" data-sync="keys"><span aria-hidden="true"></span></span></label>
       </div>
       </section>
@@ -264,7 +265,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-12.18</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-12.22</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -279,7 +280,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-12.18';
+      l.querySelector('small').textContent = 'Version 2026-10-12.22';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -291,14 +292,14 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-12.18): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-12.22): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
 })();
 </script>
 
-<script id="appLoader" data-parts="app/library.js app/reader.js app/editing.js app/citecheck.js app/start.js">
+<script id="appLoader" data-parts="app/library.js app/reader.js app/editing.js app/citecheck.js app/newpapers.js app/start.js">
 // The app's scripts (app/), fetched together and run joined as one script,
 // in one go, inside one function: so nothing else runs between them (a
 // timer one sets can't find the next not yet there), and their names stay

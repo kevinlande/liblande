@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-10-12.18';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-10-12.22';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -203,10 +203,12 @@ function sheetBusy(on) {
 // (A panel opened from a manuscript's report, Add say, goes back to the
 // report when it closes, saved or not.)
 function closeSheet() {
-  const back = sheet && sheet.msBack;
+  const back = sheet && sheet.msBack, np = sheet && sheet.npBack;
   $('#sheet').hidden = true;
   sheet = null;
   if (back) setTimeout(() => { if (!sheet) msReturn(back); }, 0);
+  // (And one opened from New papers, back to New papers.)
+  if (np) setTimeout(() => { if (!sheet) openNewPapers(); }, 0);
 }
 
 // The top row of the Add and Edit forms: Cancel, the title, and the button
@@ -698,7 +700,7 @@ async function saveAdd() {
 $('#sheetForm').addEventListener('submit', ev => {
   ev.preventDefault();
   if (!sheet || $('#sheetSave').disabled) return;
-  if (sheet.mode === 'edit') saveEdit(); else if (sheet.mode === 'forth') saveForth(); else if (sheet.mode === 'join') saveJoin(); else if (sheet.mode === 'export') runExport(); else if (sheet.mode === 'export-save') saveExport(); else if (sheet.mode === 'help' || sheet.mode === 'msreport') closeSheet(); else if (sheet.mode === 'mscheck') runMsCheck(); else if (sheet.mode === 'smart') saveSmart(); else if (sheet.mode === 'bulk') saveBulk(); else if (sheet.mode === 'attach') { const a = sheet, mode = ($('#sheetBody').querySelector('[name=attachMode]:checked') || {}).value; closeSheet(); runAttach(a.entry, a.file, mode === 'replace'); } else saveAdd();
+  if (sheet.mode === 'edit') saveEdit(); else if (sheet.mode === 'forth') saveForth(); else if (sheet.mode === 'join') saveJoin(); else if (sheet.mode === 'export') runExport(); else if (sheet.mode === 'export-save') saveExport(); else if (sheet.mode === 'help' || sheet.mode === 'msreport' || sheet.mode === 'newpapers') closeSheet(); else if (sheet.mode === 'npfollow') saveFollow(); else if (sheet.mode === 'mscheck') runMsCheck(); else if (sheet.mode === 'smart') saveSmart(); else if (sheet.mode === 'bulk') saveBulk(); else if (sheet.mode === 'attach') { const a = sheet, mode = ($('#sheetBody').querySelector('[name=attachMode]:checked') || {}).value; closeSheet(); runAttach(a.entry, a.file, mode === 'replace'); } else saveAdd();
 });
 $('#sheetCancel').addEventListener('click', closeSheet);
 $('#sheetBody').addEventListener('click', ev => { const x = ev.target.closest('[data-sheet-cancel]'); if (x && !x.disabled) closeSheet(); });

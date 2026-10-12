@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-10-12.18';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-10-12.22';
 // On GitHub Pages, every part of the app must be from the same version: a
 // part kept from an older one (the offline copy, served when the network
 // was slow) lacks what this page needs. Then the kept copies go, and the
@@ -12,7 +12,7 @@ let RELOADING = false;
 if (window.LIBLANDE_PAGES && navigator.onLine) {
   const want = (($('#version') || {}).textContent || '').replace('Version ', '');
   const parts = window.LIBLANDE_PARTS || {};
-  const old = ['server', 'builder', 'edits', 'build', 'app/library.js', 'app/reader.js', 'app/editing.js', 'app/citecheck.js', 'app/start.js'].filter(k => parts[k] !== want);
+  const old = ['server', 'builder', 'edits', 'build'].concat($('#appLoader').dataset.parts.split(' ')).filter(k => parts[k] !== want);
   if (want && old.length) {
     let tried = false;
     try { tried = sessionStorage.getItem('liblande.partsFixed') === want; } catch (e) { tried = true; }
@@ -386,6 +386,8 @@ if (RELOADING) {
     if (status.prefs) {
       recentMerge(status.prefs);
       msMerge(status.prefs);
+      npMerge(status.prefs);
+      sideOrderMerge(status.prefs);
       smartMerge(status.prefs);
       keysMerge(status.prefs);
       progressMerge(status.prefs);
@@ -780,6 +782,6 @@ if (RELOADING) {
 }
 // For the test suite (_test/suite.html) only: a few of the reader's
 // insides, when the test page asks for them.
-if (window.LIBLANDE_TEST) window.LL = { sweepCovers, COVERS, V, BM, JOURNAL, LOCAL, AUTO, saveMarkup, setTool, setReading, renderRLBar, netBadge, placeToast, POS, MARK, PDFJS, pdfJsFix, findEndPage, refHeading, combineMarks, makeZip, MARK_ERASER: () => MARK.eraserSize,
+if (window.LIBLANDE_TEST) window.LL = { SMART, NP, npCheck, openNewPapers, openFollow, sweepCovers, COVERS, V, BM, JOURNAL, LOCAL, AUTO, saveMarkup, setTool, setReading, renderRLBar, netBadge, placeToast, POS, MARK, PDFJS, pdfJsFix, findEndPage, refHeading, combineMarks, makeZip, MARK_ERASER: () => MARK.eraserSize,
   lib: () => ({ ENTRIES, BYKEY, DATA, VERSION_OF, VERSIONS, NESTED, state }), init, refresh, openEdit, isForthcoming, forthChanges, parseBibtexEntry,
   oldLineMarks, convertOldLines, fetchAhead, PTABS, renderPaperTabs, openPdf, loadPdfJs, addStreamIteration, msCheck, msCites, msRef, msDocx, MS, msVisible };
