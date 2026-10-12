@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-10-12.27';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-10-12.32';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -290,7 +290,7 @@ function openAdd(pdf) {
   sheet = { mode: 'add', pdf: null };
   const h = sheetHead('Add a publication', 'Add to library') +
     `<div class="fld"><label for="doiLookup">From a DOI or BibTeX</label><div class="doi-row">` +
-    `<input id="doiLookup" type="text" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="A DOI or arXiv ID, or paste a BibTeX entry">` +
+    `<input id="doiLookup" type="text" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="A DOI, ISBN or arXiv ID, or paste a BibTeX entry">` +
     `<button type="button" class="btn" id="doiGo">Fill in</button>` +
     (navigator.clipboard && navigator.clipboard.readText ? `<button type="button" class="btn" id="bibPaste" title="Fill in from the DOI or BibTeX entry you copied">Paste</button>` : '') +
     `</div></div>` +
@@ -301,6 +301,8 @@ function openAdd(pdf) {
   showSheet(h, 'Add to library');
   $('#sheet').classList.add('head-mode', 'compact', 'pop');
   renderAddFields({});
+  // (A PDF chosen here is read for its DOI or ISBN too, as one dropped is.)
+  $('#addPdf').addEventListener('change', ev => { const f = ev.target.files[0]; if (f && sheet && f !== sheet.pdf) setAddPdf(f); });
   if (pdf) setAddPdf(pdf);
 }
 function renderAddFields(values) {
@@ -427,14 +429,16 @@ async function pasteIntoForm() {
 async function lookupIntoForm() {
   if (sheet) sheet.extra = {};
   const doi = $('#doiLookup').value.trim();
-  if (!doi) { sheetMsg('Paste a DOI first.', true); return; }
+  if (!doi) { sheetMsg('Paste a DOI or ISBN first.', true); return; }
   $('#doiGo').disabled = true;
-  sheetMsg('Looking up the DOI\u2026');
+  sheetMsg(/^\s*(isbn|\d{9})/i.test(doi) ? 'Looking up the ISBN\u2026' : 'Looking up the DOI\u2026');
   try {
     const r = await callServer('lookupDoi', doi);
     $('#addType').value = TYPE_CHOICES.some(([v]) => v === r.type) ? r.type : 'misc';
     renderAddFields(r.fields);
-    const have = r.fields.doi && ENTRIES.find(x => (x.f.doi || '').toLowerCase() === r.fields.doi.toLowerCase());
+    const digits = v => String(v || '').replace(/[^\dXx]/g, '').toUpperCase();
+    const have = (r.fields.doi && ENTRIES.find(x => (x.f.doi || '').toLowerCase() === r.fields.doi.toLowerCase())) ||
+      (r.fields.isbn && ENTRIES.find(x => String(x.f.isbn || '').split(/[,;\s]+/).map(digits).includes(r.fields.isbn)));
     sheetMsg(have ? 'Already in your library: \u201c' + (have.f.title || have.k) + '\u201d. You can still add it.'
       : 'Filled in from ' + (r.source || 'Crossref') + '. Check the details, then add it.', !!have);
   } catch (err) {
@@ -951,6 +955,7 @@ function selectionHTML() {
     (gs && n >= 2 && list.every(x => !x.ib) ? `<button type="button" class="btn" data-join>${ICON.versions}<span>Join as versions\u2026</span></button>` : '') +
     (gs ? `<button type="button" class="btn" data-bulk>${ICON.tag}<span>Keywords and groups\u2026</span></button>` +
       `<button type="button" class="btn" data-bulk-rl>${ICON.bookmark}<span>Add to reading list</span></button>` : '') +
+    (gs && LIBS.list.length && list.some(x => !x.ib) ? `<button type="button" class="btn" data-copy-lib-sel>${ICON.lib}<span>Copy to another library\u2026</span></button>` : '') +
     `<details class="menu"><summary class="btn">${ICON.copy}<span>Copy</span>${ICON.chev}</summary>` +
     `<div class="menu-list" role="menu"><button type="button" role="menuitem" data-copy-sel="bibtex">BibTeX<kbd>${esc(keyHint('copyBib'))}</kbd></button>` +
     `<button type="button" role="menuitem" data-copy-sel="apa">APA (long)<kbd>${esc(keyHint('copyApa'))}</kbd></button>` +
@@ -1419,9 +1424,98 @@ rowsEl.addEventListener('dragstart', ev => {
   ev.dataTransfer.setData(KEY_TYPE, e.k);
   ev.dataTransfer.setData('text/plain', e.k);
   // ("move": Safari doesn't drop a "link" drag.)
-  ev.dataTransfer.effectAllowed = 'move';
+  ev.dataTransfer.effectAllowed = 'copyMove';
 });
-rowsEl.addEventListener('dragend', () => { dragKey = null; markJoin(null); });
+rowsEl.addEventListener('dragend', () => { dragKey = null; markJoin(null); libDropOn(null); });
+// A row dropped on another library in the sidebar: copied to it.
+let libDropEl = null;
+function libDropOn(b) {
+  if (libDropEl && libDropEl !== b) libDropEl.classList.remove('drop-on');
+  libDropEl = b || null;
+  if (libDropEl) libDropEl.classList.add('drop-on');
+}
+const libOver = ev => {
+  const b = ev.target.closest && ev.target.closest('.grp[data-lib]:not(.cur)');
+  if (!dragKey || !b) { libDropOn(null); return; }
+  ev.preventDefault();
+  ev.dataTransfer.dropEffect = 'copy';
+  libDropOn(b);
+};
+$('#groups').addEventListener('dragenter', libOver);
+$('#groups').addEventListener('dragover', libOver);
+$('#groups').addEventListener('dragleave', ev => { if (libDropEl && !libDropEl.contains(ev.relatedTarget)) libDropOn(null); });
+$('#groups').addEventListener('drop', ev => {
+  const b = ev.target.closest && ev.target.closest('.grp[data-lib]:not(.cur)');
+  const key = dragKey || (ev.dataTransfer && ev.dataTransfer.getData(KEY_TYPE));
+  libDropOn(null);
+  if (!b || !key) return;
+  ev.preventDefault();
+  dragKey = null;
+  const lib = LIBS.list.find(l => l.bibId === b.dataset.lib);
+  // (A selected row brings the rest of the selection with it.)
+  const keys = state.picked.has(key) ? [...state.picked] : [key];
+  copyToLibrary(keys, lib);
+});
+// With a finger (an iPad): hold a publication, then drag it onto another
+// library in the sidebar (which opens, if it's tucked away) to copy it
+// there. A finger that moves before the hold is up is scrolling.
+const ROW_DRAG = { on: false };
+(() => {
+  const list = $('#list');
+  let h = null;
+  const libUnder = (x, y) => { const el = document.elementFromPoint(x, y); return el && el.closest('.grp[data-lib]:not(.cur)'); };
+  const start = () => {
+    h.on = ROW_DRAG.on = true;
+    h.keys = state.picked.has(h.e.k) ? [...state.picked] : [h.e.k];
+    h.row.classList.add('held');
+    h.ghost = document.createElement('div');
+    h.ghost.className = 'drag-ghost';
+    h.ghost.textContent = h.keys.length > 1 ? h.keys.length + ' publications' : (h.e.f.title || h.e.k);
+    document.body.appendChild(h.ghost);
+    place(h.x0, h.y0);
+    // (The sidebar out, to drop on.)
+    if (tabletMQ.matches && !app.classList.contains('side-open')) { app.classList.add('side-open'); h.opened = true; }
+    else if (app.classList.contains('side-collapsed')) { app.classList.remove('side-collapsed'); h.uncollapsed = true; }
+    if (navigator.vibrate) navigator.vibrate(8);
+    const sel = window.getSelection && window.getSelection();
+    if (sel) sel.removeAllRanges();
+  };
+  const place = (x, y) => { h.ghost.style.left = x + 'px'; h.ghost.style.top = y + 'px'; };
+  const stop = drop => {
+    if (!h) return;
+    clearTimeout(h.timer);
+    if (h.on) {
+      const b = drop && libUnder(drop.x, drop.y), lib = b && LIBS.list.find(l => l.bibId === b.dataset.lib);
+      h.ghost.remove();
+      h.row.classList.remove('held');
+      libDropOn(null);
+      if (h.opened) setTimeout(closeDrawer, lib ? 600 : 0);
+      if (h.uncollapsed) app.classList.add('side-collapsed');
+      if (lib) copyToLibrary(h.keys, lib);
+      // (The tap that ends it doesn't open the publication.)
+      h.row.addEventListener('click', ev => { ev.stopPropagation(); ev.preventDefault(); }, { capture: true, once: true });
+      setTimeout(() => { ROW_DRAG.on = false; }, 0);
+    }
+    h = null;
+  };
+  list.addEventListener('pointerdown', ev => {
+    if (h || ev.pointerType === 'mouse' || !gs || !LIBS.list.length || phoneMQ.matches) return;
+    const row = ev.target.closest('.row[data-i], .card[data-i]'), e = row && state.view[+row.dataset.i];
+    if (!e || e.ib) return;
+    h = { row, e, id: ev.pointerId, x0: ev.clientX, y0: ev.clientY, on: false };
+    h.timer = setTimeout(() => { if (h && !h.on) start(); }, 450);
+  });
+  list.addEventListener('pointermove', ev => {
+    if (!h || ev.pointerId !== h.id) return;
+    if (!h.on) { if (Math.hypot(ev.clientX - h.x0, ev.clientY - h.y0) > 8) stop(null); return; }
+    place(ev.clientX, ev.clientY);
+    libDropOn(libUnder(ev.clientX, ev.clientY));
+  });
+  list.addEventListener('pointerup', ev => { if (h && ev.pointerId === h.id) stop({ x: ev.clientX, y: ev.clientY }); });
+  list.addEventListener('pointercancel', ev => { if (h && ev.pointerId === h.id) stop(null); });
+  list.addEventListener('touchmove', ev => { if (h && h.on) ev.preventDefault(); }, { passive: false });
+  list.addEventListener('contextmenu', ev => { if (h) ev.preventDefault(); });
+})();
 let joinEl = null;
 function markJoin(r, e) {
   if (joinEl && joinEl !== r) joinEl.classList.remove('join-on');

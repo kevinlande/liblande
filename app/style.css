@@ -362,6 +362,36 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .set-file { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 10px; font-size: 14px; }
 .set-file > span:last-child { color: var(--muted); overflow-wrap: anywhere; }
 .set-files .linkish { justify-self: start; margin-top: 4px; font-size: 13.5px; }
+/* Other libraries: switch to one used before, or start a new one. */
+.set-libs { display: grid; gap: 6px; padding: 4px 0 8px; }
+.set-sec > .set-files:has(+ .set-libs) { border-bottom: 0; padding-bottom: 4px; }
+.set-sec > .set-libs { padding: 0 0 12px; border-bottom: 1px solid var(--line); }
+.set-libs .linkish { justify-self: start; font-size: 13.5px; }
+.set-lib { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: none; color: var(--text); font: inherit; font-size: 13.5px; text-align: left; cursor: pointer; }
+.set-lib:hover { border-color: var(--accent); }
+.set-lib .i { width: 16px; height: 16px; color: var(--muted); flex: none; }
+.copy-libs { display: grid; gap: 6px; margin-top: 4px; }
+/* The sidebar's libraries: the open one ticked; another lit up as
+   publications are dragged onto it. */
+.lib-row.cur { cursor: default; }
+.lib-row.cur .ct .i { width: 14px; height: 14px; color: var(--accent); }
+.lib-row.drop-on { background: var(--accent-soft); box-shadow: inset 0 0 0 1.5px var(--accent); }
+/* The open library's own lists, indented under it. */
+.lib-sub .grp { padding-left: 26px; }
+.lib-sub { overflow: hidden; transition: height .32s cubic-bezier(.32, .72, 0, 1), opacity .24s ease; }
+.lib-sub.folded { height: 0 !important; opacity: 0; }
+/* (While the library loads: there, but its counts not yet, nor clicks.) */
+.lib-sub.lib-wait { pointer-events: none; }
+.lib-sub.lib-wait .ct { visibility: hidden; }
+@media (prefers-reduced-motion: reduce) { .lib-sub { transition: none; } }
+/* A publication held and dragged (on an iPad): its title under the finger. */
+.drag-ghost { position: fixed; z-index: 90; max-width: 260px; padding: 8px 12px; border-radius: 10px; background: var(--panel); color: var(--text); box-shadow: var(--shadow); font: 600 13.5px/1.3 var(--serif); pointer-events: none; transform: translate(-50%, -130%); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row.held, .card.held { background: var(--accent-soft); }
+@media (pointer: coarse) { #list .row, #list .card { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; } }
+.set-newlib { display: grid; gap: 8px; }
+.set-newlib .hint { margin: 0; font-size: 13px; }
+.set-newlib-go { display: flex; gap: 8px; }
+.set-newlib-go input { flex: 1; min-width: 0; }
 .set-links { display: grid; gap: 8px; }
 .set-links[hidden] { display: none; }
 .fields-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0 12px; }

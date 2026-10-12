@@ -17,7 +17,7 @@
   window.LIBLANDE_PAGES = true;
   // (Which version each part of the app is from: index.html checks they
   // match. build.py fills it in.)
-  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-10-12.27';
+  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-10-12.32';
   const CLIENT_ID = '789682218462-98mjugngb46ttd01ucp9dcj71ufspjgn.apps.googleusercontent.com';
   // Google Drive (your .bib, papers and LibLande folder): all it needs.
   const SCOPE = 'https://www.googleapis.com/auth/drive';
@@ -251,6 +251,9 @@
         configured: true,
         bibName: w.bib.name,
         papersName,
+        bibId: w.s.bibId, papersId: w.s.papersId || '',
+        libraries: (w.s.libraries || []).filter(l => l.bibId !== w.s.bibId),
+        allLibraries: w.s.libraries || [],
         stamp: w.lib ? Date.parse(w.lib.modifiedTime) : null,
         libraryId: w.lib ? w.lib.id : null,
         token,
@@ -292,12 +295,21 @@
       } else if (!(bib.parents && bib.parents[0])) {
         throw new Error('LibLande can\u2019t see the folder that holds this .bib file. Paste the link to your papers folder too.');
       }
-      const before = await builder.settings(true);
-      await builder.updateSettings(s => { s.bibId = bibId; s.papersId = papersId; });
-      if (before && (before.bibId !== bibId || (before.papersId || '') !== papersId)) {
-        const old = await builder.named(await builder.dataFolder(true), LIBRARY_FILE, 'id');
-        if (old) await drive('files/' + encodeURIComponent(old.id) + '?fields=id', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ trashed: true }) });
-      }
+      await edits.useLibrary({ bibId, papersId });
+      lastBuilt = null; window.LIBLANDE_BUILT = null;
+      return SERVER.getStatus();
+    },
+    // A new, empty library (a folder in My Drive with a .bib in it), used
+    // from now on; or one used before, back again (edits.js).
+    async createLibrary(name) {
+      const made = await edits.createLibrary({ name });
+      lastBuilt = null; window.LIBLANDE_BUILT = null;
+      return Object.assign(await SERVER.getStatus(), { created: made });
+    },
+    copyToLibrary(req) { return edits.copyToLibrary(req); },
+    async switchLibrary(bibId, papersId) {
+      await edits.useLibrary({ bibId, papersId });
+      lastBuilt = null; window.LIBLANDE_BUILT = null;
       return SERVER.getStatus();
     },
     // Changing the .bib, the inbox and the reading list:
@@ -560,7 +572,39 @@
     if (ax) return '10.48550/arXiv.' + ax[1];
     return v.replace(/^https?:\/\/(dx\.)?doi\.org\//i, '').replace(/^doi:\s*/i, '');
   }
+  // An ISBN (10 or 13 digits, its check digit right), from what was
+  // typed or found in a PDF; '' if it isn't one.
+  function isbnOf(input) {
+    const s = String(input || '').trim();
+    if (!/^(isbn(-1[03])?[:\s]*)?[\d][\d\s-]{8,16}[\dXx]$/i.test(s)) return '';
+    const d = s.replace(/^isbn(-1[03])?/i, '').replace(/[^\dXx]/g, '').toUpperCase();
+    if (d.length === 10) { let t = 0; for (let i = 0; i < 10; i++) t += (10 - i) * (d[i] === 'X' ? 10 : +d[i]); return t % 11 === 0 ? d : ''; }
+    if (d.length === 13 && /^\d+$/.test(d)) { let t = 0; for (let i = 0; i < 13; i++) t += +d[i] * (i % 2 ? 3 : 1); return t % 10 === 0 ? d : ''; }
+    return '';
+  }
+  // A book's details from Open Library, by its ISBN.
+  async function lookupIsbn(isbn) {
+    let res;
+    try { res = await fetch('https://openlibrary.org/api/books?' + new URLSearchParams({ bibkeys: 'ISBN:' + isbn, format: 'json', jscmd: 'data' })); }
+    catch (e) { throw new Error(navigator.onLine ? 'Open Library can\u2019t be reached just now. Try again, or fill in the details yourself.' : 'You\u2019re offline.'); }
+    if (!res.ok) throw new Error('The ISBN lookup didn\u2019t work (Open Library error ' + res.status + '). Try again, or fill in the details yourself.');
+    const b = (await res.json())['ISBN:' + isbn];
+    if (!b) throw new Error('Open Library doesn\u2019t have a book with the ISBN ' + isbn + '. Fill in the details yourself.');
+    // ("David Quammen" as BibTeX has it: Quammen, David.)
+    const person = n => { const w = String(n || '').trim().split(/\s+/); return w.length > 1 ? w.pop() + ', ' + w.join(' ') : w[0] || ''; };
+    const f = {
+      title: (b.title || '') + (b.subtitle ? ': ' + b.subtitle : ''),
+      author: (b.authors || []).map(a => person(a.name)).filter(Boolean).join(' and '),
+      year: ((/\d{4}/.exec(b.publish_date || '') || [''])[0]),
+      publisher: ((b.publishers || [])[0] || {}).name || '',
+      address: ((b.publish_places || [])[0] || {}).name || '',
+      isbn,
+    };
+    return { type: 'book', fields: tidyFields(f), source: 'Open Library' };
+  }
   async function lookupDoi(input) {
+    const isbn = isbnOf(input);
+    if (isbn) return lookupIsbn(isbn);
     const doi = doiOf(input);
     if (!/^10\.\d{4,9}\/\S+$/.test(doi)) {
       throw new Error('That doesn\u2019t look like a DOI. A DOI starts with 10., like 10.1111/phpr.70141 (or give an arXiv ID, like 2301.01234).');

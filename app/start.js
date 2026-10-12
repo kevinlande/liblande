@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-10-12.27';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-10-12.32';
 // On GitHub Pages, every part of the app must be from the same version: a
 // part kept from an older one (the offline copy, served when the network
 // was slow) lacks what this page needs. Then the kept copies go, and the
@@ -234,6 +234,7 @@ const callServer = (name, ...args) => new Promise((resolve, reject) => {
 const errText = err => ((err && err.message) || String(err)).replace(/^(Exception|Error): /, '');
 let status = null, statusReq = null, STYLE_WAS = null;
 let showSetup = () => {};
+let switchLibraryTo = () => {}, openNewLibrary = () => {};
 
 // Builds run in the background on Google's side (a big library takes a
 // minute or more). Poll until the build finishes, reporting progress.
@@ -388,6 +389,7 @@ if (RELOADING) {
       msMerge(status.prefs);
       npMerge(status.prefs);
       sideOrderMerge(status.prefs);
+      libCountsMerge(status.prefs);
       smartMerge(status.prefs);
       keysMerge(status.prefs);
       progressMerge(status.prefs);
@@ -407,6 +409,7 @@ if (RELOADING) {
     if (status.prefs && status.prefs.tools) applyToolPrefs(status.prefs.tools);
     if (!status.configured) { $('#settingsBtn').hidden = $('#addBtn').hidden = true; showSetup(status, false); return; }
     setReading(status.reading);
+    setLibraries(status);
     $('#settingsBtn').hidden = false; $('#addBtn').hidden = false;
     if (status.stamp == null && !status.building) status = await callServer('refreshNow');
     if (status.building) {
@@ -558,6 +561,7 @@ if (RELOADING) {
       t0 = { row, x: ev.touches[0].clientX, y: ev.touches[0].clientY };
     }, { passive: true });
     list.addEventListener('touchmove', ev => {
+      if (ROW_DRAG.on) { t0 = null; return; }
       if (!t0 && !(sw && !sw.wheel)) return;
       const t = ev.touches[0];
       if (!sw) {
@@ -629,7 +633,7 @@ if (RELOADING) {
     }, { passive: true });
     list.addEventListener('touchmove', ev => {
       if (y0 == null) return;
-      if (list.scrollTop > 0) { reset(); return; }
+      if (list.scrollTop > 0 || ROW_DRAG.on) { reset(); return; }
       d = Math.max(0, ev.touches[0].clientY - y0);
       show();
     }, { passive: true });
@@ -675,9 +679,15 @@ if (RELOADING) {
       $('#coversBox').checked = coversOn();
       $('#setup').querySelectorAll('[data-sync]').forEach(b => { b.checked = SYNC[b.dataset.sync] !== false; });
       $('#curBib').textContent = st.bibName || '';
+      // (Other libraries: with the .bib file and folder, in Settings.)
+      document.querySelector('#setupEdit .set-files').after($('#setLibs'));
+      // (The libraries used before, to switch back to.)
+      $('#libOthers').innerHTML = (st.libraries || []).filter(l => l.bibId).map(l =>
+        `<button type="button" class="set-lib" data-lib="${esc(l.bibId)}" data-papers="${esc(l.papersId || '')}">${ICON.lib}<span>Switch to <b>${esc((l.name || 'another library').replace(/\.bib$/i, ''))}</b></span></button>`).join('');
       $('#curPapers').textContent = st.papersName || '';
       $('#changeLinks').hidden = false;
     }
+    if (!configured) $('#linkFields').after($('#setLibs'));
     setupMsg(st && st.problem, 'error');
     $('#setup').scrollTop = 0;
     if (!configured) $('#bibLink').focus();
@@ -700,6 +710,69 @@ if (RELOADING) {
     $('#bibLink').focus();
   });
   $('#setClose').addEventListener('click', closeSettings);
+  // Another library: a new, empty one, or one used before. LibLande builds
+  // it, as for new links, and opens it.
+  // (From the sidebar, quiet: what's happening in a message at the foot.)
+  let switching = false;
+  const otherLibrary = async (call, args, what, quiet, target) => {
+    if (switching) return;
+    switching = true;
+    const say = (m, kind) => (quiet ? (m ? toast(m, kind === 'error' ? 7000 : 0) : null) : setupMsg(m, kind));
+    const btns = ['#setSave', '#setClose', '#setupGo', '#newLibGo'].map(s => $(s)).concat([...$('#libOthers').querySelectorAll('button')]);
+    btns.forEach(b => { if (b) b.disabled = true; });
+    const msg = what + ' LibLande builds it, which can take a minute or two for a large library.';
+    say(msg, 'status');
+    foldLibSub(target);
+    try {
+      status = await callServer(call, ...args);
+      await waitForBuild(secs => say(msg + ' (' + secs + ' s)', 'status'));
+      say('Downloading the library\u2026', 'status');
+      const lib = await download();
+      await show(lib, ENTRIES.length > 0);
+      cache.put(lib);
+      if (status.reading) setReading(status.reading);
+      setLibraries(status);
+      if (!quiet) setupMsg('', 'status');
+      // (A theme only tried out goes back, as with Cancel.)
+      if (STYLE_WAS != null) { applyStyle(STYLE_WAS); STYLE_WAS = null; }
+      $('#setup').hidden = true;
+      $('#settingsBtn').hidden = false; $('#addBtn').hidden = false;
+      $('#newLibRow').hidden = true; $('#newLibName').value = '';
+      toast('Now using ' + (status.bibName || 'the library').replace(/\.bib$/i, '') + ': ' + ENTRIES.length.toLocaleString() + ' publication' + (ENTRIES.length === 1 ? '' : 's'), 3500);
+    } catch (err) {
+      say((quiet ? 'Couldn\u2019t switch: ' : '') + errText(err), 'error');
+    } finally {
+      btns.forEach(b => { if (b) b.disabled = false; });
+      switching = false;
+      endLibSwitch();
+    }
+  };
+  switchLibraryTo = l => otherLibrary('switchLibrary', [l.bibId, l.papersId || ''], 'Switching to ' + libName(l) + '.', true, l);
+  // (+ beside Libraries: Settings, at the new library's name.)
+  openNewLibrary = async () => {
+    $('#settingsBtn').click();
+    for (let i = 0; i < 150 && ($('#setup').hidden || $('#setupEdit').hidden); i++) await new Promise(r => setTimeout(r, 100));
+    if ($('#setup').hidden) return;
+    $('#newLibRow').hidden = false;
+    $('#newLibRow').scrollIntoView({ block: 'center' });
+    $('#newLibName').focus();
+  };
+  $('#newLibBtn').addEventListener('click', () => {
+    const row = $('#newLibRow');
+    row.hidden = !row.hidden;
+    if (!row.hidden) $('#newLibName').focus();
+  });
+  const createLib = () => {
+    const name = $('#newLibName').value.trim();
+    if (!name) { setupMsg('Give the new library a name.', 'error'); $('#newLibName').focus(); return; }
+    otherLibrary('createLibrary', [name], 'Making \u201c' + name + '\u201d in your Google Drive.');
+  };
+  $('#newLibGo').addEventListener('click', createLib);
+  $('#newLibName').addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); createLib(); } });
+  $('#libOthers').addEventListener('click', ev => {
+    const b = ev.target.closest('[data-lib]');
+    if (b) otherLibrary('switchLibrary', [b.dataset.lib, b.dataset.papers], 'Switching to ' + b.querySelector('b').textContent + '.', false, LIBS.list.find(l => l.bibId === b.dataset.lib));
+  });
   document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && !$('#setup').hidden && !$('#setHead').hidden) { ev.preventDefault(); closeSettings(); } });
   // With a saved copy, Settings shows before Google Drive has answered: wait
   // for the answer (or ask again, if it failed) rather than show the
@@ -782,6 +855,6 @@ if (RELOADING) {
 }
 // For the test suite (_test/suite.html) only: a few of the reader's
 // insides, when the test page asks for them.
-if (window.LIBLANDE_TEST) window.LL = { SMART, NP, npCheck, openNewPapers, openFollow, sweepCovers, COVERS, V, BM, JOURNAL, LOCAL, AUTO, saveMarkup, setTool, setReading, renderRLBar, netBadge, placeToast, POS, MARK, PDFJS, pdfJsFix, pdfViewerFix, findEndPage, refHeading, combineMarks, makeZip, MARK_ERASER: () => MARK.eraserSize,
+if (window.LIBLANDE_TEST) window.LL = { LIBS, renderGroups, SMART, NP, npCheck, openNewPapers, openFollow, sweepCovers, COVERS, V, BM, JOURNAL, LOCAL, AUTO, saveMarkup, setTool, setReading, renderRLBar, netBadge, placeToast, POS, MARK, PDFJS, pdfJsFix, pdfViewerFix, findEndPage, refHeading, combineMarks, makeZip, MARK_ERASER: () => MARK.eraserSize,
   lib: () => ({ ENTRIES, BYKEY, DATA, VERSION_OF, VERSIONS, NESTED, state }), init, refresh, openEdit, isForthcoming, forthChanges, parseBibtexEntry,
   oldLineMarks, convertOldLines, fetchAhead, PTABS, renderPaperTabs, openPdf, loadPdfJs, addStreamIteration, msCheck, msCites, msRef, msDocx, MS, msVisible };

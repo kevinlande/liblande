@@ -19,7 +19,7 @@
  */
 (function (root) {
   'use strict';
-  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).edits = '2026-10-12.27';
+  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).edits = '2026-10-12.32';
   const FOLDER = 'application/vnd.google-apps.folder';
   const UPLOAD = 'https://www.googleapis.com/upload/drive/v3/';
   const READING_FILE = 'reading-list.json',
@@ -185,6 +185,28 @@
       const edited = renameKey_(text, req.key, newKey);
       const after = checkRename_(text, edited, req.key, newKey);
       return { text: edited, hash: hashOf(edited, newKey), gh: groupsHashOf(after) };
+    },
+    // Copying to another library: an entry's fields (for its PDFs' names)
+    // and its linked files; the entry's own text, its links and dates
+    // changed; and those texts added to the other .bib, checked.
+    entryInfo(text, key) {
+      const loc = locateEntry_(text, key);
+      const fields = parseBib_(text.slice(loc.start, loc.end))[0][0][2];
+      return { fields, files: Object.keys(fields).filter(n => /^bdsk-file-\d+$/.test(n)) };
+    },
+    copyOut(text, key, set) {
+      const loc = locateEntry_(text, key);
+      return editEntry_(text.slice(loc.start, loc.end), key, set);
+    },
+    copyIn(text, raws, keys) {
+      const before = parseBib_(text)[0];
+      let next = text;
+      raws.forEach(r => { next = appendEntry_(next, r); });
+      const after = parseBib_(next)[0];
+      if (after.length !== before.length + raws.length || keys.some(k => !after.some(e => e[1] === k))) {
+        throw new Error('The copied entries didn\u2019t come out right, so LibLande didn\u2019t save them.');
+      }
+      return { text: next };
     },
     // attachPdf: the entry's fields, and which bdsk-file-N the PDF takes.
     attachPrepare(text, req) {
@@ -576,6 +598,111 @@
       });
       return { hash: out.hash, gh: out.gh, stamp: out.stamp, reading: readingOut(d) };
     });
+
+    /* -------------------------------------------- libraries */
+    // Another library: its .bib (and papers folder) go in settings.json,
+    // with the ones used before, to switch back to. Each library keeps its
+    // own reading list: the one in use is put aside (reading-list <bib
+    // id>.json) and the other's comes back. The library built from the old
+    // .bib goes to the trash, to be built again from the new one.
+    const shelved = id => 'reading-list ' + id + '.json';
+    F.useLibrary = req => serial(async () => {
+      const bibId = req.bibId, papersId = req.papersId || '';
+      const bib = await meta(bibId, 'id,name');
+      const s = (await B.settings(true)) || {};
+      const folder = await B.dataFolder(true);
+      const other = s.bibId && s.bibId !== bibId;
+      let oldName = '';
+      if (other) {
+        const cur = await B.readJson(folder, READING_FILE);
+        if (cur) await B.writeFile(folder, shelved(s.bibId), JSON.stringify(cur), 'application/json');
+        const back = await B.readJson(folder, shelved(bibId));
+        await B.writeFile(folder, READING_FILE, JSON.stringify(back || blankReading()), 'application/json');
+        try { oldName = (await meta(s.bibId, 'name')).name; } catch (e) { oldName = ((s.libraries || []).find(l => l.bibId === s.bibId) || {}).name || ''; }
+      }
+      // (In a steady order: the first time, the one in use, then new ones
+      // at the end. Switching doesn't move them.)
+      await B.updateSettings(x => {
+        const list = (x.libraries || []).slice();
+        const put = l => { const i = list.findIndex(y => y.bibId === l.bibId); if (i < 0) list.push(l); else list[i] = Object.assign({}, list[i], l); };
+        if (other) put(Object.assign({ bibId: x.bibId, papersId: x.papersId || '' }, oldName ? { name: oldName } : {}));
+        put({ bibId, papersId, name: bib.name });
+        x.libraries = list.slice(0, 20);
+        if (other) x.readingGroup = '';
+        x.bibId = bibId;
+        x.papersId = papersId;
+      });
+      if (other || (s.papersId || '') !== papersId) {
+        const old = await B.named(folder, 'library.json.gz', 'id');
+        if (old) await patch(old.id, { trashed: true });
+      }
+      return { name: bib.name };
+    });
+    // A new library: a folder in My Drive (named as asked, or with a number
+    // if that's taken) with an empty .bib in it, BibDesk's way, then used.
+    F.createLibrary = async req => {
+      const base = String(req.name || '').replace(/[\/\\:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim() || 'New library';
+      let name = base, n = 2;
+      while (await B.named('root', name, 'id', true)) name = base + ' ' + n++;
+      const folder = await json('files?fields=id,name', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, mimeType: FOLDER, parents: ['root'] }) });
+      const text = '%% This BibTeX bibliography file was created using LibLande.\n%% Created ' + new Date().toISOString().slice(0, 10) + '\n\n%% Saved with string encoding Unicode (UTF-8) \n\n';
+      const bib = await B.writeFile(folder.id, name + '.bib', text, 'text/plain');
+      // (Its papers in a folder of their own, beside the .bib.)
+      const papers = await subFolder(folder.id, 'Papers', true);
+      await F.useLibrary({ bibId: bib.id, papersId: papers.id });
+      return { name, folderId: folder.id, bibId: bib.id, papersId: papers.id };
+    };
+    // Publications copied from the library in use to another one: their
+    // entries as they are (the same cite keys), with today's dates, and
+    // their PDFs copied into the other library's papers folder under the
+    // names AutoFile would give them. One already there (by cite key) is
+    // left out. The copies made are put in the trash if saving fails.
+    F.copyToLibrary = req => serial(async () => {
+      const s = await settings();
+      if (!req.bibId || req.bibId === s.bibId) throw new Error('That\u2019s the library you have open.');
+      const src = (await read(s.bibId)).text;
+      const tbib = await meta(req.bibId, 'id,name,parents,trashed');
+      if (tbib.trashed || !(tbib.parents && tbib.parents[0])) throw new Error('LibLande can\u2019t open that library\u2019s .bib file.');
+      // (Where its PDFs go: its papers folder, if that's beside the .bib;
+      // otherwise Papers there, as AutoFile would.)
+      let prefix = 'Papers';
+      if (req.papersId) {
+        try { const pf = await meta(req.papersId, 'id,name,parents'); if (pf.parents && pf.parents[0] === tbib.parents[0]) prefix = pf.name; } catch (e) { /* Papers */ }
+      }
+      const there = (await read(req.bibId)).text;
+      const skipped = [], ready = [], copies = [];
+      try {
+        for (const it of req.items || []) {
+          if (!(await run('hasKey', src, it.key))) { skipped.push({ key: it.key, reason: 'not in this library' }); continue; }
+          if (await run('hasKey', there, it.key)) { skipped.push({ key: it.key, reason: 'already there' }); continue; }
+          const info = await run('entryInfo', src, it.key);
+          const set = { 'date-added': req.now, 'date-modified': req.now };
+          info.files.forEach(n => { set[n] = null; });
+          let n = 1;
+          for (const id of it.fileIds || []) {
+            const c = await json('files/' + encodeURIComponent(id) + '/copy?fields=id', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ parents: [tbib.parents[0]] }) });
+            copies.push(c.id);
+            const filed = await filePdf(tbib, c.id, info.fields, prefix);
+            set['bdsk-file-' + n++] = bdskValue(filed.relPath);
+          }
+          ready.push({ key: it.key, raw: await run('copyOut', src, it.key, set) });
+        }
+        if (ready.length) {
+          await changeFile(req.bibId, async text => {
+            const go = [];
+            for (const r of ready) if (!(await run('hasKey', text, r.key))) go.push(r);
+            return go.length ? run('copyIn', text, go.map(r => r.raw), go.map(r => r.key)) : null;
+          }, req.backupName);
+        }
+      } catch (e) {
+        for (const id of copies) { try { await patch(id, { trashed: true }); } catch (err) { /* gone */ } }
+        throw e;
+      }
+      return { copied: ready.map(r => r.key), skipped, files: copies.length };
+    });
+
 
     return F;
   }

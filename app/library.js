@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-12.27';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-12.32';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -814,8 +814,9 @@ document.addEventListener('drop', ev => {
   attachFile(t.e, file);
 });
 
-// A PDF for the Add form: shown by name, and its DOI (if the first pages
-// have one) looked up to fill in the details.
+// A PDF for the Add form: shown by name, and its DOI (if its first pages
+// have one) or, for a book, its ISBN (on the copyright page, in the first
+// ten pages or the last two) looked up to fill in the details.
 async function setAddPdf(file) {
   if (!sheet || sheet.mode !== 'add') return;
   sheet.pdf = file;
@@ -824,23 +825,41 @@ async function setAddPdf(file) {
   note.hidden = false;
   note.textContent = 'PDF: ' + file.name;
   if ($('#doiLookup').value.trim()) return;
-  sheetMsg('Looking for a DOI in the PDF\u2026');
-  let doi = null;
-  try { doi = await doiFromPdf(file); } catch (err) { doi = null; }
+  sheetMsg('Looking for a DOI or ISBN in the PDF\u2026');
+  let id = null;
+  try { id = await idFromPdf(file); } catch (err) { id = null; }
   if (!sheet || sheet.mode !== 'add' || sheet.pdf !== file) return;
-  if (!doi) { sheetMsg('There\u2019s no DOI in the PDF\u2019s first pages. Paste one, or fill in the details yourself.'); return; }
-  $('#doiLookup').value = doi;
+  if (!id) { sheetMsg('There\u2019s no DOI or ISBN in the PDF\u2019s first pages. Paste one, or fill in the details yourself.'); return; }
+  $('#doiLookup').value = id.doi || 'ISBN ' + id.isbn;
   lookupIntoForm();
 }
-async function doiFromPdf(file) {
+// A valid ISBN in some text (its check digit right), 13 digits preferred.
+function isbnIn(text) {
+  const found = [];
+  for (const m of String(text).matchAll(/ISBN(?:-1[03])?[:\s]*((?:97[89][-\s\u2010\u2011]?)?(?:\d[-\s\u2010\u2011]?){9}[\dXx])/gi)) {
+    const d = m[1].replace(/[^\dXx]/g, '').toUpperCase();
+    let ok = false;
+    if (d.length === 10) { let t = 0; for (let i = 0; i < 10; i++) t += (10 - i) * (d[i] === 'X' ? 10 : +d[i]); ok = t % 11 === 0; }
+    if (d.length === 13 && /^\d+$/.test(d)) { let t = 0; for (let i = 0; i < 13; i++) t += +d[i] * (i % 2 ? 3 : 1); ok = t % 10 === 0; }
+    if (ok) found.push(d);
+  }
+  return found.find(d => d.length === 13) || found[0] || '';
+}
+// {doi} from the first two pages, or else {isbn} from the first ten (or
+// the last two); null if neither.
+async function idFromPdf(file) {
   const lib = await loadPdfJs();
   const pdf = await openPdf(lib, { data: new Uint8Array(await file.arrayBuffer()) }).promise;
   try {
+    const textOf = async p => (await (await pdf.getPage(p)).getTextContent()).items.map(i => i.str).join(' ');
     for (let p = 1; p <= Math.min(2, pdf.numPages); p++) {
-      const tc = await (await pdf.getPage(p)).getTextContent();
-      const m = /\b(10\.\d{4,9}[/][^\s"<>]+)/.exec(tc.items.map(i => i.str).join(' '));
-      if (m) return m[1].replace(/[.,;:)\]]+$/, '');
+      const m = /\b(10\.\d{4,9}[/][^\s"<>]+)/.exec(await textOf(p));
+      if (m) return { doi: m[1].replace(/[.,;:)\]]+$/, '') };
     }
+    const pages = [];
+    for (let p = 1; p <= Math.min(10, pdf.numPages); p++) pages.push(p);
+    for (let p = Math.max(11, pdf.numPages - 1); p <= pdf.numPages; p++) pages.push(p);
+    for (const p of pages) { const isbn = isbnIn(await textOf(p)); if (isbn) return { isbn }; }
     return null;
   } finally {
     closePdf(pdf);
@@ -1013,14 +1032,145 @@ const msToolCount = () => {
   if (!x || Date.now() - (x.at || 0) > 14 * 86400000) return '';
   return x.todo ? '<span class="ct ms-todo-ct">' + x.todo + '</span>' : '<span class="ct ms-ok-ct">' + ICON.check + '</span>';
 };
+// Your libraries (each a .bib with its papers folder): the one open, and
+// the others used here, to switch to (a click) or copy publications to
+// (drag them onto one, or Copy to another library). From the status.
+const LIBS = { current: null, list: [], all: [], phase: '', pending: null, unfold: false };
+function setLibraries(st) {
+  if (!st || !st.bibId) return;
+  LIBS.current = { bibId: st.bibId, papersId: st.papersId || '', name: st.bibName || '' };
+  LIBS.list = (st.libraries || []).filter(l => l.bibId && l.bibId !== st.bibId);
+  // (All of them, in their steady order; the one open among them.)
+  LIBS.all = (st.allLibraries || []).filter(l => l.bibId).map(l => (l.bibId === st.bibId ? Object.assign({}, l, LIBS.current) : l));
+  if (!LIBS.all.some(l => l.bibId === st.bibId)) LIBS.all.unshift(LIBS.current);
+  if (ENTRIES.length) renderGroups();
+}
+// How many publications each library has: the open one's counted, the
+// others' as last seen (here or on another device, with your preferences).
+const LIB_COUNTS = store.get('libCounts', {});
+let libCountsTimer = 0;
+function noteLibCount(bibId, n) {
+  if (!bibId || (LIB_COUNTS[bibId] && LIB_COUNTS[bibId].n === n)) return;
+  LIB_COUNTS[bibId] = { n, at: Date.now() };
+  store.set('libCounts', LIB_COUNTS);
+  clearTimeout(libCountsTimer);
+  libCountsTimer = setTimeout(() => { if (gs) google.script.run.withFailureHandler(() => {}).savePrefs({ libCounts: LIB_COUNTS }); }, 3000);
+}
+function libCountsMerge(prefs) {
+  Object.entries((prefs && prefs.libCounts) || {}).forEach(([k, v]) => { if (v && (!LIB_COUNTS[k] || LIB_COUNTS[k].at < v.at)) LIB_COUNTS[k] = v; });
+  store.set('libCounts', LIB_COUNTS);
+}
+const libName = l => String((l && l.name) || 'Library').replace(/\.bib$/i, '');
+// The Libraries section: each library, with its count; the open one is
+// the whole library (a click shows it all), with its own lists below it.
+function librariesHTML() {
+  if (!gs || !LIBS.current) return '';
+  const inboxCount = ENTRIES.filter(e => e.ib).length;
+  // (Not while switching: the library loaded may not be the one ticked yet.)
+  if (!LIBS.phase) noteLibCount(LIBS.current.bibId, ENTRIES.length);
+  // (While another loads, it's the one ticked, with its count as last seen.)
+  const curId = LIBS.phase === 'loading' && LIBS.pending ? LIBS.pending.bibId : LIBS.current.bibId;
+  const row = l => {
+    const cur = l.bibId === curId, n = cur && !LIBS.phase ? ENTRIES.length : (LIB_COUNTS[l.bibId] || {}).n;
+    return `<button type="button" class="grp lib-row${cur ? ' cur' : ''}${cur && state.group === 'all' ? ' on' : ''}" data-lib="${esc(l.bibId)}" data-papers="${esc(l.papersId || '')}"${cur ? ' data-g="all"' : ''}` +
+      ` title="${cur ? esc(libName(l)) + ': the library open now' : 'Switch to ' + esc(libName(l)) + ' (or drop publications here to copy them to it)'}">` +
+      `${ICON.lib}<span class="nm">${esc(libName(l))}</span><span class="ct">${n != null ? n.toLocaleString() : ''}</span></button>`;
+  };
+  const sub = `<div class="lib-sub${LIBS.phase === 'folding' ? ' folded' : LIBS.phase === 'loading' ? ' lib-wait' : ''}">` +
+    (RECENT.seen.length || state.group === 'recent' ? grpBtn('recent', 'Recently viewed', groupItems('recent').length, ICON.history) : '') +
+    (inboxCount || state.group === 'inbox' ? grpBtn('inbox', 'Inbox', inboxCount, ICON.inbox) : '') +
+    (DUPS.size || state.group === 'dups' ? grpBtn('dups', 'Possible duplicates', DUPS.size, ICON.copy) : '') +
+    ((n => (n || state.group === 'forth' ? grpBtn('forth', 'Forthcoming', n, ICON.forth) : ''))(ENTRIES.filter(isForthcoming).length)) + `</div>`;
+  return `<div class="sec" data-sec="libs"><div class="sec-row"><div class="sec-h">Libraries</div>` +
+    `<button type="button" class="sec-add" data-new-lib title="New library" aria-label="New library"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button></div>` +
+    LIBS.all.map(l => row(l) + (l.bibId === curId ? sub : '')).join('') + `</div>`;
+}
+// Publications copied to another library: their entries, and their PDFs
+// into its papers folder (edits.js's copyToLibrary). A copy, as when
+// dragging between BibDesk files: they stay here too.
+async function copyToLibrary(keys, lib) {
+  const list = keys.map(k => BYKEY.get(k)).filter(e => e && !e.ib);
+  if (!list.length || !lib) return;
+  const what = list.length === 1 ? '\u201c' + (list[0].f.title || list[0].k) + '\u201d' : list.length + ' publications';
+  toast('Copying ' + what + ' to ' + libName(lib) + '\u2026', 0);
+  try {
+    const r = await callServer('copyToLibrary', { bibId: lib.bibId, papersId: lib.papersId || '', now: bibdeskTime(), backupName: fileTime(),
+      items: list.map(e => ({ key: e.k, fileIds: (e.files || []).map(f => f.id).filter(Boolean) })) });
+    const n = r.copied.length, there = r.skipped.filter(x => x.reason === 'already there').length;
+    if (n && LIB_COUNTS[lib.bibId]) { noteLibCount(lib.bibId, LIB_COUNTS[lib.bibId].n + n); renderGroups(); }
+    toast(n ? 'Copied ' + (n === 1 && list.length === 1 ? what : n + ' publication' + (n === 1 ? '' : 's')) + ' to ' + libName(lib) +
+      (r.files ? ', with ' + r.files + ' PDF' + (r.files === 1 ? '' : 's') : '') + (there ? '; ' + there + ' already there' : '')
+      : (there ? (list.length === 1 ? 'It\u2019s' : 'They\u2019re') + ' already in ' + libName(lib) : 'Nothing copied'), 5000);
+  } catch (err) { toast('Couldn\u2019t copy to ' + libName(lib) + ': ' + errText(err), 7000); }
+}
+// Which library to copy to: a short list of the others.
+function openCopyTo(keys) {
+  if (!LIBS.list.length) { toast('You have no other library yet. Make one with + beside Libraries in the sidebar.', 4000); return; }
+  sheet = { mode: 'help', copyKeys: keys };
+  showSheet(`<h2>Copy to another library</h2><p class="sheet-note">${keys.length === 1 ? 'The publication' : keys.length + ' publications'}, with ${keys.length === 1 ? 'its PDFs' : 'their PDFs'}, copied to the library you choose. ${keys.length === 1 ? 'It stays' : 'They stay'} here too.</p>` +
+    `<div class="copy-libs">${LIBS.list.map(l => `<button type="button" class="set-lib" data-copy-to="${esc(l.bibId)}">${ICON.lib}<span>${esc(libName(l))}</span></button>`).join('')}</div>`, 'Cancel');
+  $('#sheetCancel').hidden = true;
+}
+$('#sheetBody').addEventListener('click', ev => {
+  const b = ev.target.closest('[data-copy-to]');
+  if (!b || !sheet || !sheet.copyKeys) return;
+  const keys = sheet.copyKeys, lib = LIBS.list.find(l => l.bibId === b.dataset.copyTo);
+  closeSheet();
+  copyToLibrary(keys, lib);
+});
+// Switching libraries: the open one's lists fold up into it, then
+// unfold under the one chosen (ticked at once), their counts hidden until
+// it has loaded. (A new one, not yet in the list: they unfold when it's
+// open.)
+function foldLibSub(target) {
+  LIBS.phase = 'folding';
+  LIBS.pending = target || null;
+  const sub = $('#groups .lib-sub');
+  if (sub && !sub.classList.contains('folded')) {
+    sub.style.height = sub.scrollHeight + 'px';
+    void sub.offsetHeight;
+    sub.classList.add('folded');
+    sub.style.height = '';
+  }
+  if (target) setTimeout(() => { if (LIBS.phase === 'folding' && LIBS.pending === target) { LIBS.phase = 'loading'; LIBS.unfold = true; renderGroups(); } }, sub ? 320 : 0);
+}
+function unfoldLibSub(root, from) {
+  if (!LIBS.unfold && from == null) return;
+  LIBS.unfold = false;
+  const sub = root.querySelector('.lib-sub');
+  if (!sub || sub.classList.contains('folded')) return;
+  // (Its height when open, measured, then grown to from where it was.)
+  const to = sub.getBoundingClientRect().height;
+  sub.classList.add('moving');
+  sub.style.height = (from == null ? 0 : from) + 'px';
+  sub.style.opacity = from == null ? '0' : '';
+  void sub.offsetHeight;
+  sub.style.height = to + 'px';
+  sub.style.opacity = '';
+  const done = () => { if (sub.isConnected) { sub.style.height = ''; sub.classList.remove('moving'); } };
+  sub.addEventListener('transitionend', ev => { if (ev.propertyName === 'height') done(); });
+  setTimeout(done, 500);
+}
+// (Done: the counts in. Already unfolded under the new one, unless it
+// failed and it's back under the old one, or the new one is new.)
+function endLibSwitch() {
+  const moved = LIBS.phase === 'loading' && LIBS.pending && LIBS.current && LIBS.pending.bibId === LIBS.current.bibId;
+  LIBS.unfold = !moved;
+  LIBS.phase = '';
+  LIBS.pending = null;
+  renderGroups();
+}
 function renderGroups() {
   const inboxCount = ENTRIES.filter(e => e.ib).length;
-  let h = `<div class="sec" data-sec="lib"><div class="sec-h">Library</div>${grpBtn('all', 'Library', ENTRIES.length, ICON.lib)}` +
+  // (Signed in: the Libraries section, the open one's lists under it.
+  // Otherwise, the one library as before.)
+  const libs = librariesHTML();
+  let h = (libs || `<div class="sec" data-sec="lib"><div class="sec-h">Library</div>${grpBtn('all', 'Library', ENTRIES.length, ICON.lib)}` +
     (RECENT.seen.length || state.group === 'recent' ? grpBtn('recent', 'Recently viewed', groupItems('recent').length, ICON.history) : '') +
     (inboxCount || state.group === 'inbox' ? grpBtn('inbox', 'Inbox', inboxCount, ICON.inbox) : '') +
     (DUPS.size || state.group === 'dups' ? grpBtn('dups', 'Possible duplicates', DUPS.size, ICON.copy) : '') +
     ((n => (n || state.group === 'forth' ? grpBtn('forth', 'Forthcoming', n, ICON.forth) : ''))(ENTRIES.filter(isForthcoming).length)) +
-    `</div>` +
+    `</div>`) +
     // (Tools: not lists, so no count.)
     `<div class="sec" data-sec="tools"><div class="sec-h">Tools</div><button type="button" class="grp" data-tool="mscheck" aria-label="Cite Check: check a manuscript\u2019s citations"${msToolTitle()}>${ICON.citecheck}<span class="nm">Cite Check</span>${msToolCount()}</button>` +
       (gs ? `<button type="button" class="grp" data-tool="newpapers" aria-label="New papers" title="New papers that cite yours, by authors you follow, like ones you choose, and in your journals">${ICON.bell}<span class="nm">New papers</span>${npToolCount()}</button>` : '') + `</div>`;
@@ -1047,8 +1197,11 @@ function renderGroups() {
   const g = $('#groups');
   const hadFocus = document.activeElement && document.activeElement.id === 'kwfilter';
   const hadName = document.activeElement && document.activeElement.id === 'ngName';
+  // (Drawn again in the middle of the lists' unfolding: it carries on from there.)
+  const was = g.querySelector('.lib-sub.moving'), from = was ? was.getBoundingClientRect().height : null;
   g.innerHTML = h;
   applySideOrder(g);
+  unfoldLibSub(g, from);
   if (hadFocus) { const k = $('#kwfilter'); k.focus(); k.setSelectionRange(k.value.length, k.value.length); }
   if (hadName || NG.focus) { const n = $('#ngName'); if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); } NG.focus = false; }
 }
@@ -1058,7 +1211,7 @@ function renderGroups() {
 // other devices with your preferences; your .bib's groups aren't changed.
 // (New items go at the end of their section.)
 const SIDE_ORDER = Object.assign({ at: 0 }, store.get('sideOrder', {}));
-const sideId = b => b.dataset.g || 'tool:' + b.dataset.tool;
+const sideId = b => (b.dataset.lib ? 'lib:' + b.dataset.lib : b.dataset.g || 'tool:' + b.dataset.tool);
 function applySideOrder(root) {
   root.querySelectorAll('.sec[data-sec]').forEach(sec => {
     const want = SIDE_ORDER[sec.dataset.sec];
@@ -1066,6 +1219,9 @@ function applySideOrder(root) {
     const at = id => { const i = want.indexOf(id); return i < 0 ? want.length : i; };
     [...sec.children].filter(b => b.matches('.grp')).map((b, i) => [b, i])
       .sort((x, y) => at(sideId(x[0])) - at(sideId(y[0])) || x[1] - y[1]).forEach(([b]) => sec.appendChild(b));
+    // (The open library's lists stay under it.)
+    const cur = sec.querySelector(':scope > .grp.cur'), sub = sec.querySelector(':scope > .lib-sub');
+    if (cur && sub) cur.after(sub);
   });
 }
 function sideOrderMerge(prefs) {
@@ -1111,6 +1267,7 @@ let sideDragged = false;
         SIDE_ORDER.at = Date.now();
         store.set('sideOrder', SIDE_ORDER);
         if (gs) google.script.run.withFailureHandler(() => {}).savePrefs({ sideOrder: SIDE_ORDER });
+        if (d.sec.querySelector(':scope > .lib-sub')) applySideOrder(g);
       } else applySideOrder(g);
       // (The click that ends a drag doesn't open the item.)
       sideDragged = true;
@@ -1151,6 +1308,9 @@ $('#groups').addEventListener('click', ev => {
   if (ev.target.closest('.ng-row')) return;
   const t = ev.target.closest('[data-toggle]');
   if (t) { const k = t.dataset.toggle; state[k] = !state[k]; store.set(k, state[k]); renderGroups(); return; }
+  if (ev.target.closest('[data-new-lib]')) { closeDrawer(); openNewLibrary(); return; }
+  const lb = ev.target.closest('[data-lib]');
+  if (lb && !lb.classList.contains('cur')) { closeDrawer(); const l = LIBS.list.find(x => x.bibId === lb.dataset.lib); if (l) switchLibraryTo(l); return; }
   if (ev.target.closest('[data-tool="mscheck"]')) { closeDrawer(); openMsCheck(); return; }
   if (ev.target.closest('[data-tool="newpapers"]')) { closeDrawer(); openNewPapers(); return; }
   const b = ev.target.closest('.grp');
@@ -2240,6 +2400,7 @@ function renderDetail() {
     `<div class="menu-list" role="menu"><button type="button" role="menuitem" data-copy="bibtex">BibTeX<kbd>${esc(keyHint('copyBib'))}</kbd></button>` +
     `<button type="button" role="menuitem" data-copy="apa">APA (long)<kbd>${esc(keyHint('copyApa'))}</kbd></button>` +
     `<button type="button" role="menuitem" data-copy="apa-short">APA (short)<kbd>${esc(keyHint('copyShort'))}</kbd></button></div></details>`);
+  if (gs && !e.ib && LIBS.list.length) more.push(`<button type="button" role="menuitem" data-copy-lib="${esc(e.k)}">${ICON.lib}<span>Copy to another library\u2026</span></button>`);
   if (more.length) btns.push(`<details class="menu act-more"><summary class="btn" title="More: ${more.length > 1 ? 'Google Drive, Attach, links' : 'more'}" aria-label="More">` +
     `<svg class="i dots" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="18" cy="12" r="1.4"/></svg>${wide ? '<span>More</span>' : ''}</summary>` +
     `<div class="menu-list" role="menu">${more.join('')}</div></details>`);
@@ -2471,6 +2632,9 @@ detailEl.addEventListener('click', ev => {
   if (ev.target.closest('[data-join]')) { openJoin(pickedEntries()); return; }
   if (ev.target.closest('[data-bulk]')) { openBulk(); return; }
   if (ev.target.closest('[data-bulk-rl]')) { bulkReading(); return; }
+  if (ev.target.closest('[data-copy-lib-sel]')) { openCopyTo(pickedEntries().filter(e => !e.ib).map(e => e.k)); return; }
+  const cl = ev.target.closest('[data-copy-lib]');
+  if (cl) { const d = cl.closest('details'); if (d) d.open = false; openCopyTo([cl.dataset.copyLib]); return; }
   if (ev.target.closest('[data-pick-clear]')) { state.picked.clear(); paint(); renderPickBar(); renderDetail(); return; }
   const cs = ev.target.closest('[data-copy-sel]');
   if (cs) { cs.closest('details').open = false; copyAs(cs.dataset.copySel); return; }
