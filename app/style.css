@@ -491,11 +491,6 @@ body:has(#sheet:not([hidden])) .pick-bar { visibility: hidden; }
 .rl-list-bar .btn { min-height: 28px; padding: 3px 12px; font-size: 13px; }
 .rl-list-bar select { height: 28px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); color: var(--text); font: 13px var(--ui); padding: 0 6px; }
 .rl-list-bar label { display: inline-flex; align-items: center; gap: 6px; }
-.tri-progress { font-size: 12.5px; }
-.tri-progress .stale { color: var(--warn); }
-.setup-card h2.tri-title { font-size: 22px; }
-.tri-abs { font-size: 13.5px; max-height: 30vh; overflow-y: auto; }
-.tri-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 #vRL { cursor: pointer; }
 #vRL.on { color: var(--accent); }
 #vRL.on svg { fill: currentColor; }

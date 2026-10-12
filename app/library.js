@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-12.07';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-12.08';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -460,7 +460,7 @@ function readingLocal(req) {
   }
 }
 // Changes show at once and are saved together, a moment after the
-// last one, so a run of them (in Triage, say) is one save of the .bib.
+// last one, so a run of them is one save of the .bib.
 function rlOp(req, message) {
   readingLocal(req);
   setReading();
@@ -530,7 +530,7 @@ function readingClick(e, act) {
   else if (act === 'remove') rlRemove(e.k);
 }
 
-// The bar above the list in "To read": counts and Triage.
+// The bar above the list in "To read": the counts.
 function renderRLBar() {
   const bar = $('#rlBar');
   bar.hidden = !(gs && state.group === 'toread');
@@ -557,9 +557,7 @@ function renderRLBar() {
     `<span class="rl-c-text"><span class="rl-c-head">Continue reading</span><span class="rl-c-title">${esc(c.e.f.title || c.e.k)}</span></span>` +
     `<span class="rl-c-meta">p. ${c.page}${prog ? ' \u00b7 ' + esc(prog) : ''}</span>`;
   card.title = 'Open \u201c' + (c.e.f.title || c.e.k) + '\u201d at page ' + c.page;
-  $('#rlTriage').hidden = !all;
 }
-$('#rlTriage').addEventListener('click', () => openTriage());
 // The paper to continue: of those on the list, the one whose place in it
 // was noted last (on any device), past page 1 and not yet read through.
 function continueCandidate() {
@@ -592,47 +590,6 @@ $('#rlBar').addEventListener('click', ev => {
   };
   go();
 });
-
-// Triage: the list one paper at a time, oldest first within Up next, then Later.
-function openTriage() {
-  sheet = { mode: 'triage', queue: readingOrder().map(x => x.key), i: 0 };
-  showTriage();
-}
-function showTriage() {
-  const s = sheet;
-  while (s.i < s.queue.length && !(RL.get(s.queue[s.i]) && BYKEY.get(s.queue[s.i]))) s.i++;
-  if (s.i >= s.queue.length) {
-    showSheet(`<h2>All done</h2><p class="sheet-note">You\u2019ve been through your whole reading list: ${upNextCount()} up next, ` +
-      `${READING.items.length - upNextCount()} later.</p>`, 'Close');
-    $('#sheetCancel').hidden = true;
-    sheet = { mode: 'help' };
-    return;
-  }
-  const key = s.queue[s.i], e = BYKEY.get(key), x = RL.get(key);
-  const abs = (e.f.abstract || '').slice(0, 420) + ((e.f.abstract || '').length > 420 ? '\u2026' : '');
-  showSheet(`<p class="tri-progress">${s.i + 1} of ${s.queue.length} \u00b7 ${x.list === 'next' ? 'Up next' : 'Later'} \u00b7 ` +
-    `<span class="${staleRL(x) ? 'stale' : ''}">waiting ${waited(x)}</span></p>` +
-    `<h2 class="tri-title">${esc(e.f.title || '(untitled)')}</h2>` +
-    `<p class="sheet-note">${esc(e.authorsShort || '')}${e.f.year ? ' \u00b7 ' + esc(e.f.year) : ''}${e.venue ? ' \u00b7 <i>' + esc(e.venue) + '</i>' : ''}</p>` +
-    (abs ? `<p class="tri-abs">${esc(abs)}</p>` : '') +
-    `<div class="tri-actions"><button type="button" class="btn${x.list === 'next' ? ' primary' : ''}" data-tri="next">Up next</button>` +
-    `<button type="button" class="btn${x.list !== 'next' ? ' primary' : ''}" data-tri="later">Later</button>` +
-    `<button type="button" class="btn" data-tri="done">Done, I\u2019ve read it</button>` +
-    `<button type="button" class="btn" data-tri="remove">Remove</button>` +
-    `<button type="button" class="btn" data-tri="skip">Skip</button></div>`, 'Close');
-  $('#sheetCancel').hidden = true;
-}
-$('#sheetBody').addEventListener('click', ev => {
-  const b = ev.target.closest('[data-tri]');
-  if (!b || !sheet || sheet.mode !== 'triage') return;
-  const key = sheet.queue[sheet.i], act = b.dataset.tri;
-  if (act === 'next' || act === 'later') { if (RL.get(key).list !== act) rlOp({ op: 'move', key, list: act }); }
-  else if (act === 'done') rlOp({ op: 'done', key });
-  else if (act === 'remove') rlOp({ op: 'remove', key });
-  sheet.i++;
-  showTriage();
-});
-
 
 // Reader toolbar: the bookmark (filled while the paper's on your reading
 // list) opens a short menu: Up next or Later, Done (read, and off the
