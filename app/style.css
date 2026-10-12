@@ -944,6 +944,11 @@ details.d-sec[open] summary { margin-bottom: 8px; }
 .v-palette.leaving, .vp-show.leaving { pointer-events: none; }
 /* The less usual kind of a tool (freehand, strike-through): a dot in the
    button's corner, so it's seen at a glance. */
+/* A tool with another kind (highlight/freehand, underline/strike): a small
+   corner triangle, the usual sign that holding the button offers more. */
+.v-palette [data-tool].has-alt { position: relative; }
+.v-palette [data-tool].has-alt::before { content: ''; position: absolute; right: 3px; bottom: 3px; width: 0; height: 0; border-style: solid; border-width: 0 0 5px 5px; border-color: transparent transparent currentColor transparent; opacity: .5; pointer-events: none; }
+.v-palette [data-tool].has-alt[aria-pressed="true"]::before { opacity: .8; }
 .v-palette [data-tool].odd-kind { position: relative; }
 .v-palette [data-tool].odd-kind::after { content: ''; position: absolute; top: 5px; right: 5px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 1.5px var(--panel); }
 /* Going away: slower, and eased at both ends, so it's seen to go. */
