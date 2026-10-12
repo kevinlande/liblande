@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-12.11';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-12.12';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -2563,12 +2563,29 @@ function apaRtf(refs) {
     '{\\pard\\qc\\sl480\\slmult1 {\\b References}\\par}\n' + refs.map(para).join('') + '}\n';
 }
 
+// A menu opens where it's seen whole: leftwards at the right edge, upwards
+// when there's more room above than below in what holds it (the details
+// pane, say), and scrolling within itself if it fits neither way.
+function placeMenu(d) {
+  const list = d.querySelector('.menu-list');
+  if (!list) return;
+  d.classList.remove('right', 'up');
+  list.style.maxHeight = list.style.overflowY = '';
+  let clip = d.parentElement;
+  while (clip && clip !== document.body && !/(auto|scroll|hidden|clip)/.test(getComputedStyle(clip).overflowY)) clip = clip.parentElement;
+  // (A fixed menu, or one in a strip too short to hold it, goes by the window.)
+  let c = clip && clip !== document.body && getComputedStyle(list).position !== 'fixed' ? clip.getBoundingClientRect() : null;
+  if (!c || c.height < 200) c = { top: 0, bottom: window.innerHeight, right: window.innerWidth };
+  const top = Math.max(c.top, 0) + 8, bottom = Math.min(c.bottom, window.innerHeight) - 8, right = Math.min(c.right, window.innerWidth) - 8;
+  if (list.getBoundingClientRect().right > right) d.classList.add('right');
+  const s = d.getBoundingClientRect(), h = list.scrollHeight + 4, below = bottom - s.bottom, above = s.top - top;
+  if (h > below && above > below) d.classList.add('up');
+  const room = d.classList.contains('up') ? above : below;
+  if (h > room) { list.style.maxHeight = Math.max(120, room - 4) + 'px'; list.style.overflowY = 'auto'; }
+}
 document.addEventListener('toggle', ev => {
   const d = ev.target;
-  if (!d.matches || !d.matches('details.menu') || !d.open) return;
-  d.classList.remove('right');
-  const r = d.querySelector('.menu-list').getBoundingClientRect();
-  if (r.right > window.innerWidth - 8) d.classList.add('right');
+  if (d && d.classList && d.classList.contains('menu') && d.open) placeMenu(d);
 }, true);
 document.addEventListener('click', ev => {
   document.querySelectorAll('details.menu[open]').forEach(d => { if (!d.contains(ev.target)) d.open = false; });

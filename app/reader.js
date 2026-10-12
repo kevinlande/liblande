@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-12.11';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-12.12';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -1860,15 +1860,7 @@ function placePalette() {
     el.style.top = Math.max(top, Math.min(H - h - 8, pos.y * H)) + 'px';
   });
 }
-// A menu that would run off the right of the screen opens leftwards.
-document.addEventListener('toggle', ev => {
-  const d = ev.target;
-  if (!d || !d.classList || !d.classList.contains('menu') || !d.open) return;
-  const list = d.querySelector('.menu-list');
-  if (!list) return;
-  d.classList.remove('right');
-  if (list.getBoundingClientRect().right > window.innerWidth - 8) d.classList.add('right');
-}, true);
+// (Menus are placed to be seen whole: placeMenu.)
 // (What pressed a tool: a finger, the Pencil or the mouse; see FINGER.)
 $('#vPalette').addEventListener('pointerdown', ev => { FINGER.by = ev.pointerType; }, true);
 $('#vPalette').addEventListener('click', ev => {
