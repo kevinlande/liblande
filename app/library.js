@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-12.26';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-12.27';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -520,11 +520,15 @@ function readingHTML(e) {
   const x = RL.get(e.k);
   // Not on the list: the Reading list button is in the row of actions.
   if (!x) return `<div class="rl-bar" hidden></div>`;
-  return `<div class="rl-bar on"><span class="rl-where${staleRL(x) ? ' stale' : ''}">${ICON.bookmark}On your reading list, waiting ${waited(x)}${progressText(e) ? ' \u00b7 ' + progressText(e) : ''}</span>` +
-    `<div class="seg rl-seg" role="radiogroup" aria-label="Reading list"><button type="button" role="radio" data-rl="next" aria-checked="${x.list === 'next'}">Up next</button>` +
-    `<button type="button" role="radio" data-rl="later" aria-checked="${x.list !== 'next'}">Later</button></div>` +
-    `<button type="button" class="btn" data-rl="done">Done</button><button type="button" class="btn" data-rl="remove">Remove</button></div>`;
+  // (How long it's been on the list, and how far through it you are.)
+  const how = waited(x) === 'since today' ? 'Today' : waited(x);
+  return `<div class="rl-bar on"><span class="rl-where${staleRL(x) ? ' stale' : ''}" title="On your reading list ${how === 'Today' ? 'since today' : 'for ' + how}">${ICON.bookmark}${how}${progressText(e) ? ' \u00b7 ' + progressText(e) : ''}</span>` +
+    // (Icons, their names as tips: Up next, Later, Done, and off the list.)
+    `<div class="rl-acts"><div class="seg rl-seg" role="radiogroup" aria-label="Reading list">${rlBtn('next', 'Up next', 'radio', x.list === 'next')}${rlBtn('later', 'Later', 'radio', x.list !== 'next')}</div>` +
+    `${rlBtn('done', 'Done: mark it read, and take it off the list', 'btn')}${rlBtn('remove', 'Take it off the reading list', 'btn')}</div></div>`;
 }
+const rlBtn = (act, name, kind, on) => `<button type="button" ${kind === 'radio' ? `role="radio" aria-checked="${on}"` : 'class="btn rl-ic"'} data-rl="${act}" title="${name}" aria-label="${name}">` +
+  `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${RL_ICONS[{ next: 'next', later: 'later', done: 'check', remove: 'minus' }[act]]}</svg></button>`;
 function readingClick(e, act) {
   if (act === 'add') rlAdd(e.k);
   else if (act === 'next' || act === 'later') rlMove(e.k, act);
@@ -623,6 +627,8 @@ const RL_ICONS = {
   minus: '<path class="bm" d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1z"/><path class="mark" d="M9 10.5h6"/>',
   check: '<circle cx="12" cy="12" r="8.5"/><path class="mark" d="M8.2 12.3l2.6 2.6 5-5.4"/>',
   circle: '<circle cx="12" cy="12" r="8.5"/>',
+  next: '<path d="M6 5h12"/><path class="mark" d="M12 19.5V9M7.5 13.5L12 9l4.5 4.5"/>',
+  later: '<circle cx="12" cy="12" r="8.5"/><path class="mark" d="M12 7.5V12l3 2"/>',
 };
 // What was just done, at the bookmark: its icon (filled), growing in and
 // fading; the bookmark pops when the paper goes on or off the list.

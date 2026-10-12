@@ -461,8 +461,9 @@ body:has(#sheet:not([hidden])) .pick-bar { visibility: hidden; }
 .d-side .actions > .menu > summary > svg:last-child:not(.dots):not(:first-child) { display: none; }
 .d-side .menu-list { left: auto; right: 0; }
 .d-side .rl-bar { margin: 0; }
-.d-side .rl-bar .seg { width: 100%; }
-.d-side .rl-bar .seg > button { flex: 1; }
+.d-side .rl-acts { width: 100%; }
+.d-side .rl-acts .seg { flex: 1; }
+.d-side .rl-acts .rl-ic { flex: 1; width: auto; }
 .d-side .d-meta { gap: 6px 12px; }
 .thumb { flex: none; width: 118px; display: grid; gap: 6px; align-content: start; border: 0; background: none; padding: 0; text-align: left; color: var(--muted); cursor: pointer; }
 .thumb-img { display: grid; place-items: center; width: 118px; height: 152px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
@@ -509,6 +510,11 @@ body:has(#sheet:not([hidden])) .pick-bar { visibility: hidden; }
 .rl-where.stale { color: var(--warn); }
 .seg.rl-seg { grid-template-columns: repeat(2, auto); }
 .seg.rl-seg button { padding: 4px 12px; font-size: 12.5px; }
+/* The list's commands, as icons. */
+.rl-acts { display: flex; align-items: center; gap: 6px; }
+.seg.rl-seg button { display: grid; place-items: center; height: 26px; padding: 0 11px; }
+.rl-acts .i { width: 17px; height: 17px; }
+.rl-bar .btn.rl-ic { min-height: 0; width: 34px; height: 28px; padding: 0; justify-content: center; }
 .rl-tag { display: inline-block; margin-right: 6px; padding: 0 6px; border-radius: 999px; font-size: 10.5px; font-weight: 600; line-height: 16px; vertical-align: 1px; background: var(--panel); color: var(--muted); border: 1px solid var(--line); }
 .m .rl-tag { margin: 0 0 0 6px; }
 .row.sel .rl-tag.next { background: var(--accent-ink); color: var(--accent); }
