@@ -229,6 +229,10 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
   text-align: left; color: var(--text);
 }
 .grp:hover { background: var(--side-hover); }
+/* Recently viewed: its count is a button, then a box, for how many to show. */
+.recent-ct { margin: -2px -4px; padding: 2px 4px; border-radius: 4px; cursor: text; }
+.recent-ct:hover { background: var(--bg); color: var(--text); }
+.recent-edit .ct-in { width: 52px; margin: -3px -2px; padding: 1px 4px; border: 1px solid var(--accent); border-radius: 4px; background: var(--bg); color: var(--text); font: inherit; font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; }
 /* Dragged to a new place in its section. */
 .sec[data-sec] > .grp { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 .grp.dragging { position: relative; z-index: 5; background: var(--panel); box-shadow: 0 4px 14px rgba(0, 0, 0, .22); cursor: grabbing; }

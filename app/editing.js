@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-10-12.33';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-10-12.34';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -1319,7 +1319,7 @@ async function renameCore(e, newKey) {
     store.set('recentSeen', RECENT.seen);
     const pairs = [...NOT_DUPS].map(p => p.split('|').map(k => (k === old ? newKey : k))).map(([a, b]) => pairOf(a, b));
     NOT_DUPS.clear(); pairs.forEach(p => NOT_DUPS.add(p)); store.set('notDups', [...NOT_DUPS]);
-    google.script.run.withFailureHandler(() => {}).savePrefs(SYNC.recent ? { recentSeen: RECENT.seen.slice(0, 60), notDups: [...NOT_DUPS] } : { notDups: [...NOT_DUPS] });
+    google.script.run.withFailureHandler(() => {}).savePrefs(SYNC.recent ? { recentSeen: RECENT.seen.slice(0, 200), notDups: [...NOT_DUPS] } : { notDups: [...NOT_DUPS] });
     if (res.reading) setReading(res.reading);
     if (state.selKey === old) state.selKey = newKey;
     if (res.queued) e.offline = true;

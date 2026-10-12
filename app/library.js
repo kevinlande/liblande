@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-12.33';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-12.34';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -1000,7 +1000,7 @@ function groupItems(id) {
   if (id === 'all') return ENTRIES;
   if (id === 'dups') return dupOrder();
   if (id === 'forth') return ENTRIES.filter(isForthcoming);
-  if (id === 'recent') return RECENT.seen.map(x => BYKEY.get(x[0])).filter(Boolean);
+  if (id === 'recent') return RECENT.seen.map(x => BYKEY.get(x[0])).filter(Boolean).slice(0, recentShow());
   if (id === 'inbox') return ENTRIES.filter(e => e.ib);
   if (id === 'toread') return readingOrder().map(x => BYKEY.get(x.key)).filter(Boolean);
   const [kind, name] = [id.slice(0, 2), id.slice(2)];
@@ -1021,7 +1021,31 @@ function groupName(id) {
   return id.slice(2);
 }
 function grpBtn(id, label, count, icon) {
-  return `<button class="grp${state.group === id ? ' on' : ''}" data-g="${esc(id)}">${icon}<span class="nm">${esc(label)}</span><span class="ct">${count.toLocaleString()}</span></button>`;
+  // (Recently viewed's count: click it to choose how many.)
+  const ct = id === 'recent' ? ' recent-ct" title="How many to show: click to change' : '';
+  return `<button class="grp${state.group === id ? ' on' : ''}" data-g="${esc(id)}">${icon}<span class="nm">${esc(label)}</span><span class="ct${ct}">${count.toLocaleString()}</span></button>`;
+}
+// Recently viewed's count, made a box to type how many to show in (Enter
+// or leaving it keeps it; Esc doesn't).
+function editRecentCount(b) {
+  const row = document.createElement('div');
+  row.className = 'grp recent-edit' + (b.classList.contains('on') ? ' on' : '');
+  row.innerHTML = b.innerHTML.replace(/<span class="ct[^"]*"[^>]*>[^<]*<\/span>/, '') +
+    `<input class="ct-in" type="number" inputmode="numeric" min="1" max="${RECENT_KEEP}" value="${recentShow()}" aria-label="How many recently viewed to show">`;
+  b.replaceWith(row);
+  const inp = row.querySelector('input');
+  inp.focus(); inp.select();
+  let done = false;
+  const finish = keep => {
+    if (done) return;
+    done = true;
+    const n = Math.round(+inp.value);
+    if (keep && n >= 1) store.set('recentShow', Math.min(RECENT_KEEP, n));
+    renderGroups();
+    if (state.group === 'recent') refresh(false);
+  };
+  inp.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); finish(true); } else if (ev.key === 'Escape') { ev.preventDefault(); finish(false); } });
+  inp.addEventListener('blur', () => finish(true));
 }
 // The checker's row: how much is left to fix in the manuscript checked last.
 const msToolLast = () => (MS.recent && MS.recent[0]) || null;
@@ -1276,7 +1300,7 @@ let sideDragged = false;
     d = null;
   };
   g.addEventListener('pointerdown', ev => {
-    if (d || (ev.pointerType === 'mouse' && ev.button !== 0)) return;
+    if (d || (ev.pointerType === 'mouse' && ev.button !== 0) || ev.target.closest('input')) return;
     const b = ev.target.closest('.sec[data-sec] > .grp');
     if (!b) return;
     d = { b, sec: b.parentElement, id: ev.pointerId, x0: ev.clientX, y0: ev.clientY, touch: ev.pointerType !== 'mouse', on: false };
@@ -1308,6 +1332,9 @@ $('#groups').addEventListener('click', ev => {
   if (ev.target.closest('.ng-row')) return;
   const t = ev.target.closest('[data-toggle]');
   if (t) { const k = t.dataset.toggle; state[k] = !state[k]; store.set(k, state[k]); renderGroups(); return; }
+  if (ev.target.closest('.recent-edit')) return;
+  const rc = ev.target.closest('.grp[data-g="recent"] .recent-ct');
+  if (rc) { editRecentCount(rc.closest('.grp')); return; }
   if (ev.target.closest('[data-new-lib]')) { closeDrawer(); openNewLibrary(); return; }
   const lb = ev.target.closest('[data-lib]');
   if (lb && !lb.classList.contains('cur')) { closeDrawer(); const l = LIBS.list.find(x => x.bibId === lb.dataset.lib); if (l) switchLibraryTo(l); return; }
@@ -2249,6 +2276,10 @@ document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && $('#cite
 // 3 seconds after you chose it (not one shown on its own, like the first
 // in the list), or when you open its PDF. Papers closed in the reader are
 // kept too, to reopen. Both are kept on this device and with your account.
+// (Up to 500 kept; as many shown as you choose, by clicking the count in
+// the sidebar: on this device.)
+const RECENT_KEEP = 500;
+const recentShow = () => Math.max(1, Math.min(RECENT_KEEP, +store.get('recentShow', 100) || 100));
 const RECENT = { seen: store.get('recentSeen', []), closed: store.get('recentClosed', []), watch: null, timer: 0, saveT: 0, input: 0 };
 ['pointerdown', 'keydown'].forEach(t => window.addEventListener(t, () => { RECENT.input = Date.now(); }, true));
 function recentSave() {
@@ -2257,12 +2288,12 @@ function recentSave() {
   clearTimeout(RECENT.saveT);
   RECENT.saveT = setTimeout(() => {
     if (!gs || !window.google || !google.script || !google.script.run) return;
-    if (SYNC.recent) google.script.run.withFailureHandler(() => {}).savePrefs({ recentSeen: RECENT.seen.slice(0, 60), recentClosed: RECENT.closed.slice(0, 20) });
+    if (SYNC.recent) google.script.run.withFailureHandler(() => {}).savePrefs({ recentSeen: RECENT.seen.slice(0, 200), recentClosed: RECENT.closed.slice(0, 20) });
   }, 4000);
 }
 const nowSec = () => Math.round(Date.now() / 1000);
 function noteSeen(k) {
-  RECENT.seen = [[k, nowSec()], ...RECENT.seen.filter(x => x[0] !== k)].slice(0, 100);
+  RECENT.seen = [[k, nowSec()], ...RECENT.seen.filter(x => x[0] !== k)].slice(0, RECENT_KEEP);
   recentSave();
   if (ENTRIES.length) renderGroups();
 }
@@ -2279,7 +2310,7 @@ function recentMerge(prefs) {
     [...(a || []), ...(b || [])].forEach(x => { const k = key(x); if (!m.has(k) || when(m.get(k)) < when(x)) m.set(k, x); });
     return [...m.values()].sort((x, y) => when(y) - when(x));
   };
-  RECENT.seen = join(RECENT.seen, prefs.recentSeen, x => x[0], x => x[1]).slice(0, 100);
+  RECENT.seen = join(RECENT.seen, prefs.recentSeen, x => x[0], x => x[1]).slice(0, RECENT_KEEP);
   RECENT.closed = join(RECENT.closed, prefs.recentClosed, x => x[1], x => x[2]).slice(0, 30);
   store.set('recentSeen', RECENT.seen);
   store.set('recentClosed', RECENT.closed);
