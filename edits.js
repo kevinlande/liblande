@@ -1,9 +1,10 @@
 /*
  * LibLande on GitHub Pages: changing the .bib, on this device.
  *
- * The same functions as Code.gs (saveEntry, queueEdit, discardPending,
- * applyPending, addToInbox, addToMain, attachPdf, createGroup, readingOps,
- * setDirect), with the same checks, done with Drive's web API: the edit is
+ * The same functions as Code.gs (saveEntry, addToMain, attachPdf,
+ * createGroup, readingOps, renameKey), every change straight into the .bib
+ * (pending edits were dropped on 2026-10-12), with the same checks, done
+ * with Drive's web API: the edit is
  * made with Build.gs (build.js) on the text, checked, a backup copy of the
  * file goes to LibLande/Backups, and only then is the file written.
  *
@@ -18,10 +19,10 @@
  */
 (function (root) {
   'use strict';
-  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).edits = '2026-10-11.20';
+  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).edits = '2026-10-12.03';
   const FOLDER = 'application/vnd.google-apps.folder';
   const UPLOAD = 'https://www.googleapis.com/upload/drive/v3/';
-  const PENDING_FILE = 'pending-edits.json', READING_FILE = 'reading-list.json',
+  const READING_FILE = 'reading-list.json',
     INBOX_FOLDER = 'Inbox', INBOX_FILE = 'LibLande inbox.bib', BACKUP_FOLDER = 'Backups', KEEP_BACKUPS = 50;
   const READING_GROUP = '★ Reading List';
   const BUSY = 'LibLande is updating your library right now. Try again in a minute.';
@@ -90,22 +91,6 @@
       }
       return { text: edited, hash: hashOf(edited, req.key), groupsHash: groupsHashOf(after) };
     },
-    // (As Code.gs's applyPending: waiting groups first, then the edits.)
-    applyPending(original, edits, waiting) {
-      let text = original;
-      waiting.forEach(n => { text = ensureStaticGroup_(text, n); });
-      if (text !== original && parseBib_(text)[0].length !== parseBib_(original)[0].length) throw new Error('Adding the new groups went wrong, so LibLande didn’t save anything.');
-      const result = applyEdits_(text, edits, groupsHashOf(parseBib_(original)));
-      const changed = result.applied.length || text !== original;
-      const edited = changed ? result.edited : original;
-      const hashes = {};
-      result.applied.forEach(e => { hashes[e.key] = hashOf(edited, e.key); });
-      return { text: changed ? edited : null, applied: result.applied.map(e => e.key), appliedEdits: result.applied, skipped: result.skipped,
-        hashes, gh: groupsHashOf(parseBib_(edited)) };
-    },
-    // A new group can be made: its name is free and its publications are
-    // in the .bib.
-    groupCheck(text, name, keys, fileName) { checkGroup(text, name, keys, fileName); return true; },
     createGroup(text, name, keys, modified, fileName) {
       const before = checkGroup(text, name, keys, fileName);
       let edited = ensureStaticGroup_(text, name);
@@ -272,7 +257,6 @@
       if (!s || !s.bibId) throw new Error('LibLande isn’t set up yet.');
       return s.bibId;
     };
-    const direct = async () => !!(await settings()).directEdits;
     async function inboxFile(create) {
       const folder = await subFolder(await B.dataFolder(), INBOX_FOLDER, create);
       if (!folder) return null;
@@ -354,15 +338,13 @@
           const now = await meta(f.id, 'modifiedTime');
           if (now.modifiedTime !== f.modifiedTime) continue;
         }
-        await B.writeFile(folder, name, JSON.stringify(value, null, name === PENDING_FILE ? 1 : 0), 'application/json');
+        await B.writeFile(folder, name, JSON.stringify(value), 'application/json');
         return value;
       }
       throw new Error(BUSY);
     }
-    const blankPending = () => ({ edits: [] });
     const blankReading = () => ({ items: [], done: [], seeded: false, syncedKeys: null });
     const readingOut = d => ({ items: d.items || [], done: d.done || [], seeded: !!d.seeded, syncedKeys: d.syncedKeys || null });
-    async function loadPending() { return ((await B.readJson(await B.dataFolder(), PENDING_FILE)) || blankPending()).edits || []; }
 
     /* -------------------------------------------- PDFs */
     // Move an uploaded PDF into the papers folder under the name AutoFile
@@ -458,78 +440,11 @@
 
     // Save changes to one entry (as Code.gs's saveEntry).
     F.saveEntry = req => serial(async () => {
-      if (req.where !== 'inbox' && !(await direct())) throw new Error('Turn on “Save edits straight to your .bib file” in settings first.');
       const id = req.where === 'inbox' ? await inboxFile(false) : await mainBibId();
       if (!id) throw new Error('LibLande couldn’t find the file to edit.');
       const out = await changeFile(id, async (text, m) => run('saveEntry', text, req, m.name, req.where !== 'inbox' ? Date.parse(m.modifiedTime) : null), req.backupName);
       if (!out.text) return { stamp: Date.parse(out.m.modifiedTime), unchanged: true };
       return { stamp: out.stamp, hash: out.hash, groupsHash: out.groupsHash };
-    });
-
-    // Save an edit as pending (as Code.gs's queueEdit).
-    F.queueEdit = req => serial(async () => {
-      const set = req.set || {};
-      Object.keys(set).forEach(n => { if (set[n]) checkValue_(n, String(set[n])); });
-      const d = await changeJson(PENDING_FILE, blankPending, async d => {
-        const earlier = d.edits.find(x => x.key === req.key);
-        const expect = earlier ? earlier.expectHash : req.expectHash;
-        if (expect) {
-          const { text } = await read(await mainBibId());
-          if (await run('hashOf', text, req.key) !== expect) {
-            throw new Error('This publication has been changed since LibLande last read it (perhaps in BibDesk). ' + CHANGED +
-              (earlier ? ' Its earlier pending edit can’t be applied either; discard it first.' : ''));
-          }
-        }
-        mergeEdit_(d.edits, {
-          key: req.key, set,
-          groups: { add: (req.groups && req.groups.add) || [], remove: (req.groups && req.groups.remove) || [] },
-          expectHash: req.expectHash || null, expectGroupsHash: req.expectGroupsHash || null, modified: req.modified,
-        });
-      });
-      return { pending: d.edits };
-    });
-
-    F.discardPending = key => serial(async () => {
-      const d = await changeJson(PENDING_FILE, blankPending, d => { d.edits = d.edits.filter(e => e.key !== key); });
-      return { pending: d.edits };
-    });
-
-    // Write all pending edits into the main .bib in one save (as Code.gs's
-    // applyPending). Edits that can't be applied stay pending, with why.
-    F.applyPending = req => serial(async () => {
-      const edits = await loadPending();
-      const waiting = ((await settings()).pendingGroups || []).slice();
-      if (!edits.length && !waiting.length) return { applied: [], skipped: [], pending: [] };
-      const out = await changeFile(await mainBibId(), original => run('applyPending', original, edits, waiting), req && req.backupName);
-      if (waiting.length) await B.updateSettings(s => { s.pendingGroups = (s.pendingGroups || []).filter(n => waiting.indexOf(n) < 0); });
-      const reasons = {};
-      out.skipped.forEach(x => { reasons[x.key] = x.reason; });
-      const done = new Set(out.appliedEdits.map(e => JSON.stringify(e)));
-      const d = await changeJson(PENDING_FILE, blankPending, d => {
-        // (Only the edits applied go; any queued meanwhile stay.)
-        d.edits = d.edits.filter(e => !done.has(JSON.stringify(e)));
-        d.edits.forEach(e => { if (reasons[e.key]) e.conflict = reasons[e.key]; });
-      });
-      return { applied: out.applied, skipped: out.skipped, pending: d.edits, source: out.m.name, hashes: out.hashes, gh: out.gh };
-    });
-
-    // Add a publication to the inbox (as Code.gs's addToInbox). (The inbox
-    // is small: done here.)
-    F.addToInbox = req => serial(async () => {
-      const id = await inboxFile(true);
-      await changeFile(id, text => {
-        if (parseBib_(text)[0].some(e => e[1] === req.key)) throw new Error('The inbox already has a publication with the cite key ' + req.key + '.');
-        const fields = Object.assign({}, req.fields);
-        if (req.pdfName) fields.file = ':Papers/' + String(req.pdfName).replace(/[:;]/g, '-') + ':PDF';
-        fields['date-added'] = fields['date-modified'] = req.now;
-        const next = text.replace(/\s*$/, '\n\n') + bibEntryText_(req.type, req.key, fields);
-        const count = parseBib_(next)[0];
-        if (count.length !== parseBib_(text)[0].length + 1 || !count.some(e => e[1] === req.key)) {
-          throw new Error('The new entry didn’t come out right, so LibLande didn’t save it.');
-        }
-        return { text: next };
-      }, req.backupName);
-      return { key: req.key };
     });
 
     // A filed PDF, told to the build, so it needn't look for it in Drive.
@@ -538,7 +453,6 @@
     // Add a publication to the main .bib, filing its PDF first (as
     // Code.gs's addToMain).
     F.addToMain = req => serial(async () => {
-      if (!(await direct())) throw new Error('Turn on “Save edits straight to your .bib file” in settings first.');
       let filed = null;
       const out = await changeFile(await mainBibId(), async (text, m) => {
         if (await run('hasKey', text, req.key)) throw new Error('Your library already has a publication with the cite key ' + req.key + '.');
@@ -561,7 +475,6 @@
     // attachPdf). With replace, it takes the place of the first linked
     // file, which goes to the Drive trash.
     F.attachPdf = req => serial(async () => {
-      if (!(await direct())) throw new Error('Turn on “Save edits straight to your .bib file” in settings to attach PDFs.');
       let filed = null, nums = [];
       const out = await changeFile(await mainBibId(), async (text, m) => {
         const pre = await run('attachPrepare', text, req);
@@ -585,16 +498,6 @@
       if (!name || name.length > 120 || /[\r\n]/.test(name)) throw new Error('Give the group a name: one line, up to 120 characters.');
       const keys = (Array.isArray(req.keys) ? req.keys : req.key ? [req.key] : []).map(String).filter((k, i, a) => a.indexOf(k) === i);
       const id = await mainBibId();
-      if (!(await direct())) {
-        const { m, text } = await read(id);
-        await run('groupCheck', text, name, keys, m.name);
-        await B.updateSettings(s => { s.pendingGroups = s.pendingGroups || []; if (s.pendingGroups.indexOf(name) < 0) s.pendingGroups.push(name); });
-        const d = await changeJson(PENDING_FILE, blankPending, d => {
-          if (!keys.length) return false;
-          keys.forEach(k => mergeEdit_(d.edits, { key: k, set: {}, groups: { add: [name], remove: [] }, expectHash: null, expectGroupsHash: null, modified: req.modified || null }));
-        });
-        return { pendingGroup: true, pending: d.edits };
-      }
       const out = await changeFile(id, (text, m) => run('createGroup', text, name, keys, req.modified || null, m.name), req.backupName);
       return { gh: out.gh, stamp: out.stamp, hashes: out.hashes };
     });
@@ -621,13 +524,6 @@
     });
     async function syncReadingGroup(add, remove, req) {
       const name = (await settings()).readingGroup || READING_GROUP;
-      if (!(await direct())) {
-        const d = await changeJson(PENDING_FILE, blankPending, d => {
-          add.forEach(k => mergeEdit_(d.edits, { key: k, set: {}, groups: { add: [name], remove: [] }, expectHash: null, expectGroupsHash: null, modified: null }));
-          remove.forEach(k => mergeEdit_(d.edits, { key: k, set: {}, groups: { add: [], remove: [name] }, expectHash: null, expectGroupsHash: null, modified: null }));
-        });
-        return { pending: d.edits };
-      }
       const out = await changeFile(await mainBibId(), text => run('readingGroup', text, name, add, remove), req.backupName);
       if (!out.text) return {};
       return { gh: out.gh, groupKeys: out.groupKeys, group: name };
@@ -663,7 +559,6 @@
       const step = typeof req.onStep === 'function' ? req.onStep : () => {};
       step('Waiting for an earlier change to finish');
       return serial(async () => {
-      if (!(await direct())) throw new Error('Turn on \u201cSave edits straight to your .bib file\u201d in settings first.');
       const out = await changeFile(await mainBibId(), text => run('saveMany', text, req.items || [], req.modified), req.backupName, step);
       return { stamp: out.stamp || null, hashes: out.hashes || {}, skipped: out.skipped || [], gh: out.gh || null };
       });
@@ -672,8 +567,6 @@
     // A new cite key (as Code.gs's renameKey): in the .bib, then the
     // reading list.
     F.renameKey = req => serial(async () => {
-      if (!(await direct())) throw new Error('Turn on \u201cSave edits straight to your .bib file\u201d in settings to change cite keys.');
-      if ((await loadPending()).some(e => e.key === req.key)) throw new Error('This publication has a pending edit. Apply or discard it first.');
       const out = await changeFile(await mainBibId(), text => run('renameKey', text, req), req.backupName);
       const nk = String(req.newKey).trim(), swap = k => (k === req.key ? nk : k);
       const d = await changeJson(READING_FILE, blankReading, d => {
@@ -682,13 +575,6 @@
         if (d.syncedKeys) d.syncedKeys = d.syncedKeys.map(swap);
       });
       return { hash: out.hash, gh: out.gh, stamp: out.stamp, reading: readingOut(d) };
-    });
-
-    // Saving edits straight to the .bib, on or off (as Code.gs's setDirect).
-    F.setDirect = on => serial(async () => {
-      if (on && (await loadPending()).length) throw new Error('Apply or discard your pending edits first.');
-      await B.updateSettings(s => { s.directEdits = !!on; });
-      return true;
     });
 
     return F;

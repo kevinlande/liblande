@@ -9,7 +9,7 @@
  * download, PDF backups, thumbnails, DOI lookups (from Crossref) and
  * exports; the library is built here (builder.js) when the .bib or the
  * inbox has changed, on opening and on Refresh; and adding and editing
- * entries, pending edits, groups and the reading list change the .bib here
+ * entries, groups and the reading list change the .bib here
  * (edits.js), with the same checks and backups as Code.gs had.
  */
 (() => {
@@ -17,14 +17,14 @@
   window.LIBLANDE_PAGES = true;
   // (Which version each part of the app is from: index.html checks they
   // match. build.py fills it in.)
-  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-10-11.20';
+  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-10-12.03';
   const CLIENT_ID = '789682218462-98mjugngb46ttd01ucp9dcj71ufspjgn.apps.googleusercontent.com';
   // Google Drive (your .bib, papers and LibLande folder): all it needs.
   const SCOPE = 'https://www.googleapis.com/auth/drive';
   const API = 'https://www.googleapis.com/drive/v3/';
   const FOLDER = 'application/vnd.google-apps.folder';
   // As in Code.gs.
-  const DATA_FOLDER = 'LibLande', LIBRARY_FILE = 'library.json.gz', PENDING_FILE = 'pending-edits.json',
+  const DATA_FOLDER = 'LibLande', LIBRARY_FILE = 'library.json.gz',
     READING_FILE = 'reading-list.json', BACKUP_FOLDER = 'Backups', PDF_BACKUP_DAYS = 60;
   // A token is renewed on a tap after 50 minutes (it lasts an hour).
   const RENEW_AFTER = 50 * 60 * 1000;
@@ -224,7 +224,7 @@
   /* ------------------------------------------------------------ the server */
   const SERVER = {
     // What the page needs to know, from Drive (as Code.gs's getStatus):
-    // the settings, the library, pending edits, the reading list and your
+    // the settings, the library, the reading list and your
     // preferences. Meanwhile, a look at whether the library needs
     // building, which then starts here.
     async getStatus() {
@@ -236,14 +236,13 @@
       const w = await builder.look({ daily: true });
       if (!w.configured) return { configured: false };
       const started = startBuild(w);
-      // (The pending edits and the reading list as last known if they
-      // can't be read just now: never an empty list in their place.)
+      // (The reading list as last known if it can't be read just now:
+      // never an empty list in its place.)
       // (Said in the status, with when they were last read, so the page
       // can say it's showing an older copy.)
       let stale = false;
       const known = value => err => { console.warn(err); stale = true; return value(); };
-      const [pending, reading, prefs, papersName, token] = await Promise.all([
-        builder.readJson(w.folder, PENDING_FILE).catch(known(() => ({ edits: offlineLists.known.pending }))),
+      const [reading, prefs, papersName, token] = await Promise.all([
         builder.readJson(w.folder, READING_FILE).catch(known(() => offlineLists.known.reading)), loadPrefs(w.s),
         folderName(w.s.papersId || (w.bib.parents && w.bib.parents[0])), getToken()]);
       if (running) await Promise.race([running, new Promise(r => setTimeout(r, 60 * 1000))]);
@@ -257,9 +256,8 @@
         token,
         building: (started && !running) || !!buildRun,
         error: null,
-        pending: pending && Array.isArray(pending.edits) ? pending.edits : [],
         reading: { items: r.items || [], done: r.done || [], seeded: !!r.seeded, syncedKeys: r.syncedKeys || null },
-        direct: !!w.s.directEdits,
+        direct: true,
         prefs,
       };
       if (buildErr) { st.error = buildErr; buildErr = null; }
@@ -302,18 +300,10 @@
       }
       return SERVER.getStatus();
     },
-    async setDirect(on) {
-      await edits.setDirect(on);
-      return SERVER.getStatus();
-    },
-    // Changing the .bib, the inbox, pending edits and the reading list:
+    // Changing the .bib, the inbox and the reading list:
     // edits.js, here.
     // (These four are kept on this device while offline: see below.)
     saveEntry: later('saveEntry', () => ({ queued: true })),
-    queueEdit: later('queueEdit', req => ({ queued: true, pending: offlineLists.pending(req) })),
-    discardPending: later('discardPending', key => ({ queued: true, pending: offlineLists.discard(key) })),
-    applyPending(req) { return edits.applyPending(req); },
-    addToInbox: later('addToInbox', req => ({ queued: true, key: req.key })),
     // (A PDF has to be uploaded first: with one, adding needs a connection.)
     addToMain: later('addToMain', req => {
       if (req.uploadId) { const e = new Error('You\u2019re offline.'); e.offline = true; throw e; }
@@ -412,12 +402,12 @@
   }
 
   /* ------------------------------------------------------------ offline */
-  // Changes made with no connection (to entries, pending edits and the
+  // Changes made with no connection (to entries and the
   // reading list) wait here, on this device, in the order made; when it's
   // back, they're made in Drive in that order (flushOutbox). Meanwhile the
-  // page shows them (index.html's overlayPending reads
+  // page shows them (index.html's overlayOffline reads
   // window.liblandeOutbox), and asks with the answers given here: what the
-  // pending edits and reading list come to with them.
+  // reading list comes to with them.
   let outbox = store.get('outbox', []);
   window.liblandeOutbox = () => outbox.slice();
   const isOffline = e => !navigator.onLine || !!(e && e.offline);
@@ -444,38 +434,24 @@
       }
     };
   }
-  // The pending edits and the reading list as last known (from the status,
-  // or an answer), with the changes kept here made to them.
+  // The reading list as last known (from the status, or an answer), with
+  // the changes kept here made to it.
   const offlineLists = {
-    known: store.get('lists', { pending: [], reading: { items: [], done: [], seeded: false, syncedKeys: null } }),
+    known: store.get('lists', { reading: { items: [], done: [], seeded: false, syncedKeys: null } }),
     // (When they were last read from Drive.)
     at: store.get('listsAt', null),
     update(res) {
       if (!res) return;
-      if (Array.isArray(res.pending)) this.known.pending = res.pending;
       if (res.reading) this.known.reading = res.reading;
       store.set('lists', this.known);
       this.at = Date.now();
       store.set('listsAt', this.at);
-    },
-    pending(req) {
-      const set = req.set || {};
-      mergeEdit_(this.known.pending, { key: req.key, set, groups: { add: (req.groups && req.groups.add) || [], remove: (req.groups && req.groups.remove) || [] },
-        expectHash: req.expectHash || null, expectGroupsHash: req.expectGroupsHash || null, modified: req.modified });
-      store.set('lists', this.known);
-      return this.known.pending.slice();
-    },
-    discard(key) {
-      this.known.pending = this.known.pending.filter(e => e.key !== key);
-      store.set('lists', this.known);
-      return this.known.pending.slice();
     },
     renameKey(from, to) {
       const swap = k => (k === from ? to : k), d = this.known.reading;
       (d.items || []).forEach(x => { x.key = swap(x.key); });
       (d.done || []).forEach(x => { x.key = swap(x.key); });
       if (d.syncedKeys) d.syncedKeys = d.syncedKeys.map(swap);
-      this.known.pending.forEach(e => { e.key = swap(e.key); });
       store.set('lists', this.known);
       return JSON.parse(JSON.stringify(d));
     },
@@ -488,7 +464,7 @@
   };
   // The lists as last known, for the page to show before Drive answers
   // (or when it can't): an older copy, with when it's from.
-  window.liblandeKnownLists = () => JSON.parse(JSON.stringify({ reading: offlineLists.known.reading, pending: offlineLists.known.pending, at: offlineLists.at }));
+  window.liblandeKnownLists = () => JSON.parse(JSON.stringify({ reading: offlineLists.known.reading, at: offlineLists.at }));
   // Back online: the kept changes made in Drive, in order. Two edits to the
   // same publication were both checked against how it was before either;
   // the second is checked against what the first made it. One that can't
