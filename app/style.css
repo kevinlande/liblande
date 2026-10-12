@@ -423,11 +423,15 @@ body:has(#sheet:not([hidden])) .pick-bar { visibility: hidden; }
 .d-two { display: flex; align-items: flex-start; }
 .d-two > .d-inner { flex: 1 1 auto; min-width: 0; max-width: none; padding-right: 8px; }
 .d-two .d-abstract { max-width: none; }
-.d-side { flex: none; width: 178px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; align-content: start; padding: 22px 24px 40px 12px; }
+.d-side { flex: none; width: 226px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; align-content: start; padding: 22px 24px 40px 12px; }
 .d-side .thumbs { display: flex; flex-direction: column; margin: 0; padding: 0; overflow: visible; }
-.d-side .actions { flex-direction: column; align-items: stretch; gap: 6px; }
-.d-side .actions > .btn, .d-side .actions > .menu > summary { box-sizing: border-box; width: 100%; }
-.d-side .actions > .menu > summary svg:last-child:not(.dots) { margin-left: auto; }
+/* The buttons: icons in one row (their names are tips, and for screen readers). */
+.d-side .actions { flex-wrap: nowrap; gap: 5px; }
+.d-side .actions > .btn, .d-side .actions > .menu { flex: 1 1 0; min-width: 0; }
+.d-side .actions > .menu { display: flex; }
+.d-side .actions > .btn, .d-side .actions > .menu > summary { box-sizing: border-box; width: 100%; height: 36px; min-height: 0; padding: 0; justify-content: center; }
+.d-side .actions > .btn > span, .d-side .actions > .menu > summary > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.d-side .actions > .menu > summary > svg:last-child:not(.dots):not(:first-child) { display: none; }
 .d-side .menu-list { left: auto; right: 0; }
 .d-side .rl-bar { margin: 0; }
 .d-side .rl-bar .seg { width: 100%; }

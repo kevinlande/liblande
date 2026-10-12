@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-12.09';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-12.11';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -2057,7 +2057,7 @@ function renderDetail() {
   }
   const f = e.f;
   // A wide pane has two columns: the abstract comes straight after the
-  // citation, with the PDF, the buttons, rating and keywords beside it.
+  // citation, then the keywords, with the PDF, the buttons and rating beside it.
   // A narrow one has one, with the buttons and then the abstract.
   const wide = detailWide();
   let h = '';
@@ -2176,8 +2176,8 @@ function renderDetail() {
       e.kw.map(k => `<button class="chip" data-goto="${esc('k:' + k)}">${esc(k)}</button>`).join('') + kwAdd + `</div>`;
   }
   const vers = versionsHTML(e);
-  let body = '';
-  if (f.abstract) body += `<section class="d-sec"><h3>Abstract</h3><p class="d-abstract">${esc(f.abstract)}</p></section>`;
+  let abs = '', body = '';
+  if (f.abstract) abs = `<section class="d-sec"><h3>Abstract</h3><p class="d-abstract">${esc(f.abstract)}</p></section>`;
   // Notes: click to write or change them, right here.
   if (gs) body += `<section class="d-sec d-notes"><h3>Notes</h3><div class="d-abstract notes-body${f.annote ? '' : ' notes-empty'}" data-notes>${f.annote ? esc(f.annote) : 'Add notes\u2026'}</div></section>`;
   else if (f.annote) body += `<section class="d-sec"><h3>Notes</h3><p class="d-abstract">${esc(f.annote)}</p></section>`;
@@ -2194,11 +2194,11 @@ function renderDetail() {
     (e.files || []).map((x, j) => `<tr><th>file ${j + 1}</th><td>${esc(x.p)}</td></tr>`).join('') +
     `</tbody></table></details>`;
   if (wide) {
-    h = `<div class="d-two"><div class="d-inner">${h}${notices}${body}${vers}${fields}</div>` +
-      `<aside class="d-side">${thumbs ? `<div class="thumbs t-side" aria-label="PDFs">${thumbs}</div>` : ''}${acts}${rl}${metaH}${chips}</aside></div>`;
+    h = `<div class="d-two"><div class="d-inner">${h}${notices}${abs}${chips}${body}${vers}${fields}</div>` +
+      `<aside class="d-side">${thumbs ? `<div class="thumbs t-side" aria-label="PDFs">${thumbs}</div>` : ''}${acts}${rl}${metaH}</aside></div>`;
   } else {
-    // (Rating, Read and keywords, looked at less than the abstract, after it.)
-    h = `<div class="d-inner">${h}${rl}${acts}${thumbs ? `<div class="thumbs t-inline">${thumbs}</div>` : ''}${notices}${body}${metaH}${chips}${vers}${fields}</div>`;
+    // (Rating and Read, looked at less than the abstract, after it.)
+    h = `<div class="d-inner">${h}${rl}${acts}${thumbs ? `<div class="thumbs t-inline">${thumbs}</div>` : ''}${notices}${abs}${chips}${body}${metaH}${vers}${fields}</div>`;
   }
   detailEl.innerHTML = h;
   detailEl.dataset.wide = wide ? '1' : '';
