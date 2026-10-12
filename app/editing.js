@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-10-12.22';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-10-12.25';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -203,12 +203,15 @@ function sheetBusy(on) {
 // (A panel opened from a manuscript's report, Add say, goes back to the
 // report when it closes, saved or not.)
 function closeSheet() {
-  const back = sheet && sheet.msBack, np = sheet && sheet.npBack;
+  const back = sheet && sheet.msBack, np = sheet && sheet.npBack, info = sheet && sheet.infoBack;
   $('#sheet').hidden = true;
   sheet = null;
   if (back) setTimeout(() => { if (!sheet) msReturn(back); }, 0);
   // (And one opened from New papers, back to New papers.)
   if (np) setTimeout(() => { if (!sheet) openNewPapers(); }, 0);
+  // (Edit from the reader's Info: Info shows what was saved.)
+  // (A moment later: Edit closes its panel just before the change is applied.)
+  if (info) setTimeout(() => { if (SIDE.tab === 'info' && !$('#vSide').hidden) showInfo(); }, 0);
 }
 
 // The top row of the Add and Edit forms: Cancel, the title, and the button

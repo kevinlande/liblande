@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-12.22';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-12.25';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -4783,15 +4783,19 @@ function showInfo() {
   h += `<h3 class="vi-title">${esc(f.title || '(untitled)')}</h3>`;
   if (people.length) h += `<p class="vi-authors">${people.map(n => esc(fullName(n))).join(', ')}${!(e.a && e.a.length) && e.e ? ' (Eds.)' : ''}</p>`;
   h += `<p class="vi-ref">${apaCitation(e).html}</p>`;
-  h += `<div class="vi-row">` + [['apa', 'APA'], ['apa-short', 'In-text'], ['bibtex', 'BibTeX']].map(([k, l]) =>
-    `<button type="button" class="btn" data-icopy="${k}" title="Copy as ${l}">${ICON.copy}<span>${l}</span></button>`).join('') + `</div>`;
+  // Copy, the links and Edit, in one row (one link: just a button).
   const links = [];
-  if (f.doi) links.push(`<a class="btn" href="https:\/\/doi.org/${esc(f.doi.replace(/^https?:\/\/(dx\.)?doi\.org[/]/i, ''))}" target="_blank" rel="noopener" title="Open the DOI link">${ICON.link}<span>DOI</span></a>`);
+  if (f.doi) links.push([`https:\/\/doi.org/${f.doi.replace(/^https?:\/\/(dx\.)?doi\.org[/]/i, '')}`, 'DOI']);
   (e.u || []).filter(u => safeUrl(u) && !(f.doi && /doi\.org[/]/i.test(u))).slice(0, 3).forEach(u => {
     let host = u; try { host = new URL(u).hostname.replace(/^www\./, ''); } catch (err) { /* as is */ }
-    links.push(`<a class="btn" href="${esc(u)}" target="_blank" rel="noopener" title="${esc(u)}">${ICON.link}<span>${esc(host)}</span></a>`);
+    links.push([u, host]);
   });
-  if (links.length) h += `<div class="vi-row">${links.join('')}</div>`;
+  h += `<div class="vi-row"><details class="menu"><summary class="btn" title="Copy the citation">${ICON.copy}<span>Copy</span>${ICON.chev}</summary><div class="menu-list" role="menu">` +
+    [['apa', 'APA'], ['apa-short', 'In-text'], ['bibtex', 'BibTeX']].map(([k, l]) => `<button type="button" role="menuitem" data-icopy="${k}">${l}</button>`).join('') + `</div></details>` +
+    (links.length === 1 ? `<a class="btn" href="${esc(links[0][0])}" target="_blank" rel="noopener" title="${esc(links[0][0])}">${ICON.link}<span>${esc(links[0][1])}</span></a>`
+      : links.length ? `<details class="menu"><summary class="btn" title="Open a link">${ICON.link}<span>Links</span>${ICON.chev}</summary><div class="menu-list" role="menu">` +
+        links.map(([u, l]) => `<a role="menuitem" href="${esc(u)}" target="_blank" rel="noopener" title="${esc(u)}">${esc(l)}</a>`).join('') + `</div></details>` : '') +
+    (gs && !e.ib && BYKEY.get(e.k) ? `<button type="button" class="btn" data-iedit title="Edit this publication\u2019s details">${ICON.pencil}<span>Edit</span></button>` : '') + `</div>`;
   if (e.kw && e.kw.length) h += `<div class="vi-kw">${e.kw.map(k => `<span>${esc(k)}</span>`).join('')}</div>`;
   if (f.abstract) h += `<details class="vi-sec" open><summary>Abstract</summary><p>${esc(f.abstract)}</p></details>`;
   if (f.annote) h += `<details class="vi-sec" open><summary>Notes</summary><p>${esc(f.annote)}</p></details>`;
@@ -4863,6 +4867,7 @@ $('#vSideBtn').addEventListener('click', () => toggleSide());
 $('#vSide').addEventListener('click', ev => {
   const t = ev.target.closest('[data-vtab]');
   if (t) { showSideTab(t.dataset.vtab); return; }
+  if (ev.target.closest('[data-iedit]')) { const e = infoEntry(); if (e && BYKEY.get(e.k)) { openEdit(BYKEY.get(e.k)); sheet.infoBack = true; } return; }
   const ic = ev.target.closest('[data-icopy]');
   if (ic) {
     const e = infoEntry(), kind = ic.dataset.icopy;

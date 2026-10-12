@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-12.22';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-12.25';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -1016,9 +1016,10 @@ function renderGroups() {
     ((n => (n || state.group === 'forth' ? grpBtn('forth', 'Forthcoming', n, ICON.forth) : ''))(ENTRIES.filter(isForthcoming).length)) +
     `</div>` +
     // (Tools: not lists, so no count.)
-    (SMART.list.length ? `<div class="sec" data-sec="q"><div class="sec-h">Saved searches</div>` + SMART.list.map(x => grpBtn('q:' + x.name, x.name, groupItems('q:' + x.name).length, ICON.search)).join('') + `</div>` : '') +
     `<div class="sec" data-sec="tools"><div class="sec-h">Tools</div><button type="button" class="grp" data-tool="mscheck" aria-label="Cite Check: check a manuscript\u2019s citations"${msToolTitle()}>${ICON.citecheck}<span class="nm">Cite Check</span>${msToolCount()}</button>` +
       (gs ? `<button type="button" class="grp" data-tool="newpapers" aria-label="New papers" title="New papers that cite yours, by authors you follow, like ones you choose, and in your journals">${ICON.bell}<span class="nm">New papers</span>${npToolCount()}</button>` : '') + `</div>`;
+  // (Saved searches just above the static groups.)
+  if (SMART.list.length) h += `<div class="sec" data-sec="q"><div class="sec-h">Saved searches</div>` + SMART.list.map(x => grpBtn('q:' + x.name, x.name, groupItems('q:' + x.name).length, ICON.search)).join('') + `</div>`;
   if (GROUPS.some(g => !(gs && g === readingGroup())) || gs) {
     h += `<div class="sec" data-sec="s"><div class="sec-row"><div class="sec-h">Static groups</div>` +
       (gs ? `<button type="button" class="sec-add" data-new-group title="New static group" aria-label="New static group"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>` : '') + `</div>`;

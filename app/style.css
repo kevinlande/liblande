@@ -1289,6 +1289,8 @@ a.ms-ib { text-decoration: none; }
 .vi-row { display: flex; flex-wrap: wrap; gap: 6px; }
 .v-info .btn { min-height: 30px; padding: 4px 9px; font-size: 12.5px; }
 .v-info .btn .i { width: 14px; height: 14px; }
+.v-info .menu > summary svg:last-child { width: 12px; height: 12px; }
+.v-info .menu-list { min-width: 140px; }
 .vi-kw { display: flex; flex-wrap: wrap; gap: 4px; }
 .vi-kw span { padding: 2px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--muted); font-size: 11.5px; }
 .vi-sec summary { cursor: pointer; padding: 2px 0; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--faint); }
