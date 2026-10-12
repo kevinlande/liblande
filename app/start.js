@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-10-12.16';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-10-12.18';
 // On GitHub Pages, every part of the app must be from the same version: a
 // part kept from an older one (the offline copy, served when the network
 // was slow) lacks what this page needs. Then the kept copies go, and the
@@ -670,6 +670,7 @@ if (RELOADING) {
       STYLE_WAS = store.get('style', 'liblande');
       renderThemePicks();
       $('#darkPagesBox').checked = !!store.get('darkPages', false);
+      $('#coversBox').checked = coversOn();
       $('#setup').querySelectorAll('[data-sync]').forEach(b => { b.checked = SYNC[b.dataset.sync] !== false; });
       $('#curBib').textContent = st.bibName || '';
       $('#curPapers').textContent = st.papersName || '';
@@ -686,11 +687,11 @@ if (RELOADING) {
   };
   // (These take effect at once, on this device.)
   $('#darkPagesBox').addEventListener('change', ev => setDarkPages(ev.target.checked));
+  $('#coversBox').addEventListener('change', ev => { store.set('coversOn', ev.target.checked); sweepCovers(); renderDetail(); });
   $('#setup').querySelectorAll('[data-sync]').forEach(b => b.addEventListener('change', () => {
     SYNC[b.dataset.sync] = b.checked;
     store.set('sync', SYNC);
   }));
-  $('#quotesGo').addEventListener('click', () => { closeSettings(); openQuotes(); });
   $('#changeLinks').addEventListener('click', () => {
     $('#linkFields').hidden = false;
     $('#changeLinks').hidden = true;
@@ -779,6 +780,6 @@ if (RELOADING) {
 }
 // For the test suite (_test/suite.html) only: a few of the reader's
 // insides, when the test page asks for them.
-if (window.LIBLANDE_TEST) window.LL = { V, BM, JOURNAL, LOCAL, AUTO, saveMarkup, setTool, setReading, renderRLBar, netBadge, placeToast, POS, MARK, PDFJS, pdfJsFix, findEndPage, refHeading, combineMarks, makeZip, MARK_ERASER: () => MARK.eraserSize,
+if (window.LIBLANDE_TEST) window.LL = { sweepCovers, COVERS, V, BM, JOURNAL, LOCAL, AUTO, saveMarkup, setTool, setReading, renderRLBar, netBadge, placeToast, POS, MARK, PDFJS, pdfJsFix, findEndPage, refHeading, combineMarks, makeZip, MARK_ERASER: () => MARK.eraserSize,
   lib: () => ({ ENTRIES, BYKEY, DATA, VERSION_OF, VERSIONS, NESTED, state }), init, refresh, openEdit, isForthcoming, forthChanges, parseBibtexEntry,
   oldLineMarks, convertOldLines, fetchAhead, PTABS, renderPaperTabs, openPdf, loadPdfJs, addStreamIteration, msCheck, msCites, msRef, msDocx, MS, msVisible };

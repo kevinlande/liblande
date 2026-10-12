@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-12.16';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-12.18';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -247,6 +247,7 @@ function init(data, again) {
     `<br>LibLande version ${esc(APP_VERSION)}`;
 
   if (!groupItems(state.group)) state.group = 'all';
+  sweepCovers();
   if (again) { renderGroups(); refresh(false); return; }
   $('#scope').value = state.scope;
   $('#sortSel').value = state.sort;
@@ -2230,16 +2231,18 @@ function coverAsk(e) {
   const isbn = (f.isbn || '').split(/[,;\s]+/).map(x => x.replace(/[^0-9Xx]/g, '')).find(x => x.length === 10 || x.length === 13) || '';
   return { key: isbn || mainTitle(title) + '|' + (who[0] ? norm(who[0][0]) : ''), isbn, title: mainTitle(title), who: who[0] ? norm(who[0][0]).split(/\s+/).pop() : '' };
 }
+const coversOn = () => store.get('coversOn', true);
 function coverFor(e) {
-  const q = coverAsk(e);
+  const q = coversOn() && coverAsk(e);
   if (!q) return null;
   const c = COVERS[q.key];
   if (c && (c.id || Date.now() - c.at < 30 * 86400000)) return c.id ? 'https:\/\/covers.openlibrary.org/b/id/' + c.id + '-M.jpg' : null;
   findCover(q);
   return null;
 }
+// (True once Open Library has answered; false if it couldn't be asked.)
 async function findCover(q) {
-  if (COVER_WAIT.has(q.key) || !navigator.onLine || (window.LIBLANDE_TEST && !window.LIBLANDE_COVERS_LIVE)) return;
+  if (COVER_WAIT.has(q.key) || !navigator.onLine || (window.LIBLANDE_TEST && !window.LIBLANDE_COVERS_LIVE)) return false;
   COVER_WAIT.add(q.key);
   try {
     const ask = async p => {
@@ -2258,7 +2261,36 @@ async function findCover(q) {
     if (now && now.key === q.key && !detailEl.querySelector('.editing, [contenteditable="true"], textarea, input:focus')) {
       const top = detailEl.scrollTop; renderDetail(); detailEl.scrollTop = top;
     }
-  } catch {} finally { COVER_WAIT.delete(q.key); }
+    return true;
+  } catch { return false; } finally { COVER_WAIT.delete(q.key); }
+}
+// Every book's cover (and every edited volume's), looked up in the
+// background once the library's open, so it's there when the book is
+// opened, offline too. One every second and a half, paused while LibLande
+// is out of sight or offline, and a minute's wait if Open Library doesn't
+// answer. (Once on each device; then only new books, and misses a month on.)
+let coverSweep = false;
+function sweepCovers() {
+  if (coverSweep || !coversOn() || (window.LIBLANDE_TEST && !window.LIBLANDE_COVERS_LIVE)) return;
+  const seen = new Set(), todo = [];
+  ENTRIES.forEach(e => {
+    const q = coverAsk(e);
+    if (!q || seen.has(q.key)) return;
+    seen.add(q.key);
+    const c = COVERS[q.key];
+    if (!(c && (c.id || Date.now() - c.at < 30 * 86400000))) todo.push(q);
+  });
+  if (!todo.length) return;
+  coverSweep = true;
+  const next = async () => {
+    if (!todo.length || !coversOn()) { coverSweep = false; return; }
+    if (document.hidden || !navigator.onLine) { setTimeout(next, 30000); return; }
+    const q = todo.shift(), c = COVERS[q.key];
+    if (c && (c.id || Date.now() - c.at < 30 * 86400000)) { next(); return; }
+    if (await findCover(q)) setTimeout(next, 1500);
+    else { todo.push(q); setTimeout(next, 60000); }
+  };
+  setTimeout(next, 15000);
 }
 
 // Thumbnails come from Google Drive (getThumbnails)

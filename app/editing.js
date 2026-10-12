@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-10-12.16';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-10-12.18';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -698,7 +698,7 @@ async function saveAdd() {
 $('#sheetForm').addEventListener('submit', ev => {
   ev.preventDefault();
   if (!sheet || $('#sheetSave').disabled) return;
-  if (sheet.mode === 'edit') saveEdit(); else if (sheet.mode === 'forth') saveForth(); else if (sheet.mode === 'join') saveJoin(); else if (sheet.mode === 'export') runExport(); else if (sheet.mode === 'export-save') saveExport(); else if (sheet.mode === 'help' || sheet.mode === 'msreport') closeSheet(); else if (sheet.mode === 'mscheck') runMsCheck(); else if (sheet.mode === 'smart') saveSmart(); else if (sheet.mode === 'bulk') saveBulk(); else if (sheet.mode === 'quotes') saveQuotes(); else if (sheet.mode === 'attach') { const a = sheet, mode = ($('#sheetBody').querySelector('[name=attachMode]:checked') || {}).value; closeSheet(); runAttach(a.entry, a.file, mode === 'replace'); } else saveAdd();
+  if (sheet.mode === 'edit') saveEdit(); else if (sheet.mode === 'forth') saveForth(); else if (sheet.mode === 'join') saveJoin(); else if (sheet.mode === 'export') runExport(); else if (sheet.mode === 'export-save') saveExport(); else if (sheet.mode === 'help' || sheet.mode === 'msreport') closeSheet(); else if (sheet.mode === 'mscheck') runMsCheck(); else if (sheet.mode === 'smart') saveSmart(); else if (sheet.mode === 'bulk') saveBulk(); else if (sheet.mode === 'attach') { const a = sheet, mode = ($('#sheetBody').querySelector('[name=attachMode]:checked') || {}).value; closeSheet(); runAttach(a.entry, a.file, mode === 'replace'); } else saveAdd();
 });
 $('#sheetCancel').addEventListener('click', closeSheet);
 $('#sheetBody').addEventListener('click', ev => { const x = ev.target.closest('[data-sheet-cancel]'); if (x && !x.disabled) closeSheet(); });
@@ -1048,53 +1048,6 @@ function bulkReading() {
   toast('Added ' + list.length + ' to your reading list, in Later', 3000);
 }
 
-/* ---- curly quotes in abstracts */
-// Straight double quotes in abstracts made curly: opening after a space,
-// a bracket or a dash (or at the start), closing otherwise. Not \" (a
-// LaTeX accent, as G\"{o}del).
-function curlyQuotes(v) {
-  return v.replace(/(^|[\s\S])"/g, (m, before, at) => {
-    if (before === '\\') return m;
-    return before + (at === 0 && !before || /[\s(\[{\u2014\u2013-]/.test(before) ? '\u201c' : '\u201d');
-  });
-}
-function openQuotes() {
-  const list = ENTRIES.filter(e => !e.ib && /(^|[^\\])"/.test(rawOf(e, 'abstract')));
-  sheet = { mode: 'quotes', list };
-  if (!list.length) { showSheet(`<h2>Curly quotes in abstracts</h2><p class="sheet-note">No abstract has straight double quotes. Nothing to change.</p>`, 'Close'); $('#sheetCancel').hidden = true; sheet.mode = 'help'; return; }
-  const show = e => { const v = rawOf(e, 'abstract'), i = v.search(/(^|[^\\])"/); const a = Math.max(0, i - 50), b = Math.min(v.length, i + 70); return v.slice(a, b); };
-  showSheet(`<h2>Curly quotes in abstracts</h2>` +
-    `<p class="sheet-note">${list.length} abstract${list.length === 1 ? ' has' : 's have'} straight double quotes ("). They\u2019ll become curly (\u201c \u201d), in one save to your .bib file, with a backup first. Nothing else changes, and LaTeX accents such as G\\"{o}del are left as they are.</p>` +
-    `<div class="quotes-ex">${list.slice(0, 3).map(e => `<p><b>${esc(e.f.title || e.k)}</b><br><span class="ms-dim">\u2026${esc(show(e))}\u2026</span><br>\u2192 \u2026${esc(curlyQuotes(show(e)))}\u2026</p>`).join('')}</div>`,
-    'Change ' + list.length + ' abstract' + (list.length === 1 ? '' : 's'));
-}
-async function saveQuotes() {
-  const s = sheet;
-  const todo = s.list.map(e => ({ e, v: curlyQuotes(rawOf(e, 'abstract')) })).filter(x => x.v !== rawOf(x.e, 'abstract'));
-  if (!todo.length) { closeSheet(); return; }
-  sheetBusy(true);
-  const t0 = Date.now();
-  let step = '';
-  const tell = () => { if (step && sheet === s) sheetMsg(step + '\u2026 (' + Math.round((Date.now() - t0) / 1000) + ' s)'); };
-  const clock = setInterval(tell, 1000);
-  try {
-    const now = bibdeskTime();
-    const res = await callServer('saveEntries', { items: todo.map(x => ({ key: x.e.k, set: { abstract: x.v }, expectHash: x.e.h || null })), modified: now, backupName: fileTime(), onStep: t => { step = t; tell(); } });
-    if (res.stamp) lastBibStamp = res.stamp;
-    let done = 0;
-    todo.forEach(x => { if (!res.hashes[x.e.k]) return; x.e.h = res.hashes[x.e.k]; setFields(x.e, { abstract: x.v, 'date-modified': now }); done++; });
-    init(DATA, true);
-    afterWrite();
-    closeSheet();
-    const skipped = (res.skipped || []).length;
-    toast('Changed the quotes in ' + done + ' abstract' + (done === 1 ? '' : 's') + (skipped ? '; ' + skipped + ' left as they were (changed elsewhere since LibLande read them)' : ''), skipped ? 7000 : 4000);
-  } catch (err) {
-    if (sheet === s) sheetMsg(errText(err), true);
-  } finally {
-    clearInterval(clock);
-    if (sheet === s) sheetBusy(false);
-  }
-}
 /* ------------------------------------------------------------ forthcoming: updates */
 /* ---- saved searches: groups that fill themselves */
 // Kept with your preferences ({at, list: [{name, q}]}), so your other

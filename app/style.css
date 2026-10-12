@@ -321,7 +321,14 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 }
 /* Settings: a list of rows (a switch or a tick box, each with a line of
    explanation), then the library's files. */
-.set-list { display: grid; margin-top: 4px; }
+.set-list { display: grid; gap: 18px; margin-top: 4px; }
+/* Settings in sections: Appearance, what's shared, the library. */
+.set-sec { display: grid; }
+.set-sec > h3 { margin: 0; padding-bottom: 6px; border-bottom: 1px solid var(--line); font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
+.set-sec > :last-child { border-bottom: 0; }
+.set-sec > .set-group { border-top: 0; padding-top: 10px; }
+.set-sec .set-group > .hint { margin: 0 0 4px; font-size: 13px; }
+.set-sec > .set-files { padding: 12px 0; border-bottom: 1px solid var(--line); }
 .set-theme { display: grid; gap: 10px; padding: 14px 0; border-bottom: 1px solid var(--line); }
 .theme-picks { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 8px; }
 .theme-pick { display: grid; gap: 6px; padding: 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--text); text-align: left; cursor: pointer; }
@@ -1093,7 +1100,6 @@ body.is-offline .fileicon:not(.saved), body.is-offline .pdf:not(.saved) { opacit
 #smartBar .rl-count { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
 #smartBar .rl-count .i { width: 15px; height: 15px; flex: none; }
 #smartBar code { font: 12.5px var(--mono, ui-monospace, monospace); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.quotes-ex p { font-size: 13px; margin: 8px 0; overflow-wrap: anywhere; }
 /* Dark pages: the pages' colours turned round (hues kept). */
 .viewer.dark-pages #vPages .canvasWrapper, .viewer.dark-pages #vPeekPages .canvasWrapper { filter: invert(1) hue-rotate(180deg); }
 .viewer.dark-pages #vPages .page, .viewer.dark-pages #vPeekPages .page { background: #111; }
