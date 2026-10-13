@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-12.44';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-13.01';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -2422,6 +2422,35 @@ function toPdfBoxes(page, bars) {
 // column's lines together, so a range in one column can take in lines of
 // the other.
 let TEXT_CLIP = null;
+// The column you dragged in: from where you dragged, side to side, out
+// along the words of the lines you dragged over, as long as they run on
+// (a gap wider than a line is tall, between columns, stops it). So a drag
+// straight down a page takes whole lines, and one in a column only that
+// column.
+function dragColumn(path) {
+  const near = { left: path.minX - 60, right: path.maxX + 60 };
+  const page = path.page;
+  if (!page) return near;
+  const boxes = [];
+  for (const sp of page.querySelectorAll('.textLayer span')) {
+    if (!sp.textContent.trim()) continue;
+    const r = sp.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1 || r.bottom < path.minY - r.height || r.top > path.maxY + r.height) continue;
+    boxes.push(r);
+  }
+  if (!boxes.length) return near;
+  const hs = boxes.map(b => b.height).sort((a, b) => a - b), gap = Math.max(6, hs[hs.length >> 1]);
+  let left = path.minX, right = path.maxX;
+  for (let grew = true; grew;) {
+    grew = false;
+    for (const b of boxes) {
+      if (b.left <= right + gap && b.right >= left - gap && (b.left < left || b.right > right)) {
+        left = Math.min(left, b.left); right = Math.max(right, b.right); grew = true;
+      }
+    }
+  }
+  return { left: Math.min(left, near.left + 50) - 2, right: Math.max(right, near.right - 50) + 2 };
+}
 const textTurn = n => {
   const el = n.nodeType === 3 ? n.parentNode : n;
   const m = el && el.style && /rotate\((-?[\d.]+)deg\)/.exec(el.style.transform || '');
@@ -3759,7 +3788,7 @@ $('#vPages').addEventListener('pointerdown', ev => { if (ev.target.closest('.not
     const r = range || (dragging && getSelection().rangeCount ? getSelection().getRangeAt(0) : null);
     let list = [];
     if (r && !r.collapsed) {
-      TEXT_CLIP = path ? { left: path.minX - 60, right: path.maxX + 60 } : null;
+      TEXT_CLIP = path ? dragColumn(path) : null;
       try { list = bars(snapWords(r)); } finally { TEXT_CLIP = null; }
     }
     while (preview.children.length < list.length) preview.appendChild(document.createElement('div'));
@@ -3999,7 +4028,7 @@ $('#vPages').addEventListener('pointerdown', ev => { if (ev.target.closest('.not
     // of the other column don't come along); and not a highlight that then
     // still runs well above or below where you dragged (a selection that
     // jumped): that's a mistake, not what you meant.
-    TEXT_CLIP = path ? { left: path.minX - 60, right: path.maxX + 60 } : null;
+    TEXT_CLIP = path ? dragColumn(path) : null;
     try {
       if (made && path) {
         const bs = bars(made), hs = bs.map(b => b.bottom - b.top).sort((a, b) => a - b);
