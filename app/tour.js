@@ -2,86 +2,99 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-10-13.07';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-10-13.08';
 /* -------------------------------------------------------------- features */
-// What LibLande does, by area: each feature, what it's for, and where to
-// find it. Shown from the sidebar's foot (Features), with a box to find
+// What LibLande does, by area: each feature, what it's for, where to find
+// it, and its icon (see featIcon). Shown from the sidebar's foot (Features), with a box to find
 // one, and the tour (Take the tour) from its top. Keep it up to date as
 // features come and go.
 const FEATURES = [
   { area: 'Your library', items: [
-    ['Your BibDesk library, anywhere', 'Your .bib file and its PDFs on Google Drive, on any computer, iPad or iPhone. Changes go back into the .bib, so BibDesk opens it as before.'],
-    ['Works offline', 'The library and the papers you\u2019ve read are kept on the device. Marks and edits made offline go to Google Drive when you\u2019re back online.', 'The cloud in the toolbar shows what\u2019s waiting'],
-    ['Search', 'Find publications by any words in them; choose which fields to search; save a search as a group.', '\u2318F or /, or the magnifier'],
-    ['Sort and columns', 'Sort by any column, either way; choose the columns; drag the line between the list and the details to make room.', 'The sort menu at the foot of the list; the column headings'],
-    ['Lists in the sidebar', 'Library, Recently viewed (tap its number to choose how many), Inbox, Possible duplicates and Forthcoming; your saved searches and static groups; keywords and publication types.', 'The sidebar (the button at the top left)'],
-    ['Arrange the sidebar', 'Drag lists to put them in the order you want, within each section.', 'Drag a list in the sidebar'],
-    ['Static groups', 'Make a group with +, and drag publications onto it (or hold one and drag, on an iPad).', 'Static groups in the sidebar'],
-    ['Several libraries', 'Make a new library (a folder with its .bib and a folder for its papers), switch between them, and drag publications from one to another to copy them with their PDFs.', 'Libraries in the sidebar; + beside it'],
-    ['Select several', 'Choose several publications to give them keywords and groups at once, add them to your reading list, join versions, export them, or copy their citations.', 'Select in the toolbar, or \u2318-click and \u21e7-click'],
-    ['Export', 'The selected publications as a .bib and .rtf of citations, with their PDFs as they are, as clean copies, or none; to Google Drive or this device.', 'Select several, then Export'],
-    ['Appearance', 'Light, dark, or as the device is.', 'The foot of the sidebar'],
-    ['Keyboard shortcuts', 'Shortcuts for most things, and you can change them.', 'Keyboard shortcuts at the foot of the sidebar, or ?'],
+    ['Your BibDesk library, anywhere', 'Your .bib file and its PDFs on Google Drive, on any computer, iPad or iPhone. Changes go back into the .bib, so BibDesk opens it as before.', '', 'path:M7.5 18.5h9.8a3.7 3.7 0 0 0 .6-7.35A5.6 5.6 0 0 0 7.2 9.6a4.45 4.45 0 0 0 .3 8.9z'],
+    ['Works offline', 'The library and the papers you\u2019ve read are kept on the device. Marks and edits made offline go to Google Drive when you\u2019re back online.', 'The cloud in the toolbar shows what\u2019s waiting', '#netBadge'],
+    ['Search', 'Find publications by any words in them; choose which fields to search; save a search as a group.', '\u2318F or /, or the magnifier', '#searchBtn'],
+    ['Sort and columns', 'Sort by any column, either way; choose the columns; drag the line between the list and the details to make room.', 'The sort menu at the foot of the list; the column headings', 'path:M7 4v16M4 17l3 3 3-3M17 20V4M14 7l3-3 3 3'],
+    ['Lists in the sidebar', 'Library, Recently viewed (tap its number to choose how many), Inbox, Possible duplicates and Forthcoming; your saved searches and static groups; keywords and publication types.', 'The sidebar (the button at the top left)', '#sideToggle'],
+    ['Arrange the sidebar', 'Drag lists to put them in the order you want, within each section.', 'Drag a list in the sidebar', '#vpGrip'],
+    ['Static groups', 'Make a group with +, and drag publications onto it (or hold one and drag, on an iPad).', 'Static groups in the sidebar', 'ICON:folder'],
+    ['Several libraries', 'Make a new library (a folder with its .bib and a folder for its papers), switch between them, and drag publications from one to another to copy them with their PDFs.', 'Libraries in the sidebar; + beside it', 'ICON:lib'],
+    ['Select several', 'Choose several publications to give them keywords and groups at once, add them to your reading list, join versions, export them, or copy their citations.', 'Select in the toolbar, or \u2318-click and \u21e7-click', '#selectBtn'],
+    ['Export', 'The selected publications as a .bib and .rtf of citations, with their PDFs as they are, as clean copies, or none; to Google Drive or this device.', 'Select several, then Export', 'path:M12 3v12M8 11l4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2'],
+    ['Appearance', 'Light, dark, or as the device is.', 'The foot of the sidebar', 'path:M12 3.5a8.5 8.5 0 1 0 0 17zM12 3.5a8.5 8.5 0 0 1 0 17'],
+    ['Keyboard shortcuts', 'Shortcuts for most things, and you can change them.', 'Keyboard shortcuts at the foot of the sidebar, or ?', 'path:M3.5 7h17v10h-17zM7 10.5h.01M10 10.5h.01M13 10.5h.01M16 10.5h.01M8 14h8'],
   ] },
   { area: 'Adding and editing', items: [
-    ['Add a publication', 'From a DOI, ISBN or arXiv ID (the details are looked up), or paste a BibTeX entry.', '+ in the toolbar'],
-    ['Attach a PDF', 'Drop a PDF on a publication, or use Attach. A book\u2019s PDF is read for its ISBN, to fill in its details.', 'The details pane'],
-    ['Edit the details', 'Every field: authors, title, venue, keywords, notes, the cite key, a rating.', 'Edit, in the details pane'],
-    ['Book covers', 'Covers for your books, from Open Library.', 'Settings (the gear in the sidebar)'],
-    ['Copy a citation', 'APA, APA in text, BibTeX or the cite key, one publication or several.', 'Copy, in the details pane; or the shortcuts'],
-    ['Possible duplicates', 'Publications that look like the same one, to join as versions of one (the main one shown, the others under it) or to mark as different.', 'Possible duplicates in the sidebar'],
-    ['Forthcoming', 'Papers listed as forthcoming, checked for whether they\u2019ve been published since.', 'Forthcoming in the sidebar'],
-    ['Reading list', 'Papers to read: up next, later, or done; one list for each library.', 'The bookmark in the details pane or the reader; the Queue tab'],
+    ['Add a publication', 'From a DOI, ISBN or arXiv ID (the details are looked up), or paste a BibTeX entry.', '+ in the toolbar', '#addBtn'],
+    ['Attach a PDF', 'Drop a PDF on a publication, or use Attach. A book\u2019s PDF is read for its ISBN, to fill in its details.', 'The details pane', 'ICON:clip'],
+    ['Edit the details', 'Every field: authors, title, venue, keywords, notes, the cite key, a rating.', 'Edit, in the details pane', 'ICON:pencil'],
+    ['Book covers', 'Covers for your books, from Open Library.', 'Settings (the gear in the sidebar)', 'path:M6 3.5h11a1.5 1.5 0 0 1 1.5 1.5v14a1.5 1.5 0 0 1-1.5 1.5H6zM6 3.5v17M9.5 8h6M9.5 11h4'],
+    ['Copy a citation', 'APA, APA in text, BibTeX or the cite key, one publication or several.', 'Copy, in the details pane; or the shortcuts', 'ICON:quote'],
+    ['Possible duplicates', 'Publications that look like the same one, to join as versions of one (the main one shown, the others under it) or to mark as different.', 'Possible duplicates in the sidebar', 'ICON:copy'],
+    ['Forthcoming', 'Papers listed as forthcoming, checked for whether they\u2019ve been published since.', 'Forthcoming in the sidebar', 'ICON:forth'],
+    ['Reading list', 'Papers to read: up next, later, or done; one list for each library.', 'The bookmark in the details pane or the reader; the Queue tab', '#vRL'],
   ] },
   { area: 'Reading papers', items: [
-    ['Papers in tabs', 'Several papers open at once; going back to the library keeps them open.', 'The tabs along the top of the reader'],
-    ['Recently closed', 'Open again a paper you closed lately.', 'The page with an arrow, beside the title'],
-    ['Search in the paper', 'Every match highlighted; Return for the next one.', '\u2318F, or the magnifier'],
-    ['Zoom', 'Pinch, double-tap, or + and \u2212; tap the percentage to fit the page.', 'The reader\u2019s toolbar'],
-    ['Dark pages', 'Light text on dark pages, for reading at night.', 'The moon in the reader\u2019s toolbar'],
-    ['Split screen', 'A second view of the paper below, to scroll on its own (to the references, say).', 'The split box in the reader\u2019s toolbar'],
-    ['Page rail', 'Drag down the right edge to move through a long paper, with the page shown as you go.', 'The right edge of the pages'],
-    ['Links inside the paper', 'Go to a reference or figure, or look at it in a panel without losing your place; Back to page n brings you back.', 'Tap a link'],
-    ['Where you left off', 'Each paper opens where you were, on this device or another.', ''],
-    ['Copy a region', 'Drag a box to copy its text or a picture of it, or share it.', 'The box tool in the markup toolbar'],
-    ['Share a copy', 'The PDF as it is, or a clean copy without your marks, to Mail or any app; or open it in Google Drive.', 'The share button in the reader\u2019s toolbar'],
+    ['Papers in tabs', 'Several papers open at once; going back to the library keeps them open.', 'The tabs along the top of the reader', 'path:M3.5 9h17v10.5h-17zM3.5 9V6a1 1 0 0 1 1-1H10l1.5 4M11.5 9V6a1 1 0 0 1 1-1H18l1.5 4'],
+    ['Recently closed', 'Open again a paper you closed lately.', 'The page with an arrow, beside the title', '#vRecentBtn'],
+    ['Search in the paper', 'Every match highlighted; Return for the next one.', '\u2318F, or the magnifier', '#vFindBtn'],
+    ['Zoom and fit', 'Pinch, double-tap, or + and \u2212. Tap the percentage to go round the whole page, the page\u2019s width, and actual size.', 'The reader\u2019s toolbar', 'path:M11 4.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM20 20l-4.2-4.2M11 8.5v5M8.5 11h5'],
+    ['Dark pages', 'Light text on dark pages, for reading at night.', 'The moon in the reader\u2019s toolbar', '#vDarkBtn'],
+    ['Split screen', 'A second view of the paper below, to scroll on its own (to the references, say).', 'The split box in the reader\u2019s toolbar', '#vSplitBtn'],
+    ['Links inside the paper', 'Go to a reference or figure, or look at it in a panel without losing your place; Back to page n brings you back.', 'Tap a link', '#vBackGo'],
+    ['Where you left off', 'Each paper opens where you were, on this device or another.', '', 'ICON:history'],
+    ['Copy a region', 'Drag a box to copy its text or a picture of it, or share it.', 'The box tool in the markup toolbar', '#vPalette [data-tool="select"]'],
+    ['Share a copy', 'The PDF as it is, or a clean copy without your marks, to Mail or any app; or open it in Google Drive.', 'The share button in the reader\u2019s toolbar', '#vShare summary'],
   ] },
   { area: 'Marking up', items: [
-    ['Highlight', 'Drag over the words. Lines join into one block, it keeps to the column you\u2019re in, and a highlight can be made longer by dragging from it. Choose its colour.', 'The highlighter (H)'],
-    ['Underline and strike through', 'Real underlines and strike-throughs, as other apps show them.', 'U; hold the button for the other kind'],
-    ['Pen, text boxes and notes', 'Draw, write on the page, or pin a note to it.', 'P, T and N'],
-    ['Comments', 'A comment on any highlight, shown when you tap it.', 'Tap a highlight'],
-    ['Eraser', 'Rub out marks, or just part of a highlight.', 'E'],
-    ['Undo and redo', 'Step back and forward through your changes.', 'The arrows in the markup toolbar'],
-    ['A toolbar that moves', 'Drag the markup toolbar anywhere, or tuck it away.', 'Its grip, and the arrow at its end'],
-    ['Saved as you go', 'Marks are saved into the PDF on Google Drive, so other apps (and BibDesk) show them. Changed elsewhere meanwhile? Combine puts your marks into the newer version.', ''],
-    ['Your highlights, gathered', 'Every highlight and note in a paper, by colour; copy them with the citation, or add them to the publication\u2019s notes.', 'Marks, in the reader\u2019s sidebar'],
-    ['Bookmarks', 'Mark pages to come back to.', 'Tap a page\u2019s top right corner twice, or B'],
+    ['Highlight', 'Drag over the words. Lines join into one block, it keeps to the column you\u2019re in, and a highlight can be made longer by dragging from it. Choose its colour. Hold the highlighter for freehand highlighting, over anything.', 'The highlighter (H); hold it for the other kind', '#vpMarkup'],
+    ['Underline and strike through', 'Real underlines and strike-throughs, as other apps show them.', 'U; hold the button for the other kind', '#vpLines'],
+    ['Pen, text boxes and notes', 'Draw, write on the page, or pin a note to it.', 'P, T and N', '#vPalette [data-tool="pen"]'],
+    ['Comments', 'A comment on any highlight, shown when you tap it.', 'Tap a highlight', '#vPalette [data-tool="comment"]'],
+    ['Eraser', 'Rub out marks, or just part of a highlight.', 'E', '#vPalette [data-tool="eraser"]'],
+    ['Undo and redo', 'Step back and forward through your changes.', 'The arrows in the markup toolbar', '#vpUndo'],
+    ['A toolbar that moves', 'Drag the markup toolbar anywhere, or tuck it away.', 'Its grip, and the arrow at its end', '#vpGrip'],
+    ['Saved as you go', 'Marks are saved into the PDF on Google Drive, so other apps (and BibDesk) show them. Changed elsewhere meanwhile? Combine puts your marks into the newer version.', '', 'path:M7.5 18.5h9.8a3.7 3.7 0 0 0 .6-7.35A5.6 5.6 0 0 0 7.2 9.6a4.45 4.45 0 0 0 .3 8.9zM9.4 13.6l1.9 1.9 3.4-3.6'],
+    ['Your highlights, gathered', 'Every highlight and note in a paper, by colour; copy them with the citation, or add them to the publication\u2019s notes.', 'Marks, in the reader\u2019s sidebar', '#vSide [data-vtab="marks"]'],
+    ['Bookmarks', 'Mark pages to come back to.', 'Tap a page\u2019s top right corner twice, or B', '#vSide [data-vtab="bookmarks"]'],
   ] },
   { area: 'Pages and outlines', items: [
-    ['Make a scan searchable', 'Reads a scanned PDF (OCR, on your device) and adds its words as hidden text, so you can search, select and highlight them.', 'The notice on a scan, or Search in it'],
-    ['Rotate pages', 'Turn one page, or all of them; saved into the PDF.', 'Pages, in the reader\u2019s sidebar'],
-    ['Split two-page scans', 'A scan of an open book, two pages to each, cut at the fold into single pages; one page or all at once.', 'Pages, in the reader\u2019s sidebar'],
-    ['Outline', 'The paper\u2019s table of contents, to jump to a chapter or section. A book without one gets one made from its printed Contents.', 'Outline, in the reader\u2019s sidebar'],
-    ['Edit or make an outline', 'Change titles, drag to indent, add the page you\u2019re on, delete; or make one from the Contents or the headings. Saved into the PDF.', 'Edit and Make\u2026 in the Outline tab'],
+    ['Make a scan searchable', 'Reads a scanned PDF (OCR, on your device) and adds its words as hidden text, so you can search, select and highlight them.', 'The notice on a scan, or Search in it', '#vOcr'],
+    ['Rotate pages', 'Turn one page, or all of them; saved into the PDF.', 'Pages, in the reader\u2019s sidebar', 'path:M19.5 9.5A8 8 0 1 0 18 16.5M20 4.5v5h-5'],
+    ['Split two-page scans', 'A scan of an open book, two pages to each, cut at the fold into single pages; one page or all at once.', 'Pages, in the reader\u2019s sidebar', '#vCut'],
+    ['Outline', 'The paper\u2019s table of contents, to jump to a chapter or section. A book without one gets one made from its printed Contents.', 'Outline, in the reader\u2019s sidebar', '#vSide [data-vtab="outline"]'],
+    ['Edit or make an outline', 'Change titles, drag to indent, add the page you\u2019re on, delete; or make one from the Contents or the headings. Saved into the PDF.', 'Edit and Make\u2026 in the Outline tab', 'ICON:pencil'],
   ] },
   { area: 'Citing and keeping up', items: [
-    ['Cite Check', 'Checks a manuscript (a Google Doc or a file) against your library: citations without references, references never cited, and details that differ; and can fix the References in the Google Doc.', 'Cite Check, under Tools in the sidebar'],
-    ['New papers', 'New work that cites yours, by authors you follow, like papers you choose, and in your journals, with a Top 15; checked once a day.', 'New papers, under Tools in the sidebar'],
+    ['Cite Check', 'Checks a manuscript (a Google Doc or a file) against your library: citations without references, references never cited, and details that differ; and can fix the References in the Google Doc.', 'Cite Check, under Tools in the sidebar', 'ICON:citecheck'],
+    ['New papers', 'New work that cites yours, by authors you follow, like papers you choose, and in your journals, with a Top 15; checked once a day.', 'New papers, under Tools in the sidebar', 'ICON:bell'],
   ] },
   { area: 'On every device', items: [
-    ['iPad and iPhone', 'Made for touch and the Apple Pencil too: write with the Pencil, scroll with a finger.', ''],
-    ['Your settings everywhere', 'Preferences, groups\u2019 order and your place in each paper follow you from device to device.', ''],
-    ['Install it', 'Add LibLande to your Dock or Home Screen, to open it like an app.', 'Safari\u2019s Share menu: Add to Dock, or Add to Home Screen'],
+    ['iPad and iPhone', 'Made for touch and the Apple Pencil too: write with the Pencil, scroll with a finger.', '', 'path:M6.5 3h11a1.5 1.5 0 0 1 1.5 1.5v15a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 19.5v-15A1.5 1.5 0 0 1 6.5 3zM11 18h2'],
+    ['Your settings everywhere', 'Preferences, groups\u2019 order and your place in each paper follow you from device to device.', '', '#settingsBtn'],
+    ['Install it', 'Add LibLande to your Dock or Home Screen, to open it like an app.', 'Safari\u2019s Share menu: Add to Dock, or Add to Home Screen', 'path:M4.5 4.5h15v15h-15zM12 8v8M8 12h8'],
   ] },
 ];
+// A feature's icon: the one on its button in LibLande (copied from the
+// page: "#id" or another selector), one of the app's own (ICON:name), or
+// drawn here (path:...), so each looks as it does in the app.
+function featIcon(spec) {
+  if (!spec) return '';
+  if (spec.startsWith('ICON:')) return ICON[spec.slice(5)] || '';
+  if (spec.startsWith('path:')) return `<svg class="i" viewBox="0 0 24 24"><path d="${spec.slice(5)}"/></svg>`;
+  const el = document.querySelector(spec), svg = el && (el.matches('svg') ? el : el.querySelector('svg'));
+  if (!svg) return '';
+  const c = svg.cloneNode(true);
+  c.removeAttribute('id');
+  c.setAttribute('class', 'i');
+  return c.outerHTML;
+}
 function openFeatures() {
   sheet = { mode: 'help', features: true };
   const n = FEATURES.reduce((k, a) => k + a.items.length, 0);
   showSheet(`<h2>What LibLande does</h2>` +
     `<div class="feat-top"><input type="search" class="feat-find" id="featFind" placeholder="Find a feature (${n})" aria-label="Find a feature" autocomplete="off"><button type="button" class="btn primary" data-tour-start>Take the tour</button></div>` +
-    FEATURES.map(a => `<section class="feat-area"><h3>${esc(a.area)}</h3><ul>` + a.items.map(([name, what, where]) =>
-      `<li><b>${esc(name)}</b> <span class="feat-what">${esc(what)}</span>${where ? `<span class="feat-where">${esc(where)}</span>` : ''}</li>`).join('') + `</ul></section>`).join('') +
+    FEATURES.map(a => `<section class="feat-area"><h3>${esc(a.area)}</h3><ul>` + a.items.map(([name, what, where, icon]) =>
+      `<li><span class="feat-ic" aria-hidden="true">${featIcon(icon)}</span><div><b>${esc(name)}</b> <span class="feat-what">${esc(what)}</span>${where ? `<span class="feat-where">${esc(where)}</span>` : ''}</div></li>`).join('') + `</ul></section>`).join('') +
     `<p class="feat-none" hidden>No feature matches.</p>`, 'Close');
   $('#sheetCancel').hidden = true;
 }
@@ -142,28 +155,30 @@ async function toReader() {
 const readerSide = async (tab) => { if (!sideOpen()) toggleSide(true); showSideTab(tab); await tourWait(500); };
 const TOUR_STEPS = [
   { title: 'Welcome to LibLande', text: 'A quick look round: your library first, then reading and marking up a paper. Use Next and Back (or the arrow keys), or Play to go on by itself.' },
-  { sel: '#groups', title: 'Your lists', text: 'Your whole library, and the lists in it: recently viewed, possible duplicates, forthcoming; your saved searches and static groups; keywords and publication types. Drag them into the order you like.', before: async () => { await toLibrary(); showLibSide(); await tourWait(300); } },
-  { sel: '#groups .sec[data-sec="libs"]', title: 'Libraries', text: 'Several libraries, each its own .bib and folder of papers. Switch with a tap, make a new one with +, and drag publications onto another to copy them there.' },
-  { sel: '#groups .sec[data-sec="tools"]', title: 'Tools', text: 'Cite Check checks a manuscript\u2019s citations against your library (and can fix a Google Doc\u2019s References). New papers finds new work that cites yours, by authors you follow, and in your journals.' },
-  { sel: '#groups .sec[data-sec="s"]', title: 'Static groups', text: 'Your own groups. Make one with +, and drag publications onto it.' },
-  { sel: '.side-foot', title: 'Settings and help', text: 'Light or dark, the keyboard shortcuts (yours to change), this tour, and the full list of features.', after: () => { if (phoneMQ.matches) closeSidebarIfOverlay(); } },
-  { sel: '#tabs', title: 'Open lists', text: 'The lists you\u2019ve opened, as tabs; and the reading list (Queue) of papers to read next.', before: async () => { if (phoneMQ.matches) closeSidebarIfOverlay(); await tourWait(300); } },
-  { sel: '#searchBtn', title: 'Search', text: 'Find publications by any words in them (\u2318F or /), choose which fields to search, and save a search as a group.' },
-  { sel: '#addBtn', title: 'Add a publication', text: 'From a DOI, ISBN or arXiv ID, which LibLande looks up, or paste a BibTeX entry. Drop a PDF on a publication to attach it.' },
-  { sel: '#selectBtn', title: 'Select several', text: 'Give several publications keywords and groups at once, add them to your reading list, join versions of one, or export them with their PDFs.' },
-  { sel: '#list', title: 'The publications', text: 'Sort by any column (the menu at the foot), choose the columns, and type letters to jump. Return opens the PDF.' },
-  { sel: '#detail', title: 'The details', text: 'Everything about the publication: read its PDF, copy a citation (APA or BibTeX), add it to your reading list, rate it, or Edit it.', before: async () => {
+  { lib: true, sel: '#groups', title: 'Your lists', text: 'Your whole library, and the lists in it: recently viewed, possible duplicates, forthcoming; your saved searches and static groups; keywords and publication types. Drag them into the order you like.', before: async () => { await toLibrary(); showLibSide(); await tourWait(300); } },
+  { lib: true, sel: '#groups .sec[data-sec="libs"]', title: 'Libraries', text: 'Several libraries, each its own .bib and folder of papers. Switch with a tap, make a new one with +, and drag publications onto another to copy them there.' },
+  { lib: true, sel: '#groups .sec[data-sec="tools"]', title: 'Tools', text: 'Cite Check checks a manuscript\u2019s citations against your library (and can fix a Google Doc\u2019s References). New papers finds new work that cites yours, by authors you follow, and in your journals.' },
+  { lib: true, sel: '#groups .sec[data-sec="s"]', title: 'Static groups', text: 'Your own groups. Make one with +, and drag publications onto it.' },
+  { lib: true, sel: '.side-foot', title: 'Settings and help', text: 'Light or dark, the keyboard shortcuts (yours to change), this tour, and the full list of features.', after: () => closeSidebarIfOverlay() },
+  { lib: true, sel: '#tabs', title: 'Open lists', text: 'The lists you\u2019ve opened, as tabs; and the reading list (Queue) of papers to read next.', before: async () => { closeSidebarIfOverlay(); await tourWait(350); } },
+  { lib: true, sel: '#searchBtn', title: 'Search', text: 'Find publications by any words in them (\u2318F or /), choose which fields to search, and save a search as a group.' },
+  { lib: true, sel: '#addBtn', title: 'Add a publication', text: 'From a DOI, ISBN or arXiv ID, which LibLande looks up, or paste a BibTeX entry. Drop a PDF on a publication to attach it.' },
+  { lib: true, sel: '#selectBtn', title: 'Select several', text: 'Give several publications keywords and groups at once, add them to your reading list, join versions of one, or export them with their PDFs.' },
+  { lib: true, sel: '#list', title: 'The publications', text: 'Sort by any column (the menu at the foot), choose the columns, and type letters to jump. Return opens the PDF.' },
+  { lib: true, sel: '#detail', title: 'The details', text: 'Everything about the publication: read its PDF, copy a citation (APA or BibTeX), add it to your reading list, rate it, or Edit it.', before: async () => {
     if (phoneMQ.matches) return 'skip';
     if (!state.selKey) { const r = $('#rows .row'); if (r) r.click(); await tourWait(400); }
   } },
-  { sel: '#vTop', title: 'Reading a paper', text: 'Papers open in tabs (with more than one open). Library goes back to your library and keeps them open, and the button beside it opens again papers you\u2019ve closed.', before: async () => (await toReader()) ? null : 'skip-reader' },
+  { sel: '#vTop', title: 'Reading a paper', text: 'Papers open in tabs (with more than one open). Library goes back to your library and keeps them open.', before: async () => (await toReader()) ? null : 'skip-reader' },
+  { sel: '#vRecentBtn', title: 'Recently closed', text: 'The papers you\u2019ve closed lately, to open again with a tap.' },
   { sel: '#vFindBtn', title: 'Search in the paper', text: 'Every match highlighted; Return for the next. A scan can be made searchable first.' },
   { sel: '#vDarkBtn', title: 'Dark pages', text: 'Light text on dark pages, for reading at night.' },
+  { sel: '#vZoomLevel', title: 'Fit to the screen', text: 'Tap the percentage to go round: the whole page, the page\u2019s width, and actual size. Or zoom with \u2212 and +, or pinch.' },
   { sel: '#vSplitBtn', title: 'Split screen', text: 'A second view of the paper below, to keep the references (say) in sight while you read.' },
   { sel: '#vShare', title: 'Share a copy', text: 'Send the PDF to Mail or any app, as it is or as a clean copy without your marks.' },
   { sel: '#vRLMenu', title: 'Reading list', text: 'Add the paper to your reading list, or mark it up next, later, or done.' },
   { sel: '#vPalette', title: 'Marking up', text: 'Highlight (H), underline or strike through (U), draw (P), write on the page (T), pin a note (N), or rub out (E). Highlights join from line to line; tap one to comment on it. It\u2019s all saved into the PDF as you go.' },
-  { sel: '#vRail', title: 'The page rail', text: 'Drag down the right edge to move through a long paper.' },
+  { sel: '#vpMarkup', title: 'Two kinds of each', text: 'The tools with a small triangle have two kinds: hold the highlighter (or right-click it) to switch between highlighting text and highlighting freehand; hold underline to switch to strike-through.' },
   { sel: '#vSide', title: 'Pages', text: 'Thumbnails of every page. Turn a page, or all of them; split a scan of two book pages into two.', before: () => readerSide('pages') },
   { sel: '#vSide', title: 'Your marks', text: 'Every highlight and note in the paper, by colour, to go to, copy with the citation, or add to the publication\u2019s notes.', before: () => readerSide('marks') },
   { sel: '#vSide', title: 'Bookmarks', text: 'Pages you\u2019ve marked to come back to: tap a page\u2019s top right corner twice (or press B).', before: () => readerSide('bookmarks') },
@@ -213,12 +228,26 @@ async function tourGo(i, dir) {
   TOUR.i = i;
   const s = steps[i];
   TOUR.el.classList.add('moving');
+  // (The library's steps in the library: a paper open, or opening, as
+  // after Safari reloads the page, is put aside.)
+  if (s.lib) await toLibrary();
   let r = s.before ? await s.before() : null;
   if (!TOUR.on) return;
   // (No paper to open: past the reader's steps.)
   if (r === 'skip-reader') { const end = steps.length - 1; TOUR.i = end; return tourGo(end, 1); }
   const target = s.sel ? document.querySelector(s.sel) : null;
-  const shown = el => { if (!el) return false; const b = el.getBoundingClientRect(); return b.width > 4 && b.height > 4 && b.bottom > 0 && b.right > 0 && b.top < innerHeight && b.left < innerWidth && !el.closest('[hidden]'); };
+  // (On the screen, and not covered by something else, as the library by
+  // a paper.)
+  const shown = el => {
+    if (!el) return false;
+    const b = el.getBoundingClientRect();
+    if (!(b.width > 4 && b.height > 4 && b.bottom > 0 && b.right > 0 && b.top < innerHeight && b.left < innerWidth) || el.closest('[hidden]')) return false;
+    const x = Math.min(innerWidth - 2, Math.max(1, b.left + Math.min(b.width / 2, 40))), y = Math.min(innerHeight - 2, Math.max(1, b.top + Math.min(b.height / 2, 30)));
+    TOUR.el.style.visibility = 'hidden';
+    const hit = document.elementFromPoint(x, y);
+    TOUR.el.style.visibility = '';
+    return !!hit && (el.contains(hit) || hit.contains(el));
+  };
   if (r === 'skip' || (s.sel && !shown(target))) { tourGo(i + dir, dir); return; }
   TOUR.target = target;
   const card = TOUR.el.querySelector('.tour-card');
@@ -236,6 +265,8 @@ function tourPlace() {
   const spot = TOUR.el.querySelector('.tour-spot'), card = TOUR.el.querySelector('.tour-card'), dim = TOUR.el.querySelector('.tour-dim');
   // (The page dimmed all round the spotlight: a hole cut in the dimming.)
   const hole = (l, t, r, b) => { dim.style.clipPath = `polygon(evenodd, 0 0, 100% 0, 100% 100%, 0 100%, 0 0, ${l}px ${t}px, ${r}px ${t}px, ${r}px ${b}px, ${l}px ${b}px, ${l}px ${t}px)`; };
+  // (Drawn afresh meanwhile, as the sidebar's lists are: found again.)
+  if (TOUR.target && !TOUR.target.isConnected) { const s = TOUR.steps[TOUR.i]; TOUR.target = (s && s.sel && document.querySelector(s.sel)) || null; }
   const t = TOUR.target && TOUR.target.isConnected ? TOUR.target : null;
   TOUR.el.classList.toggle('centred', !t);
   const W = innerWidth, H = innerHeight, cw = card.offsetWidth, ch = card.offsetHeight, gap = 12;

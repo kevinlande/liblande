@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/ocr.js'] = '2026-10-13.07';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/ocr.js'] = '2026-10-13.08';
 /* ------------------------------------------------------------------ OCR */
 // A scan's pages are pictures, with no text to search, select or mark.
 // Make searchable reads each page without text with Tesseract (in this
@@ -315,7 +315,7 @@ async function ocrSave(file, found) {
   if (md5 && now && now !== md5) throw new Error('the PDF changed on Google Drive meanwhile.');
   await callServer('backupPdf', file.id);
   const newMd5 = await uploadMarked(file, out);
-  recentPdfs.set(file.id, out);
+  recentPdfs.delete(file.id); recentPdfs.set(file.id, out); trimRecentPdfs();
   if (newMd5) recentMd5.set(file.id, newMd5); else recentMd5.delete(file.id);
   THUMBS.delete(file.id);
 }

@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-13.07';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-13.08';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -231,6 +231,18 @@ async function driveToken(fresh) {
 
 // The last few papers opened, kept in memory so reopening or sharing is instant.
 const recentPdfs = new Map(), recentMd5 = new Map();
+// The PDFs kept in memory, to open again at once: the last three, or fewer
+// if they're big (a scanned book can be 30 MB), no more than 60 MB in all
+// (but always the last one).
+function trimRecentPdfs() {
+  let total = 0;
+  for (const b of recentPdfs.values()) total += b ? b.byteLength : 0;
+  while (recentPdfs.size > 1 && (recentPdfs.size > 3 || total > 60e6)) {
+    const k = recentPdfs.keys().next().value, b = recentPdfs.get(k);
+    total -= b ? b.byteLength : 0;
+    recentPdfs.delete(k); recentMd5.delete(k);
+  }
+}
 async function getPdfBytes(file, onProgress) {
   if (recentPdfs.has(file.id)) return recentPdfs.get(file.id);
   const url = 'https:\/\/www.googleapis.com/drive/v3/files/' + encodeURIComponent(file.id) + '?alt=media';
@@ -262,7 +274,7 @@ async function getPdfBytes(file, onProgress) {
   }
   recentPdfs.set(file.id, bytes);
   refreshSavedSoon();
-  while (recentPdfs.size > 3) { const k = recentPdfs.keys().next().value; recentPdfs.delete(k); recentMd5.delete(k); }
+  trimRecentPdfs();
   return bytes;
 }
 
@@ -349,10 +361,11 @@ function ensureViewer(lib, VL) {
     // Draw pages with the graphics card, as Firefox's own viewer does (the
     // viewer component defaults to drawing in software).
     enableHWA: true,
-    // On the iPad and iPhone, a page is drawn whole at most this big (the
-    // most iOS allows one canvas; bigger ones fail to draw); zoomed in
-    // further, PDF.js draws the part on screen sharply on top.
-    maxCanvasPixels: coarseMQ.matches ? 2 ** 24 : 2 ** 25,
+    // A page is drawn whole at most this big (the most iOS allows one
+    // canvas; bigger ones fail to draw; and on a computer, enough: each is
+    // up to 64 MB); zoomed in further, PDF.js draws the part on screen
+    // sharply on top.
+    maxCanvasPixels: 2 ** 24,
     enableDetailCanvas: true,
     // Our own comment box (PDF.js asks the viewer for one).
     commentManager,
@@ -548,6 +561,10 @@ async function openReader(entry, file, pos) {
     }
     V.bytes = data; V.md5 = md5; V.openBytes = data;
     ensureViewer(lib, viewerLib);
+    // The copy of the paper shown before (as when it's opened again after
+    // pages were turned or split): closed once this one is in its place,
+    // or it stays in memory, with every page's pictures.
+    const before = V.doc !== doc ? V.doc : null;
     V.doc = doc;
     // (PDF.js 6 counts the PDF's own marks as changes when it puts them on
     // a page again, as after an upload: a change that leaves the marks as
@@ -573,6 +590,7 @@ async function openReader(entry, file, pos) {
     const bmLoaded = loadBookmarks(doc);
     V.viewer.setDocument(doc);
     V.link.setDocument(doc);
+    if (before) closePdf(before);
     // (Where you left it on another device: there, once its pages are laid
     // out, after this device's own place for it.)
     const far = elsewhere(file.id);
@@ -1077,7 +1095,7 @@ async function saveMarkup(force, auto, now) {
       const res = await r.json().catch(() => ({}));
       V.md5 = res.md5Checksum || null;
       V.bytes = bytes;
-      recentPdfs.set(file.id, bytes);
+      recentPdfs.delete(file.id); recentPdfs.set(file.id, bytes); trimRecentPdfs();
       if (V.md5) recentMd5.set(file.id, V.md5); else recentMd5.delete(file.id);
       THUMBS.delete(file.id);
       V.savedSinceOpen = true;
@@ -1237,7 +1255,7 @@ async function rewritePdf(file, edit, opts = {}) {
   if (md5 && now && now !== md5) throw new Error('the PDF changed on Google Drive meanwhile.');
   await callServer('backupPdf', file.id);
   const newMd5 = await uploadMarked(file, out);
-  recentPdfs.set(file.id, out);
+  recentPdfs.delete(file.id); recentPdfs.set(file.id, out); trimRecentPdfs();
   if (newMd5) recentMd5.set(file.id, newMd5); else recentMd5.delete(file.id);
   THUMBS.delete(file.id);
   // (Marks made in the moment since are offered to Combine, as the PDF on
@@ -1377,7 +1395,7 @@ async function combineMarks() {
     // on this device is gone, or it would be offered again).
     await forgetKept(file.id).catch(() => {});
     if (doc === V.doc) { doc.annotationStorage.resetModified(); V.dirty = V.drawing = V.bmDirty = false; }
-    recentPdfs.set(file.id, out);
+    recentPdfs.delete(file.id); recentPdfs.set(file.id, out); trimRecentPdfs();
     if (newMd5) recentMd5.set(file.id, newMd5); else recentMd5.delete(file.id);
     AUTO.paused = false;
     vStatus('');
@@ -4938,7 +4956,8 @@ const sidePhone = () => window.innerWidth < 600;
 function resetSide() {
   SIDE.token++;
   if (SIDE.io) SIDE.io.disconnect();
-  Object.assign(SIDE, { io: null, thumbs: [], queue: [], busy: false, marks: null, outline: null, pp: null, colour: null });
+  if (SIDE.far) SIDE.far.disconnect();
+  Object.assign(SIDE, { io: null, far: null, thumbs: [], queue: [], busy: false, marks: null, outline: null, pp: null, colour: null });
   Object.assign(OLE, { on: false, items: [], sel: -1, from: '' });
   $('#vSideBody').replaceChildren();
 }
@@ -4965,8 +4984,9 @@ function showSideTab(tab) {
   // again after pages were split or turned: made again.)
   if (V.doc && SIDE.forDoc !== V.doc) {
     if (SIDE.io) SIDE.io.disconnect();
+    if (SIDE.far) SIDE.far.disconnect();
     SIDE.token++;
-    Object.assign(SIDE, { io: null, thumbs: [], queue: [], marks: null, outline: null, pp: null, forDoc: V.doc });
+    Object.assign(SIDE, { io: null, far: null, thumbs: [], queue: [], marks: null, outline: null, pp: null, forDoc: V.doc });
   }
   SIDE.tab = tab;
   store.set('readerTab', tab);
@@ -5153,6 +5173,17 @@ async function showThumbs() {
     if (it.isIntersecting) queueThumb(+it.target.dataset.page);
   }), { root: body, rootMargin: '300px 0px' });
   SIDE.thumbs.forEach(t => SIDE.io.observe(t.el));
+  // Thumbnails well out of sight are let go (a long book's would otherwise
+  // all be kept, scrolled past once), and drawn again if they come back.
+  SIDE.far = new IntersectionObserver(items => items.forEach(it => {
+    if (it.isIntersecting) return;
+    const t = SIDE.thumbs[+it.target.dataset.page - 1], box = t && t.el.querySelector('.v-thumb-img');
+    if (!t || !t.done || !box) return;
+    const c = box.querySelector('canvas');
+    if (c) { c.width = c.height = 0; c.remove(); }
+    t.done = false;
+  }), { root: body, rootMargin: '2000px 0px' });
+  SIDE.thumbs.forEach(t => SIDE.far.observe(t.el));
   markCurrentThumb(true);
 }
 function queueThumb(n) {
@@ -5174,7 +5205,7 @@ async function drawThumbs() {
       const base = page.getViewport({ scale: 1 });
       // At the size it's shown (the sidebar's width), for the screen.
       const box = t.el.querySelector('.v-thumb-img');
-      const dpr = Math.min(window.devicePixelRatio || 1, 2), cssW = Math.max(96, box.clientWidth || 128);
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.5), cssW = Math.max(96, box.clientWidth || 128);
       const vp = page.getViewport({ scale: cssW / base.width * dpr });
       // (Each its own shape: a page turned sideways is wide.)
       box.style.aspectRatio = (base.width / base.height).toFixed(4);
