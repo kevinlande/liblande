@@ -1,8 +1,8 @@
 ﻿// LibLande: the PDF reader: pages, marks, tools, saving, the sidebar.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, reader, editing, citecheck, start.)
+// index.html: library, reader, editing, citecheck, newpapers, ocr, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-12.41';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-12.43';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -378,6 +378,9 @@ function ensureViewer(lib, VL) {
     const none = !!q && state === 1;
     el.classList.toggle('none', none);
     el.textContent = !q ? '' : none ? 'Not found' : mc && mc.total ? (mc.current || 1) + ' of ' + mc.total + (mc.total >= 1000 ? '+' : '') : state === 3 ? 'Searching\u2026' : '';
+    // (Nothing found in a scan: it has no text to find, until it's made
+    // searchable.)
+    $('#vFindOcr').hidden = !(none && V.scan && !OCR.file);
   };
   bus.on('updatefindmatchescount', e => findCount(e.matchesCount));
   bus.on('updatefindcontrolstate', e => { findCount(e.matchesCount, e.state); revealFindMatch(); });
@@ -394,6 +397,7 @@ function ensureViewer(lib, VL) {
     $('#vPage').textContent = viewer.currentPageNumber + ' / ' + e.pagesCount; RAIL.lastPage = viewer.currentPageNumber; railSoon();
     V.endPage = 0;
     endPageFor(V.doc, V.file).catch(err => console.warn('Where the references start:', err));
+    ocrNotice(V.doc, V.file).catch(err => console.warn('Is it a scan:', err));
     highlighterFor(V.doc, V.file).catch(() => {});
   });
   bus.on('scalechanging', () => railSoon());
@@ -473,7 +477,7 @@ async function openReader(entry, file, pos) {
   TAKEN.clear();
   $('#viewer').classList.remove('bars-hidden');
   V.restore = pos && pos.top != null ? pos : null;
-  Object.assign(V, { entry, file, bytes: null, md5: null, dirty: false, drawing: false, selected: false, canUndo: false, canRedo: false, pageLabels: undefined, quotePages: null, quoteFonts: null });
+  Object.assign(V, { entry, file, bytes: null, md5: null, stale: null, scan: false, dirty: false, drawing: false, selected: false, canUndo: false, canRedo: false, pageLabels: undefined, quotePages: null, quoteFonts: null });
   hideQuote();
   $('#vTitle').textContent = entry.f.title || file.n;
   $('#vDrive').href = driveUrl(file);
@@ -860,7 +864,8 @@ function showViewer() {
   if (!PTABS.list.length) return;
   if (PTABS.active < 0) PTABS.active = 0;
   const t = PTABS.list[PTABS.active];
-  if (!V.doc || !V.file || V.file.id !== t.fileId) { loadActiveTab(); return; }
+  // (Also if it was changed while it was out of sight: made searchable.)
+  if (!V.doc || !V.file || V.file.id !== t.fileId || V.stale === V.file.id) { V.stale = null; loadActiveTab(); return; }
   $('#viewer').hidden = false;
   renderPaperTabs();
   refit();
@@ -1211,6 +1216,117 @@ async function uploadMarked(file, bytes) {
   if (!r.ok) throw new Error('Google Drive didn\u2019t accept the changes (error ' + r.status + ').');
   return (await r.json().catch(() => ({}))).md5Checksum || null;
 }
+// The open paper changed as a whole (pages turned, or OCR's text added):
+// any marks not yet saved are saved first, edit(bytes) makes the new PDF
+// from the one on Drive, which is uploaded (if it's still the one on
+// Drive), and the paper is opened again where you are (or, if it's open
+// behind the library, when you go back to it).
+async function rewritePdf(file, edit) {
+  const showing = () => V.file && V.file.id === file.id && V.doc;
+  if (!showing()) throw new Error('the paper isn\u2019t open.');
+  if (V.dirty || V.bmDirty || V.drawing) {
+    const r = await saveMarkup(false, false, true);
+    if (r !== true) throw new Error('your marks couldn\u2019t be saved first' + (r === 'kept' ? ' (you\u2019re offline)' : '') + '.');
+  }
+  if (!showing()) throw new Error('the paper was closed.');
+  const md5 = V.md5, out = await edit(V.bytes);
+  const now = await pdfMd5(file).catch(() => null);
+  if (md5 && now && now !== md5) throw new Error('the PDF changed on Google Drive meanwhile.');
+  await callServer('backupPdf', file.id);
+  const newMd5 = await uploadMarked(file, out);
+  recentPdfs.set(file.id, out);
+  if (newMd5) recentMd5.set(file.id, newMd5); else recentMd5.delete(file.id);
+  THUMBS.delete(file.id);
+  // (Marks made in the moment since are offered to Combine, as the PDF on
+  // Drive is newer.) The sidebar as it was: open (even on a phone, to
+  // turn another page), scrolled to the same place.
+  if (showing()) {
+    if (!$('#viewer').hidden) {
+      const side = sideOpen(), sideTop = $('#vSideBody').scrollTop;
+      await openReader(V.entry, V.file, spot());
+      if (side && V.doc && V.file && V.file.id === file.id) {
+        if (!sideOpen()) toggleSide(true);
+        setTimeout(() => { $('#vSideBody').scrollTop = sideTop; }, 150);
+      }
+    } else V.stale = file.id;
+  }
+}
+// A PDF opened with pdf-lib to be changed (rebuilt first if its structure
+// is damaged).
+async function pdfLibOpen(bytes) {
+  const { PDFDocument } = await loadPdfLib();
+  const open = data => PDFDocument.load(data, { updateMetadata: false, throwOnInvalidObject: false });
+  try {
+    return await open(bytes);
+  } catch (err) {
+    if (/encrypt/i.test(String(err && err.message))) throw new Error('this PDF is password-protected.');
+    try { return await open(rebuildPdf(bytes)); } catch (err2) { throw new Error('LibLande couldn\u2019t read the PDF\u2019s file structure.'); }
+  }
+}
+
+// Rotating a page (from its thumbnail): turned in the PDF itself (the
+// page's /Rotate), so it's turned in other apps too. It turns on screen at
+// once, and is saved a moment after the last turn (turning it twice is one
+// save), then the paper opened again with it.
+const ROT = { file: null, want: new Map(), timer: 0, busy: false };
+const rotatePage = (n, by) => rotatePages([n], by);
+function rotatePages(list, by) {
+  if (!V.doc || !V.file || !V.viewer) return;
+  if (!gs || !navigator.onLine) { toast('Turning pages needs an internet connection, to save them to Google Drive.', 3500); return; }
+  if (ROT.file && ROT.file.id !== V.file.id) ROT.want.clear();
+  ROT.file = V.file;
+  for (const n of list) {
+    const k = (((ROT.want.get(n) || 0) + by) % 360 + 360) % 360;
+    ROT.want.set(n, k);
+    // Turned on screen now: the page, and its thumbnail.
+    const pv = V.viewer.getPageView(n - 1);
+    if (pv) pv.update({ rotation: (V.viewer.pagesRotation + k) % 360 });
+    const t = SIDE.thumbs[n - 1], box = t && t.el.querySelector('.v-thumb-img');
+    if (box) {
+      const r = box.clientHeight && box.clientWidth ? Math.min(box.clientWidth / box.clientHeight, box.clientHeight / box.clientWidth) : 1;
+      box.style.transform = k ? `rotate(${k}deg)` + (k % 180 ? ` scale(${r.toFixed(3)})` : '') : '';
+    }
+  }
+  // (Pages turned sideways take less room: the rest drawn as they come into view.)
+  if (list.length > 1) V.viewer.update();
+  clearTimeout(ROT.timer);
+  ROT.timer = setTimeout(saveRotation, 1200);
+}
+async function saveRotation() {
+  if (ROT.busy || V.saving) { ROT.timer = setTimeout(saveRotation, 500); return; }
+  const file = ROT.file, want = new Map([...ROT.want].filter(([, k]) => k));
+  ROT.want.clear(); ROT.file = null;
+  if (!file || !want.size) return;
+  if (!V.file || V.file.id !== file.id) { toast('The page wasn\u2019t turned: the paper was closed first.', 4000); return; }
+  ROT.busy = true;
+  saveUI('saving');
+  try {
+    await rewritePdf(file, async bytes => {
+      const { degrees } = await loadPdfLib();
+      const doc = await pdfLibOpen(bytes), pages = doc.getPages();
+      for (const [n, k] of want) {
+        const page = pages[n - 1];
+        if (page) page.setRotation(degrees(((page.getRotation().angle + k) % 360 + 360) % 360));
+      }
+      return doc.save();
+    });
+  } catch (err) {
+    toast('Couldn\u2019t turn the page' + (want.size === 1 ? '' : 's') + ': ' + errText(err), 6000);
+    // (Back as it is on Drive.)
+    if (V.file && V.file.id === file.id && V.viewer) {
+      for (const n of want.keys()) {
+        const pv = V.viewer.getPageView(n - 1);
+        if (pv) pv.update({ rotation: V.viewer.pagesRotation });
+        const t = SIDE.thumbs[n - 1], box = t && t.el.querySelector('.v-thumb-img');
+        if (box) box.style.transform = '';
+      }
+    }
+  } finally {
+    ROT.busy = false;
+    saveUI();
+  }
+}
+
 async function combineMarks() {
   if (!V.doc || !V.file || !gs || V.saving) return;
   const doc = V.doc, file = V.file, entry = V.entry, at = spot();
@@ -4900,6 +5016,10 @@ $('#vSide').addEventListener('click', ev => {
   }
   const del = ev.target.closest('[data-bm-del]');
   if (del) { toggleBookmark(+del.dataset.bmDel); return; }
+  const rot = ev.target.closest('[data-rot]');
+  if (rot) { rotatePage(+rot.dataset.rotPage, +rot.dataset.rot); return; }
+  const rotAll = ev.target.closest('[data-rot-all]');
+  if (rotAll && V.doc) { rotatePages(Array.from({ length: V.doc.numPages }, (_, i) => i + 1), +rotAll.dataset.rotAll); return; }
   const pg = ev.target.closest('[data-page]');
   if (pg && V.doc) {
     const n = +pg.dataset.page, y = pg.dataset.y;
@@ -4933,13 +5053,24 @@ async function showThumbs() {
   const vp = first.getViewport({ scale: 1 }), ratio = vp.height / vp.width;
   const list = document.createElement('div');
   list.className = 'v-thumbs';
+  // Every page turned at once (a paper scanned sideways).
+  const head = document.createElement('div');
+  head.className = 'v-thumbs-head';
+  head.innerHTML = `<span>Rotate all pages</span><button type="button" data-rot-all="-90" aria-label="Rotate all pages left" title="Rotate all pages left"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 9.5A8 8 0 1 1 6 16.5"/><path d="M4 4.5v5h5"/></svg></button><button type="button" data-rot-all="90" aria-label="Rotate all pages right" title="Rotate all pages right"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 9.5A8 8 0 1 0 18 16.5"/><path d="M20 4.5v5h-5"/></svg></button>`;
+  list.appendChild(head);
   for (let n = 1; n <= doc.numPages; n++) {
+    const box = document.createElement('div');
+    box.className = 'v-thumb-box';
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'v-thumb';
     b.dataset.page = n;
     b.innerHTML = `<span class="v-thumb-img" style="aspect-ratio:${(1 / ratio).toFixed(4)}"></span><span class="v-thumb-n">${n}</span>`;
-    list.appendChild(b);
+    // (Turning the page: shown on the page you're on, and on the one
+    // under the pointer.)
+    box.innerHTML = `<span class="v-thumb-rot"><button type="button" data-rot="-90" data-rot-page="${n}" aria-label="Rotate page ${n} left" title="Rotate left"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 9.5A8 8 0 1 1 6 16.5"/><path d="M4 4.5v5h5"/></svg></button><button type="button" data-rot="90" data-rot-page="${n}" aria-label="Rotate page ${n} right" title="Rotate right"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 9.5A8 8 0 1 0 18 16.5"/><path d="M20 4.5v5h-5"/></svg></button></span>`;
+    box.prepend(b);
+    list.appendChild(box);
     SIDE.thumbs.push({ el: b, done: false });
   }
   SIDE.list = list;
@@ -4971,6 +5102,9 @@ async function drawThumbs() {
       const box = t.el.querySelector('.v-thumb-img');
       const dpr = Math.min(window.devicePixelRatio || 1, 2), cssW = Math.max(96, box.clientWidth || 128);
       const vp = page.getViewport({ scale: cssW / base.width * dpr });
+      // (Each its own shape: a page turned sideways is wide.)
+      box.style.aspectRatio = (base.width / base.height).toFixed(4);
+      box.style.transform = '';
       const c = document.createElement('canvas');
       c.width = Math.floor(vp.width); c.height = Math.floor(vp.height);
       await page.render({ canvasContext: c.getContext('2d'), viewport: vp, annotationMode: V.lib.AnnotationMode.ENABLE_STORAGE }).promise;

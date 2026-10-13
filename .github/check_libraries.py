@@ -4,7 +4,7 @@
     python3 check_libraries.py vendor/versions.json [--markdown]
 
 For each library in versions.json (written by vendor.py): the newest
-version on cdnjs, and any security advisory GitHub lists for the version
+version on cdnjs (or npm, for one taken from npm itself), and any security advisory GitHub lists for the version
 in use (npm package). Prints what it finds (or, with --markdown, a report
 for a GitHub issue) and exits 1 if there's anything; 0 if all's current;
 2 if it couldn't check. Used by build.py on every build, and once a month
@@ -25,15 +25,30 @@ def get(url):
     return json.loads(subprocess.run(cmd, check=True, stdout=subprocess.PIPE).stdout)
 
 
+def newer(a, b):
+    """Is version a higher than b? (1.10.0 above 1.9.2; 3.0.0 above 3.0.0-beta.)"""
+    def key(v):
+        main, _, pre = v.partition('-')
+        return [int(x) if x.isdigit() else 0 for x in main.split('.')], not pre
+    return key(a) > key(b)
+
+
 def check(versions):
     """[(library, kind, text, link)] for each finding."""
     found = []
     for lib in versions:
-        name, cur = lib['cdnjs'], lib['version']
-        latest = get('https://api.cdnjs.com/libraries/' + name + '?fields=version').get('version')
-        if latest and latest != cur:
-            found.append((name, 'update', 'version ' + latest + ' is out (LibLande uses ' + cur + ')',
-                          'https://cdnjs.com/libraries/' + name))
+        cur = lib['version']
+        if 'cdnjs' in lib:
+            name = lib['cdnjs']
+            latest = get('https://api.cdnjs.com/libraries/' + name + '?fields=version').get('version')
+            page = 'https://cdnjs.com/libraries/' + name
+        else:
+            name = lib['npm']
+            latest = (get('https://registry.npmjs.org/' + name.replace('/', '%2F')).get('dist-tags') or {}).get('latest')
+            page = 'https://www.npmjs.com/package/' + name
+        # (Only a higher version: npm's "latest" can be a fix to an older one.)
+        if latest and newer(latest, cur):
+            found.append((name, 'update', 'version ' + latest + ' is out (LibLande uses ' + cur + ')', page))
         advisories = get('https://api.github.com/advisories?ecosystem=npm&affects=' + lib['npm'] + '@' + cur)
         for a in advisories:
             fixed = ', '.join(str(v.get('first_patched_version') or v.get('patched_versions') or '?')
@@ -66,7 +81,7 @@ def main():
         for name, kind, text, link in found:
             print(('Security advisory for ' if kind == 'security' else 'Newer ') + name + ': ' + text)
         if not found:
-            print('Libraries up to date: ' + ', '.join(l['cdnjs'] + ' ' + l['version'] for l in versions))
+            print('Libraries up to date: ' + ', '.join((l.get('cdnjs') or l['npm']) + ' ' + l['version'] for l in versions))
     return 1 if found else 0
 
 

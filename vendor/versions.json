@@ -13,5 +13,23 @@
     "cdnjs": "jszip",
     "npm": "jszip",
     "version": "3.10.2"
+  },
+  {
+    "dir": "tesseract.js",
+    "npm": "tesseract.js",
+    "version": "7.0.0",
+    "sub": "dist/"
+  },
+  {
+    "dir": "tesseract.js-core",
+    "npm": "tesseract.js-core",
+    "version": "7.0.0",
+    "sub": ""
+  },
+  {
+    "dir": "tesseract-eng",
+    "npm": "@tesseract.js-data/eng",
+    "version": "1.0.0",
+    "sub": ""
   }
 ]

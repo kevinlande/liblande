@@ -1354,6 +1354,21 @@ a.ms-ib { text-decoration: none; }
 .v-thumb-img canvas { display: block; width: 100%; height: auto; }
 .v-thumb:hover .v-thumb-img { outline-color: var(--line); }
 .v-thumb.current .v-thumb-img { outline-color: var(--accent); }
+.v-thumbs-head { grid-column: 1 / -1; justify-self: stretch; display: flex; align-items: center; gap: 2px; margin: -4px 0 0; font-size: 12px; color: var(--muted); }
+.v-thumbs-head span { flex: 1; padding-left: 4px; }
+.v-thumbs-head button { display: flex; border: 0; background: none; color: var(--text); padding: 5px; border-radius: 6px; }
+.v-thumbs-head button:hover { background: var(--accent-soft); color: var(--accent); }
+.v-thumbs-head .i { width: 16px; height: 16px; }
+@media (pointer: coarse) { .v-thumbs-head button { padding: 8px; } }
+/* Rotate left and right: over the top of the page you're on, and the one under the pointer. */
+.v-thumb-box { position: relative; width: 100%; display: grid; justify-items: center; }
+.v-thumb-img { transition: transform .2s; }
+.v-thumb-rot { position: absolute; top: 6px; left: 50%; transform: translateX(-50%); display: flex; gap: 2px; padding: 2px; border-radius: 8px; background: var(--bg); box-shadow: 0 1px 4px rgba(0, 0, 0, .25); opacity: 0; pointer-events: none; transition: opacity .15s; }
+.v-thumb-box:hover .v-thumb-rot, .v-thumb-box:has(.v-thumb.current) .v-thumb-rot, .v-thumb-rot:focus-within { opacity: 1; pointer-events: auto; }
+.v-thumb-rot button { display: flex; border: 0; background: none; color: var(--text); padding: 5px; border-radius: 6px; }
+.v-thumb-rot button:hover { background: var(--accent-soft); color: var(--accent); }
+.v-thumb-rot .i { width: 16px; height: 16px; }
+@media (pointer: coarse) { .v-thumb-rot button { padding: 8px; } }
 .v-thumb-n { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .v-thumb.current .v-thumb-n { color: var(--accent); font-weight: 600; }
 .v-marks { padding: 2px 0 24px; }
@@ -1416,6 +1431,20 @@ a.ms-ib { text-decoration: none; }
 .v-find input:focus { border-color: var(--accent); outline: none; }
 .v-find-count { font-size: 12.5px; color: var(--muted); white-space: nowrap; min-width: 64px; padding: 0 4px; font-variant-numeric: tabular-nums; }
 .v-find-count.none { color: var(--warn); }
+.v-find-ocr { min-height: 28px; padding: 2px 10px; font-size: 12.5px; white-space: nowrap; }
+/* OCR: "This PDF is a scan" and how making it searchable is going, at the top of the paper. */
+.v-ocr { position: absolute; z-index: 6; top: calc(var(--top-h, 48px) + 10px); left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100% - 32px); box-sizing: border-box; display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 12px; border-radius: 10px; background: var(--bg); color: var(--text); box-shadow: var(--shadow); font: 13px/1.35 var(--ui); overflow: hidden; }
+.v-ocr > .i { width: 18px; height: 18px; flex: none; color: var(--accent); }
+.v-ocr-msg { flex: 1 1 auto; min-width: 0; font-variant-numeric: tabular-nums; }
+.v-ocr .btn { flex: none; min-height: 30px; padding: 3px 12px; font-size: 13px; }
+.v-ocr.busy { padding-right: 12px; }
+.v-ocr.busy .btn { margin-right: -6px; }
+.viewer.bars-hidden .v-ocr { top: calc(env(safe-area-inset-top, 0px) + 10px); }
+.v-ocr-x { flex: none; display: flex; border: 0; background: none; color: var(--muted); padding: 6px; }
+.v-ocr-x .i { width: 15px; height: 15px; }
+.v-ocr-x:hover { color: var(--text); }
+.v-ocr-fill { position: absolute; left: 0; bottom: 0; height: 3px; width: 0; background: var(--accent); transition: width .4s; }
+.v-ocr:not(.busy) .v-ocr-fill { display: none; }
 @media (max-width: 599px) { .v-zoomctl { display: none; } }
 /* (The panel doesn't open on a phone.) */
 @media (max-width: 699px) { #vSplitBtn { display: none; } }
