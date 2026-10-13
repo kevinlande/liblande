@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-12.43';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-12.44';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -2376,6 +2376,30 @@ function markAt(x, y) {
   return null;
 }
 
+// A highlight's lines (screen boxes, one per line, top to bottom) made to
+// meet: each grows halfway across the space to the next, as in Preview,
+// so a highlight over several lines is one block, not stripes. (The first
+// and last grow as much, so every line is as tall. Lines far apart, as
+// across a paragraph break or a figure, or side by side, are left.)
+function joinLines(list) {
+  const out = list.map(b => Object.assign({}, b)).sort((a, b) => a.top - b.top);
+  const halves = [];
+  for (let i = 0; i + 1 < out.length; i++) {
+    const a = out[i], b = out[i + 1], h = Math.min(a.bottom - a.top, b.bottom - b.top), gap = b.top - a.bottom;
+    if (gap <= 0 || gap > h * 0.9 || Math.min(a.right, b.right) - Math.max(a.left, b.left) <= 0) continue;
+    const mid = (a.bottom + b.top) / 2;
+    halves.push(gap / 2);
+    a.bottom = mid; b.top = mid; a.joinedDown = b.joinedUp = true;
+  }
+  if (halves.length) {
+    const half = halves.sort((x, y) => x - y)[halves.length >> 1];
+    for (const b of out) {
+      if (!b.joinedUp) b.top -= half;
+      if (!b.joinedDown) b.bottom += half;
+    }
+  }
+  return out.map(({ left, right, top, bottom }) => ({ left, right, top, bottom }));
+}
 // Screen boxes to PDF coordinates on one page.
 function pageOf(el) { return el && el.closest ? el.closest('.page') : null; }
 function toPdfBoxes(page, bars) {
@@ -3728,7 +3752,7 @@ $('#vPages').addEventListener('pointerdown', ev => { if (ev.target.closest('.not
         out.push({ left: b.left, right: b.right, top: b.top, bottom: b.bottom });
       }
     }
-    return out;
+    return joinLines(out);
   };
   const draw = () => {
     frame = 0;
@@ -5326,12 +5350,17 @@ async function showOutline() {
     // (None in the file: one made from the printed Contents, if there is one.)
     if (!rest.length) {
       if (SIDE.tab === 'outline') body.innerHTML = `<p class="v-side-note">This PDF has no outline built in. Looking for a Contents page\u2026</p>`;
-      let made = null;
-      try { made = await printedContents(V.doc, V.file && V.file.id); } catch (err) { made = null; }
+      let made = null, failed = null;
+      try { made = await printedContents(V.doc, V.file && V.file.id); } catch (err) { failed = err; console.warn('Reading the Contents page:', err); }
       if (my !== SIDE.token) return;
       if (made && made.items.length) {
         rest = made.items;
         note = `<p class="v-side-note v-ol-note">Made from the printed Contents (page${made.from === made.to ? ' ' + made.from : 's ' + made.from + '\u2013' + made.to}).</p>`;
+      } else if (failed) {
+        // (Said, rather than that there's none.)
+        SIDE.outline = { flat, html: `<p class="v-side-note">This PDF has no outline built in, and its Contents page couldn\u2019t be read: ${esc(errText(failed))}</p>` };
+        if (SIDE.tab === 'outline') body.innerHTML = SIDE.outline.html;
+        return;
       }
     }
     const html = rest.length ? note + `<ul class="v-outline">${walk(rest)}</ul>` : '';

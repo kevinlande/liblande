@@ -1524,6 +1524,11 @@ a.ms-ib { text-decoration: none; }
    handles and loupe) stays out of the way. */
 .viewer:not(.pencil):not([data-markup="read"]) .v-scroll { touch-action: none; }
 .viewer:not(.pencil):not([data-markup="read"]) .v-scroll .textLayer { -webkit-touch-callout: none; }
+/* Only the pages' text can be selected. (Otherwise Safari, with a selection
+   dragged past the end of a page, colours the gap between pages and the
+   whole of the next one.) */
+.viewer .pdfViewer, .viewer .pdfViewer .page { -webkit-user-select: none; user-select: none; }
+.viewer .pdfViewer .textLayer, .viewer .pdfViewer [contenteditable="true"] { -webkit-user-select: text; user-select: text; }
 .viewer[data-markup="eraser"] .textLayer { user-select: none; -webkit-user-select: none; }
 /* Erasing, marks don't take presses themselves (PDF.js would pick one up
    and move it, or resize it, as the Pencil rubs it out); the eraser finds
