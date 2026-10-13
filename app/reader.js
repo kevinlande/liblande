@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-13.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-13.06';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -4961,6 +4961,13 @@ function refit() {
   if (v === 'auto' || v === 'page-width' || v === 'page-fit') V.viewer.currentScaleValue = v;
 }
 function showSideTab(tab) {
+  // (What it shows was made for another copy of the paper, as one opened
+  // again after pages were split or turned: made again.)
+  if (V.doc && SIDE.forDoc !== V.doc) {
+    if (SIDE.io) SIDE.io.disconnect();
+    SIDE.token++;
+    Object.assign(SIDE, { io: null, thumbs: [], queue: [], marks: null, outline: null, pp: null, forDoc: V.doc });
+  }
   SIDE.tab = tab;
   store.set('readerTab', tab);
   document.querySelectorAll('#vSide [data-vtab]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.vtab === tab)));
@@ -5184,6 +5191,8 @@ async function drawThumbs() {
     /* a page that won't draw keeps its blank frame */
   } finally {
     SIDE.busy = false;
+    // (Pages asked for meanwhile, for a new list, are drawn now.)
+    if (my !== SIDE.token && SIDE.queue.length) setTimeout(drawThumbs, 0);
   }
 }
 function markCurrentThumb(scroll) {
@@ -5414,16 +5423,23 @@ async function showOutline() {
   if (OLE.on) { oleRender(); return; }
   const o = SIDE.outline;
   if (o.html) {
-    body.innerHTML = `<div class="v-ol-head"><span class="v-ol-note">${esc(o.note || '')}</span><button type="button" class="btn" data-ol-edit title="Change the outline, and save it into the PDF">Edit</button></div>` + o.html;
+    body.innerHTML = `<div class="v-ol-head"><span class="v-ol-note">${esc(o.note || '')}</span>` + OL_MAKE_MENU +
+      `<button type="button" class="btn" data-ol-edit title="Change the outline, and save it into the PDF">Edit</button></div>` + o.html;
     return;
   }
   // None: ways to make one.
   body.innerHTML = `<p class="v-side-note">${o.none || 'This PDF has no outline (a table of contents built into the file), and no Contents page was found in its first pages. Many journal articles have neither.'}</p>` +
     `<div class="v-ol-make"><span>Make one:</span>` +
-    `<button type="button" class="btn" data-ol-make="toc" title="Go to the Contents page first">From the Contents on this page</button>` +
+    `<button type="button" class="btn" data-ol-make="toc" title="The Contents page you\u2019re on, or else the one LibLande finds">From the Contents</button>` +
     `<button type="button" class="btn" data-ol-make="heads" title="Lines in larger type than the text">From the headings</button>` +
     `<button type="button" class="btn" data-ol-make="empty" title="Add entries yourself, page by page">Empty, to fill in</button></div>`;
 }
+
+// Make... (an outline afresh), in the Outline tab and its editor.
+const OL_MAKE_MENU = `<details class="menu right v-ole-make"><summary class="btn" title="Make the outline afresh">Make\u2026</summary><div class="menu-list" role="menu">` +
+  `<button type="button" role="menuitem" data-ol-make="toc">From the Contents</button>` +
+  `<button type="button" role="menuitem" data-ol-make="heads">From the headings</button>` +
+  `<button type="button" role="menuitem" data-ol-make="empty">Empty</button></div></details>`;
 
 /* ---- an outline from the printed Contents */
 // For a PDF with no outline of its own: its Contents page (in the first 25
@@ -5456,12 +5472,21 @@ async function pageLines(doc, n) {
 }
 const romanValue = s => { const v = { i: 1, v: 5, x: 10, l: 50, c: 100, d: 500, m: 1000 }; let n = 0; for (let i = 0; i < s.length; i++) { const a = v[s[i]], b = v[s[i + 1]] || 0; n += a < b ? -a : a; } return n; };
 const TOC_HEAD = /^(table ?of ?)?contents$/i;
-const TOC_ENTRY = /^(.*?\S)(?:\s*[.\u00b7\u2026_]{2,}\s*|\s+)(\d{1,4}|[ivxlcdm]{1,8})$/;
-const tocHeading = t => /^(chapter|part|book|section|appendix|appendices)\b/i.test(t) || ((l => l.length >= 4 && l.replace(/[^A-Z]/g, '').length / l.length > 0.7)(t.replace(/[^A-Za-z]/g, '')));
+// (The page number: in figures, OCR's misreadings of them too, as "4]" or
+// "l6"; or in roman numerals, small or capital.)
+const TOC_ENTRY = /^(.*?\S)(?:\s*[.\u00b7\u2026_]{2,}\s*|\s+)(\d[\dIl|\]]{0,3}|[Il|\]]\d{1,3}|[ivxlcdm]{1,8}|[IVXLCDM]{1,8})$/;
+const tocNum = n => /\d/.test(n) ? n.replace(/[Il|\]]/g, '1') : n.toLowerCase();
+// "2.3 Title": a section numbered within a chapter (depth 1).
+const TOC_NUMBERED = /^(\d{1,2}(?:\.\d{1,2}){0,3})\.?\s+\S/;
+// (A line starting "Chapter", "Part", "Appendix"... is a heading if it's
+// short: a long one is an entry's title running over two lines.)
+const tocHeading = t => (/^(chapter|part|book|section|appendix|appendices)\b/i.test(t) && t.split(/\s+/).length <= 6) || ((l => l.length >= 4 && l.replace(/[^A-Z]/g, '').length / l.length > 0.7)(t.replace(/[^A-Za-z]/g, '')));
 // (at: the Contents start on that page, said so, rather than found.)
 async function printedContents(doc, fileId, at) {
   if (at) fileId = null;
-  const ck = (fileId || '') + ':' + doc.numPages;
+  // (v3: read again since running heads, capital roman numerals and
+  // section numbers were read.)
+  const ck = 'v3:' + (fileId || '') + ':' + doc.numPages;
   if (fileId && TOC_CACHE[ck]) return TOC_CACHE[ck];
   const N = doc.numPages, lines = {};
   const read = async n => (lines[n] = lines[n] || await pageLines(doc, n));
@@ -5474,18 +5499,30 @@ async function printedContents(doc, fileId, at) {
   for (let n = from + 1; n <= Math.min(from + 8, N); n++) {
     if ((await read(n)).filter(l => TOC_ENTRY.test(l.text)).length >= 3) to = n; else break;
   }
+  // Lines on every page, as a running head or a scan's "Copyrighted
+  // Material": on two or more of the pages around the Contents, or twice on
+  // one page (at its top and foot).
+  const others = [from - 2, from - 1, to + 1, to + 2, to + 3].filter(n => n >= 1 && n <= N && (n < from || n > to));
+  const seen = new Map(), twice = new Set();
+  for (const n of others) for (const t of new Set((await read(n)).map(l => l.text.trim().toLowerCase()))) seen.set(t, (seen.get(t) || 0) + 1);
+  for (let n = from; n <= to; n++) {
+    const on = new Map();
+    for (const l of await read(n)) { const t = l.text.trim().toLowerCase(); on.set(t, (on.get(t) || 0) + 1); }
+    on.forEach((k, t) => { if (k >= 2 && !TOC_ENTRY.test(t)) twice.add(t); });
+  }
+  const repeated = l => { const t = l.text.trim().toLowerCase(); return (seen.get(t) || 0) >= 2 || twice.has(t); };
   // The entries.
   const raw = [];
   for (let n = from; n <= to; n++) {
     // (Not the heading, page numbers, or running heads such as "viii CONTENTS".)
-    const ls = (await read(n)).filter(l => !TOC_HEAD.test(l.text.replace(/^(\d{1,4}|[ivxlc]{1,7})\s+|\s+(\d{1,4}|[ivxlc]{1,7})$/gi, '').replace(/\s+/g, '')) && !/^\d{1,4}$|^[ivxlc]{1,6}$/.test(l.text));
+    const ls = (await read(n)).filter(l => !TOC_HEAD.test(l.text.replace(/^(\d{1,4}|[ivxlc]{1,7})\s+|\s+(\d{1,4}|[ivxlc]{1,7})$/gi, '').replace(/\s+/g, '')) && !/^\d{1,4}$|^[ivxlc]{1,6}$/i.test(l.text) && !repeated(l));
     for (let i = 0; i < ls.length; i++) {
       const l = ls[i], m = TOC_ENTRY.exec(l.text);
-      if (m && !(/^[ivxlcdm]+$/.test(m[2]) && /\b(part|chapter|book|volume)$/i.test(m[1]))) { raw.push({ title: m[1].replace(/[\s.\u00b7\u2026_]+$/, ''), num: m[2], x: l.x }); continue; }
+      if (m && !(/^[ivxlcdm]+$/.test(tocNum(m[2])) && /\b(part|chapter|book|volume)$/i.test(m[1]))) { raw.push({ title: m[1].replace(/[\s.\u00b7\u2026_]+$/, ''), num: tocNum(m[2]), x: l.x }); continue; }
       if (tocHeading(l.text)) { raw.push({ title: l.text, num: null, x: l.x, head: true }); continue; }
       // (A title over two lines, its page number on the second.)
       const next = ls[i + 1], nm = next && TOC_ENTRY.exec(next.text);
-      if (nm && !tocHeading(next.text)) { raw.push({ title: l.text + ' ' + nm[1].replace(/[\s.\u00b7\u2026_]+$/, ''), num: nm[2], x: l.x }); i++; }
+      if (nm && !tocHeading(next.text)) { raw.push({ title: l.text + ' ' + nm[1].replace(/[\s.\u00b7\u2026_]+$/, ''), num: tocNum(nm[2]), x: l.x }); i++; }
     }
   }
   if (raw.filter(r => r.num).length < 3) return null;
@@ -5496,12 +5533,24 @@ async function printedContents(doc, fileId, at) {
   // from how far in each line starts.
   for (let i = 0; i < raw.length; i++) if (!raw[i].num) { const nx = raw.slice(i + 1).find(r => r.page); raw[i].page = nx ? nx.page : 0; }
   const out = [], heads = raw.some(r => r.head), minX = Math.min(...raw.map(r => r.x));
-  let cur = null;
-  for (const r of raw) {
-    const item = { title: r.title, page: r.page, items: [] };
-    if (r.head || (!heads && r.x - minX <= 8)) { out.push(item); cur = r.head || !heads ? item : null; }
-    else if (cur && (heads || r.x - minX > 8)) cur.items.push(item);
-    else out.push(item);
+  // Sections numbered within chapters ("2.3 ..."): levels from the numbers.
+  const depth = r => { const m = TOC_NUMBERED.exec(r.title); return m ? m[1].split('.').length - 1 : null; };
+  if (raw.filter(r => depth(r) != null).length >= 3 && raw.some(r => depth(r) > 0)) {
+    const stack = [];
+    for (const r of raw) {
+      const item = { title: r.title, page: r.page, items: [] }, lv = Math.min(depth(r) || 0, stack.length);
+      stack.length = lv;
+      (lv ? stack[lv - 1].items : out).push(item);
+      stack.push(item);
+    }
+  } else {
+    let cur = null;
+    for (const r of raw) {
+      const item = { title: r.title, page: r.page, items: [] };
+      if (r.head || (!heads && r.x - minX <= 8)) { out.push(item); cur = r.head || !heads ? item : null; }
+      else if (cur && (heads || r.x - minX > 8)) cur.items.push(item);
+      else out.push(item);
+    }
   }
   const made = { items: out, from, to };
   if (fileId) {

@@ -2,11 +2,11 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/outline.js'] = '2026-10-13.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/outline.js'] = '2026-10-13.06';
 /* -------------------------------------------------------- outline editor */
 // In the sidebar's Outline tab: Edit the outline (the PDF's own, or the one
-// made from its printed Contents), or, with none, make one: from the
-// Contents on the page you're on (when it wasn't found by itself), from
+// made from its printed Contents), or Make one afresh: from the Contents
+// (the page you're on, if it's the Contents; otherwise the one found), from
 // the paper's headings (lines in larger type than the text), or starting
 // empty. Each entry: its title, to type over, and its page, to go to.
 // Drag one by its grip to move it in or out a level; This page moves
@@ -60,10 +60,7 @@ function oleRender() {
   const body = $('#vSideBody'), n = OLE.items.length;
   body.innerHTML = `<div class="v-ole">` +
     `<div class="v-ole-bar"><button type="button" class="tb-btn v-ole-add" data-ole="add" aria-label="Add an entry for the page you\u2019re on" title="Add an entry for the page you\u2019re on"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>` +
-    `<details class="menu v-ole-make"><summary class="btn" title="Make the outline afresh">Make\u2026</summary><div class="menu-list" role="menu">` +
-    `<button type="button" role="menuitem" data-ol-make="toc">From the Contents on this page</button>` +
-    `<button type="button" role="menuitem" data-ol-make="heads">From the headings</button>` +
-    `<button type="button" role="menuitem" data-ol-make="empty">Empty</button></div></details><span></span>` +
+    OL_MAKE_MENU.replace('menu right', 'menu') + `<span></span>` +
     `<button type="button" class="btn" data-ole="cancel">Cancel</button><button type="button" class="btn primary" data-ole="save">Save</button></div>` +
     (OLE.from ? `<p class="v-side-note v-ole-from">${esc(OLE.from)} Check it, then Save.</p>` : '') +
     (n ? `<ol class="v-ole-list">` + OLE.items.map((it, i) =>
@@ -328,21 +325,24 @@ async function oleMake(kind) {
   try {
     let items = [], from = '';
     if (kind === 'toc') {
+      // The Contents on the page you're on; or else the one found in the
+      // first pages.
       const n = V.viewer.currentPageNumber;
-      body.innerHTML = `<p class="v-side-note">Reading the Contents on page ${n}…</p>`;
-      const made = await printedContents(doc, null, n);
+      body.innerHTML = `<p class="v-side-note">Reading the Contents\u2026</p>`;
+      let made = await printedContents(doc, null, n);
+      if (!made || !made.items.length) made = await printedContents(doc, null);
       if (doc !== V.doc) return;
       if (!made || !made.items.length) {
-        toast('No contents could be read on page ' + n + ': go to the Contents page (or its first page), then try again.', 6000);
+        toast('No Contents page was found. Go to it (its first page), then try again.', 6000);
         OLE.busy = false;
         if (OLE.on) oleRender(); else showOutline();
         return;
       }
       const walk = (list, level) => { for (const it of list) { if (it.page) items.push({ title: it.title, page: it.page, top: null, level }); walk(it.items || [], level + 1); } };
       walk(made.items, 0);
-      from = 'Made from the Contents on page' + (made.from === made.to ? ' ' + made.from : 's ' + made.from + '–' + made.to) + '.';
+      from = 'Made from the Contents on page' + (made.from === made.to ? ' ' + made.from : 's ' + made.from + '\u2013' + made.to) + '.';
     } else {
-      items = await headingOutline(doc, p => { if (p % 10 === 1) body.innerHTML = `<p class="v-side-note">Looking for headings: page ${p} of ${doc.numPages}…</p>`; });
+      items = await headingOutline(doc, p => { if (p % 10 === 1) body.innerHTML = `<p class="v-side-note">Looking for headings: page ${p} of ${doc.numPages}\u2026</p>`; });
       if (doc !== V.doc) return;
       if (!items.length) {
         toast('No headings were found: no lines in larger type than the text' + (V.scan ? ' (a scan has no text: make it searchable first)' : '') + '.', 6000);
@@ -355,7 +355,7 @@ async function oleMake(kind) {
     OLE.busy = false;
     await oleStart(items, from);
   } catch (err) {
-    toast('Couldn’t make an outline: ' + errText(err), 6000);
+    toast('Couldn\u2019t make an outline: ' + errText(err), 6000);
   } finally {
     OLE.busy = false;
   }
@@ -368,7 +368,7 @@ async function oleSave() {
   const items = OLE.items.map(it => Object.assign({}, it, { title: it.title.trim() || 'Untitled' })), file = V.file;
   OLE.busy = true;
   const bar = $('#vSideBody .v-ole-bar [data-ole="save"]');
-  if (bar) { bar.disabled = true; bar.textContent = 'Saving…'; }
+  if (bar) { bar.disabled = true; bar.textContent = 'Saving\u2026'; }
   try {
     await rewritePdf(file, bytes => writeOutline(bytes, items));
     OLE.on = false; OLE.items = []; OLE.sel = -1;
@@ -378,7 +378,7 @@ async function oleSave() {
       showSideTab('outline');
     }
   } catch (err) {
-    toast('Couldn’t save the outline: ' + errText(err), 6000);
+    toast('Couldn\u2019t save the outline: ' + errText(err), 6000);
     if (bar) { bar.disabled = false; bar.textContent = 'Save'; }
   } finally {
     OLE.busy = false;

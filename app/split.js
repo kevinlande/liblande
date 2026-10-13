@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/split.js'] = '2026-10-13.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/split.js'] = '2026-10-13.06';
 /* ---------------------------------------------------------- split pages */
 // From a page's thumbnail (Split), or all the wide pages at once (Split
 // all). A dashed line shows where the page will be cut, at the fold
@@ -84,7 +84,7 @@ async function splitStart(n, all) {
   setTool('read');
   Object.assign(SPLIT, { n, all, at: 0.5 });
   V.viewer.scrollPageIntoView({ pageNumber: n });
-  splitBar('Finding the fold…');
+  splitBar('Finding the fold\u2026');
   const at = await foldOf(doc, n).catch(() => 0.5);
   if (my !== SPLIT.token || doc !== V.doc || !SPLIT.n) return;
   SPLIT.at = at;
@@ -94,8 +94,8 @@ async function splitStart(n, all) {
   if (my !== SPLIT.token || !SPLIT.n) return;
   SPLIT.wide = wide;
   splitBar(all
-    ? 'Split ' + wide + ' wide page' + (wide === 1 ? '' : 's') + ' in two, each at its fold. On this one, drag the line if it’s not at the fold.'
-    : 'Split page ' + n + ' in two at the line. Drag it to the fold if it’s not there.', true);
+    ? 'Split ' + wide + ' wide page' + (wide === 1 ? '' : 's') + ' in two, each at its fold. On this one, drag the line if it\u2019s not at the fold.'
+    : 'Split page ' + n + ' in two at the line. Drag it to the fold if it\u2019s not there.', true);
 }
 function splitEnd() {
   SPLIT.token++;
@@ -157,7 +157,7 @@ async function splitApply() {
     const cuts = [];
     for (const [i, n] of list.entries()) {
       if (doc !== V.doc) throw new Error('the paper was closed.');
-      if (list.length > 1) splitBar('Finding the fold: page ' + (i + 1) + ' of ' + list.length + '…');
+      if (list.length > 1) splitBar('Finding the fold: page ' + (i + 1) + ' of ' + list.length + '\u2026');
       const at = n === first ? at0 : await foldOf(doc, n);
       const vp = (await doc.getPage(n)).getViewport({ scale: 1 }), W = vp.width, H = vp.height;
       const box = (x0, x1) => {
@@ -166,13 +166,13 @@ async function splitApply() {
       };
       cuts.push({ n, first: box(0, at * W), second: box(at * W, W) });
     }
-    splitBar('Splitting and saving…');
+    splitBar('Splitting and saving\u2026');
     // Where you were: the same page, numbered anew (its first half).
     const cur = V.viewer.currentPageNumber, page = cur + cuts.filter(c => c.n < cur).length;
     await rewritePdf(file, bytes => splitPdf(bytes, cuts), { page });
     toast(cuts.length === 1 ? 'Page ' + first + ' split in two.' : cuts.length + ' pages split in two.', 3500);
   } catch (err) {
-    toast('Couldn’t split the page' + (all ? 's' : '') + ': ' + errText(err), 6000);
+    toast('Couldn\u2019t split the page' + (all ? 's' : '') + ': ' + errText(err), 6000);
   } finally {
     SPLIT.busy = false;
     splitEnd();
