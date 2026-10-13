@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/citecheck.js'] = '2026-10-12.35';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/citecheck.js'] = '2026-10-12.41';
 /* ------------------------------------------------------------ manuscript check */
 // A manuscript's citations checked: a Google Doc, or a Word file from Google
 // Drive or this device, read (never changed). Each APA author-date citation
@@ -520,6 +520,7 @@ function showMsReport(rep) {
     `<div class="actions ms-top">` +
       (R.items.length ? `<button type="button" class="btn primary" data-ms-allrefs title="Every work cited, in APA style, in order; references never cited are left out">${ICON.copy}<span>Copy References (${R.items.length})</span></button>` : '') +
       (v.missing.some(w => w.lib) ? `<button type="button" class="btn" data-ms-missing>${ICON.copy}<span>Copy missing (${v.missing.filter(w => w.lib).length})</span></button>` : '') +
+      (rep.kind === 'gdoc' && rep.id && rep.refs && gs && msFixes(rep).length ? `<button type="button" class="btn" data-ms-fix title="Add missing references, bring old ones up to date, take out ones never cited: in the Google Doc itself">${ICON.pencil}<span>Fix in the document\u2026</span></button>` : '') +
       `<button type="button" class="btn" data-ms-again>${ICON.doc}<span>Check another</span></button></div>` +
     (R.left ? `<p class="ms-note">${ICON.alert}<span>${R.left} cited work${R.left === 1 ? ' is' : 's are'} in neither the References nor your library, so Copy References leaves ${R.left === 1 ? 'it' : 'them'} out.</span></p>` : '') +
     sec('bad', ICON.alert, 'Cited, but missing from the References', missing, true) +
@@ -541,6 +542,7 @@ $('#sheetBody').addEventListener('click', ev => {
   if (sheet.mode !== 'msreport') return;
   const rep = sheet.rep, A = sheet.acts || [];
   if (ev.target.closest('[data-ms-recheck]')) { openMsCheck(); runMsCheck({ id: rep.id, kind: rep.kind }); return; }
+  if (ev.target.closest('[data-ms-fix]')) { openMsFix(rep); return; }
   const show = ev.target.closest('[data-ms-show]');
   if (show) { closeSheet(); showTwin(show.dataset.msShow); return; }
   const one = ev.target.closest('[data-ms-ref]');
@@ -584,3 +586,146 @@ $('#sheetBody').addEventListener('click', ev => {
     msFill('', w.names.join(' and '), w.base);
   }
 });
+
+/* ---------- fixing a Google Doc's References */
+// For a Google Doc, Cite Check can change its References section itself:
+// add the references missing (works cited that are in your library, in
+// APA style, in alphabetical order), bring old ones up to date (published
+// since, or a different year in your library), and take out ones never
+// cited (only those ticked). Its citations in the text are left as they
+// are. Done with Google Docs' API, in one batch; the Doc's version history
+// has what it was before. (Word files: reported only.)
+const DOCS_API = 'https:\/\/docs.googleapis.com/v1/documents/';
+async function docsCall(path, opts = {}) {
+  const go = async token => fetch(DOCS_API + path, Object.assign({}, opts, { headers: Object.assign({ Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, opts.headers || {}) }));
+  let r = await go(await driveToken());
+  if (r.status === 401) r = await go(await driveToken(true));
+  if (r.ok) return r.json();
+  let msg = '';
+  try { msg = ((await r.json()).error || {}).message || ''; } catch (e) { /* none */ }
+  if (r.status === 403 && /has not been used|is disabled|SERVICE_DISABLED/i.test(msg)) {
+    const link = (/https:\/\/console\.(?:developers|cloud)\.google\.com\/\S+/.exec(msg) || [''])[0].replace(/[.,]+$/, '');
+    throw new Error('Google Docs’ API isn’t turned on for LibLande yet. In the Google Cloud console, for the project LibLande signs in with, turn on the “Google Docs API”' + (link ? ' (' + link + ')' : '') + ', then try again.');
+  }
+  if (r.status === 403) throw new Error('Google Docs didn’t allow the change: perhaps you can only view or comment on this document.');
+  throw new Error('Google Docs didn’t make the change (error ' + r.status + (msg ? ': ' + msg : '') + ').');
+}
+// A reference's text and its italic stretches, from LibLande's APA HTML.
+function msRuns(html) {
+  const box = document.createElement('div');
+  box.innerHTML = html;
+  let text = '';
+  const italics = [];
+  const walk = (n, it) => n.childNodes.forEach(c => {
+    if (c.nodeType === 3) { if (it && c.data) italics.push([text.length, text.length + c.data.length]); text += c.data; }
+    else walk(c, it || /^(I|EM)$/.test(c.nodeName));
+  });
+  walk(box, false);
+  return { text, italics };
+}
+const msSquash = t => norm(String(t || '')).replace(/[^a-z0-9]+/g, '');
+// The changes that could be made, from a report.
+function msFixes(rep) {
+  const v = msVisible(rep), out = [];
+  v.missing.filter(w => w.lib).forEach(w => { if (!out.some(x => x.kind === 'add' && x.e === w.lib.e)) out.push({ kind: 'add', e: w.lib.e, on: true }); });
+  v.flags.forEach(f => {
+    const r = f.r || (f.pub && f.w && f.w.refs.length === 1 ? f.w.refs[0] : null), e = f.pub || (f.r && f.r.lib && f.r.lib.e);
+    if (r && e && !out.some(x => x.r === r)) out.push({ kind: 'update', r, e, on: true });
+  });
+  v.uncited.forEach(r => out.push({ kind: 'remove', r, on: false }));
+  return out;
+}
+function openMsFix(rep) {
+  const fixes = msFixes(rep);
+  sheet = { mode: 'msfix', rep, fixes, msBack: rep };
+  const row = (x, i) => `<label class="msf-row"><input type="checkbox" data-msf="${i}"${x.on ? ' checked' : ''}>` +
+    `<span><b>${{ add: 'Add', update: 'Bring up to date', remove: 'Take out' }[x.kind]}</b> ` +
+    (x.kind === 'remove' ? esc(x.r.raw) : apaCitation(x.e).html) + (x.kind === 'update' ? `<span class="ms-dim"> (was: ${esc(x.r.raw)})</span>` : '') + `</span></label>`;
+  const part = (kind, title) => { const ix = fixes.map((x, i) => [x, i]).filter(([x]) => x.kind === kind); return ix.length ? `<h3 class="msf-h">${title}</h3>` + ix.map(([x, i]) => row(x, i)).join('') : ''; };
+  showSheet(`<h2>Fix the References</h2>` +
+    `<p class="sheet-note">In “${esc(rep.name)}” itself, in one go. Its citations in the text stay as they are. To undo, use the document’s version history (File › Version history).</p>` +
+    (fixes.length ? part('add', 'Missing from the References') + part('update', 'Out of date') + part('remove', 'Never cited')
+      : `<p class="ms-dim">Nothing in the References for LibLande to change.</p>`), fixes.length ? 'Make the changes' : 'Close');
+}
+$('#sheetBody').addEventListener('change', ev => {
+  const c = ev.target.closest('[data-msf]');
+  if (c && sheet && sheet.mode === 'msfix') sheet.fixes[+c.dataset.msf].on = c.checked;
+});
+// The Doc's paragraphs, with where each starts and ends.
+function msDocParas(doc) {
+  return ((doc.body && doc.body.content) || []).filter(el => el.paragraph).map(el => ({
+    start: el.startIndex, end: el.endIndex,
+    text: (el.paragraph.elements || []).map(x => (x.textRun && x.textRun.content) || '').join('').replace(/\n$/, ''),
+    heading: /^(HEADING_|TITLE)/.test((el.paragraph.paragraphStyle || {}).namedStyleType || ''),
+  }));
+}
+// The requests for the changes chosen: made from the end of the Doc
+// backwards, so each one's place is still right when it's made.
+function msFixRequests(doc, fixes) {
+  const paras = msDocParas(doc);
+  const h = paras.map((p, i) => [p, i]).filter(([p]) => MS_REFS_HEAD.test(p.text)).pop();
+  if (!h) throw new Error('LibLande couldn’t find the References heading in the document.');
+  let end = paras.length;
+  for (let i = h[1] + 1; i < paras.length; i++) if (paras[i].heading || MS_AFTER_REFS.test(paras[i].text)) { end = i; break; }
+  const refs = paras.slice(h[1] + 1, end).filter(p => p.text.trim().length > 15);
+  const last = paras[paras.length - 1];
+  const find = r => { const k = msSquash(r.raw); return refs.find(p => msSquash(p.text) === k) || refs.find(p => k.length > 40 && msSquash(p.text).startsWith(k.slice(0, 40))); };
+  const ops = [], missed = [];
+  const styled = (at, run) => [{ updateTextStyle: { range: { startIndex: at, endIndex: at + run.text.length }, textStyle: { italic: false }, fields: 'italic' } }]
+    .concat(run.italics.map(([a, b]) => ({ updateTextStyle: { range: { startIndex: at + a, endIndex: at + b }, textStyle: { italic: true }, fields: 'italic' } })));
+  const gone = new Set();
+  fixes.filter(x => x.on && x.kind === 'remove').forEach(x => {
+    const p = find(x.r);
+    if (!p) { missed.push(x); return; }
+    gone.add(p);
+    const tail = p === last;
+    ops.push({ at: p.start, rank: 0, reqs: [{ deleteContentRange: { range: { startIndex: tail ? p.start - 1 : p.start, endIndex: tail ? p.end - 1 : p.end } } }] });
+  });
+  fixes.filter(x => x.on && x.kind === 'update').forEach(x => {
+    const p = find(x.r);
+    if (!p || gone.has(p)) { if (!p) missed.push(x); return; }
+    const run = msRuns(apaCitation(x.e).html);
+    ops.push({ at: p.start, rank: 0, reqs: [{ deleteContentRange: { range: { startIndex: p.start, endIndex: p.end - 1 } } }, { insertText: { location: { index: p.start }, text: run.text } }].concat(styled(p.start, run)) });
+  });
+  // (A new one goes before the first that follows it in the alphabet, or
+  // after the last; after the heading if there are none.)
+  const kept = refs.filter(p => !gone.has(p));
+  fixes.filter(x => x.on && x.kind === 'add').forEach(x => {
+    const run = msRuns(apaCitation(x.e).html), key = norm(run.text);
+    const next = kept.find(p => norm(p.text).localeCompare(key) > 0);
+    if (next) { ops.push({ at: next.start, rank: 1, key, reqs: [{ insertText: { location: { index: next.start }, text: run.text + '\n' } }].concat(styled(next.start, run)) }); return; }
+    const after = kept.length ? kept[kept.length - 1] : h[0];
+    ops.push({ at: after.end - 1, rank: 1, key, reqs: [{ insertText: { location: { index: after.end - 1 }, text: '\n' + run.text } }].concat(styled(after.end, run))
+      .concat(after === h[0] ? [{ updateParagraphStyle: { range: { startIndex: after.end, endIndex: after.end + run.text.length }, paragraphStyle: { namedStyleType: 'NORMAL_TEXT' }, fields: 'namedStyleType' } }] : []) });
+  });
+  // (Last in the Doc first; at one place, changes before additions, and
+  // additions in reverse, so they end up in alphabetical order.)
+  ops.sort((a, b) => b.at - a.at || a.rank - b.rank || (b.key || '').localeCompare(a.key || ''));
+  return { requests: ops.flatMap(o => o.reqs), missed };
+}
+async function runMsFix() {
+  const s = sheet, rep = s.rep;
+  if (!s.fixes.some(x => x.on)) { closeSheet(); return; }
+  sheetBusy(true);
+  sheetMsg('Reading the document…');
+  try {
+    const doc = await docsCall(encodeURIComponent(rep.id));
+    const { requests, missed } = msFixRequests(doc, s.fixes);
+    if (sheet !== s) return;
+    if (requests.length) {
+      sheetMsg('Making the changes…');
+      await docsCall(encodeURIComponent(rep.id) + ':batchUpdate', { method: 'POST', body: JSON.stringify({ requests, writeControl: { requiredRevisionId: doc.revisionId } }) });
+    }
+    const made = s.fixes.filter(x => x.on).length - missed.length;
+    s.msBack = null;
+    closeSheet();
+    toast('Made ' + made + ' change' + (made === 1 ? '' : 's') + ' to the References' + (missed.length ? '; ' + missed.length + ' reference' + (missed.length === 1 ? '' : 's') + ' not found as written, left as ' + (missed.length === 1 ? 'it was' : 'they were') : ''), 6000);
+    // (Checked again, to show the document as it is now.)
+    openMsCheck();
+    runMsCheck({ id: rep.id, kind: rep.kind });
+  } catch (err) {
+    if (sheet === s) sheetMsg(/requiredRevisionId|revision/i.test(errText(err)) ? 'The document changed while LibLande was reading it. Try again.' : errText(err), true);
+  } finally {
+    if (sheet === s) sheetBusy(false);
+  }
+}

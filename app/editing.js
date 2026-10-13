@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-10-12.35';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-10-12.41';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -707,7 +707,7 @@ async function saveAdd() {
 $('#sheetForm').addEventListener('submit', ev => {
   ev.preventDefault();
   if (!sheet || $('#sheetSave').disabled) return;
-  if (sheet.mode === 'edit') saveEdit(); else if (sheet.mode === 'forth') saveForth(); else if (sheet.mode === 'join') saveJoin(); else if (sheet.mode === 'export') runExport(); else if (sheet.mode === 'export-save') saveExport(); else if (sheet.mode === 'help' || sheet.mode === 'msreport' || sheet.mode === 'newpapers') closeSheet(); else if (sheet.mode === 'npfollow') saveFollow(); else if (sheet.mode === 'mscheck') runMsCheck(); else if (sheet.mode === 'smart') saveSmart(); else if (sheet.mode === 'bulk') saveBulk(); else if (sheet.mode === 'attach') { const a = sheet, mode = ($('#sheetBody').querySelector('[name=attachMode]:checked') || {}).value; closeSheet(); runAttach(a.entry, a.file, mode === 'replace'); } else saveAdd();
+  if (sheet.mode === 'edit') saveEdit(); else if (sheet.mode === 'forth') saveForth(); else if (sheet.mode === 'join') saveJoin(); else if (sheet.mode === 'export') runExport(); else if (sheet.mode === 'export-save') saveExport(); else if (sheet.mode === 'help' || sheet.mode === 'msreport' || sheet.mode === 'newpapers') closeSheet(); else if (sheet.mode === 'npfollow') saveFollow(); else if (sheet.mode === 'mscheck') runMsCheck(); else if (sheet.mode === 'msfix') runMsFix(); else if (sheet.mode === 'smart') saveSmart(); else if (sheet.mode === 'bulk') saveBulk(); else if (sheet.mode === 'attach') { const a = sheet, mode = ($('#sheetBody').querySelector('[name=attachMode]:checked') || {}).value; closeSheet(); runAttach(a.entry, a.file, mode === 'replace'); } else saveAdd();
 });
 $('#sheetCancel').addEventListener('click', closeSheet);
 $('#sheetBody').addEventListener('click', ev => { const x = ev.target.closest('[data-sheet-cancel]'); if (x && !x.disabled) closeSheet(); });
@@ -1427,7 +1427,9 @@ rowsEl.addEventListener('dragstart', ev => {
   ev.dataTransfer.effectAllowed = 'copyMove';
 });
 rowsEl.addEventListener('dragend', () => { dragKey = null; markJoin(null); libDropOn(null); });
-// A row dropped on another library in the sidebar: copied to it.
+// A row dropped on another library in the sidebar: copied to it; on a
+// static group: put in it.
+const DROP_ON = '.grp[data-lib]:not(.cur), .sec[data-sec="s"] .grp[data-g^="s:"]';
 let libDropEl = null;
 function libDropOn(b) {
   if (libDropEl && libDropEl !== b) libDropEl.classList.remove('drop-on');
@@ -1435,7 +1437,7 @@ function libDropOn(b) {
   if (libDropEl) libDropEl.classList.add('drop-on');
 }
 const libOver = ev => {
-  const b = ev.target.closest && ev.target.closest('.grp[data-lib]:not(.cur)');
+  const b = ev.target.closest && ev.target.closest(DROP_ON);
   if (!dragKey || !b) { libDropOn(null); return; }
   ev.preventDefault();
   ev.dataTransfer.dropEffect = 'copy';
@@ -1445,17 +1447,49 @@ $('#groups').addEventListener('dragenter', libOver);
 $('#groups').addEventListener('dragover', libOver);
 $('#groups').addEventListener('dragleave', ev => { if (libDropEl && !libDropEl.contains(ev.relatedTarget)) libDropOn(null); });
 $('#groups').addEventListener('drop', ev => {
-  const b = ev.target.closest && ev.target.closest('.grp[data-lib]:not(.cur)');
+  const b = ev.target.closest && ev.target.closest(DROP_ON);
   const key = dragKey || (ev.dataTransfer && ev.dataTransfer.getData(KEY_TYPE));
   libDropOn(null);
   if (!b || !key) return;
   ev.preventDefault();
   dragKey = null;
-  const lib = LIBS.list.find(l => l.bibId === b.dataset.lib);
   // (A selected row brings the rest of the selection with it.)
   const keys = state.picked.has(key) ? [...state.picked] : [key];
-  copyToLibrary(keys, lib);
+  dropOnSide(b, keys);
 });
+function dropOnSide(b, keys) {
+  if (b.dataset.lib) copyToLibrary(keys, LIBS.list.find(l => l.bibId === b.dataset.lib));
+  else addToGroup(keys, b.dataset.g.slice(2));
+}
+// Publications put in a static group by a drop: one save to the .bib (as
+// Keywords and groups does). Ones already in it, or in the
+// LibLande inbox, are left out.
+async function addToGroup(keys, name) {
+  const g = (DATA.groups || []).find(x => x.name === name);
+  const list = keys.map(k => BYKEY.get(k)).filter(e => e && !e.ib && !(g && g.keys.includes(e.k)));
+  const what = n => (n === 1 && keys.length === 1 ? '\u201c' + (BYKEY.get(keys[0]).f.title || keys[0]) + '\u201d' : n + ' publication' + (n === 1 ? '' : 's'));
+  if (!list.length) { toast((keys.length === 1 ? 'It\u2019s' : 'They\u2019re') + ' already in ' + name, 2500); return; }
+  toast('Putting ' + what(list.length) + ' in ' + name + '\u2026', 0);
+  try {
+    const res = await callServer('saveEntries', { items: list.map(e => ({ key: e.k, set: {}, groups: { add: [name], remove: [] }, expectHash: e.h || null })),
+      modified: bibdeskTime(), backupName: fileTime() });
+    if (res.stamp) lastBibStamp = res.stamp;
+    if (res.gh) DATA.gh = res.gh;
+    let done = 0;
+    list.forEach(e => {
+      if (!res.hashes[e.k]) return;
+      e.h = res.hashes[e.k];
+      let grp = (DATA.groups || []).find(y => y.name === name);
+      if (!grp) { grp = { name, keys: [] }; (DATA.groups = DATA.groups || []).push(grp); }
+      if (!grp.keys.includes(e.k)) grp.keys.push(e.k);
+      done++;
+    });
+    init(DATA, true);
+    afterWrite();
+    const skipped = (res.skipped || []).length;
+    toast(done ? 'Put ' + what(done) + ' in ' + name + (skipped ? '; ' + skipped + ' left out (changed elsewhere since LibLande read them)' : '') : 'Nothing put in ' + name, 5000);
+  } catch (err) { toast('Couldn\u2019t put ' + (list.length === 1 ? 'it' : 'them') + ' in ' + name + ': ' + errText(err), 7000); }
+}
 // With a finger (an iPad): hold a publication, then drag it onto another
 // library in the sidebar (which opens, if it's tucked away) to copy it
 // there. A finger that moves before the hold is up is scrolling.
@@ -1463,7 +1497,7 @@ const ROW_DRAG = { on: false };
 (() => {
   const list = $('#list');
   let h = null;
-  const libUnder = (x, y) => { const el = document.elementFromPoint(x, y); return el && el.closest('.grp[data-lib]:not(.cur)'); };
+  const libUnder = (x, y) => { const el = document.elementFromPoint(x, y); return el && el.closest(DROP_ON); };
   const start = () => {
     h.on = ROW_DRAG.on = true;
     h.keys = state.picked.has(h.e.k) ? [...state.picked] : [h.e.k];
@@ -1485,13 +1519,13 @@ const ROW_DRAG = { on: false };
     if (!h) return;
     clearTimeout(h.timer);
     if (h.on) {
-      const b = drop && libUnder(drop.x, drop.y), lib = b && LIBS.list.find(l => l.bibId === b.dataset.lib);
+      const b = drop && libUnder(drop.x, drop.y);
       h.ghost.remove();
       h.row.classList.remove('held');
       libDropOn(null);
-      if (h.opened) setTimeout(closeDrawer, lib ? 600 : 0);
+      if (h.opened) setTimeout(closeDrawer, b ? 600 : 0);
       if (h.uncollapsed) app.classList.add('side-collapsed');
-      if (lib) copyToLibrary(h.keys, lib);
+      if (b) dropOnSide(b, h.keys);
       // (The tap that ends it doesn't open the publication.)
       h.row.addEventListener('click', ev => { ev.stopPropagation(); ev.preventDefault(); }, { capture: true, once: true });
       setTimeout(() => { ROW_DRAG.on = false; }, 0);
@@ -1499,7 +1533,7 @@ const ROW_DRAG = { on: false };
     h = null;
   };
   list.addEventListener('pointerdown', ev => {
-    if (h || ev.pointerType === 'mouse' || !gs || !LIBS.list.length || phoneMQ.matches) return;
+    if (h || ev.pointerType === 'mouse' || !gs || phoneMQ.matches) return;
     const row = ev.target.closest('.row[data-i], .card[data-i]'), e = row && state.view[+row.dataset.i];
     if (!e || e.ib) return;
     h = { row, e, id: ev.pointerId, x0: ev.clientX, y0: ev.clientY, on: false };

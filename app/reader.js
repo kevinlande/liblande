@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-12.35';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-12.41';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -4914,6 +4914,7 @@ $('#vSide').addEventListener('click', ev => {
     const item = SIDE.outline && SIDE.outline.flat[+ol.dataset.outline];
     if (!item) return;
     if (item.dest) { pushBack(); V.link.goToDestination(item.dest); }
+    else if (item.page) { pushBack(); V.viewer.currentPageNumber = item.page; }
     else if (item.url && safeUrl(item.url)) window.open(item.url, '_blank', 'noopener');
     if (sidePhone()) toggleSide(false);
     return;
@@ -5187,12 +5188,163 @@ async function showOutline() {
         `<button type="button" class="v-ol-item" data-outline="${i}">${esc(it.title || 'Untitled')}</button>${kids}</li>`;
     }).join('');
     // The page bookmarks are under Bookmarks.
-    const rest = (items || []).filter(it => !isBookmarkItem(it));
-    const html = rest.length ? `<ul class="v-outline">${walk(rest)}</ul>` : '';
+    let rest = (items || []).filter(it => !isBookmarkItem(it)), note = '';
+    // (None in the file: one made from the printed Contents, if there is one.)
+    if (!rest.length) {
+      if (SIDE.tab === 'outline') body.innerHTML = `<p class="v-side-note">This PDF has no outline built in. Looking for a Contents page\u2026</p>`;
+      let made = null;
+      try { made = await printedContents(V.doc, V.file && V.file.id); } catch (err) { made = null; }
+      if (my !== SIDE.token) return;
+      if (made && made.items.length) {
+        rest = made.items;
+        note = `<p class="v-side-note v-ol-note">Made from the printed Contents (page${made.from === made.to ? ' ' + made.from : 's ' + made.from + '\u2013' + made.to}).</p>`;
+      }
+    }
+    const html = rest.length ? note + `<ul class="v-outline">${walk(rest)}</ul>` : '';
     SIDE.outline = { flat, html };
   }
   if (SIDE.tab !== 'outline') return;
-  body.innerHTML = SIDE.outline.html || `<p class="v-side-note">This PDF has no outline (a table of contents built into the file). Many journal articles don\u2019t.</p>`;
+  body.innerHTML = SIDE.outline.html || `<p class="v-side-note">This PDF has no outline (a table of contents built into the file), and no Contents page was found in its first pages. Many journal articles have neither.</p>`;
+}
+
+/* ---- an outline from the printed Contents */
+// For a PDF with no outline of its own: its Contents page (in the first 25
+// pages, perhaps running over several) read line by line: each entry, its
+// page number at the end (roman for the front matter); lines without one,
+// such as "CHAPTER 2. DEFINITION OF OBSERVER", heading what follows. The
+// printed pages are found in the PDF by its page labels, if it has them,
+// or else by the page numbers printed at the top or foot of its pages (or
+// failing that, by finding the first entry's title). Kept on this device.
+const TOC_CACHE = store.get('tocMade', {});
+// A page's text as lines, top to bottom, each with where it starts.
+async function pageLines(doc, n) {
+  const tc = await (await doc.getPage(n)).getTextContent();
+  const rows = [];
+  for (const it of tc.items) {
+    if (!it.str || !it.transform) continue;
+    const x = it.transform[4], y = it.transform[5], h = Math.abs(it.transform[3]) || it.height || 10;
+    let r = rows.find(q => Math.abs(q.y - y) < Math.max(2, h * 0.45));
+    if (!r) rows.push(r = { y, x, parts: [] });
+    r.parts.push({ x, str: it.str, w: it.width || 0 });
+    r.x = Math.min(r.x, x);
+  }
+  rows.sort((a, b) => b.y - a.y);
+  return rows.map(r => {
+    r.parts.sort((a, b) => a.x - b.x);
+    let t = '', end = null;
+    for (const q of r.parts) { if (end != null && q.x - end > 1.5 && !/\s$/.test(t) && !/^\s/.test(q.str)) t += ' '; t += q.str; end = q.x + q.w; }
+    return { x: r.x, text: t.replace(/\s+/g, ' ').trim() };
+  }).filter(l => l.text);
+}
+const romanValue = s => { const v = { i: 1, v: 5, x: 10, l: 50, c: 100, d: 500, m: 1000 }; let n = 0; for (let i = 0; i < s.length; i++) { const a = v[s[i]], b = v[s[i + 1]] || 0; n += a < b ? -a : a; } return n; };
+const TOC_HEAD = /^(table ?of ?)?contents$/i;
+const TOC_ENTRY = /^(.*?\S)(?:\s*[.\u00b7\u2026_]{2,}\s*|\s+)(\d{1,4}|[ivxlcdm]{1,8})$/;
+const tocHeading = t => /^(chapter|part|book|section|appendix|appendices)\b/i.test(t) || ((l => l.length >= 4 && l.replace(/[^A-Z]/g, '').length / l.length > 0.7)(t.replace(/[^A-Za-z]/g, '')));
+async function printedContents(doc, fileId) {
+  const ck = (fileId || '') + ':' + doc.numPages;
+  if (fileId && TOC_CACHE[ck]) return TOC_CACHE[ck];
+  const N = doc.numPages, lines = {};
+  const read = async n => (lines[n] = lines[n] || await pageLines(doc, n));
+  // The Contents page, and the pages of it that follow.
+  let from = 0;
+  // (Spaces taken out: "C O N T E N T S" too.)
+  for (let n = 1; n <= Math.min(25, N) && !from; n++) if ((await read(n)).some(l => TOC_HEAD.test(l.text.replace(/\s+/g, '')))) from = n;
+  if (!from) return null;
+  let to = from;
+  for (let n = from + 1; n <= Math.min(from + 8, N); n++) {
+    if ((await read(n)).filter(l => TOC_ENTRY.test(l.text)).length >= 3) to = n; else break;
+  }
+  // The entries.
+  const raw = [];
+  for (let n = from; n <= to; n++) {
+    // (Not the heading, page numbers, or running heads such as "viii CONTENTS".)
+    const ls = (await read(n)).filter(l => !TOC_HEAD.test(l.text.replace(/^(\d{1,4}|[ivxlc]{1,7})\s+|\s+(\d{1,4}|[ivxlc]{1,7})$/gi, '').replace(/\s+/g, '')) && !/^\d{1,4}$|^[ivxlc]{1,6}$/.test(l.text));
+    for (let i = 0; i < ls.length; i++) {
+      const l = ls[i], m = TOC_ENTRY.exec(l.text);
+      if (m && !(/^[ivxlcdm]+$/.test(m[2]) && /\b(part|chapter|book|volume)$/i.test(m[1]))) { raw.push({ title: m[1].replace(/[\s.\u00b7\u2026_]+$/, ''), num: m[2], x: l.x }); continue; }
+      if (tocHeading(l.text)) { raw.push({ title: l.text, num: null, x: l.x, head: true }); continue; }
+      // (A title over two lines, its page number on the second.)
+      const next = ls[i + 1], nm = next && TOC_ENTRY.exec(next.text);
+      if (nm && !tocHeading(next.text)) { raw.push({ title: l.text + ' ' + nm[1].replace(/[\s.\u00b7\u2026_]+$/, ''), num: nm[2], x: l.x }); i++; }
+    }
+  }
+  if (raw.filter(r => r.num).length < 3) return null;
+  // Printed page to PDF page.
+  const tocEnd = to, pdfOf = await pageMapper(doc, raw, from, tocEnd, read);
+  raw.forEach(r => { r.page = r.num ? pdfOf(r.num) : 0; });
+  // Headings go to their first entry's page; levels from headings, or else
+  // from how far in each line starts.
+  for (let i = 0; i < raw.length; i++) if (!raw[i].num) { const nx = raw.slice(i + 1).find(r => r.page); raw[i].page = nx ? nx.page : 0; }
+  const out = [], heads = raw.some(r => r.head), minX = Math.min(...raw.map(r => r.x));
+  let cur = null;
+  for (const r of raw) {
+    const item = { title: r.title, page: r.page, items: [] };
+    if (r.head || (!heads && r.x - minX <= 8)) { out.push(item); cur = r.head || !heads ? item : null; }
+    else if (cur && (heads || r.x - minX > 8)) cur.items.push(item);
+    else out.push(item);
+  }
+  const made = { items: out, from, to };
+  if (fileId) {
+    TOC_CACHE[ck] = made;
+    const keys = Object.keys(TOC_CACHE);
+    if (keys.length > 30) delete TOC_CACHE[keys[0]];
+    store.set('tocMade', TOC_CACHE);
+  }
+  return made;
+}
+// How printed page numbers become the PDF's pages: its page labels, if it
+// has them; or the numbers printed at the top or foot of the pages after
+// the Contents (the commonest difference between the two); or, failing
+// that, where the first entry's title is found. Roman ones likewise, in
+// the pages before.
+async function pageMapper(doc, raw, tocStart, tocEnd, read) {
+  const N = doc.numPages;
+  let labels = null;
+  try { labels = await doc.getPageLabels(); } catch (err) { labels = null; }
+  if (labels && labels.some((l, i) => l !== String(i + 1))) {
+    const at = new Map();
+    labels.forEach((l, i) => { const k = String(l).trim().toLowerCase(); if (!at.has(k)) at.set(k, i + 1); });
+    const hits = raw.filter(r => r.num && at.has(r.num.toLowerCase())).length;
+    if (hits >= raw.filter(r => r.num).length / 2) return num => at.get(num.toLowerCase()) || 0;
+  }
+  const isRoman = num => /^[ivxlcdm]+$/.test(num);
+  const offsetFrom = async (pages, roman) => {
+    const votes = new Map();
+    for (const n of pages) {
+      const ls = await read(n), ends = ls.slice(0, 2).concat(ls.slice(-2));
+      for (const l of ends) {
+        const m = roman ? /^([ivxlc]{1,7})$/.exec(l.text) : /^(\d{1,4})$/.exec(l.text) || /^(\d{1,4})\s+\S|\S\s+(\d{1,4})$/.exec(l.text);
+        const v = m && (roman ? romanValue(m[1]) : +(m[1] || m[2]));
+        if (v && v <= n) { const off = n - v; votes.set(off, (votes.get(off) || 0) + 1); }
+      }
+    }
+    const best = [...votes].sort((a, b) => b[1] - a[1])[0];
+    return best && best[1] >= 2 ? best[0] : null;
+  };
+  const sq = t => norm(t).replace(/^[\divxlc]+[.)]?\s+/i, '').replace(/[^a-z0-9]+/g, ' ').trim().split(' ').slice(0, 4).join(' ');
+  const findTitle = async (r, lo, hi) => {
+    const want = sq(r.title);
+    if (want.length < 4) return null;
+    // (Not on the Contents pages, where every title is.)
+    for (let n = lo; n <= hi; n++) if ((n < tocStart || n > tocEnd) && (await read(n)).some(l => sq(l.text).includes(want))) return n;
+    return null;
+  };
+  let off = await offsetFrom(Array.from({ length: Math.min(40, N - tocEnd) }, (_, i) => tocEnd + 1 + i), false);
+  if (off == null) {
+    const first = raw.find(r => r.num && !isRoman(r.num));
+    const at = first && await findTitle(first, tocEnd + 1, Math.min(N, tocEnd + 60));
+    off = at ? at - +first.num : tocEnd;
+  }
+  let roff = null;
+  if (raw.some(r => r.num && isRoman(r.num))) {
+    roff = await offsetFrom(Array.from({ length: Math.min(tocEnd + 15, N) }, (_, i) => i + 1), true);
+    if (roff == null) {
+      const first = raw.find(r => r.num && isRoman(r.num));
+      const at = await findTitle(first, tocEnd + 1, Math.min(N, tocEnd + 20)) || await findTitle(first, 1, tocStart - 1);
+      roff = at ? at - romanValue(first.num) : 0;
+    }
+  }
+  return num => { const p = isRoman(num) ? romanValue(num) + roff : +num + off; return p >= 1 && p <= N ? p : 0; };
 }
 
 /* ---- bookmarked pages */
@@ -5659,8 +5811,9 @@ function showBack() {
 const SWIPE_SPEED = 0.6;
 const swipeAxis = (dx, dy) => (Math.abs(dx) > Math.abs(dy) ? 'x' : 'y');
 /* ---- the scroll bar, and the page number on a new page */
-// The scroll bar is for the iPad and iPhone only (touch screens): elsewhere
-// the browser's own can already be dragged. The page number shows on all.
+// The scroll bar, on every device: it starts below the toolbar (the
+// browser's own ran up behind it, where it couldn't be grabbed). The page
+// number shows on all.
 const TOUCH_UI = matchMedia('(pointer: coarse)');
 const RAIL = { frame: 0, drag: null, pillTimer: 0, activeTimer: 0, lastPage: 0 };
 function railMetrics() {
@@ -5672,7 +5825,7 @@ function railMetrics() {
 function drawRail() {
   RAIL.frame = 0;
   const rail = $('#vRail'), m = railMetrics();
-  rail.hidden = !TOUCH_UI.matches || $('#viewer').hidden || !V.doc || m.max < 20;
+  rail.hidden = $('#viewer').hidden || !V.doc || m.max < 20;
   if (rail.hidden) return;
   const t = $('#vThumb');
   t.style.height = m.th + 'px';

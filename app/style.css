@@ -384,7 +384,7 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
    publications are dragged onto it. */
 .lib-row.cur { cursor: default; }
 .lib-row.cur .ct .i { width: 14px; height: 14px; color: var(--accent); }
-.lib-row.drop-on { background: var(--accent-soft); box-shadow: inset 0 0 0 1.5px var(--accent); }
+.lib-row.drop-on, .grp.drop-on { background: var(--accent-soft); box-shadow: inset 0 0 0 1.5px var(--accent); }
 /* The open library's own lists, indented under it. */
 .lib-sub .grp { padding-left: 26px; }
 .lib-sub { overflow: hidden; transition: height .32s cubic-bezier(.32, .72, 0, 1), opacity .24s ease; }
@@ -1172,6 +1172,10 @@ body.is-offline .fileicon:not(.saved), body.is-offline .pdf:not(.saved) { opacit
 .ms-group { display: grid; gap: 4px; margin: 4px 0 8px; }
 .ms-gh { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin: 4px 0 2px; }
 .ms-gh .i { width: 14px; height: 14px; }
+/* Fix the References: each change, ticked or not. */
+.msf-h { margin: 12px 0 2px; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
+.msf-row { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 13px; line-height: 1.45; cursor: pointer; }
+.msf-row input { margin-top: 3px; flex: none; accent-color: var(--accent); }
 /* New papers: the count in the sidebar, the kinds, and each paper. */
 .grp .ct.np-ct { min-width: 18px; padding: 0 6px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-weight: 600; text-align: center; }
 .np-head { display: flex; align-items: center; gap: 4px; }
@@ -1266,12 +1270,18 @@ a.ms-ib { text-decoration: none; }
 .recent-menu .rc-none { margin: 0; padding: 8px 10px; font-size: 13px; color: var(--muted); }
 .link-menu button { display: flex; align-items: center; gap: 10px; }
 .v-scroll { position: absolute; inset: 0; overflow: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y; }
-/* (On a touch screen the page rail, on the right, is the scroll bar: the
-   browser's own would be a second one beside it, as on the iPad. With a
-   mouse there's no rail, and the browser's stays.) */
+/* (The page rail, on the right, is the scroll bar, below the toolbar: the
+   browser's own ran up behind the toolbar, where it couldn't be grabbed.
+   With a mouse, the browser's bar along the bottom stays, for a page
+   zoomed wider than the window.) */
 @media (pointer: coarse) {
   .v-scroll { scrollbar-width: none; }
   .v-scroll::-webkit-scrollbar { display: none; width: 0; height: 0; }
+}
+@media (pointer: fine) {
+  .v-scroll::-webkit-scrollbar { width: 0; height: 9px; background: transparent; }
+  .v-scroll::-webkit-scrollbar-thumb { border-radius: 999px; background: rgba(27, 35, 33, .38); border: 2px solid transparent; background-clip: padding-box; }
+  @supports not selector(::-webkit-scrollbar) { .v-scroll { scrollbar-width: none; } }
 }
 .v-scroll .pdfViewer.zooming { will-change: transform; }
 .v-scroll .pdfViewer.tap-zoom { transition: transform .28s cubic-bezier(.2, .8, .2, 1); will-change: transform; }
@@ -1287,19 +1297,14 @@ a.ms-ib { text-decoration: none; }
 .v-rail[hidden] { display: none; }
 .l-rail { z-index: 6; }
 .v-grab-tip:empty { display: none; }
-.v-grab { position: absolute; right: 3px; width: 6px; min-height: 36px; border-radius: 999px; background: rgba(27, 35, 33, .38); transition: width .15s, background .15s, opacity .3s; }
-.v-rail:hover .v-grab, .v-rail.dragging .v-grab, .v-rail.active .v-grab { width: 10px; background: rgba(27, 35, 33, .6); }
+.v-grab { position: absolute; right: 3px; width: 7px; min-height: 36px; border-radius: 999px; background: rgba(27, 35, 33, .62); box-shadow: 0 0 0 1px rgba(255, 255, 255, .45), 0 1px 3px rgba(0, 0, 0, .2); transition: width .15s, background .15s, opacity .3s; }
+/* (Dark, with a white edge: seen on a white page and on the dark around it.) */
+.v-rail:hover .v-grab, .v-rail.dragging .v-grab, .v-rail.active .v-grab { width: 10px; background: rgba(27, 35, 33, .8); }
 .v-rail.dragging .v-grab { background: var(--accent); }
 .v-grab-tip { position: absolute; right: 18px; top: 50%; transform: translateY(-50%); padding: 4px 9px; border-radius: 999px; background: rgba(27, 35, 33, .85); color: #fff; font: 600 12px var(--ui); white-space: nowrap; font-variant-numeric: tabular-nums; pointer-events: none; opacity: 0; transition: opacity .15s; }
 .v-rail.dragging .v-grab-tip { opacity: 1; }
 .v-pagepill { position: absolute; z-index: 6; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); padding: 6px 13px; border-radius: 999px; background: rgba(27, 35, 33, .8); color: #fff; font: 600 13px var(--ui); font-variant-numeric: tabular-nums; pointer-events: none; opacity: 0; transition: opacity .35s; white-space: nowrap; }
 .v-pagepill.show { opacity: 1; transition: opacity .12s; }
-:root[data-theme="dark"] .v-grab { background: rgba(226, 232, 229, .38); }
-:root[data-theme="dark"] .v-rail:hover .v-grab, :root[data-theme="dark"] .v-rail.active .v-grab { background: rgba(226, 232, 229, .6); }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .v-grab { background: rgba(226, 232, 229, .38); }
-  :root:not([data-theme="light"]) .v-rail:hover .v-grab, :root:not([data-theme="light"]) .v-rail.active .v-grab { background: rgba(226, 232, 229, .6); }
-}
 .v-back { position: absolute; z-index: 6; right: calc(16px + env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); display: flex; align-items: center; border-radius: 999px; background: var(--accent); color: var(--accent-ink); box-shadow: 0 6px 20px rgba(0, 0, 0, .25); }
 .v-back button { border: 0; background: none; color: inherit; display: flex; align-items: center; }
 .v-back.fwd .v-back-go svg { transform: scaleX(-1); }
