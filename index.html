@@ -151,7 +151,7 @@ try {
     <button type="button" class="tb-btn" id="vSideBtn" aria-pressed="false" aria-label="Pages, annotations, bookmarks and outline" title="Pages, annotations, bookmarks and outline"><svg class="i" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M9.5 4.5v15"/></svg></button>
     <button type="button" class="tb-btn v-lib" id="vClose" aria-label="Back to the library" title="Back to the library (Esc); the papers stay open"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h3v16H5zM10.5 4h3v16h-3z"/><path d="M16 5.2l2.9-.8 3.1 15.4-2.9.8z"/></svg><span>Library</span></button>
     <button type="button" class="tb-btn" id="vRecentBtn" aria-label="Recently closed papers" title="Recently closed papers" aria-haspopup="menu"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 20H5A1.5 1.5 0 0 1 3.5 18.5v-14A1.5 1.5 0 0 1 5 3h5.5L14 6.5V8.5"/><path d="M10.5 3v3.5H14"/><path d="M12.2 15.5a4.8 4.8 0 1 0 1.6-3.6" stroke-width="2"/><path d="M13.6 9v3.1h3.1" stroke-width="2"/></svg></button>
-    <div class="v-title" id="vTitle"></div>
+    <div class="v-title-wrap"><div class="v-title" id="vTitle"></div><button type="button" class="tb-btn v-title-x" id="vTitleX" hidden aria-label="Close this paper" title="Close this paper"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
     <span class="v-page" id="vPage"></span>
     <div class="v-tools">
       <button type="button" class="tb-btn" id="vFindBtn" aria-label="Search in this paper" title="Search in this paper (&#x2318;F)" aria-pressed="false"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg></button>
@@ -276,7 +276,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-13.08</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-13.10</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -291,7 +291,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-13.08';
+      l.querySelector('small').textContent = 'Version 2026-10-13.10';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -303,7 +303,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-13.08): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-13.10): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });

@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-13.08';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-13.10';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -760,6 +760,8 @@ function renderPaperTabs() {
   }).join('');
   const n = PTABS.list.length;
   nav.classList.toggle('single', n < 2);
+  // (One paper open: no tabs, so its close button is beside its title.)
+  $('#vTitleX').hidden = n !== 1;
   $('#readerBtn').hidden = !n;
   $('#readerCt').textContent = n > 1 ? String(n) : '';
   $('#readerBtn').setAttribute('aria-label', n === 1 ? 'Back to your open paper' : 'Back to your ' + n + ' open papers');
@@ -898,6 +900,7 @@ $('#vTabs').addEventListener('click', ev => {
   if (g && +g.dataset.ptab !== PTABS.active) switchPaperTab(+g.dataset.ptab);
 });
 $('#readerBtn').addEventListener('click', () => showViewer());
+$('#vTitleX').addEventListener('click', () => { if (PTABS.list.length) closePaperTab(PTABS.active >= 0 ? PTABS.active : 0); });
 // Recently viewed: pressed again, back to the list you were on.
 $('#recentBtn').addEventListener('click', () => {
   if (state.group === 'recent') { setGroup(RECENT.back && groupItems(RECENT.back) ? RECENT.back : 'all'); return; }

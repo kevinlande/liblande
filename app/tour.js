@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-10-13.08';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-10-13.10';
 /* -------------------------------------------------------------- features */
 // What LibLande does, by area: each feature, what it's for, where to find
 // it, and its icon (see featIcon). Shown from the sidebar's foot (Features), with a box to find
@@ -12,6 +12,7 @@ const FEATURES = [
   { area: 'Your library', items: [
     ['Your BibDesk library, anywhere', 'Your .bib file and its PDFs on Google Drive, on any computer, iPad or iPhone. Changes go back into the .bib, so BibDesk opens it as before.', '', 'path:M7.5 18.5h9.8a3.7 3.7 0 0 0 .6-7.35A5.6 5.6 0 0 0 7.2 9.6a4.45 4.45 0 0 0 .3 8.9z'],
     ['Works offline', 'The library and the papers you\u2019ve read are kept on the device. Marks and edits made offline go to Google Drive when you\u2019re back online.', 'The cloud in the toolbar shows what\u2019s waiting', '#netBadge'],
+    ['Check for changes', 'Look at Google Drive now for changes made in BibDesk or on another device (LibLande also looks when it opens). On an iPhone or iPad, pull down on the list.', 'The circling arrow in the toolbar', '#refreshBtn'],
     ['Search', 'Find publications by any words in them; choose which fields to search; save a search as a group.', '\u2318F or /, or the magnifier', '#searchBtn'],
     ['Sort and columns', 'Sort by any column, either way; choose the columns; drag the line between the list and the details to make room.', 'The sort menu at the foot of the list; the column headings', 'path:M7 4v16M4 17l3 3 3-3M17 20V4M14 7l3-3 3 3'],
     ['Lists in the sidebar', 'Library, Recently viewed (tap its number to choose how many), Inbox, Possible duplicates and Forthcoming; your saved searches and static groups; keywords and publication types.', 'The sidebar (the button at the top left)', '#sideToggle'],
@@ -161,9 +162,10 @@ const TOUR_STEPS = [
   { lib: true, sel: '#groups .sec[data-sec="s"]', title: 'Static groups', text: 'Your own groups. Make one with +, and drag publications onto it.' },
   { lib: true, sel: '.side-foot', title: 'Settings and help', text: 'Light or dark, the keyboard shortcuts (yours to change), this tour, and the full list of features.', after: () => closeSidebarIfOverlay() },
   { lib: true, sel: '#tabs', title: 'Open lists', text: 'The lists you\u2019ve opened, as tabs; and the reading list (Queue) of papers to read next.', before: async () => { closeSidebarIfOverlay(); await tourWait(350); } },
-  { lib: true, sel: '#searchBtn', title: 'Search', text: 'Find publications by any words in them (\u2318F or /), choose which fields to search, and save a search as a group.' },
-  { lib: true, sel: '#addBtn', title: 'Add a publication', text: 'From a DOI, ISBN or arXiv ID, which LibLande looks up, or paste a BibTeX entry. Drop a PDF on a publication to attach it.' },
   { lib: true, sel: '#selectBtn', title: 'Select several', text: 'Give several publications keywords and groups at once, add them to your reading list, join versions of one, or export them with their PDFs.' },
+  { lib: true, sel: '#addBtn', title: 'Add a publication', text: 'From a DOI, ISBN or arXiv ID, which LibLande looks up, or paste a BibTeX entry. Drop a PDF on a publication to attach it.' },
+  { lib: true, sel: '#refreshBtn', title: 'Reload the library', text: 'Check Google Drive for changes now: made in BibDesk, or on another device. (LibLande also looks by itself when it opens; on an iPhone or iPad, pull down on the list.)' },
+  { lib: true, sel: '#searchBtn', title: 'Search', text: 'Find publications by any words in them (\u2318F or /), choose which fields to search, and save a search as a group.' },
   { lib: true, sel: '#list', title: 'The publications', text: 'Sort by any column (the menu at the foot), choose the columns, and type letters to jump. Return opens the PDF.' },
   { lib: true, sel: '#detail', title: 'The details', text: 'Everything about the publication: read its PDF, copy a citation (APA or BibTeX), add it to your reading list, rate it, or Edit it.', before: async () => {
     if (phoneMQ.matches) return 'skip';
@@ -173,8 +175,8 @@ const TOUR_STEPS = [
   { sel: '#vRecentBtn', title: 'Recently closed', text: 'The papers you\u2019ve closed lately, to open again with a tap.' },
   { sel: '#vFindBtn', title: 'Search in the paper', text: 'Every match highlighted; Return for the next. A scan can be made searchable first.' },
   { sel: '#vDarkBtn', title: 'Dark pages', text: 'Light text on dark pages, for reading at night.' },
-  { sel: '#vZoomLevel', title: 'Fit to the screen', text: 'Tap the percentage to go round: the whole page, the page\u2019s width, and actual size. Or zoom with \u2212 and +, or pinch.' },
   { sel: '#vSplitBtn', title: 'Split screen', text: 'A second view of the paper below, to keep the references (say) in sight while you read.' },
+  { sel: '#vZoomLevel', title: 'Fit to the screen', text: 'Tap the percentage to go round: the whole page, the page\u2019s width, and actual size. Or zoom with \u2212 and +, or pinch.' },
   { sel: '#vShare', title: 'Share a copy', text: 'Send the PDF to Mail or any app, as it is or as a clean copy without your marks.' },
   { sel: '#vRLMenu', title: 'Reading list', text: 'Add the paper to your reading list, or mark it up next, later, or done.' },
   { sel: '#vPalette', title: 'Marking up', text: 'Highlight (H), underline or strike through (U), draw (P), write on the page (T), pin a note (N), or rub out (E). Highlights join from line to line; tap one to comment on it. It\u2019s all saved into the PDF as you go.' },
@@ -183,6 +185,7 @@ const TOUR_STEPS = [
   { sel: '#vSide', title: 'Your marks', text: 'Every highlight and note in the paper, by colour, to go to, copy with the citation, or add to the publication\u2019s notes.', before: () => readerSide('marks') },
   { sel: '#vSide', title: 'Bookmarks', text: 'Pages you\u2019ve marked to come back to: tap a page\u2019s top right corner twice (or press B).', before: () => readerSide('bookmarks') },
   { sel: '#vSide', title: 'Outline', text: 'The table of contents, to jump to a chapter. A book without one gets one made from its printed Contents; Edit it, or Make one from the headings.', before: () => readerSide('outline') },
+  { sel: '#vSideBody .v-ole-make, #vSideBody .v-ol-make', title: 'Make an outline', text: 'Make the outline afresh: from the printed Contents (the page you\u2019re on, or the one LibLande finds), from the headings, or empty to fill in yourself. Check it, then Save it into the PDF.', before: () => readerSide('outline') },
   { sel: '#vSide', title: 'The citation', text: 'The paper\u2019s details while you read, to copy a citation or edit.', before: () => readerSide('info') },
   { title: 'That\u2019s the tour', text: 'Everything LibLande does is listed in Features, at the foot of the sidebar, with a box to find one. Take the tour again from there whenever you like.' },
 ];
