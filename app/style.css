@@ -1413,6 +1413,40 @@ a.ms-ib { text-decoration: none; }
 .v-outline li.shut > .v-ol-twist .i { transform: rotate(-90deg); }
 .v-ol-item { border: 0; background: none; text-align: left; padding: 5px 6px; font-size: 13px; line-height: 1.35; color: var(--text); border-radius: 6px; }
 .v-ol-item:hover { background: var(--accent-soft); }
+/* The outline's top line (where it came from; Edit), and with none, ways to make one. */
+.v-ol-head { display: flex; align-items: center; gap: 8px; padding: 10px 10px 4px 14px; }
+.v-ol-head .v-ol-note { flex: 1; font-size: 12.5px; line-height: 1.4; color: var(--muted); }
+.v-ol-head .btn, .v-ol-make .btn, .v-ole .btn { min-height: 30px; padding: 3px 11px; font-size: 13px; }
+.v-ol-make { display: grid; gap: 8px; padding: 0 14px 14px; justify-items: start; }
+.v-ol-make > span { font-size: 12.5px; color: var(--muted); }
+/* The outline editor: + and Make..., Cancel and Save; entries with a grip to drag in and out, This page, the page, and Delete (a red minus) at the end. */
+.v-ole-bar { display: flex; align-items: center; gap: 6px; padding: 10px 10px 8px; border-bottom: 1px solid var(--line); }
+.v-ole-bar > span { flex: 1; }
+.v-ole-add .i { width: 19px; height: 19px; }
+.v-ole-make > summary.btn { min-height: 30px; padding: 3px 10px; font-size: 13px; }
+.v-ole-from { padding: 8px 14px 0; font-size: 12.5px; }
+.v-ole-list { position: relative; list-style: none; margin: 0; padding: 6px 6px 28px; }
+.v-ole-list li { position: relative; border-radius: 6px; }
+.v-ole-list li.lifted { opacity: .4; }
+.v-ole-row { display: flex; align-items: center; gap: 2px; padding: 2px 4px 2px calc(var(--lvl, 0) * 14px); }
+.v-ole-here, .v-ole-del { flex: none; display: flex; border: 0; background: none; padding: 4px; border-radius: 6px; color: var(--muted); }
+.v-ole-here .i { width: 17px; height: 17px; }
+.v-ole-here:hover { color: var(--accent); background: var(--bg); }
+.v-ole-del svg { width: 19px; height: 19px; }
+.v-ole-del circle { fill: #d63c31; stroke: none; }
+.v-ole-del path { stroke: #fff; stroke-width: 2.4; stroke-linecap: round; fill: none; }
+.v-ole-del:hover circle { fill: #b82f25; }
+.v-ole-grip { flex: none; display: flex; padding: 5px 1px; color: var(--faint); cursor: ew-resize; touch-action: none; }
+.v-ole-grip .i { width: 15px; height: 15px; }
+.v-ole-grip:hover { color: var(--text); }
+.v-ole-drop { position: absolute; right: 8px; height: 2px; border-radius: 1px; background: var(--accent); pointer-events: none; }
+.v-ole-drop::before { content: ""; position: absolute; left: -4px; top: -3px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+.v-ole-title { flex: 1; min-width: 0; border: 1px solid transparent; border-radius: 5px; background: none; color: var(--text); font: 13px/1.3 var(--ui); padding: 4px 5px; }
+.v-ole-title:hover { border-color: var(--line); }
+.v-ole-title:focus { border-color: var(--accent); background: var(--bg); outline: none; }
+.v-ole-pg { flex: none; min-width: 26px; text-align: right; border: 0; background: none; color: var(--muted); font: 12px var(--ui); font-variant-numeric: tabular-nums; padding: 4px 4px; border-radius: 5px; }
+.v-ole-pg:hover { color: var(--accent); background: var(--bg); }
+@media (pointer: coarse) { .v-ole-grip { padding: 9px 3px; } .v-ole-title { font-size: 16px; } .v-ole-here, .v-ole-del { padding: 8px 5px; } }
 @media (max-width: 599px) {
   .v-side { width: 100%; z-index: 7; border-right: 0; }
   .v-side-grip { display: none; }
@@ -1445,6 +1479,13 @@ a.ms-ib { text-decoration: none; }
 .v-ocr-x:hover { color: var(--text); }
 .v-ocr-fill { position: absolute; left: 0; bottom: 0; height: 3px; width: 0; background: var(--accent); transition: width .4s; }
 .v-ocr:not(.busy) .v-ocr-fill { display: none; }
+/* Split pages: the bar (as OCR's), and the line where the page will be cut, to drag. */
+.v-cut { max-width: min(560px, calc(100% - 32px)); }
+.v-cut-line { position: absolute; z-index: 30; top: 0; bottom: 0; width: 28px; margin-left: -14px; cursor: ew-resize; touch-action: none; }
+.v-cut-line::before { content: ""; position: absolute; left: 13px; top: 0; bottom: 0; border-left: 2px dashed var(--accent); }
+.v-cut-grip { position: absolute; left: 4px; top: 50%; width: 20px; height: 44px; margin-top: -22px; border-radius: 10px; background: var(--accent); box-shadow: 0 2px 8px rgba(0, 0, 0, .3); }
+.v-cut-grip::after { content: ""; position: absolute; left: 7px; right: 7px; top: 14px; bottom: 14px; border-left: 2px solid var(--accent-ink); border-right: 2px solid var(--accent-ink); opacity: .7; }
+.v-cut-line.moving .v-cut-grip { transform: scale(1.1); }
 @media (max-width: 599px) { .v-zoomctl { display: none; } }
 /* (The panel doesn't open on a phone.) */
 @media (max-width: 699px) { #vSplitBtn { display: none; } }

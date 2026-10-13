@@ -192,6 +192,7 @@ try {
     <div class="vp-panel" id="vpPanel" hidden role="dialog" aria-label="Colour and size"></div>
     <button type="button" class="vp-show" id="vpShow" hidden title="Show the markup tools" aria-label="Show the markup tools"><svg class="i" viewBox="0 0 24 24"><path d="M4 20l1.2-4.8L15.8 4.6a2 2 0 0 1 2.8 0l.8.8a2 2 0 0 1 0 2.8L8.8 18.8z"/><path d="M13.5 7l3.5 3.5"/></svg></button>
     <div class="v-ocr" id="vOcr" hidden role="status"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16"/><path d="M8 9.5h8M8 12h8M8 14.5h5"/></svg><span class="v-ocr-msg"></span><button type="button" class="btn" id="vOcrGo"></button><button type="button" class="v-ocr-x" id="vOcrX" aria-label="Dismiss" title="Don’t offer this for this paper again"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"/></svg></button><i class="v-ocr-fill"></i></div>
+    <div class="v-ocr v-cut" id="vCut" hidden role="status"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="1.5"/><path d="M12 2.5v19" stroke-dasharray="2.2 2"/></svg><span class="v-cut-msg"></span><button type="button" class="btn primary" id="vCutGo" hidden>Split</button><button type="button" class="v-ocr-x" id="vCutX" aria-label="Cancel" title="Cancel (Esc)"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"/></svg></button></div>
     <div class="v-back" id="vBack" hidden><button type="button" class="v-back-go" id="vBackGo"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 7l-5 5 5 5"/><path d="M5 12h9a5 5 0 0 1 5 5v1"/></svg><span></span></button><button type="button" class="v-back-x" id="vBackX" aria-label="Dismiss" title="Dismiss"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"/></svg></button></div>
   </div>
   <div class="v-status" id="vStatus" role="status" hidden></div>
@@ -275,7 +276,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-13.01</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-13.04</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -290,7 +291,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-13.01';
+      l.querySelector('small').textContent = 'Version 2026-10-13.04';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -302,14 +303,14 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-13.01): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-13.04): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
 })();
 </script>
 
-<script id="appLoader" data-parts="app/library.js app/reader.js app/editing.js app/citecheck.js app/newpapers.js app/ocr.js app/start.js">
+<script id="appLoader" data-parts="app/library.js app/reader.js app/editing.js app/citecheck.js app/newpapers.js app/ocr.js app/split.js app/outline.js app/start.js">
 // The app's scripts (app/), fetched together and run joined as one script,
 // in one go, inside one function: so nothing else runs between them (a
 // timer one sets can't find the next not yet there), and their names stay

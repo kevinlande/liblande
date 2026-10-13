@@ -1,8 +1,8 @@
 ﻿// LibLande: the library: data, the reading list, groups, search, the list and the details.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, reader, editing, citecheck, newpapers, ocr, start.)
+// index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-13.01';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-13.04';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.

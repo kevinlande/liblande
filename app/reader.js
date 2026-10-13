@@ -1,8 +1,8 @@
 ﻿// LibLande: the PDF reader: pages, marks, tools, saving, the sidebar.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, reader, editing, citecheck, newpapers, ocr, start.)
+// index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-13.01';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-13.04';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -393,6 +393,7 @@ function ensureViewer(lib, VL) {
     noteProgress(e.pageNumber, viewer.pagesCount);
     notePosition(e.pageNumber);
   });
+  bus.on('pagerendered', e => { if (SPLIT.n === e.pageNumber) splitLine(); });
   bus.on('pagesloaded', e => {
     $('#vPage').textContent = viewer.currentPageNumber + ' / ' + e.pagesCount; RAIL.lastPage = viewer.currentPageNumber; railSoon();
     V.endPage = 0;
@@ -477,6 +478,7 @@ async function openReader(entry, file, pos) {
   TAKEN.clear();
   $('#viewer').classList.remove('bars-hidden');
   V.restore = pos && pos.top != null ? pos : null;
+  if (SPLIT.n && !SPLIT.busy) splitEnd();
   Object.assign(V, { entry, file, bytes: null, md5: null, stale: null, scan: false, dirty: false, drawing: false, selected: false, canUndo: false, canRedo: false, pageLabels: undefined, quotePages: null, quoteFonts: null });
   hideQuote();
   $('#vTitle').textContent = entry.f.title || file.n;
@@ -1221,7 +1223,8 @@ async function uploadMarked(file, bytes) {
 // from the one on Drive, which is uploaded (if it's still the one on
 // Drive), and the paper is opened again where you are (or, if it's open
 // behind the library, when you go back to it).
-async function rewritePdf(file, edit) {
+// (opts.page: the page to open it at, as when pages were added.)
+async function rewritePdf(file, edit, opts = {}) {
   const showing = () => V.file && V.file.id === file.id && V.doc;
   if (!showing()) throw new Error('the paper isn\u2019t open.');
   if (V.dirty || V.bmDirty || V.drawing) {
@@ -1243,7 +1246,14 @@ async function rewritePdf(file, edit) {
   if (showing()) {
     if (!$('#viewer').hidden) {
       const side = sideOpen(), sideTop = $('#vSideBody').scrollTop;
-      await openReader(V.entry, V.file, spot());
+      await openReader(V.entry, V.file, opts.page ? null : spot());
+      if (opts.page && V.viewer) {
+        // (Once its pages are laid out, and after any place it would
+        // otherwise open at.)
+        const go = () => setTimeout(() => { if (V.viewer && V.viewer.pagesCount >= opts.page) V.viewer.currentPageNumber = opts.page; }, 150);
+        if (V.viewer.pagesCount && V.doc && V.viewer.pdfDocument === V.doc) go();
+        else { const once = () => { V.bus.off('pagesinit', once); go(); }; V.bus.on('pagesinit', once); }
+      }
       if (side && V.doc && V.file && V.file.id === file.id) {
         if (!sideOpen()) toggleSide(true);
         setTimeout(() => { $('#vSideBody').scrollTop = sideTop; }, 150);
@@ -4929,6 +4939,7 @@ function resetSide() {
   SIDE.token++;
   if (SIDE.io) SIDE.io.disconnect();
   Object.assign(SIDE, { io: null, thumbs: [], queue: [], busy: false, marks: null, outline: null, pp: null, colour: null });
+  Object.assign(OLE, { on: false, items: [], sel: -1, from: '' });
   $('#vSideBody').replaceChildren();
 }
 function toggleSide(open) {
@@ -5071,6 +5082,9 @@ $('#vSide').addEventListener('click', ev => {
   if (del) { toggleBookmark(+del.dataset.bmDel); return; }
   const rot = ev.target.closest('[data-rot]');
   if (rot) { rotatePage(+rot.dataset.rotPage, +rot.dataset.rot); return; }
+  const sp = ev.target.closest('[data-split]');
+  if (sp) { splitStart(+sp.dataset.split, false); return; }
+  if (ev.target.closest('[data-split-all]')) { splitStart(0, true); return; }
   const rotAll = ev.target.closest('[data-rot-all]');
   if (rotAll && V.doc) { rotatePages(Array.from({ length: V.doc.numPages }, (_, i) => i + 1), +rotAll.dataset.rotAll); return; }
   const pg = ev.target.closest('[data-page]');
@@ -5109,7 +5123,7 @@ async function showThumbs() {
   // Every page turned at once (a paper scanned sideways).
   const head = document.createElement('div');
   head.className = 'v-thumbs-head';
-  head.innerHTML = `<span>Rotate all pages</span><button type="button" data-rot-all="-90" aria-label="Rotate all pages left" title="Rotate all pages left"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 9.5A8 8 0 1 1 6 16.5"/><path d="M4 4.5v5h5"/></svg></button><button type="button" data-rot-all="90" aria-label="Rotate all pages right" title="Rotate all pages right"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 9.5A8 8 0 1 0 18 16.5"/><path d="M20 4.5v5h-5"/></svg></button>`;
+  head.innerHTML = `<span>All pages</span><button type="button" data-split-all aria-label="Split all wide pages in two" title="Split all wide pages in two (two book pages scanned side by side)"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="1.5"/><path d="M12 2.5v19" stroke-dasharray="2.2 2"/></svg></button><button type="button" data-rot-all="-90" aria-label="Rotate all pages left" title="Rotate all pages left"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 9.5A8 8 0 1 1 6 16.5"/><path d="M4 4.5v5h5"/></svg></button><button type="button" data-rot-all="90" aria-label="Rotate all pages right" title="Rotate all pages right"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 9.5A8 8 0 1 0 18 16.5"/><path d="M20 4.5v5h-5"/></svg></button>`;
   list.appendChild(head);
   for (let n = 1; n <= doc.numPages; n++) {
     const box = document.createElement('div');
@@ -5121,7 +5135,7 @@ async function showThumbs() {
     b.innerHTML = `<span class="v-thumb-img" style="aspect-ratio:${(1 / ratio).toFixed(4)}"></span><span class="v-thumb-n">${n}</span>`;
     // (Turning the page: shown on the page you're on, and on the one
     // under the pointer.)
-    box.innerHTML = `<span class="v-thumb-rot"><button type="button" data-rot="-90" data-rot-page="${n}" aria-label="Rotate page ${n} left" title="Rotate left"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 9.5A8 8 0 1 1 6 16.5"/><path d="M4 4.5v5h5"/></svg></button><button type="button" data-rot="90" data-rot-page="${n}" aria-label="Rotate page ${n} right" title="Rotate right"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 9.5A8 8 0 1 0 18 16.5"/><path d="M20 4.5v5h-5"/></svg></button></span>`;
+    box.innerHTML = `<span class="v-thumb-rot"><button type="button" data-rot="-90" data-rot-page="${n}" aria-label="Rotate page ${n} left" title="Rotate left"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 9.5A8 8 0 1 1 6 16.5"/><path d="M4 4.5v5h5"/></svg></button><button type="button" data-rot="90" data-rot-page="${n}" aria-label="Rotate page ${n} right" title="Rotate right"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 9.5A8 8 0 1 0 18 16.5"/><path d="M20 4.5v5h-5"/></svg></button><button type="button" data-split="${n}" aria-label="Split page ${n} in two" title="Split in two (two book pages scanned side by side)"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="1.5"/><path d="M12 2.5v19" stroke-dasharray="2.2 2"/></svg></button></span>`;
     box.prepend(b);
     list.appendChild(box);
     SIDE.thumbs.push({ el: b, done: false });
@@ -5375,28 +5389,40 @@ async function showOutline() {
         `<button type="button" class="v-ol-item" data-outline="${i}">${esc(it.title || 'Untitled')}</button>${kids}</li>`;
     }).join('');
     // The page bookmarks are under Bookmarks.
-    let rest = (items || []).filter(it => !isBookmarkItem(it)), note = '';
+    let rest = (items || []).filter(it => !isBookmarkItem(it)), note = '', made = null;
     // (None in the file: one made from the printed Contents, if there is one.)
     if (!rest.length) {
       if (SIDE.tab === 'outline') body.innerHTML = `<p class="v-side-note">This PDF has no outline built in. Looking for a Contents page\u2026</p>`;
-      let made = null, failed = null;
+      let failed = null;
       try { made = await printedContents(V.doc, V.file && V.file.id); } catch (err) { failed = err; console.warn('Reading the Contents page:', err); }
       if (my !== SIDE.token) return;
       if (made && made.items.length) {
         rest = made.items;
-        note = `<p class="v-side-note v-ol-note">Made from the printed Contents (page${made.from === made.to ? ' ' + made.from : 's ' + made.from + '\u2013' + made.to}).</p>`;
+        note = `Made from the printed Contents (page${made.from === made.to ? ' ' + made.from : 's ' + made.from + '\u2013' + made.to}).`;
       } else if (failed) {
         // (Said, rather than that there's none.)
-        SIDE.outline = { flat, html: `<p class="v-side-note">This PDF has no outline built in, and its Contents page couldn\u2019t be read: ${esc(errText(failed))}</p>` };
-        if (SIDE.tab === 'outline') body.innerHTML = SIDE.outline.html;
+        SIDE.outline = { flat, html: '', items: [], none: `This PDF has no outline built in, and its Contents page couldn\u2019t be read: ${esc(errText(failed))}` };
+        if (SIDE.tab === 'outline') showOutline();
         return;
       }
     }
-    const html = rest.length ? note + `<ul class="v-outline">${walk(rest)}</ul>` : '';
-    SIDE.outline = { flat, html };
+    const html = rest.length ? `<ul class="v-outline">${walk(rest)}</ul>` : '';
+    SIDE.outline = { flat, html, items: rest, note };
   }
   if (SIDE.tab !== 'outline') return;
-  body.innerHTML = SIDE.outline.html || `<p class="v-side-note">This PDF has no outline (a table of contents built into the file), and no Contents page was found in its first pages. Many journal articles have neither.</p>`;
+  // Being edited (see outline.js): the editor.
+  if (OLE.on) { oleRender(); return; }
+  const o = SIDE.outline;
+  if (o.html) {
+    body.innerHTML = `<div class="v-ol-head"><span class="v-ol-note">${esc(o.note || '')}</span><button type="button" class="btn" data-ol-edit title="Change the outline, and save it into the PDF">Edit</button></div>` + o.html;
+    return;
+  }
+  // None: ways to make one.
+  body.innerHTML = `<p class="v-side-note">${o.none || 'This PDF has no outline (a table of contents built into the file), and no Contents page was found in its first pages. Many journal articles have neither.'}</p>` +
+    `<div class="v-ol-make"><span>Make one:</span>` +
+    `<button type="button" class="btn" data-ol-make="toc" title="Go to the Contents page first">From the Contents on this page</button>` +
+    `<button type="button" class="btn" data-ol-make="heads" title="Lines in larger type than the text">From the headings</button>` +
+    `<button type="button" class="btn" data-ol-make="empty" title="Add entries yourself, page by page">Empty, to fill in</button></div>`;
 }
 
 /* ---- an outline from the printed Contents */
@@ -5432,13 +5458,15 @@ const romanValue = s => { const v = { i: 1, v: 5, x: 10, l: 50, c: 100, d: 500, 
 const TOC_HEAD = /^(table ?of ?)?contents$/i;
 const TOC_ENTRY = /^(.*?\S)(?:\s*[.\u00b7\u2026_]{2,}\s*|\s+)(\d{1,4}|[ivxlcdm]{1,8})$/;
 const tocHeading = t => /^(chapter|part|book|section|appendix|appendices)\b/i.test(t) || ((l => l.length >= 4 && l.replace(/[^A-Z]/g, '').length / l.length > 0.7)(t.replace(/[^A-Za-z]/g, '')));
-async function printedContents(doc, fileId) {
+// (at: the Contents start on that page, said so, rather than found.)
+async function printedContents(doc, fileId, at) {
+  if (at) fileId = null;
   const ck = (fileId || '') + ':' + doc.numPages;
   if (fileId && TOC_CACHE[ck]) return TOC_CACHE[ck];
   const N = doc.numPages, lines = {};
   const read = async n => (lines[n] = lines[n] || await pageLines(doc, n));
   // The Contents page, and the pages of it that follow.
-  let from = 0;
+  let from = at || 0;
   // (Spaces taken out: "C O N T E N T S" too.)
   for (let n = 1; n <= Math.min(25, N) && !from; n++) if ((await read(n)).some(l => TOC_HEAD.test(l.text.replace(/\s+/g, '')))) from = n;
   if (!from) return null;

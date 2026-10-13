@@ -1,8 +1,8 @@
 ﻿// LibLande: OCR: a scanned PDF made searchable.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, reader, editing, citecheck, newpapers, ocr, start.)
+// index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/ocr.js'] = '2026-10-13.01';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/ocr.js'] = '2026-10-13.04';
 /* ------------------------------------------------------------------ OCR */
 // A scan's pages are pictures, with no text to search, select or mark.
 // Make searchable reads each page without text with Tesseract (in this
@@ -109,7 +109,7 @@ function ocrBar() {
   const bar = $('#vOcr');
   if (!bar) return;
   const busy = !!OCR.file, here = busy && V.file && V.file.id === OCR.file.id;
-  const offer = !busy && V.scan && V.file && !OCR_NO.has(V.file.id) && !$('#viewer').hidden;
+  const offer = !busy && V.scan && V.file && !OCR_NO.has(V.file.id) && !$('#viewer').hidden && !SPLIT.n;
   bar.hidden = !(busy || offer) || $('#viewer').hidden;
   bar.classList.toggle('busy', busy);
   if (bar.hidden) return;
