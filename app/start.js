@@ -1,8 +1,8 @@
 ﻿// LibLande: messages, navigation, and starting up.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, start.)
+// index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-10-13.06';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-10-13.07';
 // On GitHub Pages, every part of the app must be from the same version: a
 // part kept from an older one (the offline copy, served when the network
 // was slow) lacks what this page needs. Then the kept copies go, and the
@@ -884,6 +884,6 @@ if (RELOADING) {
 }
 // For the test suite (_test/suite.html) only: a few of the reader's
 // insides, when the test page asks for them.
-if (window.LIBLANDE_TEST) window.LL = { toggleBookmark, OLE, oleMake, headingOutline, pageRows, writeOutline, SPLIT, foldOf, splitStart, splitApply, printedContents, pageLines, OCR, makeSearchable, ocrLayer, textlessPages, openMsCheck, runMsCheck, LIBS, renderGroups, SMART, NP, npCheck, openNewPapers, openFollow, sweepCovers, COVERS, V, BM, JOURNAL, LOCAL, AUTO, saveMarkup, setTool, setReading, renderRLBar, netBadge, placeToast, POS, MARK, PDFJS, pdfJsFix, pdfViewerFix, findEndPage, refHeading, combineMarks, makeZip, MARK_ERASER: () => MARK.eraserSize,
+if (window.LIBLANDE_TEST) window.LL = { TOUR, startTour, endTour, openFeatures, FEATURES, toggleBookmark, OLE, oleMake, headingOutline, pageRows, writeOutline, SPLIT, foldOf, splitStart, splitApply, printedContents, pageLines, OCR, makeSearchable, ocrLayer, textlessPages, openMsCheck, runMsCheck, LIBS, renderGroups, SMART, NP, npCheck, openNewPapers, openFollow, sweepCovers, COVERS, V, BM, JOURNAL, LOCAL, AUTO, saveMarkup, setTool, setReading, renderRLBar, netBadge, placeToast, POS, MARK, PDFJS, pdfJsFix, pdfViewerFix, findEndPage, refHeading, combineMarks, makeZip, MARK_ERASER: () => MARK.eraserSize,
   lib: () => ({ ENTRIES, BYKEY, DATA, VERSION_OF, VERSIONS, NESTED, state }), init, refresh, openEdit, isForthcoming, forthChanges, parseBibtexEntry,
   oldLineMarks, convertOldLines, fetchAhead, PTABS, renderPaperTabs, openPdf, loadPdfJs, addStreamIteration, msCheck, msCites, msRef, msDocx, MS, msVisible };

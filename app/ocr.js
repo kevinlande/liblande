@@ -1,8 +1,8 @@
 ﻿// LibLande: OCR: a scanned PDF made searchable.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, start.)
+// index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/ocr.js'] = '2026-10-13.06';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/ocr.js'] = '2026-10-13.07';
 /* ------------------------------------------------------------------ OCR */
 // A scan's pages are pictures, with no text to search, select or mark.
 // Make searchable reads each page without text with Tesseract (in this
