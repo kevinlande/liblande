@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-10-13.17';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-10-13.19';
 /* -------------------------------------------------------------- features */
 // What LibLande does, by area: each feature, what it's for, where to find
 // it, and its icon (see featIcon). Shown from the sidebar's foot (Features), with a box to find
@@ -33,7 +33,7 @@ const FEATURES = [
     ['Copy a citation', 'APA, APA in text, BibTeX or the cite key, one publication or several.', 'Copy, in the details pane; or the shortcuts', 'ICON:quote'],
     ['Possible duplicates', 'Publications that look like the same one, to join as versions of one (the main one shown, the others under it) or to mark as different.', 'Possible duplicates in the sidebar', 'ICON:copy'],
     ['Forthcoming', 'Papers listed as forthcoming, checked for whether they\u2019ve been published since.', 'Forthcoming in the sidebar', 'ICON:forth'],
-    ['Reading list', 'Papers to read: up next, later, or done; one list for each library.', 'The bookmark in the details pane or the reader; the Queue tab', '#vRL'],
+    ['Reading list', 'Papers to read: up next, later, or done; one list for each library. Each shows how far you\u2019ve read (press it to start the count again).', 'The bookmark in the details pane or the reader; the Queue tab', '#vRL'],
   ] },
   { area: 'Reading papers', items: [
     ['Papers in tabs', 'Several papers open at once; going back to the library keeps them open.', 'The tabs along the top of the reader', 'path:M3.5 9h17v10.5h-17zM3.5 9V6a1 1 0 0 1 1-1H10l1.5 4M11.5 9V6a1 1 0 0 1 1-1H18l1.5 4'],

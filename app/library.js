@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-13.17';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-13.19';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -317,8 +317,10 @@ function rlTag(e) {
   const x = RL.get(e.k);
   return (x && x.list === 'next' ? '<span class="rl-tag next">Up next</span>' : '') + (x ? progressTag(e) : '');
 }
-// How far into each paper you've read: the furthest page reached, as a
-// share of its pages ({key: {p, at}}; page 1 alone doesn't count). Kept
+// How far into each paper you've read: the pages read (each long enough
+// on screen: see noteProgress), as a share of its pages ({key: {p, at,
+// pages: "1-5,8", n: pages up to its references, base: an older count, from
+// before pages were kept}; reset: true once pressed to start again). Kept
 // with your preferences (the 300 read most lately), for every device.
 const PROGRESS = store.get('progress', {});
 // What's shared with your other devices (through your preferences): each
@@ -356,17 +358,84 @@ const elsewhere = fileId => { const x = SYNC.position && POS[fileId]; return x &
 // (the pages before it count towards it), so a paper read through doesn't
 // stall at 85% for its reference list. Found once per PDF (endPage) and
 // remembered; without one (a scan, say), the whole PDF counts.
+// A page counts as read once it's been the page you're on long enough to
+// read it: by its words, 4 seconds for a page with little text (a figure,
+// say) up to 20 for a full one; 10 for a page of a scan, with no text.
+// Scrolling past, or jumping to the end, doesn't count; nor does time with
+// LibLande out of sight. Reading 90% of the pages (to where the references
+// start) is reading it through: a table or two skimmed past doesn't hold
+// it back.
+const DWELL = { key: null, page: 0, t0: 0, acc: new Map(), need: new Map(), timer: 0 };
+const pagesOf = str => { const out = new Set(); String(str || '').split(',').forEach(r => { const [a, b] = r.split('-').map(Number); if (a) for (let n = a; n <= (b || a) && n - a < 5000; n++) out.add(n); }); return out; };
+const rangesOf = set => {
+  const ns = [...set].sort((a, b) => a - b), out = [];
+  for (let i = 0; i < ns.length; i++) { let j = i; while (j + 1 < ns.length && ns[j + 1] === ns[j] + 1) j++; out.push(i === j ? String(ns[i]) : ns[i] + '-' + ns[j]); i = j; }
+  return out.join(',');
+};
+const progressOf = x => {
+  const n = x.n || 0, read = n ? [...pagesOf(x.pages)].filter(q => q <= n).length : 0;
+  return Math.max(x.base || 0, n ? Math.min(100, Math.round(read / Math.max(1, n * 0.9) * 100)) : 0);
+};
 function noteProgress(page, total) {
+  dwellFlush();
   const e = V.entry;
-  if (!e || !total || page < 2) return;
-  const end = V.endPage && V.endPage <= total ? V.endPage : total;
-  const p = Math.min(100, Math.round(page / end * 100)), old = PROGRESS[e.k];
-  if (old && old.p >= p) return;
-  PROGRESS[e.k] = { p, at: Date.now() };
-  if (p >= 100) syncReaderRL();
-  clearTimeout(noteProgress.t);
-  noteProgress.t = setTimeout(saveProgress, 4000);
+  if (!e || !total) return;
+  if (DWELL.key !== e.k) { DWELL.key = e.k; DWELL.acc = new Map(); DWELL.need = new Map(); }
+  DWELL.page = page; DWELL.total = total; DWELL.t0 = Date.now();
+  dwellNeed(page);
+  clearInterval(DWELL.timer);
+  DWELL.timer = setInterval(dwellTick, 1000);
 }
+// (The time since last looked, to the page you're on, if LibLande was in
+// sight with the paper open.)
+function dwellFlush() {
+  const now = Date.now();
+  if (DWELL.page && DWELL.t0 && V.entry && V.entry.k === DWELL.key && !document.hidden && !$('#viewer').hidden) {
+    DWELL.acc.set(DWELL.page, (DWELL.acc.get(DWELL.page) || 0) + Math.min(now - DWELL.t0, 5000));
+  }
+  DWELL.t0 = now;
+}
+function dwellTick() {
+  if (!V.entry || V.entry.k !== DWELL.key) { clearInterval(DWELL.timer); return; }
+  dwellFlush();
+  const pg = DWELL.page;
+  // (Tests can make the times shorter.)
+  if ((DWELL.acc.get(pg) || 0) >= (DWELL.need.get(pg) || 10000) * (window.LIBLANDE_DWELL_SCALE || 1)) countPage(V.entry, pg);
+}
+// How long a page needs: by its words (looked at once).
+async function dwellNeed(page) {
+  if (DWELL.need.has(page) || !V.doc) return;
+  DWELL.need.set(page, 10000);
+  try {
+    const tc = await (await V.doc.getPage(page)).getTextContent();
+    const words = tc.items.reduce((k, it) => k + (it.str ? it.str.split(/\s+/).filter(Boolean).length : 0), 0);
+    DWELL.need.set(page, words < 15 ? 10000 : Math.max(4000, Math.min(20000, words * 30)));
+  } catch (err) { /* (the usual 10 s) */ }
+}
+function countPage(e, page) {
+  const end = V.endPage && V.endPage <= DWELL.total ? V.endPage : DWELL.total;
+  const old = PROGRESS[e.k], x = old && !old.reset ? Object.assign({}, old) : { p: 0 };
+  // (An older count, from before pages were kept: kept as the least.)
+  if (old && !old.reset && old.pages == null && old.p) x.base = old.p;
+  const pages = pagesOf(x.pages);
+  if (pages.has(page)) return;
+  pages.add(page);
+  x.pages = rangesOf(pages); x.n = end; x.at = Date.now(); delete x.reset;
+  x.p = progressOf(x);
+  PROGRESS[e.k] = x;
+  if (x.p >= 100 && !(old && old.p >= 100)) syncReaderRL();
+  clearTimeout(noteProgress.t);
+  noteProgress.t = setTimeout(() => { noteProgress.t = 0; saveProgress(); }, 4000);
+}
+document.addEventListener('visibilitychange', () => { if (DWELL.timer) dwellFlush(); });
+// (Back to the library with progress not yet saved: saved now, so the
+// list shows it.)
+new MutationObserver(() => {
+  if (!$('#viewer').hidden || !noteProgress.t) return;
+  clearTimeout(noteProgress.t);
+  noteProgress.t = 0;
+  saveProgress();
+}).observe($('#viewer'), { attributes: true, attributeFilter: ['hidden'] });
 // The page a paper's reference list starts on (0: none found): from the
 // PDF's outline, or else a line on its own reading References,
 // Bibliography, Works Cited or the like, in the second half of the PDF
@@ -436,13 +505,48 @@ function saveProgress() {
   if (gs && SYNC.progress) google.script.run.withFailureHandler(() => {}).savePrefs({ progress: PROGRESS });
   if (ENTRIES.length) paint();
 }
+// From another device: the further read, unless one was reset (pressing
+// the badge), when the later of the two counts, so a reset isn't undone by
+// a device that hasn't heard of it.
 function progressMerge(prefs) {
   if (!SYNC.progress) return;
-  Object.entries((prefs && prefs.progress) || {}).forEach(([k, v]) => { if (!PROGRESS[k] || PROGRESS[k].p < v.p) PROGRESS[k] = v; });
+  Object.entries((prefs && prefs.progress) || {}).forEach(([k, v]) => {
+    const mine = PROGRESS[k];
+    if (!mine) { PROGRESS[k] = v; return; }
+    if (mine.reset || v.reset) { if ((v.at || 0) > (mine.at || 0)) PROGRESS[k] = v; return; }
+    // (Both counting pages: the pages read on either.)
+    if (mine.pages != null && v.pages != null) {
+      const x = Object.assign({}, mine, { pages: rangesOf(new Set([...pagesOf(mine.pages), ...pagesOf(v.pages)])), n: Math.max(mine.n || 0, v.n || 0), base: Math.max(mine.base || 0, v.base || 0), at: Math.max(mine.at || 0, v.at || 0) });
+      x.p = progressOf(x);
+      PROGRESS[k] = x;
+    } else if (mine.p < v.p) PROGRESS[k] = v;
+  });
   store.set('progress', PROGRESS);
 }
-const progressText = e => { const x = PROGRESS[e.k]; return !x ? '' : x.p >= 100 ? 'read through' : x.p + '% read'; };
-const progressTag = e => progressText(e) ? `<span class="rl-prog" style="--p:${PROGRESS[e.k].p}%">${progressText(e)}</span>` : '';
+const progressText = e => { const x = PROGRESS[e.k]; return !x || !x.p ? '' : x.p >= 100 ? 'read through' : x.p + '% read'; };
+// The badge: pressed, the count starts again (with Undo).
+const progressTag = e => progressText(e) ? `<button type="button" class="rl-prog" data-prog-reset="${esc(e.k)}" style="--p:${PROGRESS[e.k].p}%" title="How far you\u2019ve read: press to start the count again">${progressText(e)}</button>` : '';
+function progressReset(k) {
+  const was = PROGRESS[k];
+  if (!was || !was.p) return;
+  PROGRESS[k] = { p: 0, at: Date.now(), reset: true };
+  saveProgress();
+  renderDetail();
+  syncReaderRL();
+  const e = BYKEY.get(k);
+  toast('Reading progress reset' + (e ? ' for \u201c' + (e.f.title || k) + '\u201d' : ''), 6000, { label: 'Undo', run: () => {
+    PROGRESS[k] = Object.assign({}, was, { at: Date.now() });
+    saveProgress(); renderDetail(); syncReaderRL();
+  } });
+}
+// (Pressed in the list, it doesn't open or select the publication.)
+document.addEventListener('click', ev => {
+  const b = ev.target.closest && ev.target.closest('[data-prog-reset]');
+  if (!b) return;
+  ev.stopPropagation();
+  ev.preventDefault();
+  progressReset(b.dataset.progReset);
+}, true);
 
 // The change made here at once, so the page updates before it's saved.
 function readingLocal(req) {
@@ -522,7 +626,7 @@ function readingHTML(e) {
   if (!x) return `<div class="rl-bar" hidden></div>`;
   // (How long it's been on the list, and how far through it you are.)
   const how = waited(x) === 'since today' ? 'Today' : waited(x);
-  return `<div class="rl-bar on"><span class="rl-where${staleRL(x) ? ' stale' : ''}" title="On your reading list ${how === 'Today' ? 'since today' : 'for ' + how}">${ICON.bookmark}${how}${progressText(e) ? ' \u00b7 ' + progressText(e) : ''}</span>` +
+  return `<div class="rl-bar on"><span class="rl-where${staleRL(x) ? ' stale' : ''}" title="On your reading list ${how === 'Today' ? 'since today' : 'for ' + how}">${ICON.bookmark}${how}${progressText(e) ? ' \u00b7 ' + progressTag(e) : ''}</span>` +
     // (Icons, their names as tips: Up next, Later, Done, and off the list.)
     `<div class="rl-acts"><div class="seg rl-seg" role="radiogroup" aria-label="Reading list">${rlBtn('next', 'Up next', 'radio', x.list === 'next')}${rlBtn('later', 'Later', 'radio', x.list !== 'next')}</div>` +
     `${rlBtn('done', 'Done: mark it read, and take it off the list', 'btn')}${rlBtn('remove', 'Take it off the reading list', 'btn')}</div></div>`;

@@ -1119,9 +1119,12 @@ button.v-zoom:hover { background: var(--side-hover); color: var(--text); }
 .ms-ref, .ms-raw, .ms-msg, .ms-ctx { overflow-wrap: anywhere; }
 /* Several changed at once: keywords as chips (tapped off: struck through). */
 /* Reading progress, on the reading list: a small bar under the words. */
-.rl-prog { display: inline-block; margin: 0 6px 0 0; padding: 0 6px 1px; border-radius: 6px; font: 600 11px var(--ui); color: var(--muted); vertical-align: 1px;
+.rl-prog { display: inline-block; margin: 0 6px 0 0; padding: 0 6px 1px; border: 0; border-radius: 6px; font: 600 11px var(--ui); line-height: 16px; color: var(--muted); vertical-align: 1px; cursor: pointer;
   background: linear-gradient(var(--accent), var(--accent)) left bottom / var(--p, 0%) 2px no-repeat, var(--side-hover); }
 /* A paper saved on this device: a dot on its icon; offline, the others fade. */
+/* (A button: pressed, the count starts again.) */
+.rl-prog:hover { color: var(--text); box-shadow: inset 0 0 0 1px var(--line); }
+.rl-where .rl-prog { margin: 0; }
 .fileicon.saved, .pdf.saved { position: relative; }
 .fileicon.saved::after { content: ''; position: absolute; right: 3px; bottom: 3px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 1.5px var(--bg); }
 .pdf.saved::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-right: 4px; vertical-align: 1px; }
