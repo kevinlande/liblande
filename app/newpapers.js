@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/newpapers.js'] = '2026-10-13.12';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/newpapers.js'] = '2026-10-13.13';
 /* ------------------------------------------------------------ new papers */
 // Found with OpenAlex (citations, authors, journals) and Semantic Scholar
 // (papers like your examples), asked from this page: no key, and no email
@@ -169,14 +169,14 @@ async function npToggleAbstract(item, x) {
   box.hidden = !open;
   if (!open || NP_ABS.has(x.id)) { if (open) box.textContent = NP_ABS.get(x.id) || 'No abstract is to be had for this one.'; return; }
   box.textContent = 'Getting the abstract\u2026';
-  box.classList.add('loading');
+  box.classList.add('np-abs-wait');
   try {
     const text = await npAbstract(x);
     box.textContent = text || 'No abstract is to be had for this one.';
   } catch (err) {
     box.textContent = 'Couldn\u2019t get the abstract: ' + errText(err);
     NP_OPEN.delete(x.id);
-  } finally { box.classList.remove('loading'); }
+  } finally { box.classList.remove('np-abs-wait'); }
 }
 
 // An OpenAlex work as an item.
