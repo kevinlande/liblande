@@ -1890,3 +1890,9 @@ a.ms-ib { text-decoration: none; }
 .proxy-row input:focus { border-color: var(--accent); outline: none; }
 .proxy-row .proxy-eg { grid-column: 1 / -1; font-size: 12px; overflow-wrap: anywhere; }
 @media (max-width: 520px) { .proxy-row { grid-template-columns: minmax(0, 1fr) auto; } .proxy-row .proxy-name { grid-column: 1 / -1; } }
+
+/* Add a publication: Find PDF beside the file chooser. */
+.add-pdf-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
+.add-pdf-row input[type="file"] { min-width: 0; flex: 1 1 200px; }
+.add-pdf-row .menu > summary.btn { min-height: 32px; padding: 3px 10px; font-size: 13px; }
+.menu-list .menu-note { margin: 0; padding: 8px 10px; max-width: 260px; font-size: 13px; color: var(--muted); }

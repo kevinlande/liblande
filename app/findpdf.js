@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/findpdf.js'] = '2026-10-13.14';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/findpdf.js'] = '2026-10-13.15';
 /* ------------------------------------------------------------ find a PDF */
 // For a publication: its free copy, found through OpenAlex (which carries
 // Unpaywall's open-access data, and needs no email), or the article
@@ -55,12 +55,14 @@ function findPdfItems(e) {
   if (!findTarget(e)) return '';
   const doi = String(e.f.doi || '').trim();
   return (doi ? `<button type="button" role="menuitem" data-find-pdf="oa">${FIND_ICON}<span>Free copy (open access)</span></button>` : '') +
-    PROXIES.list.map((p, i) => `<button type="button" role="menuitem" data-find-pdf="p:${i}">${ICON.lib}<span>Through ${esc(proxyName(p))}</span></button>`).join('') +
-    `<button type="button" role="menuitem" data-find-pdf="setup">${ICON.pencil}<span>${PROXIES.list.length ? 'Library proxies\u2026' : 'Set up a library proxy\u2026'}</span></button>`;
+    PROXIES.list.map((p, i) => `<button type="button" role="menuitem" data-find-pdf="p:${i}">${ICON.lib}<span>Through ${esc(proxyName(p))}</span></button>`).join('');
 }
 const FIND_ICON = '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3.5h7l4 4V13"/><path d="M14 3.5v4h4"/><path d="M7 3.5a1.5 1.5 0 0 0-1.5 1.5v14A1.5 1.5 0 0 0 7 20.5h4"/><circle cx="16.5" cy="17" r="3"/><path d="M18.7 19.2l2 2"/></svg>';
 
-async function findPdf(e, how) {
+// (after: what to say once it's open; by default, to drop the PDF on the
+// publication.)
+async function findPdf(e, how, after) {
+  after = after || (what => afterFind(e, what));
   if (how === 'setup') { openProxySettings(); return; }
   const target = findTarget(e);
   if (!target) return;
@@ -68,7 +70,7 @@ async function findPdf(e, how) {
     const p = PROXIES.list[+how.slice(2)];
     if (!p || !p.prefix) return;
     window.open(proxyLink(p, target), '_blank', 'noopener');
-    afterFind(e, 'It\u2019s open through ' + proxyName(p) + ' (sign in there if asked).');
+    after('It\u2019s open through ' + proxyName(p) + ' (sign in there if asked).');
     return;
   }
   // The free copy: the tab opened now (a browser allows one only straight
@@ -78,9 +80,9 @@ async function findPdf(e, how) {
   let url = '', page = false;
   try {
     const doi = target.replace(/^https:\/\/doi\.org\//, '');
-    const r = await npFetch(NP_OA + '/works/doi:' + npPath(doi) + '?select=best_oa_location,oa_locations,open_access');
+    const r = await npFetch(NP_OA + '/works/doi:' + npPath(doi) + '?select=best_oa_location,locations,open_access');
     if (r.ok) {
-      const w2 = await r.json(), locs = [w2.best_oa_location].concat(w2.oa_locations || []).filter(Boolean);
+      const w2 = await r.json(), locs = [w2.best_oa_location].concat((w2.locations || []).filter(l => l && l.is_oa)).filter(Boolean);
       const pdf = locs.find(l => safeUrl(l.pdf_url || ''));
       if (pdf) url = pdf.pdf_url;
       else {
@@ -101,8 +103,29 @@ async function findPdf(e, how) {
     return;
   }
   if (w) { try { w.opener = null; } catch (err) { /* (gone) */ } w.location.href = url; } else window.open(url, '_blank', 'noopener');
-  afterFind(e, page ? 'Its free copy\u2019s page is open (the PDF is a link there).' : 'Its free copy is open.');
+  after(page ? 'Its free copy\u2019s page is open (the PDF is a link there).' : 'Its free copy is open.');
 }
+// In Add a publication: beside the file chooser, for the DOI (or link)
+// filled in so far; then the PDF saved is chosen there (or dropped on the
+// panel).
+function addFindEntry() {
+  const v = n => { const el = $('#sheetBody').querySelector(`[data-field="${n}"]`); return el ? el.value.trim() : ''; };
+  const typed = ($('#doiLookup') && $('#doiLookup').value.trim()) || '';
+  const doi = v('doi') || (/^(https?:\/\/(dx\.)?doi\.org\/)?10\.\d{4,}\//i.test(typed) ? typed : '');
+  return { k: '', f: { doi }, u: [v('url')].filter(Boolean), ib: true };
+}
+$('#sheetBody').addEventListener('toggle', ev => {
+  if (!sheet || sheet.mode !== 'add' || ev.target.id !== 'addFind' || !ev.target.open) return;
+  const items = findPdfItems(addFindEntry());
+  $('#addFindList').innerHTML = items || `<p class="menu-note">Fill in its DOI (or its link) first${PROXIES.list.length ? '' : '; a library proxy can be added in Settings'}.</p>`;
+}, true);
+$('#sheetBody').addEventListener('click', ev => {
+  const b = sheet && sheet.mode === 'add' && ev.target.closest('#addFindList [data-find-pdf]');
+  if (!b) return;
+  $('#addFind').open = false;
+  findPdf(addFindEntry(), b.dataset.findPdf, what => toast(what + ' Save the PDF, then choose it here (or drop it on this panel).', 10000,
+    { label: 'Choose file\u2026', run: () => { const f = $('#addPdf'); if (f) f.click(); } }));
+});
 // Then: save the PDF, and drop it on the publication (or Attach it).
 function afterFind(e, what) {
   toast(what + ' Save the PDF, then drop it on the publication, or Attach it.', 10000,

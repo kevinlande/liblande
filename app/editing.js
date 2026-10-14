@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-10-13.14';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-10-13.15';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -296,7 +296,10 @@ function openAdd(pdf) {
     `</div></div>` +
     `<div class="fld"><label for="addType">Type</label><select id="addType">${TYPE_CHOICES.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></div>` +
     `<div class="fields-grid" id="addFields"></div>` + keywordEditor([]) +
-    `<div class="fld"><label for="addPdf">PDF <span class="opt">(optional)</span></label><input type="file" id="addPdf" accept="application/pdf,.pdf"><p class="add-pdf-name" id="addPdfName" hidden></p></div>` +
+    `<div class="fld"><label for="addPdf">PDF <span class="opt">(optional)</span></label><div class="add-pdf-row"><input type="file" id="addPdf" accept="application/pdf,.pdf">` +
+    // (Its free copy, or the article through your library: see findpdf.js.)
+    `<details class="menu" id="addFind"><summary class="btn" title="Its free copy, or the article through your library">${FIND_ICON}<span>Find PDF</span>${ICON.chev}</summary><div class="menu-list" role="menu" id="addFindList"></div></details></div>` +
+    `<p class="add-pdf-name" id="addPdfName" hidden></p></div>` +
     `<label class="check"><input type="checkbox" id="addRL">Put it on my reading list</label>`;
   showSheet(h, 'Add to library');
   $('#sheet').classList.add('head-mode', 'compact', 'pop');
