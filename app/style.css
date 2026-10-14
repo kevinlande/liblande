@@ -501,8 +501,11 @@ body:has(#sheet:not([hidden])) .pick-bar { visibility: hidden; }
 .d-side .menu-list { left: auto; right: 0; }
 .d-side .rl-bar { margin: 0; }
 .d-side .rl-acts { width: 100%; }
-.d-side .rl-acts .seg { flex: 1; }
-.d-side .rl-acts .rl-ic { flex: 1; width: auto; }
+/* (Up next and Later together take two buttons' room: four equal ones in
+   all, with Done and off the list.) */
+.d-side .rl-acts .seg { flex: 2 1 0; min-width: 0; grid-template-columns: 1fr 1fr; }
+.d-side .rl-acts .seg button { padding: 0; }
+.d-side .rl-acts .rl-ic { flex: 1 1 0; min-width: 0; width: auto; }
 .d-side .d-meta { gap: 6px 12px; }
 .thumb { flex: none; width: 118px; display: grid; gap: 6px; align-content: start; border: 0; background: none; padding: 0; text-align: left; color: var(--muted); cursor: pointer; }
 .thumb-img { display: grid; place-items: center; width: 118px; height: 152px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
