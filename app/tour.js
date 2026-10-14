@@ -1,8 +1,8 @@
 ﻿// LibLande: Features (everything LibLande does, in one list) and the tour (played through the app itself).
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, tour, start.)
+// index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-10-13.13';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-10-13.14';
 /* -------------------------------------------------------------- features */
 // What LibLande does, by area: each feature, what it's for, where to find
 // it, and its icon (see featIcon). Shown from the sidebar's foot (Features), with a box to find
@@ -26,6 +26,7 @@ const FEATURES = [
   ] },
   { area: 'Adding and editing', items: [
     ['Add a publication', 'From a DOI, ISBN or arXiv ID (the details are looked up), or paste a BibTeX entry.', '+ in the toolbar', '#addBtn'],
+    ['Find a PDF', 'Its free copy (open access, found through OpenAlex and Unpaywall\u2019s data), or the article through your library\u2019s proxy, opened in a new tab: save the PDF, then drop it on the publication.', 'Find PDF in the details; library proxies in Settings', 'path:M7 3.5h7l4 4V13M14 3.5v4h4M7 3.5a1.5 1.5 0 0 0-1.5 1.5v14A1.5 1.5 0 0 0 7 20.5h4M16.5 14a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM18.7 19.2l2 2'],
     ['Attach a PDF', 'Drop a PDF on a publication, or use Attach. A book\u2019s PDF is read for its ISBN, to fill in its details.', 'The details pane', 'ICON:clip'],
     ['Edit the details', 'Every field: authors, title, venue, keywords, notes, the cite key, a rating.', 'Edit, in the details pane', 'ICON:pencil'],
     ['Book covers', 'Covers for your books, from Open Library.', 'Settings (the gear in the sidebar)', 'path:M6 3.5h11a1.5 1.5 0 0 1 1.5 1.5v14a1.5 1.5 0 0 1-1.5 1.5H6zM6 3.5v17M9.5 8h6M9.5 11h4'],

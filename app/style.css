@@ -1883,3 +1883,10 @@ a.ms-ib { text-decoration: none; }
 .tour-acts .i { width: 14px; height: 14px; }
 .tour-x { position: absolute; top: 8px; right: 8px; display: flex; padding: 6px; border: 0; background: none; color: var(--muted); }
 .tour-x .i { width: 16px; height: 16px; }
+
+/* Library proxies, in Settings: a name and an address each, with the link an article would open through. */
+.proxy-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto; gap: 6px; align-items: center; margin: 8px 0; }
+.proxy-row input { min-width: 0; height: 34px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font: 14px var(--ui); }
+.proxy-row input:focus { border-color: var(--accent); outline: none; }
+.proxy-row .proxy-eg { grid-column: 1 / -1; font-size: 12px; overflow-wrap: anywhere; }
+@media (max-width: 520px) { .proxy-row { grid-template-columns: minmax(0, 1fr) auto; } .proxy-row .proxy-name { grid-column: 1 / -1; } }

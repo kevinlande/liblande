@@ -1,8 +1,8 @@
 ﻿// LibLande: adding and editing, BibTeX pasted in, selecting several, updates, cite keys, versions, export, the keyboard.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, tour, start.)
+// index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-10-13.13';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-10-13.14';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],

@@ -252,6 +252,13 @@ try {
         <span class="switch"><input type="checkbox" role="switch" id="coversBox"><span aria-hidden="true"></span></span>
       </div>
       </section>
+      <section class="set-sec" id="proxySec"><h3>Library proxies</h3>
+      <div class="set-group">
+        <p class="hint">Your library&#x2019;s proxy (as EZproxy): Find a PDF, in a publication&#x2019;s details, then opens the article through it, signed in with your library account. Type its address, as ezproxy.library.yorku.ca, or its whole login link.</p>
+        <div id="proxyList"></div>
+        <button type="button" class="linkish" id="proxyAdd">Add a library proxy&#x2026;</button>
+      </div>
+      </section>
     </div>
     <div class="set-links" id="linkFields">
       <label for="bibLink">Link to your .bib file</label>
@@ -276,7 +283,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-13.13</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-13.14</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -291,7 +298,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-13.13';
+      l.querySelector('small').textContent = 'Version 2026-10-13.14';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -303,14 +310,14 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-13.13): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-13.14): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
 })();
 </script>
 
-<script id="appLoader" data-parts="app/library.js app/reader.js app/editing.js app/citecheck.js app/newpapers.js app/ocr.js app/split.js app/outline.js app/tour.js app/start.js">
+<script id="appLoader" data-parts="app/library.js app/reader.js app/editing.js app/citecheck.js app/newpapers.js app/ocr.js app/split.js app/outline.js app/findpdf.js app/tour.js app/start.js">
 // The app's scripts (app/), fetched together and run joined as one script,
 // in one go, inside one function: so nothing else runs between them (a
 // timer one sets can't find the next not yet there), and their names stay

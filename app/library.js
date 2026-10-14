@@ -1,8 +1,8 @@
 ﻿// LibLande: the library: data, the reading list, groups, search, the list and the details.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, tour, start.)
+// index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-13.13';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-13.14';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -2419,6 +2419,11 @@ function renderDetail() {
     if (e.files) more.push(`<button type="button" role="menuitem" data-attach title="Attach a PDF (or drop one here)">${ICON.clip}<span>Attach a PDF\u2026</span></button>`);
     else btns.push(`<button type="button" class="btn primary act-read" data-attach title="Attach a PDF (or drop one here)">${ICON.clip}<span>Attach</span></button>`);
   }
+  // Find a PDF (see findpdf.js): with none yet, a button beside Attach;
+  // with one, in More (a better copy, say).
+  const finds = findPdfItems(e);
+  if (finds && !readable.length && !(e.files && e.files.some(fl => fl.id))) btns.push(menu('act-find', `${FIND_ICON}<span>Find PDF</span>`, 'Its free copy, or the article through your library', finds));
+  else if (finds) more.push(`<div class="menu-head">Find a PDF</div>` + finds);
   if (gs) btns.push(`<button type="button" class="btn" data-rl="add"${RL.has(e.k) ? ' hidden' : ''} title="Add to reading list" aria-label="Add to reading list">${ICON.bookmark}<span>Reading list</span></button>`);
   if (f.doi) more.push(`<a role="menuitem" href="https:\/\/doi.org/${esc(f.doi.replace(/^https?:\/\/(dx\.)?doi\.org[/]/i, ''))}" target="_blank" rel="noopener" title="Open the DOI link">${ICON.link}<span>DOI</span></a>`);
   const doiish = u => /doi\.org[/]/i.test(u);
@@ -2696,6 +2701,8 @@ detailEl.addEventListener('click', ev => {
     return;
   }
   if (e && ev.target.closest('[data-attach]')) { $('#attachInput').click(); return; }
+  const fp = ev.target.closest('[data-find-pdf]');
+  if (e && fp) { const d = fp.closest('details'); if (d) d.open = false; findPdf(e, fp.dataset.findPdf); return; }
   const rl = ev.target.closest('[data-rl]');
   if (e && rl) { readingClick(e, rl.dataset.rl); return; }
   const rd = ev.target.closest('[data-read]'), sh = ev.target.closest('[data-share]');

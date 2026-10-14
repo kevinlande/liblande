@@ -1,8 +1,8 @@
 ﻿// LibLande: messages, navigation, and starting up.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, tour, start.)
+// index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-10-13.13';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-10-13.14';
 // On GitHub Pages, every part of the app must be from the same version: a
 // part kept from an older one (the offline copy, served when the network
 // was slow) lacks what this page needs. Then the kept copies go, and the
@@ -398,6 +398,7 @@ if (RELOADING) {
       npMerge(status.prefs);
       sideOrderMerge(status.prefs);
       libCountsMerge(status.prefs);
+      proxiesMerge(status.prefs);
       smartMerge(status.prefs);
       keysMerge(status.prefs);
       progressMerge(status.prefs);
@@ -685,6 +686,7 @@ if (RELOADING) {
       renderThemePicks();
       $('#darkPagesBox').checked = !!store.get('darkPages', false);
       $('#coversBox').checked = coversOn();
+      renderProxies();
       $('#setup').querySelectorAll('[data-sync]').forEach(b => { b.checked = SYNC[b.dataset.sync] !== false; });
       $('#curBib').textContent = st.bibName || '';
       // (Other libraries: with the .bib file and folder, in Settings.)
@@ -701,6 +703,7 @@ if (RELOADING) {
   };
   const closeSettings = () => {
     if ($('#setSave').disabled) return;
+    proxiesTidy();
     if (STYLE_WAS != null) { applyStyle(STYLE_WAS); STYLE_WAS = null; }
     $('#setup').hidden = true;
   };
@@ -884,6 +887,6 @@ if (RELOADING) {
 }
 // For the test suite (_test/suite.html) only: a few of the reader's
 // insides, when the test page asks for them.
-if (window.LIBLANDE_TEST) window.LL = { TOUR, startTour, endTour, openFeatures, FEATURES, toggleBookmark, OLE, oleMake, headingOutline, pageRows, writeOutline, SPLIT, foldOf, splitStart, splitApply, printedContents, pageLines, OCR, makeSearchable, ocrLayer, textlessPages, openMsCheck, runMsCheck, LIBS, renderGroups, SMART, NP, npCheck, openNewPapers, openFollow, sweepCovers, COVERS, V, BM, JOURNAL, LOCAL, AUTO, saveMarkup, setTool, setReading, renderRLBar, netBadge, placeToast, POS, MARK, PDFJS, pdfJsFix, pdfViewerFix, findEndPage, refHeading, combineMarks, makeZip, MARK_ERASER: () => MARK.eraserSize,
+if (window.LIBLANDE_TEST) window.LL = { PROXIES, proxyPrefix, proxyLink, findPdf, renderProxies, TOUR, startTour, endTour, openFeatures, FEATURES, toggleBookmark, OLE, oleMake, headingOutline, pageRows, writeOutline, SPLIT, foldOf, splitStart, splitApply, printedContents, pageLines, OCR, makeSearchable, ocrLayer, textlessPages, openMsCheck, runMsCheck, LIBS, renderGroups, SMART, NP, npCheck, openNewPapers, openFollow, sweepCovers, COVERS, V, BM, JOURNAL, LOCAL, AUTO, saveMarkup, setTool, setReading, renderRLBar, netBadge, placeToast, POS, MARK, PDFJS, pdfJsFix, pdfViewerFix, findEndPage, refHeading, combineMarks, makeZip, MARK_ERASER: () => MARK.eraserSize,
   lib: () => ({ ENTRIES, BYKEY, DATA, VERSION_OF, VERSIONS, NESTED, state }), init, refresh, openEdit, isForthcoming, forthChanges, parseBibtexEntry,
   oldLineMarks, convertOldLines, fetchAhead, PTABS, renderPaperTabs, openPdf, loadPdfJs, addStreamIteration, msCheck, msCites, msRef, msDocx, MS, msVisible };
