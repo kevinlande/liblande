@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-10-13.15';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-10-13.17';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -1161,7 +1161,8 @@ function forthChanges(e, w) {
   const parts = ((inIssue && (w['published-print'] || w.issued)) || w['published-online'] || w.issued || {})['date-parts'];
   const year = parts && parts[0] && parts[0][0] ? String(parts[0][0]) : '';
   const month = parts && parts[0] && parts[0][1] ? MONTH_ABBR[parts[0][1] - 1] : '';
-  const clean = v => String(v || '').replace(/[{}]/g, '').trim();
+  // (Crossref's text can have HTML's codes, as "&amp;": the characters.)
+  const clean = v => { let s = String(v || ''); if (/&(#\d+|#x[0-9a-f]+|[a-z]+\d*);/i.test(s)) { const t = document.createElement('textarea'); t.innerHTML = s; s = t.value; } return s.replace(/[{}]/g, '').trim(); };
   const add = (n, to, on) => { to = clean(to); if (to && to !== (f[n] || '')) out.push({ n, from: f[n] || '', to, on }); };
   if (inIssue && year) {
     const forth = !f.year || FORTH_RE.test(f.year);

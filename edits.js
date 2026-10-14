@@ -19,7 +19,7 @@
  */
 (function (root) {
   'use strict';
-  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).edits = '2026-10-13.15';
+  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).edits = '2026-10-13.17';
   const FOLDER = 'application/vnd.google-apps.folder';
   const UPLOAD = 'https://www.googleapis.com/upload/drive/v3/';
   const READING_FILE = 'reading-list.json',
@@ -461,7 +461,20 @@
     F.prefetch = async () => { await read(await mainBibId()); };
 
     // Save changes to one entry (as Code.gs's saveEntry).
+    // An ampersand in a text field written as BibTeX wants it, \& (a bare
+    // & stops LaTeX: "Misplaced alignment tab"), as BibDesk writes it, and
+    // shows it, as &. Not in links, DOIs, file paths and such. One already
+    // escaped (\& or BibDesk's \{&}) is left as it is.
+    const TEX_TEXT = /^(title|subtitle|shorttitle|booktitle|journal|publisher|series|school|institution|organization|address|abstract|annote|note|howpublished|edition|type)$/i;
+    const texSafe = fields => {
+      Object.keys(fields || {}).forEach(n => {
+        if (TEX_TEXT.test(n) && typeof fields[n] === 'string') fields[n] = fields[n].replace(/(?<!\\)(?<!\\\{)&/g, '\\&');
+      });
+      return fields;
+    };
+
     F.saveEntry = req => serial(async () => {
+      req = Object.assign({}, req, { set: texSafe(Object.assign({}, req.set || {})) });
       const id = req.where === 'inbox' ? await inboxFile(false) : await mainBibId();
       if (!id) throw new Error('LibLande couldn’t find the file to edit.');
       const out = await changeFile(id, async (text, m) => run('saveEntry', text, req, m.name, req.where !== 'inbox' ? Date.parse(m.modifiedTime) : null), req.backupName);
@@ -478,7 +491,7 @@
       let filed = null;
       const out = await changeFile(await mainBibId(), async (text, m) => {
         if (await run('hasKey', text, req.key)) throw new Error('Your library already has a publication with the cite key ' + req.key + '.');
-        const fields = Object.assign({}, req.fields);
+        const fields = texSafe(Object.assign({}, req.fields));
         fields['date-added'] = fields['date-modified'] = req.now;
         filed = req.uploadId ? await filePdf(m, req.uploadId, fields, req.prefix) : null;
         try {
@@ -581,7 +594,8 @@
       const step = typeof req.onStep === 'function' ? req.onStep : () => {};
       step('Waiting for an earlier change to finish');
       return serial(async () => {
-      const out = await changeFile(await mainBibId(), text => run('saveMany', text, req.items || [], req.modified), req.backupName, step);
+      const items = (req.items || []).map(x => Object.assign({}, x, x.set ? { set: texSafe(Object.assign({}, x.set)) } : {}));
+      const out = await changeFile(await mainBibId(), text => run('saveMany', text, items, req.modified), req.backupName, step);
       return { stamp: out.stamp || null, hashes: out.hashes || {}, skipped: out.skipped || [], gh: out.gh || null };
       });
     };

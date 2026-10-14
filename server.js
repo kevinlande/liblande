@@ -17,7 +17,7 @@
   window.LIBLANDE_PAGES = true;
   // (Which version each part of the app is from: index.html checks they
   // match. build.py fills it in.)
-  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-10-13.15';
+  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-10-13.17';
   const CLIENT_ID = '789682218462-98mjugngb46ttd01ucp9dcj71ufspjgn.apps.googleusercontent.com';
   // Google Drive (your .bib, papers and LibLande folder): all it needs.
   const SCOPE = 'https://www.googleapis.com/auth/drive';
@@ -624,7 +624,15 @@
     if (!res.ok) throw new Error('The DOI lookup didn\u2019t work (DataCite error ' + res.status + '). Try again, or fill in the details yourself.');
     return dataciteFields((await res.json()).data.attributes, doi);
   }
-  const tidyFields = f => { Object.keys(f).forEach(k => { f[k] = String(f[k] || '').replace(/[{}]/g, '').trim(); if (!f[k]) delete f[k]; }); return f; };
+  // (Crossref and others send some text with HTML's codes, as
+  // "Philosophy &amp; Public Affairs": put back as the characters.)
+  const unEntity = s => {
+    if (!/&(#\d+|#x[0-9a-f]+|[a-z]+\d*);/i.test(s)) return s;
+    const t = document.createElement('textarea');
+    t.innerHTML = s;
+    return t.value;
+  };
+  const tidyFields = f => { Object.keys(f).forEach(k => { f[k] = unEntity(String(f[k] || '')).replace(/[{}]/g, '').trim(); if (!f[k]) delete f[k]; }); return f; };
   // DataCite's record: a preprint (arXiv's) as @misc published by arXiv,
   // with its arXiv ID as the eprint.
   function dataciteFields(a, doi) {
