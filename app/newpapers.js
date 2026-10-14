@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/newpapers.js'] = '2026-10-13.11';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/newpapers.js'] = '2026-10-13.12';
 /* ------------------------------------------------------------ new papers */
 // Found with OpenAlex (citations, authors, journals) and Semantic Scholar
 // (papers like your examples), asked from this page: no key, and no email
@@ -120,6 +120,63 @@ async function npSuggestAuthors(n, have) {
   });
   return top.map(c => votes.has(c) ? [...votes.get(c).values()].sort((a, b) => b.n - a.n)[0] : null)
     .filter(x => x && !skip.has(x.id)).slice(0, n).map(x => ({ id: x.id, name: x.name }));
+}
+
+// Abstracts: asked for when you open one (not with the lists: hundreds,
+// mostly unread), from OpenAlex by DOI, or else Semantic Scholar; kept on
+// this device (the last 300). OpenAlex keeps an abstract as each word's
+// places: put back in order.
+const NP_ABS = new Map(Object.entries(store.get('npAbs', {})));
+const NP_OPEN = new Set();
+const npPath = s => String(s).split('/').map(encodeURIComponent).join('/');
+const npUninvert = inv => {
+  if (!inv) return '';
+  const words = [];
+  for (const [w, at] of Object.entries(inv)) for (const i of at) words[i] = w;
+  return words.filter(Boolean).join(' ');
+};
+async function npAbstract(x) {
+  if (NP_ABS.has(x.id)) return NP_ABS.get(x.id);
+  let text = '';
+  if (x.doi) {
+    try {
+      // (A DOI's slash kept as it is: the rest of it made safe.)
+      const r = await npFetch(NP_OA + '/works/doi:' + npPath(x.doi) + '?select=abstract_inverted_index');
+      if (r.ok) text = npUninvert((await r.json()).abstract_inverted_index);
+    } catch (err) { /* (tried at Semantic Scholar) */ }
+  }
+  if (!text) {
+    const s2 = x.doi ? 'DOI:' + x.doi : String(x.id).replace(/^s2:/, '');
+    if (x.doi || /^s2:/.test(x.id)) {
+      const r = await npFetch('https:\/\/api.semanticscholar.org/graph/v1/paper/' + npPath(s2) + '?fields=abstract');
+      if (r.ok) text = String((await r.json()).abstract || '');
+      else if (r.status !== 404) throw new Error('Semantic Scholar didn\u2019t answer (' + r.status + ')');
+    }
+  }
+  text = text.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').replace(/^abstract[:.\s]+/i, '').trim();
+  NP_ABS.delete(x.id);
+  NP_ABS.set(x.id, text);
+  while (NP_ABS.size > 300) NP_ABS.delete(NP_ABS.keys().next().value);
+  store.set('npAbs', Object.fromEntries(NP_ABS));
+  return text;
+}
+// An abstract opened or closed, in its place (the list isn't drawn again).
+async function npToggleAbstract(item, x) {
+  const btn = item.querySelector('[data-np-abs]'), box = item.querySelector('.np-abs');
+  const open = !NP_OPEN.has(x.id);
+  if (open) NP_OPEN.add(x.id); else NP_OPEN.delete(x.id);
+  btn.setAttribute('aria-expanded', String(open));
+  box.hidden = !open;
+  if (!open || NP_ABS.has(x.id)) { if (open) box.textContent = NP_ABS.get(x.id) || 'No abstract is to be had for this one.'; return; }
+  box.textContent = 'Getting the abstract\u2026';
+  box.classList.add('loading');
+  try {
+    const text = await npAbstract(x);
+    box.textContent = text || 'No abstract is to be had for this one.';
+  } catch (err) {
+    box.textContent = 'Couldn\u2019t get the abstract: ' + errText(err);
+    NP_OPEN.delete(x.id);
+  } finally { box.classList.remove('loading'); }
 }
 
 // An OpenAlex work as an item.
@@ -284,6 +341,9 @@ function npRender() {
       `<div class="np-why">${x.why.map(w => esc(w.t)).join(' \u00b7 ')}</div>` +
       `<a class="np-title" href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.title)}</a>` +
       `<div class="np-meta">${esc(npAuthors(x.authors))}${x.venue ? ' · <i>' + esc(x.venue) + '</i>' : ''}${x.date ? ' · ' + esc(dateText(x.date)) : ''}</div>` +
+      // (Its abstract, opened and closed in place.)
+      `<button type="button" class="np-abs-btn" data-np-abs aria-expanded="${NP_OPEN.has(x.id)}">${ICON.chev}<span>Abstract</span></button>` +
+      `<div class="np-abs"${NP_OPEN.has(x.id) ? '' : ' hidden'}>${NP_OPEN.has(x.id) ? esc(NP_ABS.get(x.id) || 'No abstract is to be had for this one.') : ''}</div>` +
       `<div class="np-acts">${x.doi && gs ? `<button type="button" class="btn" data-np-add>${ICON.plus}<span>Add…</span></button><button type="button" class="btn" data-np-rl>${ICON.bookmark}<span>Reading list…</span></button>` : ''}` +
       `<button type="button" class="btn np-gone" data-np-gone>${ICON.x}<span>Dismiss</span></button></div></div>`; }).join('') + `</div>`
       : `<p class="ms-dim np-none">${NP.busy ? 'Looking…' : NP.checked ? 'Nothing new here. LibLande looks again tomorrow, or now with Check now.' : 'LibLande looks for new papers once a day.'}</p>`);
@@ -332,6 +392,7 @@ $('#sheetBody').addEventListener('click', ev => {
   const item = ev.target.closest('[data-np]');
   if (!item) return;
   const id = item.dataset.np;
+  if (ev.target.closest('[data-np-abs]')) { const x = NP.items.find(y => y.id === id); if (x) npToggleAbstract(item, x); return; }
   if (ev.target.closest('[data-np-add]')) { npAdd(id, false); return; }
   if (ev.target.closest('[data-np-rl]')) { npAdd(id, true); return; }
   if (ev.target.closest('[data-np-gone]')) {

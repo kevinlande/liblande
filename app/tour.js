@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-10-13.11';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-10-13.12';
 /* -------------------------------------------------------------- features */
 // What LibLande does, by area: each feature, what it's for, where to find
 // it, and its icon (see featIcon). Shown from the sidebar's foot (Features), with a box to find
@@ -67,7 +67,7 @@ const FEATURES = [
   ] },
   { area: 'Citing and keeping up', items: [
     ['Cite Check', 'Checks a manuscript (a Google Doc or a file) against your library: citations without references, references never cited, and details that differ; and can fix the References in the Google Doc.', 'Cite Check, under Tools in the sidebar', 'ICON:citecheck'],
-    ['New papers', 'New work that cites yours, by authors you follow, like papers you choose, and in your journals, with a Top 15; checked once a day.', 'New papers, under Tools in the sidebar', 'ICON:bell'],
+    ['New papers', 'New work that cites yours, by authors you follow, like papers you choose, and in your journals, with a Top 15; checked once a day. Open any one\u2019s abstract to see what it\u2019s about.', 'New papers, under Tools in the sidebar', 'ICON:bell'],
   ] },
   { area: 'On every device', items: [
     ['iPad and iPhone', 'Made for touch and the Apple Pencil too: write with the Pencil, scroll with a finger.', '', 'path:M6.5 3h11a1.5 1.5 0 0 1 1.5 1.5v15a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 19.5v-15A1.5 1.5 0 0 1 6.5 3zM11 18h2'],

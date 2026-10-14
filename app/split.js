@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/split.js'] = '2026-10-13.11';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/split.js'] = '2026-10-13.12';
 /* ---------------------------------------------------------- split pages */
 // From a page's thumbnail (Split), or all the wide pages at once (Split
 // all). A dashed line shows where the page will be cut, at the fold
