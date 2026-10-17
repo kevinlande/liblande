@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/titlesearch.js'] = '2026-10-17.01';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/titlesearch.js'] = '2026-10-17.02';
 /* ------------------------------------------------------------ title search */
 // A title (with an author or a year, if you like) typed in Add's lookup
 // box, instead of a DOI: candidates from Crossref (articles, chapters, and
@@ -11,7 +11,10 @@
 // the library marked. One chosen fills in the form: through the DOI lookup
 // if it has a DOI, as typing the DOI would, or else from what the search
 // found. Searched when you pause typing (or press Return); each search
-// kept for a while, so going back to one asks no one again.
+// kept for a while, so going back to one asks no one again. "title:" and
+// "author:" say which words are which (as "author: nanay title: imagery"),
+// and then only those with that author (and most of those title words)
+// are offered.
 const TS = { seq: 0, t: 0, q: '', ctl: null, list: [], cache: new Map() };
 const TS_MAX = 8, TS_PAUSE = 800;
 const TS_CR = 'https:\/\/api.crossref.org/works', TS_OL = 'https:\/\/openlibrary.org/search.json';
@@ -21,7 +24,18 @@ function tsIsQuery(t) {
   if (t.length < 4 || looksLikeBibtex(t)) return false;
   if (/^(doi:|https?:\/\/|www\.|arxiv:|isbn)/i.test(t) || /\b10\.\d{4,9}\/\S/.test(t)) return false;
   if (/^[\d\s-]{9,17}[\dXx]$/.test(t) || /^\d{4}\.\d{4,5}(v\d+)?$/.test(t) || /^[a-z-]+(\.[A-Z]{2})?\/\d{7}$/i.test(t)) return false;
-  return /[a-z\u00c0-\uffff]{3}/i.test(norm(t));
+  const p = tsParse(t);
+  return /[a-z\u00c0-\uffff]{3}/i.test(norm(p.free + ' ' + p.title + ' ' + p.author));
+}
+// What was typed: { free, title, author }, the words after "title:" and
+// "author:" (either first, either or both), and the rest.
+function tsParse(q) {
+  const out = { free: '', title: '', author: '' };
+  const parts = String(q || '').split(/\b(title|author)\s*:/i);
+  out.free = parts[0];
+  for (let i = 1; i < parts.length; i += 2) out[parts[i].toLowerCase()] += ' ' + parts[i + 1];
+  Object.keys(out).forEach(k => { out[k] = out[k].replace(/\s+/g, ' ').trim(); });
+  return out;
 }
 const tsWords = s => norm(String(s || '').replace(/<[^>]+>/g, ' ')).split(/[^a-z0-9]+/).filter(w => w.length > 1);
 // (Text from these can have HTML's codes and tags, as "&amp;" and <i>.)
@@ -51,10 +65,11 @@ const TS_KINDS = { article: 'Article', incollection: 'Chapter', book: 'Book', in
 // Each source: its candidates, as { src, doi, title, people (as BibTeX
 // has them), year, venue, type, fields (to fill in without a DOI) }.
 async function tsCrossref(q, signal) {
+  const p = tsParse(q), words = [p.free, p.title].filter(Boolean).join(' ');
   const types = { 'journal-article': 'article', 'book-chapter': 'incollection', 'book-section': 'incollection', 'book-part': 'incollection',
     'book': 'book', 'monograph': 'book', 'edited-book': 'book', 'reference-book': 'book', 'proceedings-article': 'inproceedings',
     'dissertation': 'phdthesis', 'report': 'techreport', 'posted-content': 'unpublished', 'reference-entry': 'incollection' };
-  const r = await npFetch(TS_CR + '?rows=12&query.bibliographic=' + encodeURIComponent(q) +
+  const r = await npFetch(TS_CR + '?rows=12' + (words ? '&query.bibliographic=' + encodeURIComponent(words) : '') + (p.author ? '&query.author=' + encodeURIComponent(p.author) : '') +
     '&select=DOI,title,subtitle,author,editor,issued,type,container-title,publisher', { signal });
   if (!r.ok) throw new Error('Crossref answered ' + r.status);
   return ((await r.json()).message.items || []).filter(w => types[w.type] && (w.title || [])[0] && w.DOI).map(w => {
@@ -68,7 +83,9 @@ async function tsCrossref(q, signal) {
 }
 async function tsOpenAlex(q, signal) {
   const types = { article: 'article', 'book-chapter': 'incollection', book: 'book', preprint: 'unpublished', dissertation: 'phdthesis', report: 'techreport', review: 'article', letter: 'article', editorial: 'article' };
-  const r = await npFetch(NP_OA + '/works?per_page=12&search=' + encodeURIComponent(q) +
+  // (Title and author as filters; commas would end them.)
+  const p = tsParse(q), flt = [p.title && 'title.search:' + p.title, p.author && 'raw_author_name.search:' + p.author].filter(Boolean).map(f => f.replace(/,/g, ' '));
+  const r = await npFetch(NP_OA + '/works?per_page=12' + (p.free ? '&search=' + encodeURIComponent(p.free) : '') + (flt.length ? '&filter=' + encodeURIComponent(flt.join(',')) : '') +
     '&select=id,doi,display_name,publication_year,type,authorships,primary_location,biblio', { signal });
   if (!r.ok) throw new Error('OpenAlex answered ' + r.status);
   return ((await r.json()).results || []).filter(w => w.display_name).map(w => {
@@ -89,7 +106,8 @@ async function tsOpenAlex(q, signal) {
 }
 // (Open Library: a work, with its edition that best matches.)
 async function tsOpenLibrary(q, signal) {
-  const r = await npFetch(TS_OL + '?limit=8&q=' + encodeURIComponent(q) +
+  const p = tsParse(q), ask = [['q', p.free], ['title', p.title], ['author', p.author]].filter(([, v]) => v).map(([k, v]) => '&' + k + '=' + encodeURIComponent(v)).join('');
+  const r = await npFetch(TS_OL + '?limit=8' + ask +
     '&fields=key,title,subtitle,author_name,first_publish_year,editions,editions.publisher,editions.isbn,editions.publish_place,editions.publish_date', { signal });
   if (!r.ok) throw new Error('Open Library answered ' + r.status);
   return ((await r.json()).docs || []).filter(d => d.title).map(d => {
@@ -112,7 +130,7 @@ const TS_SOURCES = [['Crossref', tsCrossref], ['OpenAlex', tsOpenAlex], ['Open L
 // review (an article with a book's title, or seen to be one) is marked,
 // and put below.
 function tsMerge(q, found) {
-  const qw = new Set(tsWords(q)), out = [], byDoi = new Map(), byTitle = new Map();
+  const p = tsParse(q), qw = new Set(tsWords([p.free, p.title, p.author].join(' '))), tqw = tsWords(p.title), aqw = tsWords(p.author), out = [], byDoi = new Map(), byTitle = new Map();
   const tkey = c => plainTitle(c.title) + '|' + norm(tsFamily(c.people[0]));
   TS_SOURCES.forEach(([name], si) => (found[name] || []).forEach((c, i) => {
     const d = (c.doi || '').toLowerCase(), k = tkey(c);
@@ -134,9 +152,13 @@ function tsMerge(q, found) {
     const tw = tsWords(c.title), all = new Set(tw.concat(tsWords(c.people.map(tsFamily).join(' ')), [c.year]));
     const hit = [...qw].filter(w => all.has(w)).length;
     c.score = (qw.size ? 2 * hit / qw.size : 0) + (tw.length ? tw.filter(w => qw.has(w)).length / tw.length : 0) - c.rank * 0.02 - (c.review ? 0.6 : 0);
+    // (With "author:", one of its names must be among the authors; with
+    // "title:", most of its words in the title.)
+    const names = new Set(tsWords(c.people.join(' ')));
+    c.off = (aqw.length && !aqw.some(w => names.has(w))) || (tqw.length && tqw.filter(w => tw.includes(w)).length < tqw.length / 2);
     c.have = tsHave(c);
   });
-  return out.sort((a, b) => b.score - a.score).slice(0, TS_MAX);
+  return out.filter(c => !c.off).sort((a, b) => b.score - a.score).slice(0, TS_MAX);
 }
 // Already in the library: the same DOI, or the same title (and year, if
 // both have one).
