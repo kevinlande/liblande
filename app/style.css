@@ -544,6 +544,7 @@ body:has(#sheet:not([hidden])) .pick-bar { visibility: hidden; }
 .add-pdf-name { font-size: 13px; color: var(--muted); }
 /* (In the compact form, beside the PDF box, not under its name.) */
 .sheet.compact .fld > .add-pdf-name { grid-column: 2; margin: 0; overflow-wrap: anywhere; }
+.sheet.compact .fld > .ts-list { grid-column: 2; }
 .rl-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 12px 0 2px; font-size: 13px; }
 .rl-bar .btn { min-height: 28px; padding: 3px 10px; font-size: 12.5px; }
 .rl-bar.on { padding: 8px 10px; border-radius: 8px; background: var(--accent-soft); }
@@ -1822,7 +1823,7 @@ a.ms-ib { text-decoration: none; }
   .sheet.compact .fld, .sheet.compact .fld.short, .sheet.compact .fld.short.lead { grid-template-columns: minmax(0, 1fr); row-gap: 2px; }
   .sheet.compact .fld > label, .sheet.compact .fld > .lbl { padding-top: 4px; }
   .sheet.compact #sheetBody > .check { margin-left: 0; }
-  .sheet.compact .fld > .add-pdf-name { grid-column: auto; }
+  .sheet.compact .fld > .add-pdf-name, .sheet.compact .fld > .ts-list { grid-column: auto; }
   .v-title, .v-bar .btn span, .v-lib span { display: none; }
   /* Edit as just the pencil. */
   .d-edit span { display: none; }
@@ -1895,6 +1896,18 @@ a.ms-ib { text-decoration: none; }
 @media (max-width: 520px) { .proxy-row { grid-template-columns: minmax(0, 1fr) auto; } .proxy-row .proxy-name { grid-column: 1 / -1; } }
 
 /* Add a publication: Find PDF beside the file chooser. */
+/* Add's title search: the candidates, under the lookup box. */
+.ts-list { display: grid; gap: 2px; margin-top: 6px; padding: 4px; max-height: min(46vh, 420px); overflow-y: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+.ts-item { display: grid; gap: 2px; width: 100%; min-width: 0; padding: 7px 10px; border: 0; border-radius: 7px; background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.ts-item:hover, .ts-item:focus-visible { background: var(--accent-soft); outline: none; }
+.ts-title { font: 600 14px/1.35 var(--serif); overflow-wrap: anywhere; }
+.ts-meta { font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
+.ts-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+.ts-kind, .ts-have { padding: 0 6px; border-radius: 6px; font-size: 11px; line-height: 17px; color: var(--muted); background: var(--stripe); border: 1px solid var(--line); }
+.ts-have { color: var(--star); border-color: currentColor; background: none; }
+.ts-note { margin: 0; padding: 6px 10px; font-size: 12.5px; color: var(--muted); }
+.ts-note.busy::before { content: ""; display: inline-block; width: 10px; height: 10px; margin-right: 6px; vertical-align: -1px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: ts-spin .8s linear infinite; }
+@keyframes ts-spin { to { transform: rotate(360deg); } }
 .add-pdf-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
 .add-pdf-row input[type="file"] { min-width: 0; flex: 1 1 200px; }
 .add-pdf-row .menu > summary.btn { min-height: 32px; padding: 3px 10px; font-size: 13px; }

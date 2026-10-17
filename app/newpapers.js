@@ -1,8 +1,8 @@
 ﻿// LibLande: New papers: new work that cites yours, by authors you follow, like papers you choose, and in your journals.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, tour, start.)
+// index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/newpapers.js'] = '2026-10-13.19';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/newpapers.js'] = '2026-10-17.01';
 /* ------------------------------------------------------------ new papers */
 // Found with OpenAlex (citations, authors, journals) and Semantic Scholar
 // (papers like your examples), asked from this page: no key, and no email

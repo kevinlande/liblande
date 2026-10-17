@@ -1,8 +1,8 @@
 ﻿// LibLande: adding and editing, BibTeX pasted in, selecting several, updates, cite keys, versions, export, the keyboard.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, tour, start.)
+// index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-10-13.19';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-10-17.01';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -289,11 +289,11 @@ async function lookupIntoEdit() {
 function openAdd(pdf) {
   sheet = { mode: 'add', pdf: null };
   const h = sheetHead('Add a publication', 'Add to library') +
-    `<div class="fld"><label for="doiLookup">From a DOI or BibTeX</label><div class="doi-row">` +
-    `<input id="doiLookup" type="text" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="A DOI, ISBN or arXiv ID, or paste a BibTeX entry">` +
+    `<div class="fld"><label for="doiLookup">From a title, DOI or BibTeX</label><div class="doi-row">` +
+    `<input id="doiLookup" type="text" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="A title (and author), a DOI, ISBN or arXiv ID, or BibTeX" aria-controls="tsList">` +
     `<button type="button" class="btn" id="doiGo">Fill in</button>` +
     (navigator.clipboard && navigator.clipboard.readText ? `<button type="button" class="btn" id="bibPaste" title="Fill in from the DOI or BibTeX entry you copied">Paste</button>` : '') +
-    `</div></div>` +
+    `</div><div class="ts-list" id="tsList" hidden></div></div>` +
     `<div class="fld"><label for="addType">Type</label><select id="addType">${TYPE_CHOICES.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></div>` +
     `<div class="fields-grid" id="addFields"></div>` + keywordEditor([]) +
     `<div class="fld"><label for="addPdf">PDF <span class="opt">(optional)</span></label><div class="add-pdf-row"><input type="file" id="addPdf" accept="application/pdf,.pdf">` +
@@ -410,10 +410,18 @@ function fillFromBibtex(text) {
     : 'Filled in from the BibTeX' + (p.more ? ' (its first entry)' : '') + '.' +
       (extra.length ? ' Also kept, without a box here: ' + extra.join(', ') + '.' : '') + ' Check the details, then add it.', !!have);
 }
-// The box: a BibTeX entry, or a DOI to look up.
+// The box: a BibTeX entry, a DOI to look up, or a title to search for
+// (see titlesearch.js); Return again on the same title goes into the list.
 function fillFromBox() {
   const t = $('#doiLookup').value;
-  if (looksLikeBibtex(t)) fillFromBibtex(t); else lookupIntoForm();
+  if (looksLikeBibtex(t)) { tsClose(); fillFromBibtex(t); return; }
+  if (tsIsQuery(t)) {
+    const first = t.trim() === TS.q && $('#tsList .ts-item');
+    if (first) first.focus(); else tsSearch(t);
+    return;
+  }
+  tsClose();
+  lookupIntoForm();
 }
 // Paste: what was copied, read straight from the clipboard (Safari asks
 // first).
@@ -425,14 +433,14 @@ async function pasteIntoForm() {
   }
   if (!t.trim()) { sheetMsg('Nothing has been copied. Copy a DOI or a BibTeX entry first.', true); return; }
   if (looksLikeBibtex(t)) { fillFromBibtex(t); return; }
-  $('#doiLookup').value = t.trim();
-  lookupIntoForm();
+  $('#doiLookup').value = t.trim().replace(/\s+/g, ' ');
+  fillFromBox();
 }
 
 async function lookupIntoForm() {
   if (sheet) sheet.extra = {};
   const doi = $('#doiLookup').value.trim();
-  if (!doi) { sheetMsg('Paste a DOI or ISBN first.', true); return; }
+  if (!doi) { sheetMsg('Type a title, or paste a DOI or ISBN, first.', true); return; }
   $('#doiGo').disabled = true;
   sheetMsg(/^\s*(isbn|\d{9})/i.test(doi) ? 'Looking up the ISBN\u2026' : 'Looking up the DOI\u2026');
   try {

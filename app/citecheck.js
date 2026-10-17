@@ -1,8 +1,8 @@
 ﻿// LibLande: Cite Check: a manuscript's citations against its references and the library.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, tour, start.)
+// index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/citecheck.js'] = '2026-10-13.19';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/citecheck.js'] = '2026-10-17.01';
 /* ------------------------------------------------------------ manuscript check */
 // A manuscript's citations checked: a Google Doc, or a Word file from Google
 // Drive or this device, read (never changed). Each APA author-date citation
@@ -575,6 +575,9 @@ $('#sheetBody').addEventListener('click', ev => {
     sheet.msBack = rep;
     if (r.doi) { $('#doiLookup').value = r.doi; lookupIntoForm(); return; }
     msFill(r.title, r.authors, r.base);
+    // (And searched for by its title and first author: candidates to
+    // choose from, as typing them would give.)
+    if (r.title) { $('#doiLookup').value = r.title + (r.names && r.names[0] ? ' ' + r.names[0] : ''); tsSearch($('#doiLookup').value); }
     return;
   }
   // (A citation with nothing else to go on: its authors and year.)
