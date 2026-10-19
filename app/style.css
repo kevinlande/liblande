@@ -1332,7 +1332,12 @@ a.ms-ib { text-decoration: none; }
 .tb-reader-pair { display: inline-flex; align-items: center; }
 .toolbar .tb-btn.tb-reader-more { width: 18px; min-width: 18px; padding: 0; margin-left: -4px; color: var(--muted); }
 .toolbar .tb-btn.tb-reader-more .i { width: 14px; height: 14px; }
-.menu-list.open-menu button { grid-template-columns: 34px minmax(0, 1fr); align-items: center; gap: 10px; }
+.menu-list .op-row { display: flex; align-items: center; gap: 2px; }
+.menu-list .op-row > button:first-child { flex: 1; min-width: 0; }
+.menu-list.open-menu button[data-op] { grid-template-columns: 34px minmax(0, 1fr); align-items: center; gap: 10px; flex: 1; min-width: 0; }
+.menu-list button.op-x { display: grid; place-items: center; width: 30px; height: 30px; flex: none; padding: 0; border-radius: 50%; color: var(--faint); }
+.menu-list button.op-x:hover { color: var(--text); background: var(--side-hover); }
+.menu-list button.op-x .i { width: 15px; height: 15px; }
 .open-menu .op-text { display: grid; gap: 1px; min-width: 0; }
 .open-menu .op-thumb { display: grid; place-items: center; width: 34px; height: 44px; overflow: hidden; border: 1px solid var(--line); border-radius: 3px; background: #fff; color: var(--faint); }
 .open-menu .op-thumb img { width: 100%; height: 100%; object-fit: cover; object-position: top; }

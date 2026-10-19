@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-19.03';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-19.04';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -814,15 +814,23 @@ function tabsMenu(side) {
   m.innerHTML = '<div class="menu-head">Open papers ' + (side === 'left' ? 'to the left' : 'to the right') + '</div>' + list.map(i => {
     const t = PTABS.list[i], x = tabEntry(t), e = x && x.e;
     const title = x ? e.f.title || x.f.n : t.key;
-    return `<button type="button" role="menuitem" data-tm="${i}"><span class="rc-title">${esc(title)}</span>` +
-      (e ? `<span class="rc-sub">${esc(e.authorsShort || '')}${e.f.year ? ' \u00b7 ' + esc(e.f.year) : ''}</span>` : '') + '</button>';
+    return `<div class="op-row"><button type="button" role="menuitem" data-tm="${i}"><span class="rc-title">${esc(title)}</span>` +
+      (e ? `<span class="rc-sub">${esc(e.authorsShort || '')}${e.f.year ? ' \u00b7 ' + esc(e.f.year) : ''}</span>` : '') + '</button>' +
+      `<button type="button" class="op-x" data-tm-x="${i}" aria-label="Close ${esc(title)}" title="Close it">${ICON.x}</button></div>`;
   }).join('');
   document.body.appendChild(m);
   const r = btn.getBoundingClientRect();
   const x = side === 'left' ? r.left : r.right - m.offsetWidth;
   m.style.left = Math.max(8, Math.min(window.innerWidth - m.offsetWidth - 8, x)) + 'px';
   m.style.top = (r.bottom + 6) + 'px';
-  m.addEventListener('click', ev => {
+  m.addEventListener('click', async ev => {
+    // (Closed: the list again, with those still out of sight there.)
+    const x = ev.target.closest('[data-tm-x]');
+    if (x) {
+      await closePaperTab(+x.dataset.tmX);
+      if (TABS_OUT[side].length) tabsMenu(side);
+      return;
+    }
     const b = ev.target.closest('[data-tm]');
     if (!b) return;
     closeTabsMenu();
@@ -926,8 +934,10 @@ function openPapersMenu(focus) {
     const x = tabEntry(t);
     if (!x) return '';
     const e = x.e, sub = [e.authorsShort || '', e.f.year || '', t.page > 1 ? 'p. ' + t.page : ''].filter(Boolean).join(' \u00b7 ');
-    return `<button type="button" role="menuitem" data-op="${i}"${i === PTABS.active ? ' aria-current="true"' : ''}>${opThumb(t.fileId)}` +
-      `<span class="op-text"><span class="rc-title">${esc(e.f.title || x.f.n)}</span>${sub ? `<span class="rc-sub">${esc(sub)}</span>` : ''}</span></button>`;
+    const title = e.f.title || x.f.n;
+    return `<div class="op-row"><button type="button" role="menuitem" data-op="${i}"${i === PTABS.active ? ' aria-current="true"' : ''}>${opThumb(t.fileId)}` +
+      `<span class="op-text"><span class="rc-title">${esc(title)}</span>${sub ? `<span class="rc-sub">${esc(sub)}</span>` : ''}</span></button>` +
+      `<button type="button" class="op-x" data-op-x="${i}" aria-label="Close ${esc(title)}" title="Close it">${ICON.x}</button></div>`;
   }).join('');
   document.body.appendChild(m);
   $('#readerMore').setAttribute('aria-expanded', 'true');
@@ -936,6 +946,8 @@ function openPapersMenu(focus) {
   m.style.left = Math.max(8, Math.min(window.innerWidth - m.offsetWidth - 8, r.left)) + 'px';
   m.style.top = (r.bottom + 6) + 'px';
   m.addEventListener('click', ev => {
+    const x = ev.target.closest('[data-op-x]');
+    if (x) { closeFromList(+x.dataset.opX); return; }
     const b = ev.target.closest('[data-op]');
     if (!b) return;
     closeOpenMenu();
@@ -954,6 +966,22 @@ function openPapersMenu(focus) {
 // the pointer on the button lists them.)
 function readerMoreShown() { $('#readerMore').hidden = $('#readerBtn').hidden || !coarseMQ.matches; }
 coarseMQ.addEventListener('change', readerMoreShown);
+// Closed from the list (the reader not opened for it): the one loaded is
+// saved first, as when its tab is closed; the list then drawn again, or
+// put away with none left. (Recently closed, in the reader, reopens it.)
+async function closeFromList(i) {
+  const t = PTABS.list[i];
+  if (!t) return;
+  if (V.doc && V.file && V.file.id === t.fileId) {
+    if (!keptNote(await saveNow())) return;
+    noteClosed(t.key, t.fileId);
+    unloadDoc();
+    PTABS.list.splice(i, 1);
+    PTABS.active = PTABS.list.length ? Math.max(0, Math.min(i, PTABS.list.length - 1)) : -1;
+    renderPaperTabs();
+  } else await closePaperTab(i);
+  if (PTABS.list.length) openPapersMenu(); else { closeOpenMenu(); $('#readerBtn').focus(); }
+}
 // (Pictures from Drive, as the details' thumbnails, kept with them.)
 const opThumb = id => `<span class="op-thumb" data-op-thumb="${esc(id)}">${THUMBS.get(id) ? `<img src="${esc(THUMBS.get(id))}" alt="">` : ICON.doc}</span>`;
 function opThumbs(m) {
