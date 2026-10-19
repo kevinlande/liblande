@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-10-19.01';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-10-19.02';
 /* -------------------------------------------------------------- features */
 // What LibLande does, by area: each feature, what it's for, where to find
 // it, and its icon (see featIcon). Shown from the sidebar's foot (Features), with a box to find
@@ -37,7 +37,7 @@ const FEATURES = [
     ['Reading list', 'Papers to read: up next, later, or done; one list for each library. Each shows how far you\u2019ve read (press it to start the count again).', 'The bookmark in the details pane or the reader; the Queue tab', '#vRL'],
   ] },
   { area: 'Reading papers', items: [
-    ['Papers in tabs', 'Several papers open at once; going back to the library keeps them open.', 'The tabs along the top of the reader', 'path:M3.5 9h17v10.5h-17zM3.5 9V6a1 1 0 0 1 1-1H10l1.5 4M11.5 9V6a1 1 0 0 1 1-1H18l1.5 4'],
+    ['Papers in tabs', 'Several papers open at once; going back to the library keeps them open. In the library, the open-papers button goes back to them; rest the pointer on it, or on an iPad or iPhone tap the \u25be beside it (or hold the button), to list them, each with a picture of its first page, and go straight to one.', 'The tabs along the top of the reader', 'path:M3.5 9h17v10.5h-17zM3.5 9V6a1 1 0 0 1 1-1H10l1.5 4M11.5 9V6a1 1 0 0 1 1-1H18l1.5 4'],
     ['Recently closed', 'Open again a paper you closed lately.', 'The page with an arrow, beside the title', '#vRecentBtn'],
     ['Search in the paper', 'Every match highlighted; Return for the next one.', '\u2318F, or the magnifier', '#vFindBtn'],
     ['Zoom and fit', 'Pinch, double-tap, or + and \u2212. Tap the percentage to go round the whole page, the page\u2019s width, and actual size.', 'The reader\u2019s toolbar', 'path:M11 4.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM20 20l-4.2-4.2M11 8.5v5M8.5 11h5'],
@@ -161,10 +161,11 @@ const TOUR_STEPS = [
   { title: 'Welcome to LibLande', text: 'A quick look round: your library first, then reading and marking up a paper. Use Next and Back (or the arrow keys), or Play to go on by itself.' },
   { lib: true, sel: '#groups', title: 'Your lists', text: 'Your whole library, and the lists in it: recently viewed, possible duplicates, forthcoming; your saved searches and static groups; keywords and publication types. Drag them into the order you like.', before: async () => { await toLibrary(); showLibSide(); await tourWait(300); } },
   { lib: true, sel: '#groups .sec[data-sec="libs"]', title: 'Libraries', text: 'Several libraries, each its own .bib and folder of papers. Switch with a tap, make a new one with +, and drag publications onto another to copy them there.' },
-  { lib: true, sel: '#groups .sec[data-sec="tools"]', title: 'Tools', text: 'Cite Check checks a manuscript\u2019s citations against your library (and can fix a Google Doc\u2019s References). New papers finds new work that cites yours, by authors you follow, and in your journals.' },
+  { lib: true, sel: '#groups .sec[data-sec="tools"]', title: 'Tools', text: 'Cite Check checks a manuscript\u2019s citations against your library (and can fix a Google Doc\u2019s References). New papers finds new work that cites yours, by authors you follow, and in your journals. Tidy keywords makes keywords written more than one way into one, and finds ones publications are probably missing.' },
   { lib: true, sel: '#groups .sec[data-sec="s"]', title: 'Static groups', text: 'Your own groups. Make one with +, and drag publications onto it.' },
   { lib: true, sel: '.side-foot', title: 'Settings and help', text: 'Light or dark, the keyboard shortcuts (yours to change), this tour, and the full list of features.', after: () => closeSidebarIfOverlay() },
   { lib: true, sel: '#tabs', title: 'Open lists', text: 'The lists you\u2019ve opened, as tabs; and the reading list (Queue) of papers to read next.', before: async () => { closeSidebarIfOverlay(); await tourWait(350); } },
+  { lib: true, sel: '#readerPair', title: 'Your open papers', text: 'Back to the papers you have open. Rest the pointer on it (on an iPad or iPhone, tap \u25be or hold it) to list them, each with a picture of its first page, and go straight to one.' },
   { lib: true, sel: '#selectBtn', title: 'Select several', text: 'Give several publications keywords and groups at once, add them to your reading list, join versions of one, or export them with their PDFs.' },
   { lib: true, sel: '#addBtn', title: 'Add a publication', text: 'Search by title and choose from what\u2019s found, or give a DOI, ISBN or arXiv ID, which LibLande looks up, or paste a BibTeX entry. Drop a PDF on a publication to attach it.' },
   { lib: true, sel: '#refreshBtn', title: 'Reload the library', text: 'Check Google Drive for changes now: made in BibDesk, or on another device. (LibLande also looks by itself when it opens; on an iPhone or iPad, pull down on the list.)' },
@@ -173,6 +174,11 @@ const TOUR_STEPS = [
   { lib: true, sel: '#detail', title: 'The details', text: 'Everything about the publication: read its PDF, copy a citation (APA or BibTeX), add it to your reading list, rate it, or Edit it.', before: async () => {
     if (phoneMQ.matches) return 'skip';
     if (!state.selKey) { const r = $('#rows .row'); if (r) r.click(); await tourWait(400); }
+  } },
+  { lib: true, sel: '#detail .chips', title: 'Keywords', text: 'Tap a keyword to see everything with it, or + Keyword to add one. Suggested keywords, from the publications most like it, are a tap away; Add and Edit suggest them too, with new ones from OpenAlex.', before: async () => {
+    if (phoneMQ.matches) return 'skip';
+    const c = $('#detail .chips');
+    if (c) { c.scrollIntoView({ block: 'center' }); await tourWait(300); }
   } },
   { sel: '#vTop', title: 'Reading a paper', text: 'Papers open in tabs (with more than one open). Library goes back to your library and keeps them open.', before: async () => (await toReader()) ? null : 'skip-reader' },
   { sel: '#vRecentBtn', title: 'Recently closed', text: 'The papers you\u2019ve closed lately, to open again with a tap.' },

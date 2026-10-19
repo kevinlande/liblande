@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-19.01';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-19.02';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -763,6 +763,7 @@ function renderPaperTabs() {
   // (One paper open: no tabs, so its close button is beside its title.)
   $('#vTitleX').hidden = n !== 1;
   $('#readerBtn').hidden = !n;
+  readerMoreShown();
   $('#readerCt').textContent = n > 1 ? String(n) : '';
   $('#readerBtn').setAttribute('aria-label', n === 1 ? 'Back to your open paper' : 'Back to your ' + n + ' open papers');
   saveTabs();
@@ -899,7 +900,112 @@ $('#vTabs').addEventListener('click', ev => {
   const g = ev.target.closest('[data-ptab]');
   if (g && +g.dataset.ptab !== PTABS.active) switchPaperTab(+g.dataset.ptab);
 });
-$('#readerBtn').addEventListener('click', () => showViewer());
+$('#readerBtn').addEventListener('click', () => {
+  // (Not after a long press, which listed them.)
+  if (RB.long) { RB.long = false; return; }
+  closeOpenMenu();
+  showViewer();
+});
+// The papers open, listed under the button, each with a picture of its
+// first page: on a computer when the pointer rests on it, on a touch
+// screen when it's held or with the \u25be beside it; or the down arrow;
+// one picked is gone to. The list stays while the pointer is over
+// it, and goes once it leaves both, or on a tap elsewhere or Esc.
+const RB = { t: 0, hide: 0, long: false, x: 0, y: 0 };
+function closeOpenMenu() { clearTimeout(RB.hide); const m = $('#openMenu'); if (m) m.remove(); $('#readerMore').setAttribute('aria-expanded', 'false'); }
+function openPapersMenu(focus) {
+  closeOpenMenu();
+  const btn = $('#readerBtn');
+  if (!PTABS.list.length || btn.hidden || !$('#viewer').hidden) return;
+  const m = document.createElement('div');
+  m.className = 'menu-list pdf-menu link-menu recent-menu open-menu';
+  m.id = 'openMenu';
+  m.setAttribute('role', 'menu');
+  m.setAttribute('aria-label', 'Open papers');
+  m.innerHTML = `<div class="menu-head">Open paper${PTABS.list.length === 1 ? '' : 's'}</div>` + PTABS.list.map((t, i) => {
+    const x = tabEntry(t);
+    if (!x) return '';
+    const e = x.e, sub = [e.authorsShort || '', e.f.year || '', t.page > 1 ? 'p. ' + t.page : ''].filter(Boolean).join(' \u00b7 ');
+    return `<button type="button" role="menuitem" data-op="${i}"${i === PTABS.active ? ' aria-current="true"' : ''}>${opThumb(t.fileId)}` +
+      `<span class="op-text"><span class="rc-title">${esc(e.f.title || x.f.n)}</span>${sub ? `<span class="rc-sub">${esc(sub)}</span>` : ''}</span></button>`;
+  }).join('');
+  document.body.appendChild(m);
+  $('#readerMore').setAttribute('aria-expanded', 'true');
+  opThumbs(m);
+  const r = btn.getBoundingClientRect();
+  m.style.left = Math.max(8, Math.min(window.innerWidth - m.offsetWidth - 8, r.left)) + 'px';
+  m.style.top = (r.bottom + 6) + 'px';
+  m.addEventListener('click', ev => {
+    const b = ev.target.closest('[data-op]');
+    if (!b) return;
+    closeOpenMenu();
+    switchPaperTab(+b.dataset.op);
+  });
+  m.addEventListener('pointerenter', () => clearTimeout(RB.hide));
+  m.addEventListener('pointerleave', ev => { if (ev.pointerType === 'mouse') RB.hide = setTimeout(closeOpenMenu, 250); });
+  m.addEventListener('keydown', ev => {
+    const items = [...m.querySelectorAll('[data-op]')], i = items.indexOf(document.activeElement);
+    if (ev.key === 'ArrowDown') { ev.preventDefault(); items[Math.min(items.length - 1, i + 1)].focus(); }
+    else if (ev.key === 'ArrowUp') { ev.preventDefault(); if (i <= 0) btn.focus(); else items[i - 1].focus(); }
+  });
+  if (focus) { const first = m.querySelector('[aria-current]') || m.querySelector('[data-op]'); if (first) first.focus(); }
+}
+// (The \u25be only on a touch screen: with a mouse or trackpad, resting
+// the pointer on the button lists them.)
+function readerMoreShown() { $('#readerMore').hidden = $('#readerBtn').hidden || !coarseMQ.matches; }
+coarseMQ.addEventListener('change', readerMoreShown);
+// (Pictures from Drive, as the details' thumbnails, kept with them.)
+const opThumb = id => `<span class="op-thumb" data-op-thumb="${esc(id)}">${THUMBS.get(id) ? `<img src="${esc(THUMBS.get(id))}" alt="">` : ICON.doc}</span>`;
+function opThumbs(m) {
+  const ids = [...new Set([...m.querySelectorAll('[data-op-thumb]')].map(el => el.dataset.opThumb))].filter(id => !THUMBS.has(id) && !THUMB_WAIT.has(id));
+  if (!ids.length || !gs) return;
+  ids.forEach(id => THUMB_WAIT.add(id));
+  callServer('getThumbnails', ids).catch(() => ({})).then(map => {
+    ids.forEach(id => {
+      THUMB_WAIT.delete(id);
+      THUMBS.set(id, (map && map[id]) || null);
+      if (!THUMBS.get(id)) setTimeout(() => { if (THUMBS.get(id) === null) THUMBS.delete(id); }, 60 * 1000);
+      const el = m.isConnected && m.querySelector(`[data-op-thumb="${CSS.escape(id)}"]`);
+      if (el) el.outerHTML = opThumb(id);
+    });
+  });
+}
+$('#readerMore').addEventListener('click', ev => {
+  if ($('#openMenu')) { closeOpenMenu(); return; }
+  // (From the keyboard, into the list.)
+  openPapersMenu(ev.detail === 0);
+});
+$('#readerBtn').addEventListener('pointerenter', ev => {
+  if (ev.pointerType !== 'mouse') return;
+  clearTimeout(RB.hide);
+  if (!$('#openMenu')) { clearTimeout(RB.t); RB.t = setTimeout(() => openPapersMenu(), 350); }
+});
+$('#readerBtn').addEventListener('pointerleave', ev => {
+  if (ev.pointerType !== 'mouse') return;
+  clearTimeout(RB.t);
+  RB.hide = setTimeout(closeOpenMenu, 250);
+});
+$('#readerBtn').addEventListener('pointerdown', ev => {
+  if (ev.pointerType === 'mouse') return;
+  RB.long = false;
+  RB.x = ev.clientX; RB.y = ev.clientY;
+  clearTimeout(RB.t);
+  RB.t = setTimeout(() => { RB.long = true; openPapersMenu(); }, 450);
+});
+$('#readerBtn').addEventListener('pointermove', ev => { if (ev.pointerType !== 'mouse' && Math.hypot(ev.clientX - RB.x, ev.clientY - RB.y) > 10) clearTimeout(RB.t); });
+['pointerup', 'pointercancel'].forEach(n => $('#readerBtn').addEventListener(n, ev => { if (ev.pointerType !== 'mouse') clearTimeout(RB.t); }));
+// (Held: not the browser's own menu for it.)
+$('#readerBtn').addEventListener('contextmenu', ev => { if (RB.long || $('#openMenu')) ev.preventDefault(); });
+$('#readerBtn').addEventListener('keydown', ev => { if (ev.key === 'ArrowDown') { ev.preventDefault(); openPapersMenu(true); } });
+document.addEventListener('pointerdown', ev => { if ($('#openMenu') && !ev.target.closest('#openMenu, #readerBtn, #readerMore')) closeOpenMenu(); }, true);
+document.addEventListener('keydown', ev => {
+  if (ev.key !== 'Escape' || !$('#openMenu')) return;
+  ev.stopPropagation();
+  const back = ev.target.closest && ev.target.closest('#openMenu');
+  closeOpenMenu();
+  if (back) $('#readerBtn').focus();
+}, true);
+window.addEventListener('resize', closeOpenMenu);
 $('#vTitleX').addEventListener('click', () => { if (PTABS.list.length) closePaperTab(PTABS.active >= 0 ? PTABS.active : 0); });
 // Recently viewed: pressed again, back to the list you were on.
 $('#recentBtn').addEventListener('click', () => {
