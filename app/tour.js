@@ -1,8 +1,8 @@
 ﻿// LibLande: Features (everything LibLande does, in one list) and the tour (played through the app itself).
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, tour, start.)
+// index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-10-17.02';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-10-19.01';
 /* -------------------------------------------------------------- features */
 // What LibLande does, by area: each feature, what it's for, where to find
 // it, and its icon (see featIcon). Shown from the sidebar's foot (Features), with a box to find
@@ -29,6 +29,7 @@ const FEATURES = [
     ['Find a PDF', 'Its free copy (open access, found through OpenAlex and Unpaywall\u2019s data), or the article through your library\u2019s proxy, opened in a new tab: save the PDF, then drop it on the publication.', 'Find PDF in the details; library proxies in Settings', 'path:M7 3.5h7l4 4V13M14 3.5v4h4M7 3.5a1.5 1.5 0 0 0-1.5 1.5v14A1.5 1.5 0 0 0 7 20.5h4M16.5 14a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM18.7 19.2l2 2'],
     ['Attach a PDF', 'Drop a PDF on a publication, or use Attach. A book\u2019s PDF is read for its ISBN, to fill in its details.', 'The details pane', 'ICON:clip'],
     ['Edit the details', 'Every field: authors, title, venue, keywords, notes, the cite key, a rating.', 'Edit, in the details pane', 'ICON:pencil'],
+    ['Suggested keywords', 'Keywords suggested from those of the publications most like it, and new ones from OpenAlex; tap one to add it. In Add, Edit and the details.', 'Under the keywords', 'ICON:tag'],
     ['Book covers', 'Covers for your books, from Open Library.', 'Settings (the gear in the sidebar)', 'path:M6 3.5h11a1.5 1.5 0 0 1 1.5 1.5v14a1.5 1.5 0 0 1-1.5 1.5H6zM6 3.5v17M9.5 8h6M9.5 11h4'],
     ['Copy a citation', 'APA, APA in text, BibTeX or the cite key, one publication or several.', 'Copy, in the details pane; or the shortcuts', 'ICON:quote'],
     ['Possible duplicates', 'Publications that look like the same one, to join as versions of one (the main one shown, the others under it) or to mark as different.', 'Possible duplicates in the sidebar', 'ICON:copy'],
@@ -68,6 +69,7 @@ const FEATURES = [
   ] },
   { area: 'Citing and keeping up', items: [
     ['Cite Check', 'Checks a manuscript (a Google Doc or a file) against your library: citations without references, references never cited, and details that differ; and can fix the References in the Google Doc.', 'Cite Check, under Tools in the sidebar', 'ICON:citecheck'],
+    ['Tidy keywords', 'Keywords written more than one way (or misspelt) made one, those used once kept, removed or changed, and keywords publications probably should have added; nothing changes until you apply it.', 'Tidy keywords, under Tools in the sidebar', 'ICON:tag'],
     ['New papers', 'New work that cites yours, by authors you follow, like papers you choose, and in your journals, with a Top 15; checked once a day. Open any one\u2019s abstract to see what it\u2019s about.', 'New papers, under Tools in the sidebar', 'ICON:bell'],
   ] },
   { area: 'On every device', items: [

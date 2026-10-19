@@ -1,8 +1,8 @@
 ﻿// LibLande: adding and editing, BibTeX pasted in, selecting several, updates, cite keys, versions, export, the keyboard.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, tour, start.)
+// index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-10-17.02';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-10-19.01';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -85,7 +85,9 @@ const fieldsHtml = (names, get) => names.map((n, i) => fieldInput(n, get(n), !i 
 const kwChip = k => `<span class="kw-chip" data-kw="${esc(k)}">${esc(k)}<button type="button" aria-label="Remove ${esc(k)}">\u00d7</button></span>`;
 function keywordEditor(list) {
   return `<div class="fld"><label for="kwInput">Keywords</label><div class="kw-edit" id="kwEdit">${list.map(kwChip).join('')}` +
-    `<input id="kwInput" placeholder="Add a keyword" autocomplete="off" autocapitalize="off" spellcheck="false"></div></div>`;
+    `<input id="kwInput" placeholder="Add a keyword" autocomplete="off" autocapitalize="off" spellcheck="false"></div>` +
+    // (Suggested ones: see keywords.js.)
+    `<div class="kw-sugs" id="kwSugs" hidden></div></div>`;
 }
 /* Keyword suggestions, under a box for adding keywords: the library's
    keywords that contain what's typed, those that start with it first.
@@ -238,6 +240,7 @@ function openEdit(e) {
   // (A panel over the library, like Add; a phone's fills the screen.)
   showSheet(h, 'Save');
   $('#sheet').classList.add('head-mode', 'compact');
+  kwsSheet();
   // Fill in, next to the DOI: what Crossref has for the empty fields.
   const doi = $('#fld-doi');
   if (doi) {
@@ -311,6 +314,7 @@ function openAdd(pdf) {
 function renderAddFields(values) {
   const type = $('#addType').value;
   $('#addFields').innerHTML = fieldsHtml(formFieldNames(type, n => values[n]), n => values[n] || '');
+  kwsSheet();
 }
 function sheetValues() {
   const vals = {};
@@ -323,6 +327,7 @@ function addKeyword(v) {
   if (v && ![...box.querySelectorAll('.kw-chip')].some(c => c.dataset.kw === v)) input.insertAdjacentHTML('beforebegin', kwChip(v));
   input.value = '';
   kwSuggHide(input);
+  kwsSheet();
 }
 function sheetKeywords() {
   const pending = $('#kwInput').value.trim();
@@ -718,7 +723,7 @@ async function saveAdd() {
 $('#sheetForm').addEventListener('submit', ev => {
   ev.preventDefault();
   if (!sheet || $('#sheetSave').disabled) return;
-  if (sheet.mode === 'edit') saveEdit(); else if (sheet.mode === 'forth') saveForth(); else if (sheet.mode === 'join') saveJoin(); else if (sheet.mode === 'export') runExport(); else if (sheet.mode === 'export-save') saveExport(); else if (sheet.mode === 'help' || sheet.mode === 'msreport' || sheet.mode === 'newpapers') closeSheet(); else if (sheet.mode === 'npfollow') saveFollow(); else if (sheet.mode === 'mscheck') runMsCheck(); else if (sheet.mode === 'msfix') runMsFix(); else if (sheet.mode === 'smart') saveSmart(); else if (sheet.mode === 'bulk') saveBulk(); else if (sheet.mode === 'attach') { const a = sheet, mode = ($('#sheetBody').querySelector('[name=attachMode]:checked') || {}).value; closeSheet(); runAttach(a.entry, a.file, mode === 'replace'); } else saveAdd();
+  if (sheet.mode === 'edit') saveEdit(); else if (sheet.mode === 'forth') saveForth(); else if (sheet.mode === 'join') saveJoin(); else if (sheet.mode === 'export') runExport(); else if (sheet.mode === 'export-save') saveExport(); else if (sheet.mode === 'help' || sheet.mode === 'msreport' || sheet.mode === 'newpapers') closeSheet(); else if (sheet.mode === 'npfollow') saveFollow(); else if (sheet.mode === 'mscheck') runMsCheck(); else if (sheet.mode === 'msfix') runMsFix(); else if (sheet.mode === 'smart') saveSmart(); else if (sheet.mode === 'bulk') saveBulk(); else if (sheet.mode === 'kwtidy') saveKwTidy(); else if (sheet.mode === 'attach') { const a = sheet, mode = ($('#sheetBody').querySelector('[name=attachMode]:checked') || {}).value; closeSheet(); runAttach(a.entry, a.file, mode === 'replace'); } else saveAdd();
 });
 $('#sheetCancel').addEventListener('click', closeSheet);
 $('#sheetBody').addEventListener('click', ev => { const x = ev.target.closest('[data-sheet-cancel]'); if (x && !x.disabled) closeSheet(); });
@@ -732,7 +737,7 @@ $('#sheetBody').addEventListener('click', ev => {
     return;
   }
   const x = ev.target.closest('.kw-chip button');
-  if (x) { x.parentElement.remove(); return; }
+  if (x) { x.parentElement.remove(); kwsSheet(); return; }
   if (ev.target.closest('#doiGo')) fillFromBox();
   if (ev.target.closest('#bibPaste')) pasteIntoForm();
   if (ev.target.closest('#editDoiGo')) lookupIntoEdit();

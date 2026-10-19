@@ -1,8 +1,8 @@
 ﻿// LibLande: Outline editing: change a paper's outline, or make one, and save it into the PDF.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, tour, start.)
+// index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/outline.js'] = '2026-10-17.02';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/outline.js'] = '2026-10-19.01';
 /* -------------------------------------------------------- outline editor */
 // In the sidebar's Outline tab: Edit the outline (the PDF's own, or the one
 // made from its printed Contents), or Make one afresh: from the Contents

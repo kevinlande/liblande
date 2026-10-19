@@ -1,8 +1,8 @@
 ﻿// LibLande: the library: data, the reading list, groups, search, the list and the details.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, tour, start.)
+// index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-17.02';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-19.01';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -1301,7 +1301,8 @@ function renderGroups() {
     `</div>`) +
     // (Tools: not lists, so no count.)
     `<div class="sec" data-sec="tools"><div class="sec-h">Tools</div><button type="button" class="grp" data-tool="mscheck" aria-label="Cite Check: check a manuscript\u2019s citations"${msToolTitle()}>${ICON.citecheck}<span class="nm">Cite Check</span>${msToolCount()}</button>` +
-      (gs ? `<button type="button" class="grp" data-tool="newpapers" aria-label="New papers" title="New papers that cite yours, by authors you follow, like ones you choose, and in your journals">${ICON.bell}<span class="nm">New papers</span>${npToolCount()}</button>` : '') + `</div>`;
+      (gs ? `<button type="button" class="grp" data-tool="newpapers" aria-label="New papers" title="New papers that cite yours, by authors you follow, like ones you choose, and in your journals">${ICON.bell}<span class="nm">New papers</span>${npToolCount()}</button>` +
+        `<button type="button" class="grp" data-tool="kwtidy" aria-label="Tidy keywords" title="Keywords written more than one way, used once, or probably missing">${ICON.tag}<span class="nm">Tidy keywords</span></button>` : '') + `</div>`;
   // (Saved searches just above the static groups.)
   if (SMART.list.length) h += `<div class="sec" data-sec="q"><div class="sec-h">Saved searches</div>` + SMART.list.map(x => grpBtn('q:' + x.name, x.name, groupItems('q:' + x.name).length, ICON.search)).join('') + `</div>`;
   if (GROUPS.some(g => !(gs && g === readingGroup())) || gs) {
@@ -1444,6 +1445,7 @@ $('#groups').addEventListener('click', ev => {
   if (lb && !lb.classList.contains('cur')) { closeDrawer(); const l = LIBS.list.find(x => x.bibId === lb.dataset.lib); if (l) switchLibraryTo(l); return; }
   if (ev.target.closest('[data-tool="mscheck"]')) { closeDrawer(); openMsCheck(); return; }
   if (ev.target.closest('[data-tool="newpapers"]')) { closeDrawer(); openNewPapers(); return; }
+  if (ev.target.closest('[data-tool="kwtidy"]')) { closeDrawer(); openKwTidy(); return; }
   const b = ev.target.closest('.grp');
   if (!b) return;
   setGroup(b.dataset.g);
@@ -2586,7 +2588,7 @@ function renderDetail() {
   if (e.kw.length || (e.groups && e.groups.length) || kwAdd) {
     chips = `<div class="chips">` +
       (e.groups || []).map(g => `<button class="chip grp-chip" data-goto="${esc('s:' + g)}">${esc(g)}</button>`).join('') +
-      e.kw.map(k => `<button class="chip" data-goto="${esc('k:' + k)}">${esc(k)}</button>`).join('') + kwAdd + `</div>`;
+      e.kw.map(k => `<button class="chip" data-goto="${esc('k:' + k)}">${esc(k)}</button>`).join('') + kwAdd + `</div>` + kwsDetailRow(e);
   }
   const vers = versionsHTML(e);
   let abs = '', body = '';
