@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-19.02';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-19.03';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -5599,7 +5599,8 @@ async function pageLines(doc, n) {
     const x = it.transform[4], y = it.transform[5], h = Math.abs(it.transform[3]) || it.height || 10;
     let r = rows.find(q => Math.abs(q.y - y) < Math.max(2, h * 0.45));
     if (!r) rows.push(r = { y, x, parts: [] });
-    r.parts.push({ x, str: it.str, w: it.width || 0 });
+    // (Letter-spaced, "C h a p t e r": closed up.)
+    r.parts.push({ x, str: spacedOut(it.str), w: it.width || 0 });
     r.x = Math.min(r.x, x);
   }
   rows.sort((a, b) => b.y - a.y);

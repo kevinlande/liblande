@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/outline.js'] = '2026-10-19.02';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/outline.js'] = '2026-10-19.03';
 /* -------------------------------------------------------- outline editor */
 // In the sidebar's Outline tab: Edit the outline (the PDF's own, or the one
 // made from its printed Contents), or Make one afresh: from the Contents
@@ -194,6 +194,9 @@ async function pageHeading(n) {
   } catch (err) { return ''; }
 }
 
+// Letter-spaced text, "T h e  r e f u t a t i o n": closed up (a wider
+// space kept as the space between words).
+const spacedOut = t => /^\s*(?:\S {1,3}){2,}\S\s*$/.test(t) && !/\S\S/.test(t) && /[A-Za-z]/.test(t) ? t.trim().split(/ {2,}/).map(w => w.replace(/ /g, '')).join(' ') : t;
 // A page's text as lines, each with its type size (the largest in it),
 // where it is, and (with fonts) whether it's all in bold.
 async function pageRows(page, fonts) {
@@ -218,7 +221,9 @@ async function pageRows(page, fonts) {
     let r = rows.find(q => Math.abs(q.y - y) < Math.max(1.5, Math.min(q.size, size) * 0.45));
     if (!r) rows.push(r = { y, size, parts: [] });
     r.size = Math.max(r.size, size);
-    r.parts.push({ x, str: it.str, w: it.width || 0, size, k: it.str.replace(/\s/g, '').length, bold: !!bold.get(it.fontName) });
+    // (Letter-spaced, "F i r s t - o r d e r": closed up.)
+    const str = spacedOut(it.str);
+    r.parts.push({ x, str, w: it.width || 0, size, k: str.replace(/\s/g, '').length, bold: !!bold.get(it.fontName) });
   }
   rows.sort((a, b) => b.y - a.y);
   // Two columns: a band down the middle that (almost) no line crosses.
@@ -244,20 +249,32 @@ async function pageRows(page, fonts) {
   const out = [];
   for (const r of rows) {
     r.parts.sort((a, b) => a.x - b.x);
+    // (Letter-spaced text, each letter on its own, as "F i r s t": a space
+    // only where the gap is clearly more than between the letters.)
+    let wide = 1.5;
+    if (r.parts.filter(q => q.k === 1).length > r.parts.length / 2 && r.parts.length >= 6) {
+      const g = r.parts.slice(1).map((q, i) => q.x - (r.parts[i].x + r.parts[i].w)).filter(x => x > 0).sort((a, b) => a - b);
+      if (g.length) wide = Math.max(1.5, g[Math.floor(g.length / 2)] * 1.8);
+    }
     let cur = null, end = null, side = -1;
     for (const q of r.parts) {
       const s = gutter && q.x >= gutter.x ? 1 : 0;
-      if (!cur || (s !== side && q.x - end > 4)) { out.push(cur = { y: r.y, x: q.x, size: 0, chars: 0, boldChars: 0, t: '' }); end = null; }
+      if (!cur || (s !== side && q.x - end > 4)) { out.push(cur = { y: r.y, x: q.x, size: 0, chars: 0, boldChars: 0, t: '', col: s }); end = null; }
       side = s;
-      if (end != null && q.x - end > 1.5 && !/\s$/.test(cur.t) && !/^\s/.test(q.str)) cur.t += ' ';
+      if (end != null && q.x - end > wide && !/\s$/.test(cur.t) && !/^\s/.test(q.str)) cur.t += ' ';
       cur.t += q.str;
       end = Math.max(end == null ? -Infinity : end, q.x + q.w);
+      cur.end = end;
       cur.size = Math.max(cur.size, q.size);
+      (cur.sizes = cur.sizes || new Map()).set(q.size, (cur.sizes.get(q.size) || 0) + q.k);
       cur.chars += q.k;
       if (q.bold) cur.boldChars += q.k;
     }
   }
-  return out.map(r => ({ y: r.y, x: r.x, size: Math.round(r.size * 2) / 2, chars: r.chars, bold: r.chars > 0 && r.boldChars / r.chars > 0.85, text: r.t.replace(/\s+/g, ' ').trim() }))
+  // (w: how wide the line is; col: which column, when there are two;
+  // size: the size most of its letters are, not a symbol's, larger.)
+  const most = r => r.sizes ? [...r.sizes].sort((a, b) => b[1] - a[1])[0][0] : r.size;
+  return out.map(r => ({ y: r.y, x: r.x, w: r.end - r.x, col: r.col, size: Math.round(most(r) * 2) / 2, chars: r.chars, bold: r.chars > 0 && r.boldChars / r.chars > 0.85, text: r.t.replace(/\s+/g, ' ').trim() }))
     .filter(r => r.text);
 }
 // The size most of the text is in.
@@ -268,51 +285,158 @@ function bodySize(rows) {
   for (const [s, c] of by) if (c > best) { best = c; size = s; }
   return size;
 }
-// An outline from the headings: lines in larger type than the body text,
-// or all in bold, not too long, not repeated on page after page (running
-// heads). Levels from their numbering ("2.1 | ..." under "2 | ...") or,
-// unnumbered, their type: the largest the top level, bold text-sized ones
-// below the larger. (A heading over two lines is one entry.)
+// An outline from the headings. Each page is judged by itself (a scan's
+// type can be larger on one page than the next): a heading is a line in
+// larger type than the page's text; or one in bold (where the text isn't),
+// or numbered ("2.1. Learning"), with more space above it than between the
+// lines of the text, and short (not a paragraph's first line, as an
+// exercise "1.2 Explain ..." is); and not on page after page (running
+// heads). Levels from the numbering ("2.1" under "2"), unnumbered ones
+// with numbered ones like them in type; otherwise by type, the largest the
+// top level. (A heading over two lines is one entry.)
+const HEAD_NUM = /^(\d{1,2}(?:\.\d{1,2}){0,3})\.?(?:\s*[|:.)]\s*|\s+)(?=[A-Za-z‘“'"])/;
 async function headingOutline(doc, onPage) {
-  const all = [], by = new Map();
+  const all = [], pages = [], whole = new Map();
   for (let n = 1; n <= doc.numPages; n++) {
     if (onPage) onPage(n);
     const page = await doc.getPage(n);
     const rows = await pageRows(page, true);
-    // (Down the left column, then the right.)
-    const [x0, , x1] = page.view, half = (x1 - x0) / 2;
-    rows.forEach(r => { r.col = r.x - x0 > half ? 1 : 0; });
-    rows.sort((a, b) => a.col - b.col || b.y - a.y);
-    for (const r of rows) { all.push(Object.assign({ page: n }, r)); by.set(r.size, (by.get(r.size) || 0) + r.chars); }
     page.cleanup();
+    pages.push(rows);
+    rows.forEach(r => whole.set(r.size, (whole.get(r.size) || 0) + r.chars));
   }
-  let best = 0, body = 10;
-  for (const [s, c] of by) if (c > best) { best = c; body = s; }
+  const docBody = [...whole].sort((a, b) => b[1] - a[1])[0];
+  // The printed page numbers: how far they are from the PDF's (the
+  // commonest difference, from the numbers at the start or end of each
+  // page's first and last lines), to know a running head by.
+  const PN = /^(\d{1,4})\s|\s(\d{1,4})$|^(\d{1,4})$/, votes = new Map();
+  pages.forEach((rows, i) => {
+    const ends = rows.slice().sort((a, b) => b.y - a.y);
+    for (const r of ends.slice(0, 2).concat(ends.slice(-2))) { const m = PN.exec(r.text); if (m) { const off = i + 1 - +(m[1] || m[2] || m[3]); votes.set(off, (votes.get(off) || 0) + 1); } }
+  });
+  const best = [...votes].sort((a, b) => b[1] - a[1])[0], pageOff = best && best[1] >= 3 ? best[0] : null;
+  for (let n = 1; n <= pages.length; n++) {
+    const rows = pages[n - 1];
+    if (!rows.length) continue;
+    // (Down the left column, then the right.)
+    rows.sort((a, b) => a.col - b.col || b.y - a.y);
+    // The page's text: its size (of those with a fair share of the page,
+    // the nearest the paper's, not the footnotes'); whether it's (nearly)
+    // all bold, as in a PDF whose every font is named bold, when bold says
+    // nothing; the space between its lines; and how wide its lines run.
+    const by = new Map();
+    let chars = 0, boldChars = 0, pageChars = 0;
+    rows.forEach(r => { by.set(r.size, (by.get(r.size) || 0) + r.chars); pageChars += r.chars; });
+    const near = s => Math.abs(Math.log(s / docBody[0]));
+    const body = ([...by].filter(([, c]) => c >= Math.min(pageChars * 0.15, 250)).sort((a, b) => near(a[0]) - near(b[0]))[0] || [...by].sort((a, b) => b[1] - a[1])[0])[0];
+    rows.forEach(r => { if (r.size === body) { chars += r.chars; if (r.bold) boldChars += r.chars; } });
+    const allBold = chars > 0 && boldChars / chars > 0.5;
+    const gaps = [], widths = [];
+    rows.forEach((r, i) => {
+      const prev = rows[i - 1];
+      r.gap = prev && prev.col === r.col ? prev.y - r.y : Infinity;
+      if (r.size === body) { widths.push(r.w); if (r.gap > 0 && r.gap < body * 2.5 && prev.size === body) gaps.push(r.gap); }
+    });
+    gaps.sort((a, b) => a - b); widths.sort((a, b) => a - b);
+    const spacing = gaps[Math.floor(gaps.length / 2)] || body * 1.2, lineW = widths[Math.floor(widths.length * 0.9)] || Infinity;
+    let prev = null;
+    rows.forEach((r, i) => {
+      const last = prev;
+      prev = null;
+      // (Not a heading: too few letters, a formula or a table's row (many
+      // symbols), or a figure's or table's caption.)
+      const ratio = r.size / body, letters = r.text.replace(/[^A-Za-z]/g, '').length;
+      if ((letters < 5 && !/^[A-Z][a-z]{3}$/.test(r.text)) || r.text.length > 120 || !/[A-Za-z]{4}/.test(r.text) || /^[\divxlc.\s]+$/i.test(r.text)) return;
+      // (Code or a formula, as "in(robot1, room1)", or a table's row of
+      // short entries.)
+      const words = r.text.split(/\s+/);
+      if (/[A-Za-z]\(/.test(r.text) || (r.text.match(/\(/g) || []).length > 2 || (words.length >= 4 && words.join('').length / words.length < 3)) return;
+      if (r.text.replace(/[\sA-Za-z\u00c0-\u024f.,:;'\u2018\u2019?!\-()0-9\u2013\u2014&"\u201c\u201d/|\u00b7*\u2020\u2021]/g, '').length > 0 || letters / r.text.replace(/[\s\d.]/g, '').length < 0.6) return;
+      if (/^(figure|fig\.|table|plate|chart)\s*\d/i.test(r.text)) return;
+      // (A running head or foot: the page's first or last line, in the
+      // text's size or smaller, with its printed page number, as "34 J.A.
+      // Fodor and Z. W. Pylyshyn"; not a chapter's "1 Recognition", or "6 |
+      // Conclusion" at the top of a page.)
+      const pn = PN.exec(r.text);
+      if (pn && ratio < 1.15 && (r.gap === Infinity || i === rows.length - 1) && pageOff != null && Math.abs(n - +(pn[1] || pn[2] || pn[3]) - pageOff) <= 1) return;
+      // (The next line of a heading: as it, and just under it; a numbered
+      // one's only if it ran the width of the text.)
+      if (last && Math.abs(r.size - last.size) <= 0.5 && (last.kind !== 'bold' || r.bold) && last.y - r.y > 0 && last.y - r.y < r.size * 1.9 && (last.kind !== 'num' || last.long) && !HEAD_NUM.test(r.text)) {
+        all.push(prev = { page: n, col: r.col, y: r.y, size: r.size, ratio, kind: last.kind, num: '', text: r.text, more: true });
+        return;
+      }
+      // (A heading starts with a capital, a number, or "(a)"; not as a
+      // label in a figure, "shape: T-shaped", or code.)
+      if (!/^(\d|[A-Z\u00c0-\u00de]|\([a-zA-Z0-9]{1,4}\)\s|["'\u2018\u201c\u2022])/.test(r.text) || (r.text.match(/:/g) || []).length > 1) return;
+      const apart = r.gap >= spacing * 1.5, long = r.w > lineW * 0.8;
+      const short = !long && r.text.split(/\s+/).length <= 14 && !/[,;:\-]$/.test(r.text);
+      const num = HEAD_NUM.exec(r.text);
+      let kind = '';
+      if (ratio >= 1.15) kind = 'big';
+      else if (r.bold && !allBold && ratio >= 0.9 && apart && r.text.length <= 100) kind = 'bold';
+      // (A long numbered one, with a lot of space above it: a chapter's
+      // heading running over two lines.)
+      // (Not an exercise, as "3.3 Suppose a function ...".)
+      else if (num && ratio >= 0.9 && apart && (short || r.gap >= spacing * 3) && !/\.$/.test(r.text) &&
+        !/^(suppose|give|find|explain|show|prove|let|consider|compute|calculate|describe|write|draw|discuss|assume|obtain|derive|determine)\b/i.test(r.text.slice(num[0].length))) kind = 'num';
+      if (kind) all.push(prev = { page: n, col: r.col, y: r.y, size: r.size, bold: r.bold, ratio, kind, long, num: num ? num[1] : '', text: r.text });
+    });
+  }
+  // Not running heads (the same words at the top or foot of page after
+  // page).
   const key = t => t.toLowerCase().replace(/[\d\s.,:;|ivxlc]+$/g, '').replace(/^[\d\s.,:;|ivxlc]+/, '').trim();
   const pagesWith = new Map();
-  for (const r of all) { const k = key(r.text); if (!k) continue; if (!pagesWith.has(k)) pagesWith.set(k, new Set()); pagesWith.get(k).add(r.page); }
-  const big = r => r.size >= body * 1.12, boldHead = r => r.bold && r.size >= body * 0.95 && r.text.length <= 90;
-  let heads = all.filter(r => (big(r) || boldHead(r)) && r.text.length >= 2 && r.text.length <= 120 && /[A-Za-z]{2}/.test(r.text) &&
-    !/^[\divxlc.\s]+$/i.test(r.text) && (pagesWith.get(key(r.text)) || new Set()).size <= 3);
-  // Two lines of one heading: the same size, one just under the other.
+  pages.forEach((rows, i) => rows.forEach((r, j) => { const k = key(r.text); if (k.length < 4 || (j > 1 && j < rows.length - 2)) return; if (!pagesWith.has(k)) pagesWith.set(k, new Set()); pagesWith.get(k).add(i + 1); }));
+  // (A chapter's title in large type, the same as the running head over
+  // its pages, is kept.)
+  let heads = all.filter(h => h.ratio >= 1.15 || (pagesWith.get(key(h.text)) || new Set()).size <= 3);
+  // Two lines of one heading (the second found as such, above).
   const joined = [];
-  for (const r of heads) {
+  for (const h of heads) {
     const last = joined[joined.length - 1];
-    if (last && last.page === r.page && last.col === r.col && last.size === r.size && last.y - r.y > 0 && last.y - r.y < r.size * 1.8 && last.lines < 3) {
-      last.text += ' ' + r.text; last.y = r.y; last.lines++;
-    } else joined.push(Object.assign({ lines: 1, top: r.y + r.size }, r));
+    if (last && h.more && last.page === h.page && last.col === h.col && last.lines < 3) {
+      last.text += ' ' + h.text; last.y = h.y; last.lines++;
+    } else joined.push(Object.assign({ lines: 1, top: h.y + h.size }, h));
   }
   heads = joined;
-  // Levels: by size, the largest three (or two, if there are very many),
-  // then bold; or by numbering.
-  const sizes = [...new Set(heads.filter(big).map(h => h.size))].sort((a, b) => b - a).slice(0, heads.length > 400 ? 2 : 3);
-  const NUM = /^(\d{1,2}(?:\.\d{1,2}){0,3})\.?(?:\s*[|:.)]\s*|\s+)(?=[A-Za-z\u2018\u201c'"])/;
-  const levelOf = h => {
-    const m = NUM.exec(h.text);
-    if (m) return m[1].split('.').length - 1;
-    return big(h) ? sizes.indexOf(h.size) : sizes.length;
-  };
-  return heads.filter(h => !big(h) || sizes.includes(h.size)).map(h => ({ title: h.text.slice(0, 160), page: h.page, top: Math.round(h.top + 2), level: Math.min(levelOf(h), OLE_MAX_LEVEL) }))
+  // Numbered ones in order: one numbered lower than the one before isn't a
+  // heading (a list, or an exercise).
+  const cmp = (a, b) => { const x = a.split('.').map(Number), y = b.split('.').map(Number); for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return x.length - y.length; };
+  if (window.LIBLANDE_TEST) headingOutline.seen = heads.slice();
+  let lastNum = '';
+  heads = heads.filter(h => { if (!h.num) return true; if (lastNum && cmp(h.num, lastNum) <= 0) return false; lastNum = h.num; return true; });
+  // Their type: larger ones by size (to a tenth of the text's; sizes within
+  // an eighth of each other one, as a scan's can vary), then bold, then
+  // plain numbered.
+  const zc = new Map();
+  heads.filter(h => h.kind === 'big').forEach(h => { const z = Math.round(h.ratio * 10); zc.set(z, (zc.get(z) || 0) + 1); });
+  const zOf = new Map(), zs0 = [...zc.keys()].sort((a, b) => a - b);
+  for (let i = 0; i < zs0.length;) {
+    let j = i;
+    while (j + 1 < zs0.length && zs0[j + 1] / zs0[j] <= 1.12) j++;
+    const group = zs0.slice(i, j + 1), main = group.slice().sort((a, b) => zc.get(b) - zc.get(a))[0];
+    group.forEach(z => zOf.set(z, main));
+    i = j + 1;
+  }
+  const style = h => h.kind === 'big' ? 'z' + zOf.get(Math.round(h.ratio * 10)) : h.kind;
+  const rank = st => st[0] === 'z' ? -+st.slice(1) : st === 'bold' ? 0 : 1;
+  // (A larger size seen once or twice is an odd line, as a figure's label
+  // or the title page's: not a heading, unless there are hardly any.)
+  const seen = new Map();
+  heads.forEach(h => seen.set(style(h), (seen.get(style(h)) || 0) + 1));
+  const styles = [...seen.keys()].sort((a, b) => rank(a) - rank(b));
+  const zs = styles.filter(st => st[0] === 'z' && (seen.get(st) > 2 || heads.length <= 3)).slice(0, 3);
+  const kept = styles.filter(st => st[0] !== 'z' || zs.includes(st));
+  heads = heads.filter(h => kept.includes(style(h)));
+  // Levels: numbered ones by their numbers; others as the numbered ones in
+  // their type (most often), or else in order of type.
+  const depthOf = new Map();
+  heads.filter(h => h.num).forEach(h => { const st = style(h), d = h.num.split('.').length - 1, m = depthOf.get(st) || new Map(); m.set(d, (m.get(d) || 0) + 1); depthOf.set(st, m); });
+  const levelOfStyle = new Map();
+  kept.forEach(st => { const m = depthOf.get(st); if (m) levelOfStyle.set(st, [...m].sort((a, b) => b[1] - a[1])[0][0]); });
+  let next = 0;
+  kept.forEach(st => { if (levelOfStyle.has(st)) next = levelOfStyle.get(st) + 1; else levelOfStyle.set(st, next++); });
+  return heads.map(h => ({ title: h.text.slice(0, 160), page: h.page, top: Math.round(h.top + 2), level: Math.min(h.num ? h.num.split('.').length - 1 : levelOfStyle.get(style(h)), OLE_MAX_LEVEL) }))
     .map((h, i, list) => Object.assign(h, { level: i ? Math.min(h.level, list[i - 1].level + 1) : 0 }));
 }
 // Making one: from the Contents on the page you're on, from the headings,
@@ -333,7 +457,9 @@ async function oleMake(kind) {
       if (!made || !made.items.length) made = await printedContents(doc, null);
       if (doc !== V.doc) return;
       if (!made || !made.items.length) {
-        toast('No Contents page was found. Go to it (its first page), then try again.', 6000);
+        // (Many papers, and some books, have none: the headings instead.)
+        toast('No Contents page was found. Go to it (its first page) and try again, or make the outline from the headings.', 9000,
+          { label: 'From the headings', run: () => oleMake('heads') });
         OLE.busy = false;
         if (OLE.on) oleRender(); else showOutline();
         return;
