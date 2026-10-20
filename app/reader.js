@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-19.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-20.01';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -5618,26 +5618,14 @@ const OL_MAKE_MENU = `<details class="menu right v-ole-make"><summary class="btn
 // or else by the page numbers printed at the top or foot of its pages (or
 // failing that, by finding the first entry's title). Kept on this device.
 const TOC_CACHE = store.get('tocMade', {});
-// A page's text as lines, top to bottom, each with where it starts.
+// A page's text as lines, top to bottom (down the left column, then the
+// right, when there are two), each with where it starts, from its
+// column's left edge too (rx).
 async function pageLines(doc, n) {
-  const tc = await (await doc.getPage(n)).getTextContent();
-  const rows = [];
-  for (const it of tc.items) {
-    if (!it.str || !it.transform) continue;
-    const x = it.transform[4], y = it.transform[5], h = Math.abs(it.transform[3]) || it.height || 10;
-    let r = rows.find(q => Math.abs(q.y - y) < Math.max(2, h * 0.45));
-    if (!r) rows.push(r = { y, x, parts: [] });
-    // (Letter-spaced, "C h a p t e r": closed up.)
-    r.parts.push({ x, str: spacedOut(it.str), w: it.width || 0 });
-    r.x = Math.min(r.x, x);
-  }
-  rows.sort((a, b) => b.y - a.y);
-  return rows.map(r => {
-    r.parts.sort((a, b) => a.x - b.x);
-    let t = '', end = null;
-    for (const q of r.parts) { if (end != null && q.x - end > 1.5 && !/\s$/.test(t) && !/^\s/.test(q.str)) t += ' '; t += q.str; end = q.x + q.w; }
-    return { x: r.x, text: t.replace(/\s+/g, ' ').trim() };
-  }).filter(l => l.text);
+  const rows = (await pageRows(await doc.getPage(n))).sort((a, b) => a.col - b.col || b.y - a.y);
+  const left = [Infinity, Infinity];
+  rows.forEach(r => { left[r.col] = Math.min(left[r.col], r.x); });
+  return rows.map(r => ({ x: r.x, rx: r.x - left[r.col], col: r.col, text: r.text }));
 }
 const romanValue = s => { const v = { i: 1, v: 5, x: 10, l: 50, c: 100, d: 500, m: 1000 }; let n = 0; for (let i = 0; i < s.length; i++) { const a = v[s[i]], b = v[s[i + 1]] || 0; n += a < b ? -a : a; } return n; };
 const TOC_HEAD = /^(table ?of ?)?contents$/i;
@@ -5653,9 +5641,9 @@ const tocHeading = t => (/^(chapter|part|book|section|appendix|appendices)\b/i.t
 // (at: the Contents start on that page, said so, rather than found.)
 async function printedContents(doc, fileId, at) {
   if (at) fileId = null;
-  // (v3: read again since running heads, capital roman numerals and
-  // section numbers were read.)
-  const ck = 'v3:' + (fileId || '') + ':' + doc.numPages;
+  // (v4: read again since two columns, page labels with gaps and parts
+  // were read.)
+  const ck = 'v4:' + (fileId || '') + ':' + doc.numPages;
   if (fileId && TOC_CACHE[ck]) return TOC_CACHE[ck];
   const N = doc.numPages, lines = {};
   const read = async n => (lines[n] = lines[n] || await pageLines(doc, n));
@@ -5687,14 +5675,22 @@ async function printedContents(doc, fileId, at) {
     const ls = (await read(n)).filter(l => !TOC_HEAD.test(l.text.replace(/^(\d{1,4}|[ivxlc]{1,7})\s+|\s+(\d{1,4}|[ivxlc]{1,7})$/gi, '').replace(/\s+/g, '')) && !/^\d{1,4}$|^[ivxlc]{1,6}$/i.test(l.text) && !repeated(l));
     for (let i = 0; i < ls.length; i++) {
       const l = ls[i], m = TOC_ENTRY.exec(l.text);
-      if (m && !(/^[ivxlcdm]+$/.test(tocNum(m[2])) && /\b(part|chapter|book|volume)$/i.test(m[1]))) { raw.push({ title: m[1].replace(/[\s.\u00b7\u2026_]+$/, ''), num: tocNum(m[2]), x: l.x }); continue; }
-      if (tocHeading(l.text)) { raw.push({ title: l.text, num: null, x: l.x, head: true }); continue; }
+      if (m && !(/^[ivxlcdm]+$/.test(tocNum(m[2])) && /\b(part|chapter|book|volume)$/i.test(m[1]))) { raw.push({ title: m[1].replace(/[\s.\u00b7\u2026_]+$/, ''), num: tocNum(m[2]), x: l.x, rx: l.rx, col: l.col }); continue; }
+      if (tocHeading(l.text)) { raw.push({ title: l.text, num: null, x: l.x, rx: l.rx, col: l.col, head: true }); continue; }
       // (A title over two lines, its page number on the second.)
       const next = ls[i + 1], nm = next && TOC_ENTRY.exec(next.text);
-      if (nm && !tocHeading(next.text)) { raw.push({ title: l.text + ' ' + nm[1].replace(/[\s.\u00b7\u2026_]+$/, ''), num: tocNum(nm[2]), x: l.x }); i++; }
+      if (nm && !tocHeading(next.text)) { raw.push({ title: l.text + ' ' + nm[1].replace(/[\s.\u00b7\u2026_]+$/, ''), num: tocNum(nm[2]), x: l.x, rx: l.rx, col: l.col }); i++; }
     }
   }
   if (raw.filter(r => r.num).length < 3) return null;
+  // (A page number set apart, "The Algorithmic Level 7 2" for 72: joined
+  // when that fits between the entries around it.)
+  raw.forEach((r, i) => {
+    const m = /^(.*\S)\s(\d)$/.exec(r.title), prev = raw.slice(0, i).reverse().find(x => x.num && /^\d+$/.test(x.num));
+    if (!m || !r.num || !/^\d+$/.test(r.num) || !prev) return;
+    const joined = +(m[2] + r.num);
+    if (+r.num < +prev.num && joined >= +prev.num && joined <= +prev.num + 40) { r.title = m[1]; r.num = String(joined); }
+  });
   // Printed page to PDF page.
   const tocEnd = to, pdfOf = await pageMapper(doc, raw, from, tocEnd, read);
   raw.forEach(r => { r.page = r.num ? pdfOf(r.num) : 0; });
@@ -5702,22 +5698,44 @@ async function printedContents(doc, fileId, at) {
   // from how far in each line starts.
   for (let i = 0; i < raw.length; i++) if (!raw[i].num) { const nx = raw.slice(i + 1).find(r => r.page); raw[i].page = nx ? nx.page : 0; }
   const out = [], heads = raw.some(r => r.head), minX = Math.min(...raw.map(r => r.x));
-  // Sections numbered within chapters ("2.3 ..."): levels from the numbers.
+  // (How far in: from the page's left edge, or in two columns, from the
+  // column's.)
+  const twoCols = raw.some(r => r.col === 1), ind = r => twoCols ? r.rx : r.x - minX;
+  // Sections numbered within chapters ("2.3 ..."): levels from the
+  // numbers, under any parts ("I Foundations"); one not numbered, under the
+  // nearest entry above it that starts further left (as "Ambiguous
+  // Figures" under "1.1.3").
   const depth = r => { const m = TOC_NUMBERED.exec(r.title); return m ? m[1].split('.').length - 1 : null; };
+  const PART = /^(part\s+)?[IVX]{1,4}\.?\s+[A-Z]/;
   if (raw.filter(r => depth(r) != null).length >= 3 && raw.some(r => depth(r) > 0)) {
-    const stack = [];
+    // (A chapter whose number isn't with its title, set apart: the one
+    // just before "8.1 ...", and no further in, is chapter 8.)
+    // (Not when chapter 8 is there already, its first section before 8.1
+    // unnumbered.)
+    const chapters = new Set();
+    raw.forEach((r, i) => {
+      const next = raw[i + 1], m = next && /^(\d{1,2})\.1\b/.exec(next.title);
+      if (depth(r) == null && m && !chapters.has(m[1]) && !PART.test(r.title) && (r.rx || 0) <= (next.rx || 0) + 2) r.title = m[1] + ' ' + r.title;
+      if (depth(r) === 0) chapters.add(TOC_NUMBERED.exec(r.title)[1]);
+    });
+    // (Back matter, and appendices, at the top.)
+    const BACK = /^(appendix|appendices|glossary|references|bibliography|notes|(name |subject |author )?index|acknowledg)/i;
+    const parts = raw.some(r => PART.test(r.title) && depth(r) == null), stack = [];
     for (const r of raw) {
-      const item = { title: r.title, page: r.page, items: [] }, lv = Math.min(depth(r) || 0, stack.length);
+      const item = { title: r.title, page: r.page, items: [] };
+      let lv = (PART.test(r.title) || BACK.test(r.title)) && depth(r) == null ? 0 : depth(r) != null ? depth(r) + (parts ? 1 : 0) : null;
+      if (lv == null) { let k = stack.length - 1; while (k >= 0 && stack[k].rx >= (r.rx || 0) - 2) k--; lv = k + 1; }
+      lv = Math.min(lv, stack.length);
       stack.length = lv;
-      (lv ? stack[lv - 1].items : out).push(item);
-      stack.push(item);
+      (lv ? stack[lv - 1].item.items : out).push(item);
+      stack.push({ item, rx: r.rx || 0 });
     }
   } else {
     let cur = null;
     for (const r of raw) {
       const item = { title: r.title, page: r.page, items: [] };
-      if (r.head || (!heads && r.x - minX <= 8)) { out.push(item); cur = r.head || !heads ? item : null; }
-      else if (cur && (heads || r.x - minX > 8)) cur.items.push(item);
+      if (r.head || (!heads && ind(r) <= 8)) { out.push(item); cur = r.head || !heads ? item : null; }
+      else if (cur && (heads || ind(r) > 8)) cur.items.push(item);
       else out.push(item);
     }
   }
@@ -5743,7 +5761,17 @@ async function pageMapper(doc, raw, tocStart, tocEnd, read) {
     const at = new Map();
     labels.forEach((l, i) => { const k = String(l).trim().toLowerCase(); if (!at.has(k)) at.set(k, i + 1); });
     const hits = raw.filter(r => r.num && at.has(r.num.toLowerCase())).length;
-    if (hits >= raw.filter(r => r.num).length / 2) return num => at.get(num.toLowerCase()) || 0;
+    // (A page without a label, as a chapter's first: counted from the
+    // nearest page with a number for its label.)
+    const numbered = [];
+    labels.forEach((l, i) => { if (/^\d+$/.test(String(l).trim())) numbered.push([+l, i + 1]); });
+    const near = num => {
+      let best = null;
+      for (const [v, p] of numbered) if (!best || Math.abs(v - num) < Math.abs(best[0] - num)) best = [v, p];
+      const p = best ? best[1] + num - best[0] : 0;
+      return p >= 1 && p <= N ? p : 0;
+    };
+    if (hits >= raw.filter(r => r.num).length / 2) return num => at.get(num.toLowerCase()) || (/^\d+$/.test(num) ? near(+num) : 0);
   }
   const isRoman = num => /^[ivxlcdm]+$/.test(num);
   const offsetFrom = async (pages, roman) => {
