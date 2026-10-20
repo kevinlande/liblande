@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-20.01';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-20.03';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -280,7 +280,13 @@ async function getPdfBytes(file, onProgress) {
 
 // "Share to...": the share sheet on iPhone and iPad (PDF Expert, Files,
 // Books...), a download on a computer.
-function openIn(bytes, name, type, downloadNote) {
+// Sent to another app: the share sheet (on a touch screen; for a PDF, on
+// a computer too, where the browser has one), or else downloaded. With
+// mail ({ subject, text }): to be emailed, the citation as the message's
+// text, from the share sheet (Mail, or another mail app there); without
+// one, downloaded, the citation copied, and a new message opened in the
+// mail app, to attach it to.
+function openIn(bytes, name, type, downloadNote, mail) {
   const file = new File([bytes], name, { type: type || 'application/pdf' });
   const saveCopy = () => {
     const url = URL.createObjectURL(file);
@@ -293,11 +299,17 @@ function openIn(bytes, name, type, downloadNote) {
     setTimeout(() => URL.revokeObjectURL(url), 60000);
     toast(downloadNote || 'Downloading ' + name + '. If nothing happens, use Google Drive and its Open in menu.', 5000);
   };
-  const canShare = coarseMQ.matches && navigator.canShare && navigator.canShare({ files: [file] });
-  if (!canShare) { saveCopy(); return; }
-  navigator.share({ files: [file] }).catch(err => {
-    if (err && err.name === 'AbortError') return;
+  const mailNoSheet = () => {
     saveCopy();
+    if (navigator.clipboard) navigator.clipboard.writeText(mail.text).catch(() => {});
+    location.href = 'mailto:?subject=' + encodeURIComponent(mail.subject) + '&body=' + encodeURIComponent(mail.text + '\n');
+    toast('Downloaded ' + name + ': attach it to the new message (its citation is in the message, and copied).', 8000);
+  };
+  const canShare = (coarseMQ.matches || !type || mail) && navigator.canShare && navigator.canShare({ files: [file] });
+  if (!canShare) { if (mail) mailNoSheet(); else saveCopy(); return; }
+  navigator.share(mail ? { files: [file], title: mail.subject, text: mail.text } : { files: [file] }).catch(err => {
+    if (err && err.name === 'AbortError') return;
+    if (mail) mailNoSheet(); else saveCopy();
   });
 }
 
@@ -6663,11 +6675,12 @@ $('#vShare').addEventListener('click', async ev => {
   if (!b) return;
   $('#vShare').open = false;
   if (!V.file) return;
-  if (b.dataset.vshare === '1') { prepareShare(V.file, true); return; }
+  const mail = b.dataset.vshare[0] === 'm' && V.entry ? mailOf(V.entry) : null;
+  if (b.dataset.vshare.slice(-1) === '1') { prepareShare(V.file, true, mail); return; }
   if (!V.bytes) { toast('The paper is still downloading.', 2000); return; }
   if (V.drawing) { await commitDrawing(); V.drawing = false; if (V.tool !== 'read') setTool(V.tool); }
   try {
-    openIn((V.dirty || V.bmDirty) && V.doc ? await realLines(await withBookmarks(await V.doc.saveDocument())) : V.bytes, V.file.n);
+    openIn((V.dirty || V.bmDirty) && V.doc ? await realLines(await withBookmarks(await V.doc.saveDocument())) : V.bytes, V.file.n, null, null, mail);
   } catch (err) { toast(errText(err), 5000); }
 });
 window.addEventListener('resize', () => {
@@ -6976,8 +6989,10 @@ const cleanName = name => name.replace(/\s*\.pdf$/i, '') + ' (clean).pdf';
 // "Share to...": the PDF as is, or a clean copy. Anything that has to be
 // downloaded or processed first ends with a "ready" bar to tap, because the
 // share sheet only opens straight after a tap.
-async function prepareShare(file, clean) {
-  if (!clean && recentPdfs.has(file.id)) { openIn(recentPdfs.get(file.id), file.n); return; }
+// (mail: to email it; see openIn.)
+const mailOf = e => ({ subject: String(e.f.title || e.k).replace(/[{}]/g, ''), text: apaCitation(e).text });
+async function prepareShare(file, clean, mail) {
+  if (!clean && recentPdfs.has(file.id)) { openIn(recentPdfs.get(file.id), file.n, null, null, mail); return; }
   toast(recentPdfs.has(file.id) ? 'Making a clean copy\u2026' : 'Getting the PDF from Google Drive\u2026', 0);
   try {
     let bytes = await getPdfBytes(file), name = file.n, note = '';
@@ -6993,7 +7008,8 @@ async function prepareShare(file, clean) {
     bar.querySelector('span').textContent = (note ? note + ': ' : '') + name;
     bar.hidden = false;
     const go = bar.querySelector('#readyGo');
-    go.onclick = () => { bar.hidden = true; openIn(bytes, name); };
+    go.lastChild.textContent = mail ? 'Email' : 'Share';
+    go.onclick = () => { bar.hidden = true; openIn(bytes, name, null, null, mail); };
     go.focus();
   } catch (err) {
     toast((clean ? 'Couldn\u2019t make a clean copy: ' : 'Couldn\u2019t get the PDF: ') + errText(err), 6000);

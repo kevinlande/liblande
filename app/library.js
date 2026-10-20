@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-20.01';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-20.03';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -2491,6 +2491,9 @@ function renderDetail() {
   const files = e.files || [];
   const readable = gs ? files.map((fl, j) => [fl, j]).filter(([fl]) => fl.id) : [];
   const fname = fl => esc(fl.n.replace(/\.pdf$/i, ''));
+  // (Email: the PDF attached, the citation in the message; see openIn.)
+  const mailItems = j => `<button type="button" role="menuitem" data-share="${j}" data-clean="0" data-mail="1">Email\u2026</button>` +
+    `<button type="button" role="menuitem" data-share="${j}" data-clean="1" data-mail="1">Email a clean copy\u2026</button>`;
   const menu = (cls, summary, title, items) => `<details class="menu ${cls}"><summary class="btn${cls.indexOf('act-read') >= 0 ? ' primary' : ''}" title="${title}">${summary}${ICON.chev}</summary>` +
     `<div class="menu-list" role="menu">${items}</div></details>`;
   if (readable.length === 1) {
@@ -2498,14 +2501,14 @@ function renderDetail() {
     btns.push(`<button type="button" class="btn primary act-read" data-read="${j}" title="${esc(fl.p)}">${ICON.read}<span>View</span></button>`);
     btns.push(menu('', `${ICON.share}<span class="share-word">Share</span>`, 'Share a copy to another app',
       `<button type="button" role="menuitem" data-share="${j}" data-clean="0">PDF as is</button>` +
-      `<button type="button" role="menuitem" data-share="${j}" data-clean="1">Clean copy (no annotations)</button>`));
+      `<button type="button" role="menuitem" data-share="${j}" data-clean="1">Clean copy (no annotations)</button>` + mailItems(j)));
   } else if (readable.length > 1) {
     btns.push(menu('act-read', `${ICON.read}<span>View</span>`, 'Choose a PDF to view',
       readable.map(([fl, j]) => `<button type="button" role="menuitem" data-read="${j}" title="${esc(fl.p)}"><span class="fname">${fname(fl)}</span></button>`).join('')));
     btns.push(menu('', `${ICON.share}<span class="share-word">Share</span>`, 'Share a copy to another app',
       readable.map(([fl, j]) => `<div class="menu-head">${fname(fl)}</div>` +
         `<button type="button" role="menuitem" data-share="${j}" data-clean="0">PDF as is</button>` +
-        `<button type="button" role="menuitem" data-share="${j}" data-clean="1">Clean copy (no annotations)</button>`).join('')));
+        `<button type="button" role="menuitem" data-share="${j}" data-clean="1">Clean copy (no annotations)</button>` + mailItems(j)).join('')));
   }
   // Less used: Google Drive, Attach, the DOI and other links, in a "More"
   // menu at the end.
@@ -2815,7 +2818,7 @@ detailEl.addEventListener('click', ev => {
   if (e && rd) { const m = rd.closest('details'); if (m) m.open = false; openPaper(e, e.files[+rd.dataset.read]); return; }
   if (e && sh) {
     sh.closest('details').open = false;
-    prepareShare(e.files[+sh.dataset.share], sh.dataset.clean === '1');
+    prepareShare(e.files[+sh.dataset.share], sh.dataset.clean === '1', sh.dataset.mail ? mailOf(e) : null);
     return;
   }
   if (c && e) {

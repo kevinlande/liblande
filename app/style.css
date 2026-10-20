@@ -1763,7 +1763,9 @@ a.ms-ib { text-decoration: none; }
 }
 .v-status { position: absolute; left: 50%; top: 45%; transform: translate(-50%, -50%); max-width: min(420px, 86vw); text-align: center; padding: 14px 18px; border-radius: 10px; background: var(--bg); color: var(--muted); box-shadow: var(--shadow); font-size: 14px; line-height: 1.5; }
 .v-status.err { color: var(--warn); }
-.ready-bar { position: fixed; z-index: 55; left: 50%; transform: translateX(-50%); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); width: min(460px, calc(100vw - 32px)); display: flex; align-items: center; gap: 8px; padding: 10px 10px 10px 14px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); box-shadow: var(--shadow); }
+/* (Over the reader too, and there above its markup toolbar.) */
+.ready-bar { position: fixed; z-index: 85; left: 50%; transform: translateX(-50%); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); width: min(460px, calc(100vw - 32px)); display: flex; align-items: center; gap: 8px; padding: 10px 10px 10px 14px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); box-shadow: var(--shadow); }
+#viewer:not([hidden]) ~ .ready-bar { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
 .ready-bar span { flex: 1; min-width: 0; font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .toast {
   position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%) translateY(12px);

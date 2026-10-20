@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-10-20.01';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-10-20.03';
 /* -------------------------------------------------------------- features */
 // What LibLande does, by area: each feature, what it's for, where to find
 // it, and its icon (see featIcon). Shown from the sidebar's foot (Features), with a box to find
@@ -46,7 +46,8 @@ const FEATURES = [
     ['Links inside the paper', 'Go to a reference or figure, or look at it in a panel without losing your place; Back to page n brings you back.', 'Tap a link', '#vBackGo'],
     ['Where you left off', 'Each paper opens where you were, on this device or another.', '', 'ICON:history'],
     ['Copy a region', 'Drag a box to copy its text or a picture of it, or share it.', 'The box tool in the markup toolbar', '#vPalette [data-tool="select"]'],
-    ['Share a copy', 'The PDF as it is, or a clean copy without your marks, to Mail or any app; or open it in Google Drive.', 'The share button in the reader\u2019s toolbar', '#vShare summary'],
+    ['Share a copy', 'The PDF as it is, or a clean copy without your marks, to Mail or any app; or open it in Google Drive.', 'The share button in the reader\u2019s toolbar, or Share in the details', '#vShare summary'],
+    ['Email a paper', 'A new message with the PDF attached (as it is, or a clean copy) and its full APA citation as the text: choose Mail, or your mail app, from the share sheet.', 'Share \u203a Email\u2026, in the reader or the details', '#vShare summary'],
   ] },
   { area: 'Marking up', items: [
     ['Highlight', 'Drag over the words. Lines join into one block, it keeps to the column you\u2019re in, and a highlight can be made longer by dragging from it. Choose its colour. Hold the highlighter for freehand highlighting, over anything.', 'The highlighter (H); hold it for the other kind', '#vpMarkup'],
@@ -186,7 +187,7 @@ const TOUR_STEPS = [
   { sel: '#vDarkBtn', title: 'Dark pages', text: 'Light text on dark pages, for reading at night.' },
   { sel: '#vSplitBtn', title: 'Split screen', text: 'A second view of the paper below, to keep the references (say) in sight while you read.' },
   { sel: '#vZoomLevel', title: 'Fit to the screen', text: 'Tap the percentage to go round: the whole page, the page\u2019s width, and actual size. Or zoom with \u2212 and +, or pinch.' },
-  { sel: '#vShare', title: 'Share a copy', text: 'Send the PDF to Mail or any app, as it is or as a clean copy without your marks.' },
+  { sel: '#vShare', title: 'Share a copy', text: 'Send the PDF to Mail or any app, as it is or as a clean copy without your marks. Email\u2026 starts a message with the PDF attached and its full citation in the text.' },
   { sel: '#vRLMenu', title: 'Reading list', text: 'Add the paper to your reading list, or mark it up next, later, or done.' },
   { sel: '#vPalette', title: 'Marking up', text: 'Highlight (H), underline or strike through (U), draw (P), write on the page (T), pin a note (N), or rub out (E). Highlights join from line to line; tap one to comment on it. It\u2019s all saved into the PDF as you go.' },
   { sel: '#vpMarkup', title: 'Two kinds of each', text: 'The tools with a small triangle have two kinds: hold the highlighter (or right-click it) to switch between highlighting text and highlighting freehand; hold underline to switch to strike-through.' },
