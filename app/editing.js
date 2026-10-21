@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-10-20.03';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-10-20.06';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -1852,17 +1852,22 @@ function copyAs(kind) {
 /* ---- keyboard shortcuts, the changeable ones yours to set */
 // A shortcut is a key (KeyboardEvent.code) with any of Ctrl, Alt, Shift
 // and Meta, as "Alt+KeyA". Library ones work in the list; reader ones
-// while a paper is open. Yours are kept with your preferences, so your
-// other devices have them too.
+// while a paper is open; both, in either (the citations: in the reader,
+// the open paper's). Yours are kept with your preferences, so your other
+// devices have them too.
 const KEY_ACTS = [
-  { id: 'copyApa', scope: 'lib', def: 'Alt+KeyA', label: 'Copy APA citation (long)' },
-  { id: 'copyShort', scope: 'lib', def: 'Alt+KeyS', label: 'Copy APA in-text citation (short)' },
+  { id: 'copyApa', scope: 'both', def: 'Alt+KeyA', label: 'Copy APA citation (long)' },
+  { id: 'copyShort', scope: 'both', def: 'Alt+Shift+KeyA', label: 'Copy APA in-text citation (short)' },
   { id: 'copyBib', scope: 'lib', def: 'Alt+KeyB', label: 'Copy BibTeX' },
   { id: 'copyKey', scope: 'lib', def: 'Alt+KeyK', label: 'Copy cite key' },
   { id: 'edit', scope: 'lib', def: 'Alt+KeyE', label: 'Edit the publication' },
-  { id: 'quote', scope: 'pdf', def: 'Alt+KeyQ', label: 'Copy the selected passage as a quotation, with its citation' },
+  { id: 'quote', scope: 'pdf', def: 'Alt+KeyC', label: 'Copy the selected passage as a quotation, with its citation' },
   { id: 'closeTab', scope: 'pdf', def: 'Alt+KeyW', label: 'Close the paper’s tab' },
   { id: 'done', scope: 'pdf', def: 'Alt+KeyD', label: 'Done with the paper (marked read, and off your reading list)' },
+  { id: 'share', scope: 'pdf', def: 'Alt+KeyM', label: 'Share the paper as it is, with its citation (as for Mail)' },
+  { id: 'shareClean', scope: 'pdf', def: 'Alt+Shift+KeyM', label: 'Share a clean copy (no annotations)' },
+  { id: 'download', scope: 'pdf', def: 'Alt+KeyS', label: 'Download (save) the paper as it is' },
+  { id: 'downloadClean', scope: 'pdf', def: 'Alt+Shift+KeyS', label: 'Download a clean copy (no annotations)' },
   { id: 'markup', scope: 'pdf', def: 'KeyH', label: 'Highlighter' },
   { id: 'lines', scope: 'pdf', def: 'KeyU', label: 'Underline and strike-through' },
   { id: 'pen', scope: 'pdf', def: 'KeyP', label: 'Pen' },
@@ -1876,6 +1881,9 @@ const KEYS = { mine: store.get('keys', {}), at: store.get('keysAt', 0), listen: 
 const keyOf = id => KEYS.mine[id] || KEY_ACTS.find(a => a.id === id).def;
 const comboOf = ev => [ev.ctrlKey && 'Ctrl', ev.altKey && 'Alt', ev.shiftKey && 'Shift', ev.metaKey && 'Meta'].filter(Boolean).concat(ev.code).join('+');
 const keyIs = (ev, id) => comboOf(ev) === keyOf(id);
+// (In the library, or the reader: a shortcut for both is in each.)
+const inScope = (a, scope) => a.scope === scope || a.scope === 'both';
+const scopesMeet = (a, b) => a.scope === 'both' || b.scope === 'both' || a.scope === b.scope;
 const KEY_NAMES = { Minus: '−', Equal: '=', Comma: ',', Period: '.', Slash: '/', Semicolon: ';', Quote: '\'', BracketLeft: '[', BracketRight: ']',
   Backslash: '\\', Backquote: '`', Space: 'Space', ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→' };
 function keyLabel(combo) {
@@ -1902,7 +1910,7 @@ const KEYS_FIXED = {
 function openShortcuts() {
   sheet = { mode: 'help' };
   KEYS.listen = null;
-  const rows = scope => KEY_ACTS.filter(a => a.scope === scope).map(a =>
+  const rows = scope => KEY_ACTS.filter(a => inScope(a, scope)).map(a =>
     `<tr><th><button type="button" class="key-set" data-key-id="${a.id}" title="Change it"><kbd>${esc(keyHint(a.id))}</kbd></button></th><td>${esc(a.label)}${KEYS.mine[a.id] ? ' <span class="key-mine">yours</span>' : ''}</td></tr>`).join('') +
     KEYS_FIXED[scope].map(([k, d]) => `<tr><th><kbd>${esc(k)}</kbd></th><td>${esc(d)}</td></tr>`).join('');
   showSheet(`<h2>Keyboard shortcuts</h2><p class="sheet-note">Click a shortcut in a box to change it, then press the keys you want. With several publications selected, the copy shortcuts copy all of them.</p>` +
@@ -1934,11 +1942,11 @@ document.addEventListener('keydown', ev => {
   const combo = comboOf(ev);
   let why = '';
   if (ev.metaKey) why = '⌘ shortcuts belong to the browser. Try ⌥ or ⌃ instead.';
-  else if (a.scope === 'lib' && !ev.altKey && !ev.ctrlKey) why = 'In the library, letters on their own jump through the list, so add ⌥ or ⌃.';
+  else if (inScope(a, 'lib') && !ev.altKey && !ev.ctrlKey) why = 'In the library, letters on their own jump through the list, so add ⌥ or ⌃.';
   else {
-    const other = KEY_ACTS.find(x => x.id !== id && x.scope === a.scope && keyOf(x.id) === combo);
+    const other = KEY_ACTS.find(x => x.id !== id && scopesMeet(x, a) && keyOf(x.id) === combo);
     if (other) why = keyLabel(combo) + ' is already for “' + other.label + '”.';
-    const fixed = KEYS_FIXED[a.scope].some(([k]) => k === keyLabel(combo)) || ['Escape', 'Enter', 'Tab'].includes(ev.code) || /^Arrow/.test(ev.code);
+    const fixed = (a.scope === 'both' ? ['lib', 'pdf'] : [a.scope]).some(s => KEYS_FIXED[s].some(([k]) => k === keyLabel(combo))) || ['Escape', 'Enter', 'Tab'].includes(ev.code) || /^Arrow/.test(ev.code);
     if (!why && fixed) why = keyLabel(combo) + ' is already taken.';
   }
   if (why) { sheetMsg(why, true); return; }
@@ -1957,6 +1965,14 @@ function runPdfKey(id) {
   else if (id === 'markup') { if (gs) setTool(V.tool === 'highlight' ? 'read' : 'markup'); }
   else if (id === 'lines') { if (gs) setTool(LINE_TOOLS.has(V.tool) ? 'read' : 'lines'); }
   else if (id === 'bookmark') { if (V.doc) toggleBookmark(V.viewer.currentPageNumber); }
+  // (As the Share menu's items: the key press lets the share sheet open.)
+  else if (id === 'copyApa' || id === 'copyShort') {
+    const e = V.entry;
+    if (!e) return;
+    if (id === 'copyApa') { const r = apaCitation(e); copy(r.text, 'Copied APA citation', r.html); }
+    else { const c = apaInText(e); copy(c.text, 'Copied APA in-text citation', c.html); }
+  }
+  else if (SHARE_KEYS[id]) { const b = $(`#vShare [data-vshare="${SHARE_KEYS[id]}"]`); if (b && V.file) b.click(); }
   else tog(id);
 }
 

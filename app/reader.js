@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-20.03';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-20.06';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -282,10 +282,10 @@ async function getPdfBytes(file, onProgress) {
 // Books...), a download on a computer.
 // Sent to another app: the share sheet (on a touch screen; for a PDF, on
 // a computer too, where the browser has one), or else downloaded. With
-// mail ({ subject, text }): to be emailed, the citation as the message's
-// text, from the share sheet (Mail, or another mail app there); without
-// one, downloaded, the citation copied, and a new message opened in the
-// mail app, to attach it to.
+// mail ({ subject, text }): the citation with it, as a message's text (in
+// Mail, say), and the title as its subject; without a share sheet, the
+// file downloaded and the citation copied. With mail 'download': just
+// downloaded.
 function openIn(bytes, name, type, downloadNote, mail) {
   const file = new File([bytes], name, { type: type || 'application/pdf' });
   const saveCopy = () => {
@@ -299,11 +299,10 @@ function openIn(bytes, name, type, downloadNote, mail) {
     setTimeout(() => URL.revokeObjectURL(url), 60000);
     toast(downloadNote || 'Downloading ' + name + '. If nothing happens, use Google Drive and its Open in menu.', 5000);
   };
+  if (mail === 'download') { saveCopy(); return; }
   const mailNoSheet = () => {
     saveCopy();
-    if (navigator.clipboard) navigator.clipboard.writeText(mail.text).catch(() => {});
-    location.href = 'mailto:?subject=' + encodeURIComponent(mail.subject) + '&body=' + encodeURIComponent(mail.text + '\n');
-    toast('Downloaded ' + name + ': attach it to the new message (its citation is in the message, and copied).', 8000);
+    if (navigator.clipboard) navigator.clipboard.writeText(mail.text).then(() => toast('Downloading ' + name + '; its citation is copied.', 5000)).catch(() => {});
   };
   const canShare = (coarseMQ.matches || !type || mail) && navigator.canShare && navigator.canShare({ files: [file] });
   if (!canShare) { if (mail) mailNoSheet(); else saveCopy(); return; }
@@ -6670,13 +6669,21 @@ $('#vFindInput').addEventListener('keydown', ev => {
   if (ev.key === 'Enter') { ev.preventDefault(); clearTimeout(findTimer); runFind('again', ev.shiftKey); }
   else if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); closeFind(); }
 });
+// (Its items, as the details' Share menu has them, before Google Drive.)
+$('#vDrive').insertAdjacentHTML('beforebegin', shareItems(k => `data-vshare="${k}"`, true) + '<hr class="mi-sep">');
+// (Its shortcuts, yours as they are now, each time it opens.)
+$('#vShare').addEventListener('toggle', () => {
+  if (!$('#vShare').open) return;
+  $('#vShare').querySelectorAll('[data-key-hint]').forEach(k => { k.textContent = keyHint(k.dataset.keyHint); });
+  $('#vShare').querySelectorAll('[data-key-title]').forEach(b => { b.title = b.getAttribute('aria-label') + ' (' + keyHint(b.dataset.keyTitle) + ')'; });
+});
 $('#vShare').addEventListener('click', async ev => {
   const b = ev.target.closest('[data-vshare]');
   if (!b) return;
   $('#vShare').open = false;
   if (!V.file) return;
-  const mail = b.dataset.vshare[0] === 'm' && V.entry ? mailOf(V.entry) : null;
-  if (b.dataset.vshare.slice(-1) === '1') { prepareShare(V.file, true, mail); return; }
+  const mail = b.dataset.vshare[0] === 'd' ? 'download' : V.entry ? mailOf(V.entry) : null;
+  if (b.dataset.vshare[1] === '1') { prepareShare(V.file, true, mail); return; }
   if (!V.bytes) { toast('The paper is still downloading.', 2000); return; }
   if (V.drawing) { await commitDrawing(); V.drawing = false; if (V.tool !== 'read') setTool(V.tool); }
   try {
@@ -7008,7 +7015,7 @@ async function prepareShare(file, clean, mail) {
     bar.querySelector('span').textContent = (note ? note + ': ' : '') + name;
     bar.hidden = false;
     const go = bar.querySelector('#readyGo');
-    go.lastChild.textContent = mail ? 'Email' : 'Share';
+    go.lastChild.textContent = mail === 'download' ? 'Download' : 'Share';
     go.onclick = () => { bar.hidden = true; openIn(bytes, name, null, null, mail); };
     go.focus();
   } catch (err) {

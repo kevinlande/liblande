@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-10-20.03';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-10-20.06';
 // On GitHub Pages, every part of the app must be from the same version: a
 // part kept from an older one (the offline copy, served when the network
 // was slow) lacks what this page needs. Then the kept copies go, and the
@@ -162,7 +162,7 @@ document.addEventListener('keydown', ev => {
     // even from its page field; not the paper.
     if (ev.key === 'Escape' && QUOTE.el && !QUOTE.el.hidden) { ev.preventDefault(); quoteDismiss(); return; }
     // (Your shortcuts first: see KEY_ACTS.)
-    const mine = !typing && KEY_ACTS.find(a => a.scope === 'pdf' && keyIs(ev, a.id));
+    const mine = !typing && KEY_ACTS.find(a => inScope(a, 'pdf') && keyIs(ev, a.id));
     if (mine) { ev.preventDefault(); runPdfKey(mine.id); return; }
     if (typing || ev.metaKey || ev.ctrlKey || ev.altKey) return;
     // Escape: a tool that's on is put down (back to reading); with none on,
@@ -188,7 +188,7 @@ document.addEventListener('keydown', ev => {
   }
   if ((ev.key === 'f' && (ev.metaKey || ev.ctrlKey)) || ev.key === '/') { ev.preventDefault(); openSearch(true); return; }
   // Your shortcuts (by physical key, since Option changes the letter typed).
-  const mine = KEY_ACTS.find(a => a.scope === 'lib' && keyIs(ev, a.id));
+  const mine = KEY_ACTS.find(a => inScope(a, 'lib') && keyIs(ev, a.id));
   if (mine) {
     ev.preventDefault();
     if (mine.id === 'edit') { const e = state.selKey && BYKEY.get(state.selKey); if (e && gs) openEdit(e); }
@@ -887,6 +887,6 @@ if (RELOADING) {
 }
 // For the test suite (_test/suite.html) only: a few of the reader's
 // insides, when the test page asks for them.
-if (window.LIBLANDE_TEST) window.LL = { apaCitation, loadPdfLib, entries: () => ENTRIES, KWS, kwsSuggest, kwsKey, kwsWithOA, ktFind, openKwTidy, TS, tsSearch, tsMerge, tsIsQuery, tsClose, PROGRESS, progressMerge, progressReset, PROXIES, proxyPrefix, proxyLink, findPdf, renderProxies, TOUR, startTour, endTour, openFeatures, FEATURES, toggleBookmark, OLE, oleMake, headingOutline, pageRows, writeOutline, SPLIT, foldOf, splitStart, splitApply, printedContents, pageLines, OCR, makeSearchable, ocrLayer, textlessPages, openMsCheck, runMsCheck, LIBS, renderGroups, SMART, NP, npCheck, openNewPapers, openFollow, sweepCovers, COVERS, V, BM, JOURNAL, LOCAL, AUTO, saveMarkup, setTool, setReading, renderRLBar, netBadge, placeToast, POS, MARK, PDFJS, pdfJsFix, pdfViewerFix, findEndPage, refHeading, combineMarks, makeZip, MARK_ERASER: () => MARK.eraserSize,
+if (window.LIBLANDE_TEST) window.LL = { apaCitation, apaInText, loadPdfLib, entries: () => ENTRIES, KWS, kwsSuggest, kwsKey, kwsWithOA, ktFind, openKwTidy, TS, tsSearch, tsMerge, tsIsQuery, tsClose, PROGRESS, progressMerge, progressReset, PROXIES, proxyPrefix, proxyLink, findPdf, renderProxies, TOUR, startTour, endTour, openFeatures, FEATURES, toggleBookmark, OLE, oleMake, headingOutline, pageRows, writeOutline, SPLIT, foldOf, splitStart, splitApply, printedContents, pageLines, OCR, makeSearchable, ocrLayer, textlessPages, openMsCheck, runMsCheck, LIBS, renderGroups, SMART, NP, npCheck, openNewPapers, openFollow, sweepCovers, COVERS, V, BM, JOURNAL, LOCAL, AUTO, saveMarkup, setTool, setReading, renderRLBar, netBadge, placeToast, POS, MARK, PDFJS, pdfJsFix, pdfViewerFix, findEndPage, refHeading, combineMarks, makeZip, MARK_ERASER: () => MARK.eraserSize,
   lib: () => ({ ENTRIES, BYKEY, DATA, VERSION_OF, VERSIONS, NESTED, state }), init, refresh, openEdit, isForthcoming, forthChanges, parseBibtexEntry,
   oldLineMarks, convertOldLines, fetchAhead, PTABS, renderPaperTabs, openPdf, loadPdfJs, addStreamIteration, msCheck, msCites, msRef, msDocx, MS, msVisible };

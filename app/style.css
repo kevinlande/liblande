@@ -973,6 +973,19 @@ button.fileicon { border: 0; background: none; cursor: pointer; }
 .menu.right .menu-list { left: auto; right: 0; }
 .menu.up .menu-list { top: auto; bottom: calc(100% + 4px); }
 .menu-list button { border: 0; background: none; text-align: left; padding: 8px 10px; border-radius: 6px; font-size: 13.5px; color: var(--text); }
+/* Items with an icon (the Share menus), and a line between groups. */
+.menu-list .mi { display: flex; align-items: center; gap: 9px; white-space: nowrap; }
+.menu-list .mi .i { width: 17px; height: 17px; flex: none; color: var(--muted); }
+.menu-list .mi-sub { color: var(--muted); }
+/* (A row whose end is a second action, as Share's "Clean".) */
+.menu-list .mi-row { display: flex; align-items: stretch; border-radius: 6px; }
+.menu-list .mi-row:hover { background: var(--side-hover); }
+.menu-list .mi-row > .mi { flex: 1; min-width: 0; background: none; }
+.menu-list .mi kbd { float: none; margin-left: auto; padding-left: 14px; }
+.menu-list button.mi-side { display: flex; align-items: center; gap: 5px; padding: 0 12px; border-left: 1px solid var(--line); border-radius: 0 6px 6px 0; color: var(--muted); font-size: 12.5px; white-space: nowrap; }
+.menu-list button.mi-side:hover { background: var(--accent-soft); color: var(--accent); }
+.menu-list button.mi-side .i { width: 15px; height: 15px; }
+.menu-list hr.mi-sep { border: 0; border-top: 1px solid var(--line); margin: 4px 2px; }
 .act-more .menu-list { min-width: 210px; }
 .act-more .menu-list > a, .act-more .menu-list > button { display: flex; align-items: center; gap: 9px; }
 .act-more .menu-list .i { width: 17px; height: 17px; flex: none; }

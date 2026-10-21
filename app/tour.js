@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-10-20.03';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-10-20.06';
 /* -------------------------------------------------------------- features */
 // What LibLande does, by area: each feature, what it's for, where to find
 // it, and its icon (see featIcon). Shown from the sidebar's foot (Features), with a box to find
@@ -31,7 +31,7 @@ const FEATURES = [
     ['Edit the details', 'Every field: authors, title, venue, keywords, notes, the cite key, a rating.', 'Edit, in the details pane', 'ICON:pencil'],
     ['Suggested keywords', 'Keywords suggested from those of the publications most like it, and new ones from OpenAlex; tap one to add it. In Add, Edit and the details.', 'Under the keywords', 'ICON:tag'],
     ['Book covers', 'Covers for your books, from Open Library.', 'Settings (the gear in the sidebar)', 'path:M6 3.5h11a1.5 1.5 0 0 1 1.5 1.5v14a1.5 1.5 0 0 1-1.5 1.5H6zM6 3.5v17M9.5 8h6M9.5 11h4'],
-    ['Copy a citation', 'APA, APA in text, BibTeX or the cite key, one publication or several.', 'Copy, in the details pane; or the shortcuts', 'ICON:quote'],
+    ['Copy a citation', 'APA, APA in text, BibTeX or the cite key, one publication or several; in the reader, the open paper\u2019s.', 'Copy, in the details pane; or the shortcuts (\u2325A for APA, \u21e7\u2325A in text, in the library or the reader)', 'ICON:quote'],
     ['Possible duplicates', 'Publications that look like the same one, to join as versions of one (the main one shown, the others under it) or to mark as different.', 'Possible duplicates in the sidebar', 'ICON:copy'],
     ['Forthcoming', 'Papers listed as forthcoming, checked for whether they\u2019ve been published since.', 'Forthcoming in the sidebar', 'ICON:forth'],
     ['Reading list', 'Papers to read: up next, later, or done; one list for each library. Each shows how far you\u2019ve read (press it to start the count again).', 'The bookmark in the details pane or the reader; the Queue tab', '#vRL'],
@@ -45,9 +45,10 @@ const FEATURES = [
     ['Split screen', 'A second view of the paper below, to scroll on its own (to the references, say).', 'The split box in the reader\u2019s toolbar', '#vSplitBtn'],
     ['Links inside the paper', 'Go to a reference or figure, or look at it in a panel without losing your place; Back to page n brings you back.', 'Tap a link', '#vBackGo'],
     ['Where you left off', 'Each paper opens where you were, on this device or another.', '', 'ICON:history'],
+    ['Quote a passage', 'Select a passage and copy it as an APA quotation with its printed page number and citation; a long one as a block quotation.', 'Quote, beside the text you select; or \u2325C', 'ICON:quote'],
     ['Copy a region', 'Drag a box to copy its text or a picture of it, or share it.', 'The box tool in the markup toolbar', '#vPalette [data-tool="select"]'],
-    ['Share a copy', 'The PDF as it is, or a clean copy without your marks, to Mail or any app; or open it in Google Drive.', 'The share button in the reader\u2019s toolbar, or Share in the details', '#vShare summary'],
-    ['Email a paper', 'A new message with the PDF attached (as it is, or a clean copy) and its full APA citation as the text: choose Mail, or your mail app, from the share sheet.', 'Share \u203a Email\u2026, in the reader or the details', '#vShare summary'],
+    ['Share a copy', 'The PDF as it is, or a clean copy without your marks, to Mail or any app (with its citation, as a message\u2019s text), or downloaded; or open it in Google Drive.', 'The share button in the reader\u2019s toolbar (\u2325M, or \u2325S to download; with \u21e7, clean), or Share in the details', '#vShare summary'],
+    ['Email a paper', 'Share it and choose Mail (or your mail app): a new message with the PDF attached, as it is or clean, and its full APA citation as the text.', 'Share \u203a Share, in the reader or the details', '#vShare summary'],
   ] },
   { area: 'Marking up', items: [
     ['Highlight', 'Drag over the words. Lines join into one block, it keeps to the column you\u2019re in, and a highlight can be made longer by dragging from it. Choose its colour. Hold the highlighter for freehand highlighting, over anything.', 'The highlighter (H); hold it for the other kind', '#vpMarkup'],
@@ -187,7 +188,7 @@ const TOUR_STEPS = [
   { sel: '#vDarkBtn', title: 'Dark pages', text: 'Light text on dark pages, for reading at night.' },
   { sel: '#vSplitBtn', title: 'Split screen', text: 'A second view of the paper below, to keep the references (say) in sight while you read.' },
   { sel: '#vZoomLevel', title: 'Fit to the screen', text: 'Tap the percentage to go round: the whole page, the page\u2019s width, and actual size. Or zoom with \u2212 and +, or pinch.' },
-  { sel: '#vShare', title: 'Share a copy', text: 'Send the PDF to Mail or any app, as it is or as a clean copy without your marks. Email\u2026 starts a message with the PDF attached and its full citation in the text.' },
+  { sel: '#vShare', title: 'Share a copy', text: 'Send the PDF to Mail or any app, as it is or as a clean copy without your marks. Share sends its citation too (in Mail, the message\u2019s text); Download saves it. Clean, at each one\u2019s end, leaves out your marks. Shortcuts: \u2325M to share and \u2325S to download, with \u21e7 for clean.' },
   { sel: '#vRLMenu', title: 'Reading list', text: 'Add the paper to your reading list, or mark it up next, later, or done.' },
   { sel: '#vPalette', title: 'Marking up', text: 'Highlight (H), underline or strike through (U), draw (P), write on the page (T), pin a note (N), or rub out (E). Highlights join from line to line; tap one to comment on it. It\u2019s all saved into the PDF as you go.' },
   { sel: '#vpMarkup', title: 'Two kinds of each', text: 'The tools with a small triangle have two kinds: hold the highlighter (or right-click it) to switch between highlighting text and highlighting freehand; hold underline to switch to strike-through.' },

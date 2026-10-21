@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-20.03';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-20.06';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -32,6 +32,8 @@ const ICON = {
   versions: '<svg class="i" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M4 16V6a2 2 0 0 1 2-2h10"/></svg>',
   read: '<svg class="i" viewBox="0 0 24 24"><path d="M2 5h6a4 4 0 0 1 4 4v11a3 3 0 0 0-3-3H2z"/><path d="M22 5h-6a4 4 0 0 0-4 4v11a3 3 0 0 1 3-3h7z"/></svg>',
   share: '<svg class="i" viewBox="0 0 24 24"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>',
+  eraser: '<svg class="i" viewBox="0 0 24 24"><path d="M9 20h11"/><path d="M4.7 14.3l8.6-8.6a2 2 0 0 1 2.8 0l3.2 3.2a2 2 0 0 1 0 2.8L12 19H8l-3.3-3.3a1 1 0 0 1 0-1.4z"/><path d="M9.3 9.7l5 5"/></svg>',
+  download: '<svg class="i" viewBox="0 0 24 24"><path d="M12 3v12"/><path d="M8 11l4 4 4-4"/><path d="M5 17v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/></svg>',
   drive: '<svg class="i" viewBox="0 0 24 24"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>',
   clip: '<svg class="i" viewBox="0 0 24 24"><path d="M20 11.5l-8 8a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L9.7 17.2a1.7 1.7 0 0 1-2.4-2.4L15 7"/></svg>',
   x: '<svg class="i" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7L7 17"/></svg>',
@@ -2491,24 +2493,20 @@ function renderDetail() {
   const files = e.files || [];
   const readable = gs ? files.map((fl, j) => [fl, j]).filter(([fl]) => fl.id) : [];
   const fname = fl => esc(fl.n.replace(/\.pdf$/i, ''));
-  // (Email: the PDF attached, the citation in the message; see openIn.)
-  const mailItems = j => `<button type="button" role="menuitem" data-share="${j}" data-clean="0" data-mail="1">Email\u2026</button>` +
-    `<button type="button" role="menuitem" data-share="${j}" data-clean="1" data-mail="1">Email a clean copy\u2026</button>`;
+  const items = j => shareItems(k => `data-share="${j}" data-how="${k}"`);
   const menu = (cls, summary, title, items) => `<details class="menu ${cls}"><summary class="btn${cls.indexOf('act-read') >= 0 ? ' primary' : ''}" title="${title}">${summary}${ICON.chev}</summary>` +
     `<div class="menu-list" role="menu">${items}</div></details>`;
   if (readable.length === 1) {
     const [fl, j] = readable[0];
     btns.push(`<button type="button" class="btn primary act-read" data-read="${j}" title="${esc(fl.p)}">${ICON.read}<span>View</span></button>`);
     btns.push(menu('', `${ICON.share}<span class="share-word">Share</span>`, 'Share a copy to another app',
-      `<button type="button" role="menuitem" data-share="${j}" data-clean="0">PDF as is</button>` +
-      `<button type="button" role="menuitem" data-share="${j}" data-clean="1">Clean copy (no annotations)</button>` + mailItems(j)));
+      items(j)));
   } else if (readable.length > 1) {
     btns.push(menu('act-read', `${ICON.read}<span>View</span>`, 'Choose a PDF to view',
       readable.map(([fl, j]) => `<button type="button" role="menuitem" data-read="${j}" title="${esc(fl.p)}"><span class="fname">${fname(fl)}</span></button>`).join('')));
     btns.push(menu('', `${ICON.share}<span class="share-word">Share</span>`, 'Share a copy to another app',
       readable.map(([fl, j]) => `<div class="menu-head">${fname(fl)}</div>` +
-        `<button type="button" role="menuitem" data-share="${j}" data-clean="0">PDF as is</button>` +
-        `<button type="button" role="menuitem" data-share="${j}" data-clean="1">Clean copy (no annotations)</button>` + mailItems(j)).join('')));
+        items(j)).join('')));
   }
   // Less used: Google Drive, Attach, the DOI and other links, in a "More"
   // menu at the end.
@@ -2818,7 +2816,8 @@ detailEl.addEventListener('click', ev => {
   if (e && rd) { const m = rd.closest('details'); if (m) m.open = false; openPaper(e, e.files[+rd.dataset.read]); return; }
   if (e && sh) {
     sh.closest('details').open = false;
-    prepareShare(e.files[+sh.dataset.share], sh.dataset.clean === '1', sh.dataset.mail ? mailOf(e) : null);
+    const how = sh.dataset.how;
+    prepareShare(e.files[+sh.dataset.share], how[1] === '1', how[0] === 'd' ? 'download' : mailOf(e));
     return;
   }
   if (c && e) {
@@ -2958,6 +2957,19 @@ function sentenceCase(display, raw) {
 // with the italics APA calls for.
 // A publication's APA reference is kept until the publication changes
 // (prep clears it).
+// The Share menu's items (in the details and the reader): Share, to the
+// share sheet with its citation, and Download, straight to Downloads; each
+// a row whose name does it as is, and whose end, "Clean", without the
+// annotations. attr: the item's data, by its key (s0, s1, d0, d1); keys:
+// with the shortcuts shown (the reader's; filled in by shareKeyHints).
+const SHARE_KEYS = { share: 's0', shareClean: 's1', download: 'd0', downloadClean: 'd1' };
+function shareItems(attr, keys) {
+  const id = k => Object.keys(SHARE_KEYS).find(x => SHARE_KEYS[x] === k);
+  const row = (k, icon, label, clean) => `<div class="mi-row"><button type="button" role="menuitem" class="mi" ${attr(k + '0')}>${icon}<span>${label}</span>` +
+    (keys ? `<kbd data-key-hint="${id(k + '0')}"></kbd>` : '') + `</button>` +
+    `<button type="button" role="menuitem" class="mi-side" ${attr(k + '1')} title="${clean}" aria-label="${clean}"${keys ? ` data-key-title="${id(k + '1')}"` : ''}>${ICON.eraser}<span>Clean</span></button></div>`;
+  return row('s', ICON.share, 'Share\u2026', 'Share a clean copy (no annotations)') + row('d', ICON.download, 'Download', 'Download a clean copy (no annotations)');
+}
 function apaCitation(e) {
   return e.apaRef || (e.apaRef = apaCitationOf(e));
 }
