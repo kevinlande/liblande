@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-10-21.07';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-10-21.09';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -45,6 +45,39 @@ function parseNamesLite(s) {
     return [last, w.join(' ')];
   });
 }
+// A list of full names as written in prose ("Daniel M. Bear, Chaofei Fan,
+// and Jiajun Wu", or with "&" or ";"), as BibTeX has them: "Bear, Daniel
+// M. and Fan, Chaofei and Wu, Jiajun". Null if it isn't one: BibTeX's own
+// "Last, First and Last, First", one "Last, First", or just two names
+// with a comma between (as a two-word surname: "Le Bear, Daniel Michael").
+const NAME_PARTICLE = /^(van|von|de|der|den|del|della|di|da|du|la|le|dos|das|ten|ter|bin|ibn|al)$/;
+const NAME_SUFFIX = /^(jr\.?|sr\.?|ii|iii|iv)$/i;
+function namesFromList(s) {
+  const t = String(s || '').trim();
+  if (!t || /[{}\\]/.test(t) || !/[,;&]/.test(t)) return null;
+  const parts = t.split(/\s*(?:;|,?\s*&\s*|,\s*and\s+|,|\s+and\s+)\s*/i).map(p => p.trim()).filter(Boolean);
+  const words = p => p.split(/\s+/).filter(w => !NAME_SUFFIX.test(w));
+  if (parts.some(p => words(p).length < 2)) return null;
+  if (parts.length < 3 && !/[;&]/.test(t)) return null;
+  return parts.map(p => {
+    const w = p.split(/\s+/), suffix = NAME_SUFFIX.test(w[w.length - 1]) ? w.pop() : '';
+    // (A surname with "van", "de"... starts there.)
+    let at = w.findIndex((x, i) => i > 0 && i < w.length - 1 && NAME_PARTICLE.test(x));
+    if (at < 0) at = w.length - 1;
+    return w.slice(at).join(' ') + (suffix ? ', ' + suffix : '') + ', ' + w.slice(0, at).join(' ');
+  }).join(' and ');
+}
+// (In Add and Edit: the authors or editors box, so written.)
+function namesTidy(el, say) {
+  const to = namesFromList(el.value);
+  if (!to) return false;
+  el.value = to;
+  if (say) sheetMsg('Read the ' + (FIELD_LABELS[el.dataset.field] || el.dataset.field).toLowerCase() + ' as ' + to.split(' and ').length + ' names, and wrote them as BibTeX does (Last, First and Last, First). Check them.');
+  return true;
+}
+$('#sheetBody').addEventListener('change', ev => {
+  if (sheet && /^(add|edit)$/.test(sheet.mode) && ev.target.matches('[data-field="author"], [data-field="editor"]')) namesTidy(ev.target, true);
+});
 // (Every brace counts, as for BibTeX, a backslash before it or not.)
 function balanced(v) {
   let depth = 0;
@@ -73,7 +106,7 @@ function formFieldNames(type, present) {
 }
 function fieldInput(n, value, lead) {
   const id = 'fld-' + n;
-  const hint = n === 'author' || n === 'editor' ? ' placeholder="Last, First and Last, First"' : '';
+  const hint = n === 'author' || n === 'editor' ? ' placeholder="Last, First and Last, First (or a list of full names)"' : '';
   const input = AREA_FIELDS.has(n) || n === 'title'
     ? `<textarea id="${id}" data-field="${n}" rows="${n === 'abstract' ? 4 : 2}">${esc(value)}</textarea>`
     : `<input id="${id}" data-field="${n}" type="text" value="${esc(value)}" autocomplete="off"${hint}${n === 'doi' || n === 'url' ? ' autocapitalize="off" spellcheck="false"' : ''}>`;
@@ -277,6 +310,8 @@ function openEdit(e) {
   // (A panel over the library, like Add; a phone's fills the screen.)
   showSheet(h, 'Save');
   $('#sheet').classList.add('head-mode', 'compact');
+  // (Authors saved as a list in prose: offered as BibTeX has them, to save.)
+  $('#sheetBody').querySelectorAll('[data-field="author"], [data-field="editor"]').forEach(el => namesTidy(el, true));
   // (From the reader: in its sidebar, beside the paper; not on a phone.)
   if (!$('#viewer').hidden && !phoneMQ.matches) dockSheet();
   kwsSheet();
@@ -602,6 +637,7 @@ async function createNewGroup() {
   }
 }
 async function saveEdit() {
+  $('#sheetBody').querySelectorAll('[data-field="author"], [data-field="editor"]').forEach(el => namesTidy(el, false));
   const e = sheet.entry, vals = sheetValues(), set = {};
   Object.keys(vals).forEach(n => { if (vals[n] !== rawOf(e, n).trim()) set[n] = vals[n]; });
   const oldKwRaw = rawOf(e, 'keywords'), kws = sheetKeywords();
@@ -734,6 +770,7 @@ function newEntry(type, key, vals, now, inbox) {
   return e;
 }
 async function saveAdd() {
+  $('#sheetBody').querySelectorAll('[data-field="author"], [data-field="editor"]').forEach(el => namesTidy(el, false));
   const type = $('#addType').value, vals = sheetValues();
   if (!vals.title) { sheetMsg('A publication needs a title.', true); return; }
   const kws = sheetKeywords();

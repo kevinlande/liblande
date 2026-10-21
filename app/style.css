@@ -892,6 +892,10 @@ button.fileicon { border: 0; background: none; cursor: pointer; }
 .citekey { font-family: var(--mono); font-size: 12px; border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; background: var(--panel); color: var(--text); display: inline-flex; align-items: center; gap: 5px; }
 .citekey svg { width: 13px; height: 13px; color: var(--faint); }
 .d-title { margin: 0; font: 600 23px/1.25 var(--serif); text-wrap: balance; }
+/* Click to edit: a hint on hover; then a box in the title's own type. */
+.d-title[data-title-edit] { cursor: text; border-radius: 6px; margin: 0 -6px; padding: 0 6px; }
+.d-title[data-title-edit]:not(.editing):hover { background: var(--side-hover); }
+.d-title-input { display: block; width: 100%; margin: -1px 0; padding: 0; border: 0; outline: 1px solid var(--accent); outline-offset: 2px; border-radius: 3px; background: transparent; color: var(--text); font: inherit; resize: none; overflow: hidden; text-wrap: balance; }
 .d-authors { display: flex; flex-wrap: wrap; gap: 2px 4px; font-size: 15px; }
 .d-authors button { border: 0; background: none; padding: 0; color: var(--text); text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
 .d-authors button:hover { color: var(--accent); text-decoration-color: currentColor; }

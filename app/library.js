@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-21.07';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-21.09';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -2269,6 +2269,43 @@ function tidyMonth(v) {
 const join2 = (a, b, sep) => (a && b ? a + sep + b : a || b);
 // Editing a piece of the citation in place: the field as it is in the .bib
 // (so 91--101, not 91\u2013101). Return or leaving the box saves; Esc cancels.
+// The title, changed in place: a box as big as it, in its type; Return
+// or a click elsewhere saves it (with Undo), Esc leaves it as it was.
+function editTitle(h1) {
+  const e = BYKEY.get(state.selKey);
+  if (!e || h1.classList.contains('editing')) return;
+  const old = rawOf(e, 'title').trim();
+  const box = document.createElement('textarea');
+  box.className = 'd-title-input';
+  box.rows = 1;
+  box.value = old;
+  box.setAttribute('aria-label', 'Title');
+  box.spellcheck = true;
+  const fit = () => { box.style.height = 'auto'; box.style.height = box.scrollHeight + 'px'; };
+  h1.classList.add('editing');
+  h1.replaceChildren(box);
+  fit();
+  box.focus();
+  box.setSelectionRange(box.value.length, box.value.length);
+  let done = false;
+  const finish = save => {
+    if (done) return;
+    done = true;
+    const v = box.value.replace(/\s*\n\s*/g, ' ').trim();
+    if (!save || v === old) { renderDetail(); return; }
+    if (!v) { toast('A publication needs a title, so it wasn\u2019t changed.', 3500); renderDetail(); return; }
+    if (!balanced(v)) { toast('That has unbalanced braces { }, so it wasn\u2019t saved.', 4000); renderDetail(); return; }
+    h1.classList.remove('editing');
+    h1.textContent = shownValue(v);
+    quickSet(e, { title: v }, 'Changed the title');
+  };
+  box.addEventListener('input', fit);
+  box.addEventListener('keydown', ev => {
+    if (ev.key === 'Enter') { ev.preventDefault(); finish(true); }
+    else if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); finish(false); }
+  });
+  box.addEventListener('blur', () => finish(true));
+}
 function editCite(span) {
   const e = BYKEY.get(state.selKey), n = span.dataset.f;
   if (!e || !n) return;
@@ -2495,7 +2532,8 @@ function renderDetail() {
     (e.ib ? `<span class="pill">Inbox</span>` : '') +
     (e.offline ? `<span class="pill pend" title="Changed while offline: it goes to Google Drive when you\u2019re back online">On this device</span>` : '') +
     (gs && !wide ? `<button type="button" class="btn d-edit" data-edit>${ICON.pencil}<span>Edit</span></button>` : '') + `</div>`;
-  h += `<h1 class="d-title">${esc(f.title || '(untitled)')}</h1>`;
+  // (Click it to change it: see editTitle.)
+  h += `<h1 class="d-title"${gs ? ' data-title-edit title="Click to edit the title"' : ''}>${esc(f.title || '(untitled)')}</h1>`;
   const people = e.a && e.a.length ? e.a : e.e || [];
   if (people.length) {
     h += `<div class="d-authors">` + people.map((n, j) =>
@@ -2817,6 +2855,8 @@ detailEl.addEventListener('click', ev => {
   if (twin) { showTwin(twin.dataset.twin); return; }
   const notes = ev.target.closest('[data-notes]');
   if (gs && e && notes && getSelection().isCollapsed) { editNotes(notes); return; }
+  const tt = ev.target.closest('[data-title-edit]');
+  if (gs && e && tt && !ev.target.closest('.d-title-input') && getSelection().isCollapsed) { editTitle(tt); return; }
   if (gs && e && ev.target.closest('[data-cite-add]')) { openCiteMenu(ev.target.closest('[data-cite-add]')); return; }
   const piece = ev.target.closest('.d-cite .cs[data-f]');
   // (Not at the end of selecting some of the line.)
