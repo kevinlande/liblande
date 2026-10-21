@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-21.09';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-21.10';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -6501,13 +6501,13 @@ function linkNear(x, y, reach) {
 // so does a finger's, with a tool on and the Pencil drawing (fingers don't
 // mark then). Not a touch that isn't meant as a tap: one that stops the
 // page while it's still gliding, one of several fingers at once, or a
-// palm (a large touch).
+// palm (a large touch: the iPad gives a fingertip as 40 or 50px across).
 $('#vScroll').addEventListener('scroll', () => { BARS.scrollAt = Date.now(); }, { passive: true });
 $('#vScroll').addEventListener('pointerdown', ev => {
   const now = Date.now();
   if (BARS.active.size) BARS.multiAt = now;
   BARS.active.add(ev.pointerId);
-  BARS.down = { x: ev.clientX, y: ev.clientY, t: now, gliding: now - BARS.scrollAt < 150, palm: ev.pointerType === 'touch' && Math.max(ev.width || 0, ev.height || 0) > 40 };
+  BARS.down = { x: ev.clientX, y: ev.clientY, t: now, gliding: now - BARS.scrollAt < 150, palm: ev.pointerType === 'touch' && Math.max(ev.width || 0, ev.height || 0) > 100 };
 }, true);
 ['pointerup', 'pointercancel'].forEach(n => window.addEventListener(n, ev => { setTimeout(() => BARS.active.delete(ev.pointerId), 0); }, true));
 $('#vScroll').addEventListener('pointerup', ev => {
