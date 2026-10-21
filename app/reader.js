@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-20.06';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-20.08';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -286,7 +286,9 @@ async function getPdfBytes(file, onProgress) {
 // Mail, say), and the title as its subject; without a share sheet, the
 // file downloaded and the citation copied. With mail 'download': just
 // downloaded.
-function openIn(bytes, name, type, downloadNote, mail) {
+// (refused: what to do if the share sheet won't open, too long after the
+// click that asked for it.)
+function openIn(bytes, name, type, downloadNote, mail, refused) {
   const file = new File([bytes], name, { type: type || 'application/pdf' });
   const saveCopy = () => {
     const url = URL.createObjectURL(file);
@@ -308,6 +310,7 @@ function openIn(bytes, name, type, downloadNote, mail) {
   if (!canShare) { if (mail) mailNoSheet(); else saveCopy(); return; }
   navigator.share(mail ? { files: [file], title: mail.subject, text: mail.text } : { files: [file] }).catch(err => {
     if (err && err.name === 'AbortError') return;
+    if (err && err.name === 'NotAllowedError' && refused) { refused(); return; }
     if (mail) mailNoSheet(); else saveCopy();
   });
 }
@@ -6683,7 +6686,7 @@ $('#vShare').addEventListener('click', async ev => {
   $('#vShare').open = false;
   if (!V.file) return;
   const mail = b.dataset.vshare[0] === 'd' ? 'download' : V.entry ? mailOf(V.entry) : null;
-  if (b.dataset.vshare[1] === '1') { prepareShare(V.file, true, mail); return; }
+  if (b.dataset.vshare[1] === '1') { prepareShare(V.file, true, mail, $('#vShare summary')); return; }
   if (!V.bytes) { toast('The paper is still downloading.', 2000); return; }
   if (V.drawing) { await commitDrawing(); V.drawing = false; if (V.tool !== 'read') setTool(V.tool); }
   try {
@@ -6993,33 +6996,73 @@ function rebuildPdf(bytes) {
 const cleanName = name => name.replace(/\s*\.pdf$/i, '') + ' (clean).pdf';
 
 
-// "Share to...": the PDF as is, or a clean copy. Anything that has to be
-// downloaded or processed first ends with a "ready" bar to tap, because the
-// share sheet only opens straight after a tap.
-// (mail: to email it; see openIn.)
+// "Share to...": the PDF as is, or a clean copy, from the button (anchor)
+// in the reader or the details. The share sheet only opens straight after
+// a click, so if getting the PDF from Drive or making the copy takes a
+// while, a bar fills along the button's foot, and then "ready" appears
+// under it, to click; quicker, the share sheet opens at once. A download
+// is saved as soon as it's ready. The last clean copy is kept, for the same
+// PDF. (mail: the citation to go with it; see openIn.)
 const mailOf = e => ({ subject: String(e.f.title || e.k).replace(/[{}]/g, ''), text: apaCitation(e).text });
-async function prepareShare(file, clean, mail) {
+const CLEAN = { src: null, made: null };
+function shareProgress(anchor) {
+  if (!anchor || !anchor.getBoundingClientRect().width) return { set() {}, creep() {}, done() {}, none: true };
+  anchor.classList.add('share-busy');
+  const bar = document.createElement('span');
+  bar.className = 'share-prog';
+  anchor.appendChild(bar);
+  let w = 0, timer = 0;
+  const put = f => { w = Math.max(w, Math.min(1, f)); bar.style.width = (w * 100) + '%'; };
+  return {
+    set: put,
+    // (Making a clean copy can't be measured: the bar creeps on, and fills
+    // when it's done.)
+    creep() { clearInterval(timer); timer = setInterval(() => put(w + (0.92 - w) * 0.08), 150); },
+    done() { clearInterval(timer); put(1); setTimeout(() => { bar.remove(); anchor.classList.remove('share-busy'); }, 250); },
+  };
+}
+function showReady(note, name, label, go, anchor) {
+  const bar = $('#readyBar'), r = anchor && anchor.getBoundingClientRect();
+  bar.querySelector('span').innerHTML = `<b>${esc(note)}</b> \u00b7 ${esc(name)}`;
+  const b = bar.querySelector('#readyGo');
+  b.lastChild.textContent = label;
+  b.onclick = () => { bar.hidden = true; go(); };
+  // (Under the button, pointing to it; or, with none in sight, at the foot.)
+  const pop = r && r.width > 0;
+  bar.classList.toggle('ready-pop', !!pop);
+  Object.assign(bar.style, pop ? { top: (r.bottom + 10) + 'px', right: Math.max(8, innerWidth - r.right - 8) + 'px', bottom: 'auto', left: 'auto' } : { top: '', right: '', bottom: '', left: '' });
+  if (pop) bar.style.setProperty('--arrow', Math.max(10, r.width / 2 + 3) + 'px');
+  bar.hidden = false;
+  b.focus();
+}
+async function prepareShare(file, clean, mail, anchor) {
   if (!clean && recentPdfs.has(file.id)) { openIn(recentPdfs.get(file.id), file.n, null, null, mail); return; }
-  toast(recentPdfs.has(file.id) ? 'Making a clean copy\u2026' : 'Getting the PDF from Google Drive\u2026', 0);
+  const t0 = performance.now(), prog = shareProgress(anchor);
+  if (prog.none) toast(recentPdfs.has(file.id) ? 'Making a clean copy…' : 'Getting the PDF from Google Drive…', 0);
   try {
-    let bytes = await getPdfBytes(file), name = file.n, note = '';
+    let bytes = await getPdfBytes(file, f => prog.set(clean ? f * 0.5 : f)), name = file.n, note = '';
     if (clean) {
-      toast('Making a clean copy\u2026', 0);
-      const result = await cleanPdf(bytes);
-      bytes = result.bytes;
+      if (CLEAN.src !== bytes) {
+        if (prog.none) toast('Making a clean copy…', 0);
+        prog.creep();
+        CLEAN.made = await cleanPdf(bytes);
+        CLEAN.src = bytes;
+      }
+      bytes = CLEAN.made.bytes;
       name = cleanName(file.n);
-      note = result.removed ? 'Clean copy ready' : 'No annotations to remove';
+      note = CLEAN.made.removed ? 'Clean copy ready' : 'No annotations to remove';
     }
-    toast('', 1);
-    const bar = $('#readyBar');
-    bar.querySelector('span').textContent = (note ? note + ': ' : '') + name;
-    bar.hidden = false;
-    const go = bar.querySelector('#readyGo');
-    go.lastChild.textContent = mail === 'download' ? 'Download' : 'Share';
-    go.onclick = () => { bar.hidden = true; openIn(bytes, name, null, null, mail); };
-    go.focus();
+    prog.done();
+    if (prog.none) toast('', 1);
+    // (Downloading needs no click of its own, as the share sheet does.)
+    if (mail === 'download') { openIn(bytes, name, null, null, 'download'); return; }
+    const ready = () => showReady(note || 'Ready', name, 'Share', () => openIn(bytes, name, null, null, mail), anchor);
+    // (Soon enough after the click: the share sheet at once; if the
+    // browser says it's too late after all, "ready".)
+    if (performance.now() - t0 < (window.LIBLANDE_SHARE_WAIT == null ? 800 : window.LIBLANDE_SHARE_WAIT)) openIn(bytes, name, null, null, mail, ready); else ready();
   } catch (err) {
-    toast((clean ? 'Couldn\u2019t make a clean copy: ' : 'Couldn\u2019t get the PDF: ') + errText(err), 6000);
+    prog.done();
+    toast((clean ? 'Couldn’t make a clean copy: ' : 'Couldn’t get the PDF: ') + errText(err), 6000);
   }
 }
 $('#readyClose').addEventListener('click', () => { $('#readyBar').hidden = true; });

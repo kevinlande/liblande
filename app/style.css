@@ -1779,6 +1779,13 @@ a.ms-ib { text-decoration: none; }
 /* (Over the reader too, and there above its markup toolbar.) */
 .ready-bar { position: fixed; z-index: 85; left: 50%; transform: translateX(-50%); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); width: min(460px, calc(100vw - 32px)); display: flex; align-items: center; gap: 8px; padding: 10px 10px 10px 14px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); box-shadow: var(--shadow); }
 #viewer:not([hidden]) ~ .ready-bar { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+/* Under the Share button that asked for it, pointing to it. */
+.ready-bar.ready-pop { transform: none; width: auto; max-width: min(460px, calc(100vw - 16px)); }
+.ready-bar.ready-pop::before { content: ""; position: absolute; top: -6px; right: var(--arrow, 22px); width: 10px; height: 10px; background: var(--bg); border-left: 1px solid var(--line); border-top: 1px solid var(--line); transform: rotate(45deg); }
+/* A Share button at work: a bar fills along its foot. */
+.share-busy { position: relative; overflow: hidden; border-color: var(--accent) !important; color: var(--accent) !important; }
+.share-prog { position: absolute; left: 0; bottom: 0; height: 3px; width: 0; background: var(--accent); border-radius: 0 2px 2px 0; transition: width .15s linear; pointer-events: none; }
+.ready-bar span b { color: var(--text); font-weight: 600; }
 .ready-bar span { flex: 1; min-width: 0; font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .toast {
   position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%) translateY(12px);
