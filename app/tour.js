@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-10-21.01';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-10-21.07';
 /* -------------------------------------------------------------- features */
 // What LibLande does, by area: each feature, what it's for, where to find
 // it, and its icon (see featIcon). Shown from the sidebar's foot (Features), with a box to find
@@ -28,7 +28,7 @@ const FEATURES = [
     ['Add a publication', 'Search by title (and author; title: and author: say which is which) and choose from what\u2019s found, or give a DOI, ISBN or arXiv ID (the details are looked up), or paste a BibTeX entry.', '+ in the toolbar', '#addBtn'],
     ['Find a PDF', 'Its free copy (open access, found through OpenAlex and Unpaywall\u2019s data), or the article through your library\u2019s proxy, opened in a new tab: save the PDF, then drop it on the publication.', 'Find PDF in the details; library proxies in Settings', 'path:M7 3.5h7l4 4V13M14 3.5v4h4M7 3.5a1.5 1.5 0 0 0-1.5 1.5v14A1.5 1.5 0 0 0 7 20.5h4M16.5 14a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM18.7 19.2l2 2'],
     ['Attach a PDF', 'Drop a PDF on a publication, or use Attach. A book\u2019s PDF is read for its ISBN, to fill in its details.', 'The details pane', 'ICON:clip'],
-    ['Edit the details', 'Every field: authors, title, venue, keywords, notes, the cite key, a rating.', 'Edit, in the details pane', 'ICON:pencil'],
+    ['Edit the details', 'Every field: authors, title, venue, keywords, notes, the cite key, a rating. From the reader, Edit opens in its sidebar, beside the paper.', 'Edit, in the details pane, or in the reader\u2019s Citation tab', 'ICON:pencil'],
     ['Suggested keywords', 'Keywords suggested from those of the publications most like it, and new ones from OpenAlex; tap one to add it. In Add, Edit and the details.', 'Under the keywords', 'ICON:tag'],
     ['Book covers', 'Covers for your books, from Open Library.', 'Settings (the gear in the sidebar)', 'path:M6 3.5h11a1.5 1.5 0 0 1 1.5 1.5v14a1.5 1.5 0 0 1-1.5 1.5H6zM6 3.5v17M9.5 8h6M9.5 11h4'],
     ['Copy a citation', 'APA, APA in text, BibTeX or the cite key, one publication or several; in the reader, the open paper\u2019s.', 'Copy, in the details pane; or the shortcuts (\u2325A for APA, \u21e7\u2325A in text, in the library or the reader)', 'ICON:quote'],
@@ -197,7 +197,7 @@ const TOUR_STEPS = [
   { sel: '#vSide', title: 'Bookmarks', text: 'Pages you\u2019ve marked to come back to: tap a page\u2019s top right corner twice (or press B).', before: () => readerSide('bookmarks') },
   { sel: '#vSide', title: 'Outline', text: 'The table of contents, to jump to a chapter. A book without one gets one made from its printed Contents; Edit it, or Make one from the headings.', before: () => readerSide('outline') },
   { sel: '#vSideBody .v-ole-make, #vSideBody .v-ol-make', title: 'Make an outline', text: 'Make the outline afresh: from the printed Contents (the page you\u2019re on, or the one LibLande finds), from the headings, or empty to fill in yourself. Check it, then Save it into the PDF.', before: () => readerSide('outline') },
-  { sel: '#vSide', title: 'The citation', text: 'The paper\u2019s details while you read, to copy a citation or edit.', before: () => readerSide('info') },
+  { sel: '#vSide', title: 'The citation', text: 'The paper\u2019s details while you read: copy its citation in one click (the icon at its corner), or Edit it, there in the sidebar, beside the paper.', before: () => readerSide('info') },
   { title: 'That\u2019s the tour', text: 'Everything LibLande does is listed in Features, at the foot of the sidebar, with a box to find one. Take the tour again from there whenever you like.' },
 ];
 function startTour() {

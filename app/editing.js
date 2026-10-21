@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-10-21.01';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-10-21.07';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -207,6 +207,7 @@ function sheetBusy(on) {
 function closeSheet() {
   const back = sheet && sheet.msBack, np = sheet && sheet.npBack, info = sheet && sheet.infoBack;
   $('#sheet').hidden = true;
+  undockSheet();
   sheet = null;
   if (back) setTimeout(() => { if (!sheet) msReturn(back); }, 0);
   // (And one opened from New papers, back to New papers.)
@@ -216,11 +217,47 @@ function closeSheet() {
   if (info) setTimeout(() => { if (SIDE.tab === 'info' && !$('#vSide').hidden) showInfo(); }, 0);
 }
 
+// Edit, from the reader: the panel in the reader's sidebar, in place of
+// what it shows (its tabs still there), the sidebar widened for it while
+// it's open (as it was, after). Put back where it was when it closes.
+const DOCK = { home: null, width: null };
+function dockSheet() {
+  const el = $('#sheet'), side = $('#vSide'), viewer = $('#viewer');
+  if (el.classList.contains('in-side')) return;
+  if (side.hidden) toggleSide(true);
+  DOCK.home = el.nextSibling;
+  DOCK.width = viewer.style.getPropertyValue('--side-w');
+  const w = side.getBoundingClientRect().width;
+  if (w < 380) viewer.style.setProperty('--side-w', Math.min(380, Math.max(w, innerWidth * 0.45)) + 'px');
+  side.classList.add('editing');
+  side.appendChild(el);
+  el.classList.remove('pop');
+  el.classList.add('in-side');
+  el.scrollTop = 0;
+  refit();
+}
+// (Another tab, or the sidebar closed, while editing: Edit is cancelled.)
+document.addEventListener('click', ev => {
+  if ($('#sheet').classList.contains('in-side') && ev.target.closest('#vSide [data-vtab], #vSideBtn')) closeSheet();
+}, true);
+function undockSheet() {
+  const el = $('#sheet');
+  if (!el.classList.contains('in-side')) return;
+  el.classList.remove('in-side');
+  $('#vSide').classList.remove('editing');
+  document.body.insertBefore(el, DOCK.home && DOCK.home.parentNode === document.body ? DOCK.home : null);
+  const viewer = $('#viewer');
+  if (DOCK.width) viewer.style.setProperty('--side-w', DOCK.width); else viewer.style.removeProperty('--side-w');
+  refit();
+}
+
 // The top row of the Add and Edit forms: Cancel, the title, and the button
 // that saves (which submits the form).
 const sheetHead = (title, go) => `<div class="sheet-head"><button type="button" class="tb-btn sheet-x" data-sheet-cancel aria-label="Cancel" title="Cancel"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>` +
   `<h2>${title}</h2><button type="submit" class="btn primary sheet-go">${go}</button></div>`;
 function openEdit(e) {
+  // (Not while its last changes are still being saved.)
+  if (SAVING.has(e.k)) { toast('Still saving the last changes to \u201c' + shortTitle(e.f.title || e.k) + '\u201d; a moment\u2026', 2500); return; }
   sheet = { mode: 'edit', entry: e };
   const rating = parseInt(e.f.rating, 10) || 0;
   let h = sheetHead('Edit publication', 'Save');
@@ -240,6 +277,8 @@ function openEdit(e) {
   // (A panel over the library, like Add; a phone's fills the screen.)
   showSheet(h, 'Save');
   $('#sheet').classList.add('head-mode', 'compact');
+  // (From the reader: in its sidebar, beside the paper; not on a phone.)
+  if (!$('#viewer').hidden && !phoneMQ.matches) dockSheet();
   kwsSheet();
   // Fill in, next to the DOI: what Crossref has for the empty fields.
   const doi = $('#fld-doi');
@@ -586,24 +625,55 @@ async function saveEdit() {
   if ('title' in set && !set.title) { sheetMsg('A publication needs a title.', true); return; }
   const bad = Object.keys(set).find(n => !balanced(set[n]));
   if (bad) { sheetMsg('The ' + (FIELD_LABELS[bad] || bad) + ' field has unbalanced braces { }. Check it and try again.', true); return; }
-  sheetBusy(true);
-  sheetMsg('Saving\u2026');
-  const s = sheet;
+  // The panel closes, and the save goes on with a bar to say so; if it
+  // fails, Try again opens the panel again as you left it.
+  const snap = { vals, kws, rating, read, groups: [...$('#sheetBody').querySelectorAll('[data-group]')].filter(cb => cb.checked).map(cb => cb.dataset.group), key: newKey };
+  const name = '\u201c' + shortTitle(vals.title || e.f.title || e.k) + '\u201d';
+  closeSheet();
+  SAVING.add(e.k);
+  toast('Saving changes to ' + name + '\u2026', 0, null, true);
   let saved = false;
   try {
     const changed = Object.keys(set).length || add.length || remove.length;
-    const done = changed ? await writeEdit(e, set, add, remove, rename ? null : closeSheet) : '';
+    const done = changed ? await inTurn(() => writeEdit(e, set, add, remove)) : '';
     saved = true;
+    infoAgain();
     if (!rename) { toast(done, 2500); return; }
-    sheetMsg('Changing the cite key\u2026');
-    const old = e.k, res = await renameCore(e, newKey);
-    if (sheet === s) closeSheet();
+    toast('Changing the cite key of ' + name + '\u2026', 0, null, true);
+    const old = e.k, res = await inTurn(() => renameCore(e, newKey));
+    infoAgain();
     renameSaid(old, newKey, res);
   } catch (err) {
-    if (sheet === s) sheetMsg((saved ? 'The other changes were saved, but the cite key wasn\u2019t: ' : '') + errText(err), true);
+    toast((saved ? 'The other changes to ' + name + ' were saved, but the cite key wasn\u2019t: ' : 'Couldn\u2019t save ' + name + ': ') + errText(err), 12000,
+      { label: 'Try again', run: () => { const now = BYKEY.get(e.k) || e; if (saved) snap.vals = null; reopenEdit(now, snap, errText(err)); } });
   } finally {
-    if (sheet === s) sheetBusy(false);
+    SAVING.delete(e.k);
   }
+}
+// Saves still going on (after their panels closed): by publication. Each
+// goes in its turn, after those before it, so it's made from the library
+// as they left it (its static groups, the cite keys taken).
+const SAVING = new Set();
+let saveTurn = Promise.resolve();
+const inTurn = fn => { const run = saveTurn.then(fn, fn); saveTurn = run.catch(() => {}); return run; };
+const shortTitle = t => { t = String(t).replace(/[{}]/g, ''); return t.length > 60 ? t.slice(0, 57).replace(/\s+\S*$/, '') + '\u2026' : t; };
+// (The reader's Citation tab, if it's showing, with what was saved.)
+const infoAgain = () => { if (SIDE.tab === 'info' && !$('#viewer').hidden && !$('#vSide').hidden) showInfo(); };
+// Edit opened again as it was left (snap: from saveEdit; its fields
+// left as they are if they were saved), with why it didn't save.
+function reopenEdit(e, snap, why) {
+  openEdit(e);
+  if (!sheet || sheet.mode !== 'edit') return;
+  const body = $('#sheetBody');
+  if (snap.vals) Object.keys(snap.vals).forEach(n => { const el = body.querySelector(`[data-field="${CSS.escape(n)}"]`); if (el) el.value = snap.vals[n]; });
+  $('#kwEdit').querySelectorAll('.kw-chip').forEach(c => c.remove());
+  snap.kws.forEach(addKeyword);
+  $('#starsEdit').dataset.rating = snap.rating;
+  $('#starsEdit').innerHTML = starButtons(snap.rating);
+  $('#readBox').checked = snap.read;
+  body.querySelectorAll('[data-group]').forEach(cb => { cb.checked = snap.groups.includes(cb.dataset.group); });
+  if ($('#editKey') && !$('#editKey').disabled) $('#editKey').value = snap.key;
+  sheetMsg(why, true);
 }
 // Saves changed fields (and static groups) of a publication: as a pending
 // edit, or straight into the .bib (or inbox). before() runs once the save
@@ -683,41 +753,65 @@ async function saveAdd() {
   }
   const bad = Object.keys(vals).find(n => !balanced(vals[n]));
   if (bad) { sheetMsg('The ' + (FIELD_LABELS[bad] || bad) + ' field has unbalanced braces { }. Check it and try again.', true); return; }
-  const key = makeCiteKey(vals), pdf = $('#addPdf').files[0] || sheet.pdf, toRead = $('#addRL').checked;
-  sheetBusy(true);
+  let key = makeCiteKey(vals);
+  const pdf = $('#addPdf').files[0] || sheet.pdf, toRead = $('#addRL').checked;
+  if (pdf && isOffline()) { sheetMsg('Adding a publication with its PDF needs a connection. Add it without the PDF now, and attach the PDF when you\u2019re back online.', true); return; }
+  // The panel closes, and the adding goes on with a bar to say so; if it
+  // fails, Try again opens the panel again as you left it.
+  const snap = { type, vals: Object.assign({}, vals), pdf, toRead, dup: sheet.dupWarned }, name = '\u201c' + shortTitle(vals.title) + '\u201d';
+  closeSheet();
   try {
     let upload = null, pdfName = null;
-    if (pdf && !navigator.onLine) throw new Error('Adding a publication with its PDF needs a connection. Add it without the PDF now, and attach the PDF when you\u2019re back online.');
     if (pdf) {
-      sheetMsg('Uploading the PDF\u2026');
+      toast('Uploading the PDF for ' + name + '\u2026', 0, null, true);
       const info = await callServer('getInboxUploadInfo');
       pdfName = key + '.pdf';
       upload = await uploadPdf(pdf, pdfName, info);
     }
+    toast('Adding ' + name + '\u2026', 0, null, true);
+    // (Its cite key made in its turn, after any added before it.)
     const now = bibdeskTime();
-    sheetMsg('Adding\u2026');
-    const res = await callServer('addToMain', { type, key, fields: vals, uploadId: upload && upload.id, prefix: papersPrefix(), now, backupName: fileTime() });
+    const res = await inTurn(() => { key = makeCiteKey(vals); return callServer('addToMain', { type, key, fields: vals, uploadId: upload && upload.id, prefix: papersPrefix(), now, backupName: fileTime() }); });
     const e = newEntry(type, key, vals, now, false);
     e.h = res.hash;
     if (res && res.queued) e.offline = true;
     if (res.file) e.files = [res.file];
     DATA.entries.push(e);
     init(DATA, true);
-    closeSheet();
-    setGroup('all');
-    state.selKey = key;
-    renderDetail();
-    revealSelected();
-    if (phoneMQ.matches) go('detail');
+    toast('', 1);
+    // (Shown, unless you've gone on to something else meanwhile.)
+    if (!sheet && $('#viewer').hidden) {
+      setGroup('all');
+      state.selKey = key;
+      renderDetail();
+      revealSelected();
+      if (phoneMQ.matches) go('detail');
+    }
     if (toRead) rlAdd(key);
     if (res && res.queued) { showDone(vals.title, 'Added on this device; it goes to ' + DATA.source + ' when you\u2019re back online'); return; }
     showDone(vals.title, 'Added to ' + DATA.source + (res.file ? ', with its PDF in ' + res.file.p.replace(/[/][^/]*$/, '') : ''));
     afterWrite();
   } catch (err) {
-    sheetMsg(errText(err), true);
-  } finally {
-    sheetBusy(false);
+    toast('Couldn\u2019t add ' + name + ': ' + errText(err), 12000, { label: 'Try again', run: () => reopenAdd(snap, errText(err)) });
   }
+}
+// Add opened again as it was left, with why it didn't add.
+function reopenAdd(snap, why) {
+  openAdd(snap.pdf || undefined);
+  const sel = $('#addType');
+  if (![...sel.options].some(o => o.value === snap.type)) sel.add(new Option(snap.type, snap.type));
+  sel.value = snap.type;
+  const f = Object.assign({}, snap.vals), kws = splitKw(f.keywords || '');
+  delete f.keywords;
+  renderAddFields(f);
+  // (Fields the form has no box for, kept as they were.)
+  const shown = new Set([...$('#sheetBody').querySelectorAll('[data-field]')].map(el => el.dataset.field));
+  sheet.extra = {};
+  Object.keys(f).forEach(n => { if (!shown.has(n)) sheet.extra[n] = f[n]; });
+  kws.forEach(addKeyword);
+  $('#addRL').checked = snap.toRead;
+  sheet.dupWarned = snap.dup;
+  sheetMsg(why, true);
 }
 
 $('#sheetForm').addEventListener('submit', ev => {
@@ -855,7 +949,7 @@ async function netBadge() {
 // Drive (an arrow; a tap saves them now), saving (it pulses), saved (a
 // tick, for a moment).
 function netRender() {
-  const off = !navigator.onLine, n = NET.changes + NET.papers;
+  const off = isOffline(), n = NET.changes + NET.papers;
   document.querySelectorAll('[data-net]').forEach(b => {
     const viewer = b.id === 'vNetBadge', st = viewer && !$('#viewer').hidden ? NET.save : '';
     b.hidden = !gs || (!off && !n && !st);
@@ -872,7 +966,7 @@ const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many);
 function netText() {
   const parts = [NET.changes && plural(NET.changes, 'change to your library', 'changes to your library'), NET.papers && 'marks on ' + plural(NET.papers, 'paper', 'papers')].filter(Boolean);
   const waiting = parts.length ? parts.join(' and ') + (NET.changes + NET.papers === 1 && !NET.papers ? ' is' : ' are') + ' kept on this device' : '';
-  if (!navigator.onLine) return 'You\u2019re offline. ' + (waiting ? waiting.charAt(0).toUpperCase() + waiting.slice(1) + ', and go to Google Drive when you\u2019re back online.' : 'Changes you make are kept on this device until you\u2019re back online. Papers saved for offline reading open as usual.');
+  if (isOffline()) return 'You\u2019re offline. ' + (waiting ? waiting.charAt(0).toUpperCase() + waiting.slice(1) + ', and go to Google Drive when you\u2019re back online.' : 'Changes you make are kept on this device until you\u2019re back online. Papers saved for offline reading open as usual.');
   return waiting ? waiting.charAt(0).toUpperCase() + waiting.slice(1) + ', waiting to go to Google Drive (they go on their own, soon).' : 'Everything is saved to Google Drive.';
 }
 document.addEventListener('click', ev => {

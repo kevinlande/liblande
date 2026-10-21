@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-21.01';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-21.07';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -2001,10 +2001,30 @@ async function refreshSaved() {
   } catch (err) { /* none kept */ }
 }
 const refreshSavedSoon = (ms = 2500) => { clearTimeout(refreshSaved.t); refreshSaved.t = setTimeout(refreshSaved, ms); };
-const showOnline = () => { document.body.classList.toggle('is-offline', !navigator.onLine); setTimeout(() => netBadge(), 0); };
-window.addEventListener('online', showOnline);
+// Offline: as the browser says (navigator.onLine), or, as a computer can
+// say it's online with no way out (a VPN or another connection still up),
+// as a tiny request to Google finds: at the start, on coming back to the
+// front, and then every two minutes (every 15 seconds while offline).
+const REACH = { ok: true, t: 0 };
+const isOffline = () => !navigator.onLine || !REACH.ok;
+async function reachCheck() {
+  clearTimeout(REACH.t);
+  let ok = navigator.onLine;
+  if (ok && !(window.LIBLANDE_TEST && !window.LIBLANDE_REACH)) {
+    const ctl = new AbortController(), give = setTimeout(() => ctl.abort(), 6000);
+    try { await (window.LIBLANDE_REACH || fetch)('https:\/\/www.gstatic.com/generate_204', { mode: 'no-cors', cache: 'no-store', signal: ctl.signal }); }
+    catch (err) { ok = false; }
+    clearTimeout(give);
+  }
+  if (ok !== REACH.ok) { REACH.ok = ok; showOnline(); }
+  if (!document.hidden) REACH.t = setTimeout(reachCheck, ok ? 120000 : 15000);
+}
+const showOnline = () => { document.body.classList.toggle('is-offline', isOffline()); setTimeout(() => netBadge(), 0); };
+window.addEventListener('online', () => { showOnline(); reachCheck(); });
 window.addEventListener('offline', showOnline);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) reachCheck(); });
 showOnline();
+reachCheck();
 const pickBox = e => `<span class="pickbox${state.picked.has(e.k) ? ' on' : ''}" aria-hidden="true">${state.picked.has(e.k) ? ICON.check : ''}</span>`;
 function rowHTML(e, i, top, h) {
   const f = e.files && e.files[0], n = readablePdfs(e).length;

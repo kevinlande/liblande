@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-21.01';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-21.07';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -5161,7 +5161,9 @@ function showInfo() {
     `<button type="button" class="vi-key" data-icopy="key" title="Copy the cite key"><span>${esc(e.k)}</span>${ICON.copy}</button></div>`;
   h += `<h3 class="vi-title">${esc(f.title || '(untitled)')}</h3>`;
   if (people.length) h += `<p class="vi-authors">${people.map(n => esc(fullName(n))).join(', ')}${!(e.a && e.a.length) && e.e ? ' (Eds.)' : ''}</p>`;
-  h += `<p class="vi-ref">${apaCitation(e).html}</p>`;
+  // (Copied in one click, with the button at its corner.)
+  h += `<div class="vi-ref-box"><p class="vi-ref">${apaCitation(e).html}</p>` +
+    `<button type="button" class="vi-ref-copy" data-icopy="apa" title="Copy the citation (${esc(keyHint('copyApa'))})" aria-label="Copy the citation">${ICON.copy}</button></div>`;
   // Copy, the links and Edit, in one row (one link: just a button).
   const links = [];
   if (f.doi) links.push([`https:\/\/doi.org/${f.doi.replace(/^https?:\/\/(dx\.)?doi\.org[/]/i, '')}`, 'DOI']);
@@ -5246,12 +5248,17 @@ $('#vSideBtn').addEventListener('click', () => toggleSide());
 $('#vSide').addEventListener('click', ev => {
   const t = ev.target.closest('[data-vtab]');
   if (t) { showSideTab(t.dataset.vtab); return; }
-  if (ev.target.closest('[data-iedit]')) { const e = infoEntry(); if (e && BYKEY.get(e.k)) { openEdit(BYKEY.get(e.k)); sheet.infoBack = true; } return; }
+  if (ev.target.closest('[data-iedit]')) { const e = infoEntry(); if (e && BYKEY.get(e.k)) { openEdit(BYKEY.get(e.k)); if (sheet) sheet.infoBack = true; } return; }
   const ic = ev.target.closest('[data-icopy]');
   if (ic) {
     const e = infoEntry(), kind = ic.dataset.icopy;
     if (!e) return;
-    if (kind === 'apa') { const cite = apaCitation(e); copy(cite.text, 'Copied APA citation', cite.html); }
+    if (kind === 'apa') {
+      const cite = apaCitation(e);
+      copy(cite.text, 'Copied APA citation', cite.html);
+      // (The corner button says so, with a tick, for a moment.)
+      if (ic.matches('.vi-ref-copy')) { ic.innerHTML = ICON.check; ic.classList.add('done'); setTimeout(() => { if (ic.isConnected) { ic.innerHTML = ICON.copy; ic.classList.remove('done'); } }, 1500); }
+    }
     else if (kind === 'apa-short') { const cite = apaInText(e); copy(cite.text, 'Copied APA in-text citation', cite.html); }
     else copy(kind === 'key' ? e.k : bibtex(e), kind === 'key' ? 'Copied cite key' : 'Copied BibTeX');
     return;
@@ -6143,6 +6150,19 @@ function closePeek() {
   setTimeout(() => { panel.hidden = true; panel.classList.remove('leaving'); showBack(); }, 220);
 }
 $('#vPeekX').addEventListener('click', closePeek);
+// (A tap of the Apple Pencil on the panel's buttons, acted on as it
+// lifts: on the iPad its click can go missing, over the paper. The click,
+// if it comes too, isn't acted on twice.)
+function penTaps(b) {
+  let at = 0;
+  b.addEventListener('pointerup', ev => {
+    if (ev.pointerType !== 'pen' || !b.contains(document.elementFromPoint(ev.clientX, ev.clientY))) return;
+    at = Date.now();
+    b.click();
+  });
+  b.addEventListener('click', ev => { if (ev.isTrusted && Date.now() - at < 800) ev.stopImmediatePropagation(); }, true);
+}
+penTaps($('#vPeekX'));
 // Its height, as a share of the page area: at least 120px, and leaving
 // 80px of the paper showing between it and the bars at the top.
 // (Remembered.)
@@ -6222,6 +6242,7 @@ function peekHeight(share) {
 })();
 // Go there: to the link's destination; in split screen, to where the
 // panel is.
+penTaps($('#vPeekGo'));
 $('#vPeekGo').addEventListener('click', () => {
   const d = PEEK.dest, loc = PEEK.viewer && PEEK.viewer._location;
   closePeek();
@@ -6454,7 +6475,7 @@ function showPagePill(n, total) {
   clearTimeout(RAIL.pillTimer);
   RAIL.pillTimer = setTimeout(() => pill.classList.remove('show'), 1200);
 }
-const BARS = { down: null, lastTap: null, tapTimer: 0 };
+const BARS = { down: null, lastTap: null, tapTimer: 0, scrollAt: 0, active: new Set(), multiAt: 0 };
 const topH = () => $('#vTop').offsetHeight;
 new ResizeObserver(() => { $('#viewer').style.setProperty('--top-h', topH() + 'px'); placePalette(); }).observe($('#vTop'));
 function barsHidden(on) {
@@ -6476,16 +6497,26 @@ function linkNear(x, y, reach) {
   });
   return best;
 }
-// A tap on the page (with no tool on) hides them, or brings them back.
-$('#vScroll').addEventListener('pointerdown', ev => { BARS.down = { x: ev.clientX, y: ev.clientY, t: Date.now() }; }, true);
+// A tap on the page (with no tool on) hides them, or brings them back;
+// so does a finger's, with a tool on and the Pencil drawing (fingers don't
+// mark then). Not a touch that isn't meant as a tap: one that stops the
+// page while it's still gliding, one of several fingers at once, or a
+// palm (a large touch).
+$('#vScroll').addEventListener('scroll', () => { BARS.scrollAt = Date.now(); }, { passive: true });
+$('#vScroll').addEventListener('pointerdown', ev => {
+  const now = Date.now();
+  if (BARS.active.size) BARS.multiAt = now;
+  BARS.active.add(ev.pointerId);
+  BARS.down = { x: ev.clientX, y: ev.clientY, t: now, gliding: now - BARS.scrollAt < 150, palm: ev.pointerType === 'touch' && Math.max(ev.width || 0, ev.height || 0) > 40 };
+}, true);
+['pointerup', 'pointercancel'].forEach(n => window.addEventListener(n, ev => { setTimeout(() => BARS.active.delete(ev.pointerId), 0); }, true));
 $('#vScroll').addEventListener('pointerup', ev => {
   const d = BARS.down;
   BARS.down = null;
-  // (With a tool on and the Pencil in use, fingers don't mark: a finger's
-  // double tap zooms then too, though a single tap leaves the bars.)
   const fingerOnly = V.tool !== 'read' && V.pencil && ev.pointerType === 'touch';
   if (!d || (V.tool !== 'read' && !fingerOnly) || !TOUCH_UI.matches) return;
   if (Math.hypot(ev.clientX - d.x, ev.clientY - d.y) > 8 || Date.now() - d.t > 400) return;
+  if (d.gliding || d.palm || BARS.active.size > 1 || Date.now() - BARS.multiAt < 400) return;
   if (ev.target.closest('a, button, .annotationLayer section, .editToolbar')) return;
   // Not when the tap ends a text selection.
   if (!getSelection().isCollapsed) return;
@@ -6510,7 +6541,6 @@ $('#vScroll').addEventListener('pointerup', ev => {
     return;
   }
   BARS.lastTap = { t: now, x, y };
-  if (fingerOnly) { BARS.tapTimer = setTimeout(() => { BARS.lastTap = null; }, 320); return; }
   BARS.tapTimer = setTimeout(() => {
     BARS.lastTap = null;
     const hidden = $('#viewer').classList.contains('bars-hidden');
