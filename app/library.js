@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-22.02';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-22.03';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -1698,10 +1698,10 @@ function notePdfPages(id, n) {
 // whose length is shown or sorted by: from the copy kept on this device if
 // there is one, or else just the few pieces of the PDF that say how many
 // pages it has (not the whole file). The list follows as they come.
-const LEN = { queue: [], busy: false, failed: new Set() };
+const LEN = { queue: [], busy: false, failed: new Map(), now: null };
 function lengthsWanted() {
   if (state.group !== 'toread' || !gs || (state.sort !== 'length' && COL_LIST.indexOf('length') < 0)) return;
-  state.view.forEach(e => { const fl = lenPdf(e); if (fl && !PDF_PAGES[fl.id] && !LEN.failed.has(fl.id) && !LEN.queue.some(x => x.id === fl.id)) LEN.queue.push(fl); });
+  state.view.forEach(e => { const fl = lenPdf(e); if (fl && !PDF_PAGES[fl.id] && !LEN.failed.has(fl.id) && LEN.now !== fl.id && !LEN.queue.some(x => x.id === fl.id)) LEN.queue.push(fl); });
   lengthsNext();
 }
 async function lengthsNext() {
@@ -1709,8 +1709,10 @@ async function lengthsNext() {
   if (isOffline()) { LEN.queue = []; return; }
   LEN.busy = true;
   const fl = LEN.queue.shift();
-  try { notePdfPages(fl.id, await countPdfPages(fl)); } catch (err) { LEN.failed.add(fl.id); }
+  LEN.now = fl.id;
+  try { notePdfPages(fl.id, await countPdfPages(fl)); } catch (err) { LEN.failed.set(fl.id, errText(err)); }
   LEN.busy = false;
+  LEN.now = null;
   if (state.group === 'toread') {
     // (Sorted by length: in order again once they're all in.)
     if (state.sort === 'length' && !LEN.queue.length) refresh(false); else paint();
@@ -2124,7 +2126,17 @@ function rowHTML(e, i, top, h) {
     `${rowDrag() ? ' draggable="true"' : ''} style="top:${top}px;height:${h}px">` +
     `<span class="c-file">${file}</span>` + COL_LIST.map(k => colCell(k, e)).join('') + `</div>`;
 }
+// Length's cell: the pages; waiting to be counted, a spinner; couldn't
+// be counted, a dash (why, on hover).
+function lengthCell(e) {
+  const fl = lenPdf(e), v = colDef('length').cell(e);
+  if (v) return `<span class="c-x c-len" title="${esc(lengthEstimated(e) ? 'From its page range (no PDF to count)' : v)}">${esc(v)}</span>`;
+  if (fl && LEN.failed.has(fl.id)) return `<span class="c-x c-len" title="${esc('Couldn\u2019t count its pages: ' + LEN.failed.get(fl.id))}">\u2014</span>`;
+  if (fl && (LEN.now === fl.id || LEN.queue.some(x => x.id === fl.id))) return `<span class="c-x c-len" title="Counting its pages\u2026"><i class="len-wait" aria-label="Counting its pages"></i></span>`;
+  return `<span class="c-x c-len"></span>`;
+}
 function colCell(k, e) {
+  if (k === 'length') return lengthCell(e);
   if (k === 'title') return `<span class="c-title">${rlTag(e)}${esc(e.f.title || '(untitled)')}</span>`;
   if (k === 'author') return `<span class="c-author" title="${esc(e.authorsInit)}">${esc(e.authorsInit)}</span>`;
   if (k === 'added') return addedCell(e);
