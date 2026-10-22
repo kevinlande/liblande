@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-21.10';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-22.01';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -1659,7 +1659,30 @@ function searchFilter(q, field) {
 // The sort keys are already folded to plain lower case (norm), so a plain
 // comparison is enough, and much quicker than localeCompare.
 const cmpStr = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+// A publication's length in pages: from its page range ("327--345": 19;
+// "1--5, 9--12": 9; "327--45" as 327--345), or a book's (or thesis's)
+// count; or else its PDF's pages, if it's been opened (0: not known).
+const WHOLE_WORKS = new Set(['book', 'phdthesis', 'mastersthesis', 'techreport', 'manual', 'booklet', 'proceedings', 'unpublished', 'misc']);
+function pageCount(e) {
+  const src = String(e.f.pagetotal || e.f.pages || '').replace(/[{}]/g, '');
+  if (e.lenOf === src && e.len != null) return e.len;
+  let n = 0;
+  const parts = src.split(/[,;]/).filter(p => p.trim());
+  for (const part of parts) {
+    const m = /^\s*(\d+)\s*(?:[-\u2013\u2014]+\s*(\d+))?\s*$/.exec(part);
+    if (!m) { n = 0; break; }
+    if (m[2]) {
+      let a = +m[1], b = +m[2];
+      if (b < a && m[2].length < m[1].length) b = +(m[1].slice(0, m[1].length - m[2].length) + m[2]);
+      n += b >= a ? b - a + 1 : 0;
+    } else n += parts.length === 1 && (e.f.pagetotal || WHOLE_WORKS.has(e.t)) ? +m[1] : 1;
+  }
+  if (!n && PROGRESS[e.k] && PROGRESS[e.k].n) n = PROGRESS[e.k].n;
+  e.lenOf = src; e.len = n;
+  return n;
+}
 const SORTS = {
+  length: Object.assign((a, b) => pageCount(a) - pageCount(b) || cmpStr(a.kAuthor, b.kAuthor), { blank: e => (pageCount(e) ? 0 : 1) }),
   author: (a, b) => cmpStr(a.kAuthor, b.kAuthor) || a.yearN - b.yearN || cmpStr(a.kTitle, b.kTitle),
   year: (a, b) => a.yearN - b.yearN || cmpStr(a.kAuthor, b.kAuthor),
   title: (a, b) => cmpStr(a.kTitle, b.kTitle),
@@ -1668,13 +1691,29 @@ const SORTS = {
   rating: (a, b) => a.rating - b.rating || cmpStr(a.kAuthor, b.kAuthor),
   file: (a, b) => (a.files ? 1 : 0) - (b.files ? 1 : 0) || cmpStr(a.kAuthor, b.kAuthor),
 };
+// The reading list keeps its own sort, and columns, apart from the other
+// tabs (both remembered): at first, its own order (Up next, then Later).
+const sortCtx = () => (state.group === 'toread' ? 'rl.' : '');
+let SORT_CTX = '';
+function syncSortCtx() {
+  if (SORT_CTX === sortCtx()) return;
+  SORT_CTX = sortCtx();
+  state.sort = store.get(SORT_CTX + 'sort', SORT_CTX ? 'list' : 'added');
+  state.dir = store.get(SORT_CTX + 'dir', SORT_CTX ? 1 : -1);
+  applyColumns();
+}
 function refresh(resetSel) {
+  syncSortCtx();
   const base = groupItems(state.group) || ENTRIES;
   const field = { all: 'sAll', author: 'sAuthor', title: 'sTitle', kw: 'sKw' }[state.scope] || 'sAll';
   const match = searchFilter(state.q, field), toks = match ? [1] : [];
   let v = match ? base.filter(match) : base.slice();
-  const cmp = SORTS[state.sort] || colSort(state.sort, v) || SORTS.added;
-  if (state.group !== 'toread' && state.group !== 'dups' && state.group !== 'recent') v.sort(cmp.blank ? (a, b) => cmp.blank(a) - cmp.blank(b) || state.dir * cmp(a, b) : state.dir > 0 ? cmp : (a, b) => cmp(b, a));
+  // (In the reading list: Added is when it went on the list; and its own
+  // order, as is or turned round.)
+  const rl = state.group === 'toread', rlAt = e => { const x = RL.get(e.k); return x ? x.added : 0; };
+  const cmp = rl && state.sort === 'added' ? (a, b) => rlAt(a) - rlAt(b) : SORTS[state.sort] || colSort(state.sort, v) || SORTS.added;
+  if (rl && state.sort === 'list') { if (state.dir < 0) v.reverse(); }
+  else if (state.group !== 'dups' && state.group !== 'recent') v.sort(cmp.blank ? (a, b) => cmp.blank(a) - cmp.blank(b) || state.dir * cmp(a, b) : state.dir > 0 ? cmp : (a, b) => cmp(b, a));
   if (state.group !== 'toread' && state.group !== 'dups' && state.group !== 'recent') v = nestVersions(v); else NESTED = new Set();
   state.view = v;
   renderRLBar();
@@ -1705,14 +1744,16 @@ function renderSortUI() {
     if (on && b.dataset.sort !== 'file') b.insertAdjacentHTML('beforeend', `<i class="arr">${state.dir > 0 ? ICON.up : ICON.down}</i>`);
     b.setAttribute('aria-sort', on ? (state.dir > 0 ? 'ascending' : 'descending') : 'none');
   });
-  $('#sortSel').value = state.sort in SORTS && state.sort !== 'file' ? state.sort : 'added';
+  const listOpt = $('#sortSel').querySelector('[value="list"]');
+  listOpt.hidden = state.group !== 'toread';
+  $('#sortSel').value = state.sort === 'list' && state.group === 'toread' ? 'list' : state.sort in SORTS && state.sort !== 'file' ? state.sort : 'added';
   $('#sortDir').innerHTML = state.dir > 0 ? ICON.up : ICON.down;
   $('#sortDir').title = state.dir > 0 ? 'Ascending' : 'Descending';
 }
 function setSort(key, dir) {
   if (dir == null) dir = key === state.sort ? -state.dir : (key === 'added' || key === 'year' || key === 'rating' || key === 'file' ? -1 : 1);
   state.sort = key; state.dir = dir;
-  store.set('sort', key); store.set('dir', dir);
+  store.set(sortCtx() + 'sort', key); store.set(sortCtx() + 'dir', dir);
   refresh(false);
   revealSelected();
 }
@@ -1743,6 +1784,7 @@ const COLS = {
   type: { name: 'Type', w: '110px', cls: 'c-x', cell: e => TYPE_NAMES[e.t] || e.t },
   key: { name: 'Cite key', w: '140px', cls: 'c-key', cell: e => e.k },
   keywords: { name: 'Keywords', w: 'minmax(100px, 18%)', cls: 'c-x', cell: e => e.kw.join(', ') },
+  length: { name: 'Length', w: '72px', cls: 'c-x c-len', cell: e => { const n = pageCount(e); return n ? n + (n === 1 ? ' p.' : ' pp.') : ''; } },
 };
 const COL_ORDER = Object.keys(COLS);
 const COL_DEFAULT = { wide: ['author', 'year', 'title', 'venue', 'added'], narrow: ['author', 'year', 'title', 'venue'] };
@@ -1766,8 +1808,10 @@ function colSort(k, list) {
   return cmp;
 }
 const colLayout = () => tabletMQ.matches ? 'narrow' : 'wide';
+// (The reading list's own, if chosen; at first, as the other tabs have them.)
 function chosenCols() {
-  let c = store.get('columns.' + colLayout(), null);
+  let c = store.get('columns.' + sortCtx() + colLayout(), null);
+  if (!Array.isArray(c) && sortCtx()) c = store.get('columns.' + colLayout(), null);
   if (!Array.isArray(c) || c.indexOf('title') < 0) c = COL_DEFAULT[colLayout()];
   c = c.filter(k => colDef(k));
   // The usual ones in their usual order, then fields in the order added.
@@ -1791,7 +1835,7 @@ function applyColumns() {
   renderSortUI();
 }
 function setCols(list) {
-  store.set('columns.' + colLayout(), list);
+  store.set('columns.' + sortCtx() + colLayout(), list);
   applyColumns();
   if (ENTRIES.length) paint();
 }

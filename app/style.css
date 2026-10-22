@@ -891,6 +891,7 @@ button.fileicon { border: 0; background: none; cursor: pointer; }
 .d-type { text-transform: uppercase; letter-spacing: .08em; font-weight: 600; font-size: 11px; color: var(--muted); }
 .citekey { font-family: var(--mono); font-size: 12px; border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; background: var(--panel); color: var(--text); display: inline-flex; align-items: center; gap: 5px; }
 .citekey svg { width: 13px; height: 13px; color: var(--faint); }
+.row .c-len { text-align: right; font-variant-numeric: tabular-nums; }
 .d-title { margin: 0; font: 600 23px/1.25 var(--serif); text-wrap: balance; }
 /* Click to edit: a hint on hover; then a box in the title's own type. */
 .d-title[data-title-edit] { cursor: text; border-radius: 6px; margin: 0 -6px; padding: 0 6px; }
