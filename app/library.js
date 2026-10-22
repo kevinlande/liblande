@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-22.03';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-22.04';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -2711,6 +2711,19 @@ function renderDetail() {
     ? `<button type="button" class="thumb" data-read="${j}" title="Read ${esc(fl.n)}">${j === first && cover ? coverBox(cover) : thumbBox(fl.id)}<span class="thumb-name">${esc(fl.n)}</span></button>`
     : '').join('') : '';
   if (!hasPdf && cover && wide) thumbs = `<div class="thumb cover-only">${coverBox(cover)}</div>`;
+  // Beside the details, several PDFs as a carousel: one at a time, ‹ › to
+  // go round (or a swipe, or the arrow keys), dots and "2 of 3" on a strip
+  // along the picture's foot. (In a narrow pane they're small rows.)
+  const pdfs = hasPdf ? e.files.map((fl, j) => [fl, j]).filter(([fl]) => fl.id) : [];
+  let sideThumbs = thumbs;
+  if (pdfs.length > 1) {
+    const n = pdfs.length, at = Math.min(CAROUSEL.get(e.k) || 0, n - 1);
+    const strip = i => `<span class="car-over" aria-hidden="true">${pdfs.map((x, d) => `<b${d === i ? ' class="on"' : ''}></b>`).join('')}<span>${i + 1} of ${n}</span></span>`;
+    const arrow = (d, path, label) => `<button type="button" class="car-arrow ${d < 0 ? 'l' : 'r'}" data-car-step="${d}" aria-label="${label}" title="${label}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="${path}"/></svg></button>`;
+    sideThumbs = pdfs.map(([fl, j], i) => `<button type="button" class="thumb${i === at ? ' on' : ''}" data-read="${j}" title="Read ${esc(fl.n)}">` +
+      `<span class="car-pic">${j === first && cover ? coverBox(cover) : thumbBox(fl.id)}${strip(i)}</span><span class="thumb-name">${esc(fl.n)}</span></button>`).join('') +
+      arrow(-1, 'M15 6l-6 6 6 6', 'Previous PDF') + arrow(1, 'M9 6l6 6-6 6', 'Next PDF');
+  }
   let notices = '';
   const twins = DUPS.get(e.k);
   if (twins) {
@@ -2768,7 +2781,7 @@ function renderDetail() {
     h = `<div class="d-two"><div class="d-inner">${h}${notices}${abs}${chips}${body}${vers}${fields}</div>` +
       // (Edit in the top corner, wherever the details are shown.)
       `<aside class="d-side${stack ? ' d-stack' : ''}">${gs ? `<button type="button" class="btn d-edit" data-edit>${ICON.pencil}<span>Edit</span></button>` : ''}` +
-      `${thumbs ? `<div class="thumbs t-side" aria-label="PDFs">${thumbs}</div>` : ''}${acts}${rl}${metaH}</aside></div>`;
+      `${sideThumbs ? `<div class="thumbs t-side${pdfs.length > 1 ? ' car' : ''}"${pdfs.length > 1 ? ` data-car="${esc(e.k)}" aria-label="PDFs: ${pdfs.length}"` : ' aria-label="PDFs"'}>${sideThumbs}</div>` : ''}${acts}${rl}${metaH}</aside></div>`;
   } else {
     // (Rating and Read, looked at less than the abstract, after it.)
     h = `<div class="d-inner">${h}${rl}${acts}${thumbs ? `<div class="thumbs t-inline">${thumbs}</div>` : ''}${notices}${abs}${chips}${body}${metaH}${vers}${fields}</div>`;
@@ -2860,6 +2873,37 @@ function sweepCovers() {
 // and are kept for this visit. A PDF Drive hasn't made one for yet shows
 // an icon, and is asked about again a minute later.
 const THUMBS = new Map(), THUMB_WAIT = new Set();
+// The carousel's place, for each publication (this visit), and going round.
+const CAROUSEL = new Map();
+function carStep(car, d) {
+  const items = [...car.querySelectorAll(':scope > .thumb')], n = items.length;
+  if (n < 2) return;
+  const at = (items.findIndex(x => x.classList.contains('on')) + d + n) % n;
+  items.forEach((x, i) => x.classList.toggle('on', i === at));
+  CAROUSEL.set(car.dataset.car, at);
+}
+detailEl.addEventListener('click', ev => {
+  const b = ev.target.closest('[data-car-step]');
+  if (b) { ev.stopPropagation(); carStep(b.closest('.car'), +b.dataset.carStep); }
+}, true);
+detailEl.addEventListener('keydown', ev => {
+  const car = ev.target.closest && ev.target.closest('.car');
+  if (!car || (ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight')) return;
+  ev.preventDefault();
+  carStep(car, ev.key === 'ArrowLeft' ? -1 : 1);
+  const on = car.querySelector(':scope > .thumb.on');
+  if (on && ev.target.matches('.thumb')) on.focus();
+});
+// (A swipe sideways on the picture goes round too.)
+let carSwipe = null;
+detailEl.addEventListener('touchstart', ev => { const car = ev.target.closest('.car'); carSwipe = car && ev.touches.length === 1 ? { car, x: ev.touches[0].clientX, y: ev.touches[0].clientY } : null; }, { passive: true });
+detailEl.addEventListener('touchend', ev => {
+  const s = carSwipe;
+  carSwipe = null;
+  if (!s || !ev.changedTouches.length) return;
+  const dx = ev.changedTouches[0].clientX - s.x, dy = ev.changedTouches[0].clientY - s.y;
+  if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5) { ev.preventDefault(); carStep(s.car, dx < 0 ? 1 : -1); }
+});
 function thumbBox(id) {
   const url = THUMBS.get(id);
   if (!THUMBS.has(id)) return `<span class="thumb-img loading" data-thumb="${esc(id)}"></span>`;
