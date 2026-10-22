@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-10-22.01';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-10-22.02';
 /* -------------------------------------------------------------- features */
 // What LibLande does, by area: each feature, what it's for, where to find
 // it, and its icon (see featIcon). Shown from the sidebar's foot (Features), with a box to find
@@ -14,7 +14,7 @@ const FEATURES = [
     ['Works offline', 'The library and the papers you\u2019ve read are kept on the device. Marks and edits made offline go to Google Drive when you\u2019re back online.', 'The cloud in the toolbar shows what\u2019s waiting', '#netBadge'],
     ['Check for changes', 'Look at Google Drive now for changes made in BibDesk or on another device (LibLande also looks when it opens). On an iPhone or iPad, pull down on the list.', 'The circling arrow in the toolbar', '#refreshBtn'],
     ['Search', 'Find publications by any words in them; choose which fields to search; save a search as a group.', '\u2318F or /, or the magnifier', '#searchBtn'],
-    ['Sort and columns', 'Sort by any column, either way, or by length (pages); choose the columns, Length among them; drag the line between the list and the details to make room. The reading list keeps its own sort and columns, and starts in its own order.', 'The sort menu at the foot of the list; the column headings', 'path:M7 4v16M4 17l3 3 3-3M17 20V4M14 7l3-3 3 3'],
+    ['Sort and columns', 'Sort by any column, either way; choose the columns; drag the line between the list and the details to make room. The reading list keeps its own sort and columns, and starts in its own order; there, Length (the PDF\u2019s pages) can be a column and a sort.', 'The sort menu at the foot of the list; the column headings', 'path:M7 4v16M4 17l3 3 3-3M17 20V4M14 7l3-3 3 3'],
     ['Lists in the sidebar', 'Library, Recently viewed (tap its number to choose how many), Inbox, Possible duplicates and Forthcoming; your saved searches and static groups; keywords and publication types.', 'The sidebar (the button at the top left)', '#sideToggle'],
     ['Arrange the sidebar', 'Drag lists to put them in the order you want, within each section.', 'Drag a list in the sidebar', '#vpGrip'],
     ['Static groups', 'Make a group with +, and drag publications onto it (or hold one and drag, on an iPad).', 'Static groups in the sidebar', 'ICON:folder'],
@@ -172,7 +172,7 @@ const TOUR_STEPS = [
   { lib: true, sel: '#addBtn', title: 'Add a publication', text: 'Search by title and choose from what\u2019s found, or give a DOI, ISBN or arXiv ID, which LibLande looks up, or paste a BibTeX entry. Drop a PDF on a publication to attach it.' },
   { lib: true, sel: '#refreshBtn', title: 'Reload the library', text: 'Check Google Drive for changes now: made in BibDesk, or on another device. (LibLande also looks by itself when it opens; on an iPhone or iPad, pull down on the list.)' },
   { lib: true, sel: '#searchBtn', title: 'Search', text: 'Find publications by any words in them (\u2318F or /), choose which fields to search, and save a search as a group.' },
-  { lib: true, sel: '#list', title: 'The publications', text: 'Sort by any column, or by length (the menu at the foot), choose the columns, and type letters to jump. The reading list keeps its own sort and columns. Return opens the PDF.' },
+  { lib: true, sel: '#list', title: 'The publications', text: 'Sort by any column (the menu at the foot), choose the columns, and type letters to jump. The reading list keeps its own sort and columns, with Length (the PDF\u2019s pages) there too. Return opens the PDF.' },
   { lib: true, sel: '#detail', title: 'The details', text: 'Everything about the publication: read its PDF, copy a citation (APA or BibTeX), add it to your reading list, rate it, or Edit it. Click the title, or a piece of the citation line, to change it there and then.', before: async () => {
     if (phoneMQ.matches) return 'skip';
     if (!state.selKey) { const r = $('#rows .row'); if (r) r.click(); await tourWait(400); }

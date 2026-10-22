@@ -696,6 +696,7 @@ body:has(#sheet:not([hidden])) .pick-bar { visibility: hidden; }
 .tab:hover { color: var(--text); background: var(--side-hover); }
 .tab[aria-selected="true"] { color: var(--text); background: var(--accent-soft); }
 .tab .nm { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.tab > .i { width: 16px; height: 16px; flex: none; margin-right: -1px; }
 .tab .ct { font-weight: 500; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .tab .ct:empty { display: none; }
 .tab-x { display: grid; place-items: center; width: 18px; height: 18px; margin-right: -4px; border-radius: 5px; color: var(--muted); }

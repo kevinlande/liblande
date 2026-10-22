@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-22.01';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-22.02';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -227,6 +227,38 @@ async function driveToken(fresh) {
   }
   tokenCache = { token, at: Date.now() };
   return tokenCache.token;
+}
+
+// How many pages a PDF has (for the reading list's Length): from a copy
+// at hand (in memory, or kept on this device for reading offline), or else
+// from Drive just the pieces of the file that say so, a part at a time,
+// as PDF.js asks for them (not the whole file).
+async function countPdfPages(fl) {
+  const lib = await loadPdfJs(), id = fl.id;
+  let bytes = recentPdfs.get(id) || null;
+  if (!bytes && window.caches) {
+    const kept = await caches.match('https:\/\/www.googleapis.com/drive/v3/files/' + encodeURIComponent(id) + '?alt=media').catch(() => null);
+    if (kept) bytes = new Uint8Array(await kept.arrayBuffer());
+  }
+  let task;
+  if (bytes) task = openPdf(lib, { data: bytes.slice(0) });
+  else {
+    const url = 'https:\/\/www.googleapis.com/drive/v3/files/' + encodeURIComponent(id);
+    const auth = async () => ({ Authorization: 'Bearer ' + await driveToken() });
+    const meta = await fetch(url + '?fields=size', { headers: await auth() });
+    if (!meta.ok) throw new Error('Drive answered ' + meta.status);
+    const size = +(await meta.json()).size;
+    if (!size) throw new Error('no size');
+    const part = async (a, b) => {
+      const r = await fetch(url + '?alt=media', { headers: Object.assign(await auth(), { Range: 'bytes=' + a + '-' + (b - 1) }) });
+      if (!r.ok) throw new Error('Drive answered ' + r.status);
+      return new Uint8Array(await r.arrayBuffer());
+    };
+    const CHUNK = 65536, tr = new lib.PDFDataRangeTransport(size, await part(0, Math.min(size, CHUNK)));
+    tr.requestDataRange = (a, b) => { part(a, b).then(d => tr.onDataRange(a, d)).catch(() => tr.abort && tr.abort()); };
+    task = openPdf(lib, { range: tr, length: size, rangeChunkSize: CHUNK, disableAutoFetch: true, disableStream: true });
+  }
+  try { return (await task.promise).numPages; } finally { task.destroy(); }
 }
 
 // The last few papers opened, kept in memory so reopening or sharing is instant.

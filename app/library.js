@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-22.01';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-22.02';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -483,6 +483,7 @@ async function findEndPage(doc) {
 // page you're on counted again against it.
 async function endPageFor(doc, file) {
   if (!file || !file.id) return;
+  notePdfPages(file.id, doc.numPages);
   let at = END_PAGES[file.id];
   if (at == null) {
     // (After the pages are drawn: the reading comes first.)
@@ -1481,13 +1482,15 @@ function renderTabs() {
   const on = id => state.group === id;
   const count = id => (groupItems(id) || []).length.toLocaleString();
   const lib = $('#tabs .tab.pinned');
+  // (The library's and the reading list's tabs with their icons.)
+  if (!lib.querySelector('.i')) lib.insertAdjacentHTML('afterbegin', ICON.lib);
   lib.setAttribute('aria-selected', String(on('all')));
   lib.querySelector('.ct').textContent = count('all');
   const box = $('#tabScroll'), keep = box.scrollLeft;
   // On a phone the reading list's tab is just "Queue", to save room.
   const short = id => (id === 'toread' && phoneMQ.matches ? 'Queue' : groupName(id));
   box.innerHTML = TABS.map(id => `<button type="button" class="tab" role="tab" data-tab="${esc(id)}" aria-selected="${on(id)}" title="${esc(groupName(id))}">` +
-    `<span class="nm">${esc(short(id))}</span><span class="ct">${count(id)}</span>` +
+    (id === 'toread' ? ICON.bookmark : '') + `<span class="nm">${esc(short(id))}</span><span class="ct">${count(id)}</span>` +
     (tabCloseable(id) ? `<span class="tab-x" data-close="${esc(id)}" role="button" aria-label="Close ${esc(groupName(id))}" title="Close">${ICON.x}</span>` : '') +
     `</button>`).join('');
   box.scrollLeft = keep;
@@ -1659,28 +1662,62 @@ function searchFilter(q, field) {
 // The sort keys are already folded to plain lower case (norm), so a plain
 // comparison is enough, and much quicker than localeCompare.
 const cmpStr = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
-// A publication's length in pages: from its page range ("327--345": 19;
-// "1--5, 9--12": 9; "327--45" as 327--345), or a book's (or thesis's)
-// count; or else its PDF's pages, if it's been opened (0: not known).
-const WHOLE_WORKS = new Set(['book', 'phdthesis', 'mastersthesis', 'techreport', 'manual', 'booklet', 'proceedings', 'unpublished', 'misc']);
-function pageCount(e) {
-  const src = String(e.f.pagetotal || e.f.pages || '').replace(/[{}]/g, '');
-  if (e.lenOf === src && e.len != null) return e.len;
+// Length (in the reading list): the pages of its PDF, counted (see
+// countPdfPages) and kept on this device by the PDF; or, with no PDF, from
+// its page range, as an estimate ("327--345": 19; "327--45" as 327--345).
+// 0: not known (yet).
+const PDF_PAGES = store.get('pdfPages', {});
+const lenPdf = e => { const fl = (e.files || []).find(f => f.id); return fl || null; };
+function rangePages(e) {
+  const src = String(e.f.pages || '').replace(/[{}]/g, '');
   let n = 0;
   const parts = src.split(/[,;]/).filter(p => p.trim());
   for (const part of parts) {
-    const m = /^\s*(\d+)\s*(?:[-\u2013\u2014]+\s*(\d+))?\s*$/.exec(part);
-    if (!m) { n = 0; break; }
-    if (m[2]) {
-      let a = +m[1], b = +m[2];
-      if (b < a && m[2].length < m[1].length) b = +(m[1].slice(0, m[1].length - m[2].length) + m[2]);
-      n += b >= a ? b - a + 1 : 0;
-    } else n += parts.length === 1 && (e.f.pagetotal || WHOLE_WORKS.has(e.t)) ? +m[1] : 1;
+    const m = /^\s*(\d+)\s*[-\u2013\u2014]+\s*(\d+)\s*$/.exec(part);
+    if (!m) return 0;
+    let a = +m[1], b = +m[2];
+    if (b < a && m[2].length < m[1].length) b = +(m[1].slice(0, m[1].length - m[2].length) + m[2]);
+    n += b >= a ? b - a + 1 : 0;
   }
-  if (!n && PROGRESS[e.k] && PROGRESS[e.k].n) n = PROGRESS[e.k].n;
-  e.lenOf = src; e.len = n;
   return n;
 }
+function pageCount(e) {
+  const fl = lenPdf(e);
+  if (fl) return PDF_PAGES[fl.id] || 0;
+  return rangePages(e);
+}
+const lengthEstimated = e => !lenPdf(e) && rangePages(e) > 0;
+function notePdfPages(id, n) {
+  if (!id || !n || PDF_PAGES[id] === n) return;
+  PDF_PAGES[id] = n;
+  const keys = Object.keys(PDF_PAGES);
+  if (keys.length > 3000) keys.slice(0, keys.length - 3000).forEach(k => delete PDF_PAGES[k]);
+  store.set('pdfPages', PDF_PAGES);
+}
+// Counted one at a time, in the background, for the reading list's papers
+// whose length is shown or sorted by: from the copy kept on this device if
+// there is one, or else just the few pieces of the PDF that say how many
+// pages it has (not the whole file). The list follows as they come.
+const LEN = { queue: [], busy: false, failed: new Set() };
+function lengthsWanted() {
+  if (state.group !== 'toread' || !gs || (state.sort !== 'length' && COL_LIST.indexOf('length') < 0)) return;
+  state.view.forEach(e => { const fl = lenPdf(e); if (fl && !PDF_PAGES[fl.id] && !LEN.failed.has(fl.id) && !LEN.queue.some(x => x.id === fl.id)) LEN.queue.push(fl); });
+  lengthsNext();
+}
+async function lengthsNext() {
+  if (LEN.busy || !LEN.queue.length) return;
+  if (isOffline()) { LEN.queue = []; return; }
+  LEN.busy = true;
+  const fl = LEN.queue.shift();
+  try { notePdfPages(fl.id, await countPdfPages(fl)); } catch (err) { LEN.failed.add(fl.id); }
+  LEN.busy = false;
+  if (state.group === 'toread') {
+    // (Sorted by length: in order again once they're all in.)
+    if (state.sort === 'length' && !LEN.queue.length) refresh(false); else paint();
+  }
+  lengthsNext();
+}
+
 const SORTS = {
   length: Object.assign((a, b) => pageCount(a) - pageCount(b) || cmpStr(a.kAuthor, b.kAuthor), { blank: e => (pageCount(e) ? 0 : 1) }),
   author: (a, b) => cmpStr(a.kAuthor, b.kAuthor) || a.yearN - b.yearN || cmpStr(a.kTitle, b.kTitle),
@@ -1696,11 +1733,14 @@ const SORTS = {
 const sortCtx = () => (state.group === 'toread' ? 'rl.' : '');
 let SORT_CTX = '';
 function syncSortCtx() {
-  if (SORT_CTX === sortCtx()) return;
-  SORT_CTX = sortCtx();
-  state.sort = store.get(SORT_CTX + 'sort', SORT_CTX ? 'list' : 'added');
-  state.dir = store.get(SORT_CTX + 'dir', SORT_CTX ? 1 : -1);
-  applyColumns();
+  if (SORT_CTX !== sortCtx()) {
+    SORT_CTX = sortCtx();
+    state.sort = store.get(SORT_CTX + 'sort', SORT_CTX ? 'list' : 'added');
+    state.dir = store.get(SORT_CTX + 'dir', SORT_CTX ? 1 : -1);
+    applyColumns();
+  }
+  // (Length is the reading list's alone.)
+  if (!SORT_CTX && state.sort === 'length') { state.sort = 'added'; state.dir = -1; }
 }
 function refresh(resetSel) {
   syncSortCtx();
@@ -1728,6 +1768,7 @@ function refresh(resetSel) {
   const nf = v.filter(e => e.files).length;
   $('#statusR').textContent = `${nf.toLocaleString()} with files`;
   renderSortUI();
+  lengthsWanted();
 
   if (resetSel || !v.some(e => e.k === state.selKey)) {
     state.selKey = (!phoneMQ.matches && v.length) ? v[0].k : null;
@@ -1745,7 +1786,7 @@ function renderSortUI() {
     b.setAttribute('aria-sort', on ? (state.dir > 0 ? 'ascending' : 'descending') : 'none');
   });
   const listOpt = $('#sortSel').querySelector('[value="list"]');
-  listOpt.hidden = state.group !== 'toread';
+  listOpt.hidden = $('#sortSel').querySelector('[value="length"]').hidden = state.group !== 'toread';
   $('#sortSel').value = state.sort === 'list' && state.group === 'toread' ? 'list' : state.sort in SORTS && state.sort !== 'file' ? state.sort : 'added';
   $('#sortDir').innerHTML = state.dir > 0 ? ICON.up : ICON.down;
   $('#sortDir').title = state.dir > 0 ? 'Ascending' : 'Descending';
@@ -1784,7 +1825,7 @@ const COLS = {
   type: { name: 'Type', w: '110px', cls: 'c-x', cell: e => TYPE_NAMES[e.t] || e.t },
   key: { name: 'Cite key', w: '140px', cls: 'c-key', cell: e => e.k },
   keywords: { name: 'Keywords', w: 'minmax(100px, 18%)', cls: 'c-x', cell: e => e.kw.join(', ') },
-  length: { name: 'Length', w: '72px', cls: 'c-x c-len', cell: e => { const n = pageCount(e); return n ? n + (n === 1 ? ' p.' : ' pp.') : ''; } },
+  length: { name: 'Length', w: '72px', cls: 'c-x c-len', cell: e => { const n = pageCount(e); return n ? (lengthEstimated(e) ? '\u2248' : '') + n + (n === 1 ? ' p.' : ' pp.') : ''; } },
 };
 const COL_ORDER = Object.keys(COLS);
 const COL_DEFAULT = { wide: ['author', 'year', 'title', 'venue', 'added'], narrow: ['author', 'year', 'title', 'venue'] };
@@ -1813,7 +1854,7 @@ function chosenCols() {
   let c = store.get('columns.' + sortCtx() + colLayout(), null);
   if (!Array.isArray(c) && sortCtx()) c = store.get('columns.' + colLayout(), null);
   if (!Array.isArray(c) || c.indexOf('title') < 0) c = COL_DEFAULT[colLayout()];
-  c = c.filter(k => colDef(k));
+  c = c.filter(k => colDef(k) && (k !== 'length' || sortCtx()));
   // The usual ones in their usual order, then fields in the order added.
   return COL_ORDER.filter(k => c.indexOf(k) >= 0).concat(c.filter(k => !COLS[k]));
 }
@@ -1853,7 +1894,7 @@ function openColMenu(x, y) {
   box.setAttribute('role', 'dialog');
   box.setAttribute('aria-label', 'Columns');
   const row = (k, name, disabled) => `<label class="${disabled ? 'off' : ''}"><input type="checkbox" data-col-toggle="${esc(k)}"${on.has(k) ? ' checked' : ''}${disabled ? ' disabled' : ''}>${esc(name)}</label>`;
-  box.innerHTML = `<h4>Columns</h4>` + COL_ORDER.map(k => row(k, COLS[k].name, k === 'title')).join('') +
+  box.innerHTML = `<h4>Columns</h4>` + COL_ORDER.filter(k => k !== 'length' || sortCtx()).map(k => row(k, COLS[k].name, k === 'title')).join('') +
     list.filter(k => !COLS[k]).map(k => row(k, colDef(k).name)).join('') +
     `<h4>Add a field</h4><div class="col-add"><input type="text" id="colAddName" list="colFieldList" placeholder="Field, e.g. publisher" autocomplete="off" autocapitalize="off" spellcheck="false">` +
     `<button type="button" class="btn" id="colAddBtn">Add</button></div>` +
