@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/titlesearch.js'] = '2026-10-23.05';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/titlesearch.js'] = '2026-10-23.06';
 /* ------------------------------------------------------------ title search */
 // A title (with an author or a year, if you like) typed in Add's lookup
 // box, instead of a DOI: candidates from Crossref (articles, chapters, and
@@ -311,31 +311,44 @@ function photoDoi(text) {
   const m = /\b(10\.\d{4,9})\s*\/\s*([^\s"<>]+(?:-\s+[^\s"<>]+)?)/.exec(String(text).replace(/\s*\n\s*/g, ' '));
   return m ? (m[1] + '/' + m[2].replace(/-\s+/, '-')).replace(/[.,;:)\]]+$/, '') : '';
 }
-// What to search for: the title (the biggest lines, next to each other,
-// not a journal's name, a link or a date) and the authors' surnames from
-// the line under it, if it's a list of names.
+// What to search for: the title and the authors' surnames. The title:
+// the biggest line (not a heading such as Abstract, a journal's name, a
+// link or a date), with the lines next to it nearly as big (a photo's
+// letter heights are rough, so a title's lines can differ); stopped at a
+// line of names, which are its authors (or else the line under it, if
+// that's names).
+const PHOTO_HEAD = /^(abstract|introduction|keywords?|categories|contents|references|bibliography|summary|preface|foreword|acknowledg\w*|chapter\s+\w+|part\s+\w+|article|original article|research article|open access|review)$/i;
+function photoNames(text) {
+  const t = String(text).replace(/[\d*†‡§¹²³⁴⁵⁶⁷⁸⁹|]+/g, ' ').replace(/^[^\p{L}]+|[^\p{L}.]+$/gu, '').trim();
+  const names = t.split(/\s*(?:,|;|\band\b|&)\s*/).map(x => x.trim()).filter(Boolean);
+  // (The first a whole name; the others capitalized words, as one can be
+  // cut short where a letter couldn't be read.)
+  return names.length && /^(\p{Lu}[\p{L}.'’-]*\s+){1,3}\p{Lu}[\p{L}'’-]+$/u.test(names[0]) &&
+    names.every(n => /^\p{Lu}[\p{L}.'’-]*(\s+\p{Lu}[\p{L}.'’-]*){0,3}$/u.test(n)) ? names : null;
+}
 function photoQuery(lines) {
   const words = s => (s.match(/\p{L}{2,}/gu) || []);
-  const fit = lines.filter(l => words(l.text).length && words(l.text).join('').length >= 4 && l.conf >= 45 &&
-    !/\b(doi|https?|www\.|vol\.?|issn|isbn|journal|received|accepted|copyright|©)\b/i.test(l.text));
+  // (Not a smudge read as letters: a line has a real word in it.)
+  const fit = lines.filter(l => words(l.text).some(w => w.length >= 4) && l.conf >= 45 &&
+    !PHOTO_HEAD.test(words(l.text).join(' ')) &&
+    !/\b(doi|https?|www\.|vol\.?|issn|isbn|journal|received|accepted|copyright)\b|©/i.test(l.text));
   if (!fit.length) return '';
   const top = Math.max(...fit.map(l => l.h));
-  const at = fit.findIndex(l => l.h >= top * 0.8);
-  const title = [fit[at]];
-  for (let i = at + 1; i < fit.length && title.length < 4; i++) {
-    const l = fit[i], last = title[title.length - 1];
-    if (l.h < top * 0.7 || l.y - last.y1 > top * 1.6) break;
-    title.push(l);
-  }
+  const at = fit.findIndex(l => l.h === top);
+  const near = (a, b) => b.y - a.y1 < top * 1.6;
+  const big = l => l.h >= top * 0.75 && !photoNames(l.text);
+  let first = at, last = at;
+  while (first > 0 && big(fit[first - 1]) && near(fit[first - 1], fit[first]) && last - first < 3) first--;
+  while (last + 1 < fit.length && big(fit[last + 1]) && near(fit[last], fit[last + 1]) && last - first < 3) last++;
+  const title = fit.slice(first, last + 1);
   const t = title.map(l => l.text).join(' ').replace(/-\s+(?=\p{Ll})/gu, '').replace(/[^\p{L}\p{N}'’:,&\s-]/gu, ' ');
-  // The authors: the next line, if it reads as names (each a few
-  // capitalized words, with commas or "and" between).
+  // The authors: a line of names just under the title (or the next one,
+  // past a subtitle or affiliation).
   let who = '';
-  const next = fit[fit.indexOf(title[title.length - 1]) + 1];
-  if (next && next.y - title[title.length - 1].y1 < top * 5 && next.text.length < 160) {
-    const names = next.text.replace(/[\d*†‡§¹²³⁴⁵⁶⁷⁸⁹]+/g, ' ').split(/\s*(?:,|;|\band\b|&)\s*/).map(s => s.trim()).filter(Boolean);
-    if (names.length && names.every(n => /^(\p{Lu}[\p{L}.'’-]*\s+){1,3}\p{Lu}[\p{L}'’-]+$/u.test(n)))
-      who = names.slice(0, 3).map(n => n.split(/\s+/).pop()).join(' ');
+  for (let i = last + 1; i < Math.min(fit.length, last + 3); i++) {
+    if (fit[i].y - fit[last].y1 > top * 5 || fit[i].text.length > 160) break;
+    const n = photoNames(fit[i].text);
+    if (n) { who = n.filter(x => /\s/.test(x)).slice(0, 3).map(x => x.split(/\s+/).pop()).join(' '); break; }
   }
   return (t.replace(/\s+/g, ' ').trim().split(' ').slice(0, 18).join(' ') + (who ? ' ' + who : '')).trim();
 }
