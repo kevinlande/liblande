@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-22.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-23.02';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -3585,6 +3585,19 @@ document.addEventListener('pointerdown', ev => {
 // boxes can be resized). Or drag a box on empty page: then copy the text
 // or a picture of what's inside, or select the marks it touches to
 // delete, recolour, comment on or move them together.
+// PDF.js, with its highlighting on (as it is while a mark you tapped is
+// picked up, or for a moment after a tool is put down), takes a drag on
+// the page for a new freehand highlight: only the highlighter, chosen,
+// draws one. Otherwise the press goes no further than LibLande's own
+// handling (selecting text, scrolling, picking up a mark); presses on a
+// mark or its toolbar still reach it.
+$('#vScroll').addEventListener('pointerdown', ev => {
+  if (!V.viewer || !V.lib || (V.tool !== 'read' && V.tool !== 'select')) return;
+  if (V.viewer.annotationEditorMode !== V.lib.AnnotationEditorType.HIGHLIGHT) return;
+  const t = ev.target;
+  if (!t.closest || !t.closest('#vPages') || t.closest('.annotationEditorLayer > [id], .editToolbar, .note-pin')) return;
+  ev.stopPropagation();
+}, true);
 (() => {
   const sc = $('#vScroll'), box = $('#vMarquee');
   let start = null;
@@ -4508,18 +4521,22 @@ async function showQuote() {
   QUOTE.el.style.left = Math.max(8, Math.min(innerWidth - w - 8, x - w / 2)) + 'px';
   return sel;
 }
+// A passage as APA quotes it: "the passage" (Lee, 2026, p. 4); at 40
+// words or more, a block quotation (no quotation marks, the citation after
+// its end). Plain text only, so it takes on the document's own font and
+// colour where it's pasted (formatted text came into Word with a colour of
+// its own: invisible on a dark page).
+function quoteWith(passage, pg) {
+  pg = String(pg || '').trim().replace(/-+/g, '–');
+  const base = apaInText(V.entry).text;
+  const cite = pg ? base.slice(0, -1) + ', ' + (/–/.test(pg) ? 'pp. ' : 'p. ') + pg + ')' : base;
+  const block = passage.split(/\s+/).length >= 40;
+  return { cite, block, text: block ? passage + ' ' + cite : '“' + passage.replace(/[.,;:]+$/, '') + '” ' + cite };
+}
 function quoteCopy() {
   const s = QUOTE.sel;
   if (!s || !V.entry) return;
-  const pg = QUOTE.el.querySelector('input').value.trim().replace(/-+/g, '–');
-  const base = apaInText(V.entry).text;
-  const cite = pg ? base.slice(0, -1) + ', ' + (/–/.test(pg) ? 'pp. ' : 'p. ') + pg + ')' : base;
-  // A block quotation (40 words or more): no quotation marks, the citation
-  // after its end. Plain text only, so it takes on the document's own font
-  // and colour where it's pasted (formatted text came into Word with a
-  // colour of its own: invisible on a dark page).
-  const block = s.text.split(/\s+/).length >= 40;
-  const text = block ? s.text + ' ' + cite : '“' + s.text.replace(/[.,;:]+$/, '') + '” ' + cite;
+  const { cite, block, text } = quoteWith(s.text, QUOTE.el.querySelector('input').value);
   // Formatted too: the passage's italics and bold (in black: see copy).
   let html = null;
   if (s.letters) {
@@ -5549,14 +5566,19 @@ async function showMarks() {
   const worded = shown.filter(m => m.text || m.note).length;
   let h = unsaved + chips + (worded ? `<div class="v-marks-acts"><button type="button" class="btn" data-marks-copy title="Every highlight and note, by page, with the reference">${ICON.copy}<span>Copy summary</span></button>` +
     (gs ? `<button type="button" class="btn" data-marks-notes title="Added to the publication\u2019s Notes">${ICON.pencil}<span>Add to notes</span></button>` : '') + `</div>` : '') + `<div class="v-marks">`, last = 0;
-  for (const m of shown) {
+  // (A mark of words, as a highlight or underline: Copy and Quote at its
+  // top right.)
+  SIDE.shown = shown;
+  shown.forEach((m, i) => {
     if (m.page !== last) { h += `<div class="v-marks-page">Page ${m.page}</div>`; last = m.page; }
-    h += `<button type="button" class="v-mark" data-page="${m.page}"${m.y != null ? ` data-y="${m.y}"` : ''}>` +
+    h += `<div class="v-mark-wrap"><button type="button" class="v-mark" data-page="${m.page}"${m.y != null ? ` data-y="${m.y}"` : ''}>` +
       `<span class="v-mark-sw" style="background:${m.color || 'var(--faint)'}"></span><span class="v-mark-body">` +
       `<span class="v-mark-kind">${esc(m.name)}</span>` +
       (m.text ? `<span class="v-mark-text">\u201c${esc(m.text.length > 220 ? m.text.slice(0, 220) + '\u2026' : m.text)}\u201d</span>` : '') +
-      (m.note ? `<span class="v-mark-note">${esc(m.note)}</span>` : '') + `</span></button>`;
-  }
+      (m.note ? `<span class="v-mark-note">${esc(m.note)}</span>` : '') + `</span></button>` +
+      (m.text ? `<span class="v-mark-acts"><button type="button" data-mk-copy="${i}" title="Copy the words" aria-label="Copy the words">${ICON.copy}</button>` +
+        `<button type="button" data-mk-quote="${i}" title="Copy as a quotation, with its page and citation" aria-label="Copy as a quotation">${ICON.quote}</button></span>` : '') + `</div>`;
+  });
   body.innerHTML = h + `</div>`;
   // (The journal's page numbers, for the summary: worked out now, so the
   // copy is at once on the click.)
@@ -5594,6 +5616,26 @@ function marksSummary(withRef) {
     (m.text ? `: \u201c${esc(m.text)}\u201d` : '') + (m.note ? (m.text ? '<br>' : ': ') + `<i>${esc(m.note)}</i>` : '') + '</li>').join('') + '</ul>';
   return { text, html, n: list.length };
 }
+// A mark's words, copied; or as a quotation (as Quote does a selection),
+// with the journal's page. The icon ticks for a moment.
+$('#vSideBody').addEventListener('click', async ev => {
+  const b = ev.target.closest('[data-mk-copy], [data-mk-quote]');
+  if (!b) return;
+  ev.stopPropagation();
+  const m = (SIDE.shown || [])[+(b.dataset.mkCopy || b.dataset.mkQuote)];
+  if (!m || !m.text || !V.entry) return;
+  const words = quoteText(m.text);
+  if (b.dataset.mkCopy != null) copy(words, 'Copied the words');
+  else {
+    const pg = (SIDE.pp && SIDE.pp.get(m.page)) || (await printedPage(m.page)).page;
+    const q = quoteWith(words, String(pg || ''));
+    copy(q.text, q.block ? 'Copied the block quotation, with its citation' : 'Copied the quotation, with its citation');
+  }
+  const was = b.innerHTML;
+  b.innerHTML = ICON.check;
+  b.classList.add('done');
+  setTimeout(() => { if (b.isConnected) { b.innerHTML = was; b.classList.remove('done'); } }, 1200);
+}, true);
 $('#vSideBody').addEventListener('click', ev => {
   if (ev.target.closest('[data-marks-copy]')) { const s = marksSummary(true); copy(s.text, 'Copied ' + s.n + ' highlight' + (s.n === 1 ? '' : 's') + ' and notes, with the reference', s.html); return; }
   if (ev.target.closest('[data-marks-notes]') && V.entry) {

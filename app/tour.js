@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-10-22.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-10-23.02';
 /* -------------------------------------------------------------- features */
 // What LibLande does, by area: each feature, what it's for, where to find
 // it, and its icon (see featIcon). Shown from the sidebar's foot (Features), with a box to find
@@ -59,7 +59,7 @@ const FEATURES = [
     ['Undo and redo', 'Step back and forward through your changes.', 'The arrows in the markup toolbar', '#vpUndo'],
     ['A toolbar that moves', 'Drag the markup toolbar anywhere, or tuck it away.', 'Its grip, and the arrow at its end', '#vpGrip'],
     ['Saved as you go', 'Marks are saved into the PDF on Google Drive, so other apps (and BibDesk) show them. Changed elsewhere meanwhile? Combine puts your marks into the newer version.', '', 'path:M7.5 18.5h9.8a3.7 3.7 0 0 0 .6-7.35A5.6 5.6 0 0 0 7.2 9.6a4.45 4.45 0 0 0 .3 8.9zM9.4 13.6l1.9 1.9 3.4-3.6'],
-    ['Your highlights, gathered', 'Every highlight and note in a paper, by colour; copy them with the citation, or add them to the publication\u2019s notes.', 'Marks, in the reader\u2019s sidebar', '#vSide [data-vtab="marks"]'],
+    ['Your highlights, gathered', 'Every highlight and note in a paper, by colour; copy them with the citation, or add them to the publication\u2019s notes. Each highlight or underline has Copy and Quote at its top right: its words, or a quotation with the page and citation.', 'Marks, in the reader\u2019s sidebar', '#vSide [data-vtab="marks"]'],
     ['Bookmarks', 'Mark pages to come back to.', 'Tap a page\u2019s top right corner twice, or B', '#vSide [data-vtab="bookmarks"]'],
   ] },
   { area: 'Pages and outlines', items: [
@@ -193,7 +193,7 @@ const TOUR_STEPS = [
   { sel: '#vPalette', title: 'Marking up', text: 'Highlight (H), underline or strike through (U), draw (P), write on the page (T), pin a note (N), or rub out (E). Highlights join from line to line; tap one to comment on it. It\u2019s all saved into the PDF as you go.' },
   { sel: '#vpMarkup', title: 'Two kinds of each', text: 'The tools with a small triangle have two kinds: hold the highlighter (or right-click it) to switch between highlighting text and highlighting freehand; hold underline to switch to strike-through.' },
   { sel: '#vSide', title: 'Pages', text: 'Thumbnails of every page. Turn a page, or all of them; split a scan of two book pages into two.', before: () => readerSide('pages') },
-  { sel: '#vSide', title: 'Your marks', text: 'Every highlight and note in the paper, by colour, to go to, copy with the citation, or add to the publication\u2019s notes.', before: () => readerSide('marks') },
+  { sel: '#vSide', title: 'Your marks', text: 'Every highlight and note in the paper, by colour, to go to, copy with the citation, or add to the publication\u2019s notes. Copy and Quote, at a highlight\u2019s top right, copy its words or quote it with the page.', before: () => readerSide('marks') },
   { sel: '#vSide', title: 'Bookmarks', text: 'Pages you\u2019ve marked to come back to: tap a page\u2019s top right corner twice (or press B).', before: () => readerSide('bookmarks') },
   { sel: '#vSide', title: 'Outline', text: 'The table of contents, to jump to a chapter. A book without one gets one made from its printed Contents; Edit it, or Make one from the headings.', before: () => readerSide('outline') },
   { sel: '#vSideBody .v-ole-make, #vSideBody .v-ol-make', title: 'Make an outline', text: 'Make the outline afresh: from the printed Contents (the page you\u2019re on, or the one LibLande finds), from the headings, or empty to fill in yourself. Check it, then Save it into the PDF.', before: () => readerSide('outline') },
