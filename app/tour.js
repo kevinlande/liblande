@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-10-23.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-10-23.05';
 /* -------------------------------------------------------------- features */
 // What LibLande does, by area: each feature, what it's for, where to find
 // it, and its icon (see featIcon). Shown from the sidebar's foot (Features), with a box to find
@@ -16,6 +16,7 @@ const FEATURES = [
     ['Search', 'Find publications by any words in them; choose which fields to search; save a search as a group.', '\u2318F or /, or the magnifier', '#searchBtn'],
     ['Sort and columns', 'Sort by any column, either way; choose the columns; drag the line between the list and the details to make room. The reading list keeps its own sort and columns, and starts in its own order; there, Length (the PDF\u2019s pages) can be a column and a sort.', 'The sort menu at the foot of the list; the column headings', 'path:M7 4v16M4 17l3 3 3-3M17 20V4M14 7l3-3 3 3'],
     ['Lists in the sidebar', 'Library, Recently viewed (tap its number to choose how many), Inbox, Possible duplicates and Forthcoming; your saved searches and static groups; keywords and publication types.', 'The sidebar (the button at the top left)', '#sideToggle'],
+    ['Open lists as tabs', 'Each list you open stays open as a tab along the toolbar, to go back to; close one with its \u00d7. On an iPhone, one button shows the list you\u2019re in and how many are open: tap it for all of them and Recently viewed.', 'The tabs in the toolbar', '#tabs'],
     ['Arrange the sidebar', 'Drag lists to put them in the order you want, within each section.', 'Drag a list in the sidebar', '#vpGrip'],
     ['Static groups', 'Make a group with +, and drag publications onto it (or hold one and drag, on an iPad).', 'Static groups in the sidebar', 'ICON:folder'],
     ['Several libraries', 'Make a new library (a folder with its .bib and a folder for its papers), switch between them, and drag publications from one to another to copy them with their PDFs.', 'Libraries in the sidebar; + beside it', 'ICON:lib'],

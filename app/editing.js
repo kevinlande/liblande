@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-10-23.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-10-23.05';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -929,13 +929,14 @@ $('#addBtn').addEventListener('click', () => {
 });
 // On a touch screen, + held: Paste (a BibTeX entry, a DOI or ISBN, or a
 // title, from the clipboard) or From a photo (the camera, or a photo
-// chosen), each opening Add with that under way.
+// chosen), each opening Add with that under way. (On a phone, + can be
+// in the toolbar's More menu: held there, the same; see addHold.)
 const AB = { t: 0, long: false, x: 0, y: 0 };
 function closeAddMenu() { const m = $('#addMenu'); if (m) m.remove(); }
-function openAddMenu() {
+function openAddMenu(btn) {
   closeAddMenu();
-  const btn = $('#addBtn');
-  if (btn.hidden) return;
+  btn = btn || $('#addBtn');
+  if ($('#addBtn').hidden) return;
   const m = document.createElement('div');
   m.className = 'menu-list pdf-menu link-menu recent-menu add-menu';
   m.id = 'addMenu';
@@ -965,16 +966,27 @@ function openAddMenu() {
     }
   });
 }
-$('#addBtn').addEventListener('pointerdown', ev => {
-  if (ev.pointerType === 'mouse') return;
-  AB.long = false;
-  AB.x = ev.clientX; AB.y = ev.clientY;
-  clearTimeout(AB.t);
-  AB.t = setTimeout(() => { AB.long = true; openAddMenu(); }, 450);
-});
-$('#addBtn').addEventListener('pointermove', ev => { if (ev.pointerType !== 'mouse' && Math.hypot(ev.clientX - AB.x, ev.clientY - AB.y) > 10) clearTimeout(AB.t); });
-['pointerup', 'pointercancel'].forEach(n => $('#addBtn').addEventListener(n, ev => { if (ev.pointerType !== 'mouse') clearTimeout(AB.t); }));
-$('#addBtn').addEventListener('contextmenu', ev => { if (AB.long || $('#addMenu')) ev.preventDefault(); });
+// A + held (a finger or Pencil, not a mouse): its menu, under it; then
+// AB.long, so the click that can follow the hold doesn't open Add too.
+// (shown: what to do once it's held, as the More menu closing first.)
+function addHold(btn, shown) {
+  btn.addEventListener('pointerdown', ev => {
+    if (ev.pointerType === 'mouse') return;
+    AB.long = false;
+    AB.x = ev.clientX; AB.y = ev.clientY;
+    clearTimeout(AB.t);
+    AB.t = setTimeout(() => {
+      AB.long = true;
+      const r = btn.getBoundingClientRect();
+      if (shown) shown();
+      openAddMenu({ getBoundingClientRect: () => r });
+    }, 450);
+  });
+  btn.addEventListener('pointermove', ev => { if (ev.pointerType !== 'mouse' && Math.hypot(ev.clientX - AB.x, ev.clientY - AB.y) > 10) clearTimeout(AB.t); });
+  ['pointerup', 'pointercancel'].forEach(n => btn.addEventListener(n, ev => { if (ev.pointerType !== 'mouse') clearTimeout(AB.t); }));
+  btn.addEventListener('contextmenu', ev => { if (AB.long || $('#addMenu')) ev.preventDefault(); });
+}
+addHold($('#addBtn'));
 document.addEventListener('pointerdown', ev => { if ($('#addMenu') && !ev.target.closest('#addMenu, #addBtn')) closeAddMenu(); }, true);
 document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && $('#addMenu')) { ev.stopPropagation(); closeAddMenu(); } }, true);
 window.addEventListener('resize', closeAddMenu);

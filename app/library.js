@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-23.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-23.05';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -1490,9 +1490,21 @@ function renderTabs() {
   const on = id => state.group === id;
   const count = id => (groupItems(id) || []).length.toLocaleString();
   const lib = $('#tabs .tab.pinned');
-  // (The library's and the reading list's tabs with their icons.)
-  if (!lib.querySelector('.i')) lib.insertAdjacentHTML('afterbegin', ICON.lib);
-  lib.setAttribute('aria-selected', String(on('all')));
+  // (The library's and the reading list's tabs with their icons.) On a
+  // phone, instead of a strip of tabs: the list showing, with how many
+  // are open, and a tap lists them (phoneLists).
+  if (phoneMQ.matches) {
+    const n = TABS.length + 1;
+    lib.innerHTML = listIcon(state.group) + `<span class="nm">${esc(state.group === 'toread' ? 'Queue' : groupName(state.group))}</span><span class="ct"></span>` +
+      (n > 1 ? `<span class="tab-n" aria-hidden="true">${n}</span>` : '') + ICON.chev;
+    lib.setAttribute('aria-selected', 'true');
+    lib.setAttribute('aria-haspopup', 'menu');
+    lib.setAttribute('aria-label', groupName(state.group) + '; ' + n + ' open list' + (n > 1 ? 's' : '') + '. Show them');
+  } else {
+    if (lib.querySelector('.tab-n') || !lib.querySelector('.i')) lib.innerHTML = ICON.lib + '<span class="nm">Library</span><span class="ct"></span>';
+    lib.removeAttribute('aria-haspopup'); lib.removeAttribute('aria-label');
+    lib.setAttribute('aria-selected', String(on('all')));
+  }
   lib.querySelector('.ct').textContent = count('all');
   const box = $('#tabScroll'), keep = box.scrollLeft;
   // On a phone the reading list's tab is just "Queue", to save room.
@@ -1567,19 +1579,47 @@ $('#tabLeft').addEventListener('click', ev => { ev.stopPropagation(); libTabsMen
 $('#tabRight').addEventListener('click', ev => { ev.stopPropagation(); libTabsMenu('right'); });
 // On a phone, the toolbar folds Select, then Add, into the More menu until
 // the tabs fit.
+// (On a phone the lists are in phoneLists' menu, and Select and Add stay
+// in the toolbar: nothing to fold. The More menu stays for a toolbar too
+// narrow even so.)
 function fitToolbar() {
-  const tb = $('#tabs').closest('.toolbar'), box = $('#tabScroll');
+  const tb = $('#tabs').closest('.toolbar');
   tb.classList.remove('fold-rec', 'fold-sel', 'fold-add');
-  if (!phoneMQ.matches) return;
-  const over = () => box.scrollWidth > box.clientWidth + 1;
-  if (!over()) return;
-  // Recently viewed goes first, then Select, then Add. While selecting,
-  // Select stays (to finish).
-  tb.classList.add('fold-rec');
-  if (!over()) return;
-  if (state.picking) { if (!$('#addBtn').hidden) tb.classList.add('fold-sel', 'fold-add'); return; }
-  tb.classList.add('fold-sel');
-  if (over() && !$('#addBtn').hidden) tb.classList.add('fold-add');
+}
+// A list's icon: the library's, the reading list's, Recently viewed's, or
+// a group's.
+const listIcon = id => id === 'all' ? ICON.lib : id === 'toread' ? ICON.bookmark : id === 'recent' ? ICON.history : ICON.folder;
+// On a phone, the list button's menu: the library, each open list (with
+// its \u00d7, if it can be closed), and Recently viewed.
+function phoneLists() {
+  const was = $('#tabsMenu');
+  closeTabsMenu();
+  if (was && was.dataset.side === 'phone') return;
+  const ids = ['all'].concat(TABS), btn = $('#tabs .tab.pinned');
+  const row = id => `<div class="op-row"><button type="button" role="menuitem" class="mi" data-tl="${esc(id)}"${state.group === id ? ' aria-current="true"' : ''}>${listIcon(id)}` +
+    `<span class="lm-nm">${esc(groupName(id))}</span><span class="lm-ct">${(groupItems(id) || []).length.toLocaleString()}</span></button>` +
+    (id !== 'recent' && tabCloseable(id) ? `<button type="button" class="op-x" data-tl-x="${esc(id)}" aria-label="Close ${esc(groupName(id))}" title="Close it">${ICON.x}</button>` : '') + `</div>`;
+  const m = document.createElement('div');
+  m.className = 'menu-list pdf-menu link-menu recent-menu lists-menu';
+  m.id = 'tabsMenu';
+  m.dataset.side = 'phone';
+  m.setAttribute('role', 'menu');
+  m.setAttribute('aria-label', 'Open lists');
+  m.innerHTML = '<div class="menu-head">Open lists</div>' + ids.map(row).join('') + '<div class="menu-sep"></div>' + row('recent');
+  document.body.appendChild(m);
+  const r = btn.getBoundingClientRect();
+  m.style.left = Math.max(8, Math.min(window.innerWidth - m.offsetWidth - 8, r.left)) + 'px';
+  m.style.top = (r.bottom + 6) + 'px';
+  m.addEventListener('click', ev => {
+    const x = ev.target.closest('[data-tl-x]');
+    if (x) { closeTab(x.dataset.tlX); closeTabsMenu(); phoneLists(); return; }
+    const b = ev.target.closest('[data-tl]');
+    if (!b) return;
+    closeTabsMenu();
+    if (b.dataset.tl === 'recent') { if (state.group !== 'recent') $('#recentBtn').click(); }
+    else if (b.dataset.tl === state.group) listEl.scrollTo({ top: 0, behavior: 'smooth' });
+    else setGroup(b.dataset.tl);
+  });
 }
 window.addEventListener('resize', () => requestAnimationFrame(() => { if (ENTRIES.length) renderTabs(); else fitToolbar(); }));
 function closeTab(id) {
@@ -1595,6 +1635,7 @@ $('#tabs').addEventListener('click', ev => {
   if (x) { ev.stopPropagation(); closeTab(x.dataset.close); return; }
   const t = ev.target.closest('[data-tab]');
   if (!t) return;
+  if (phoneMQ.matches && t.classList.contains('pinned')) { phoneLists(); return; }
   // The tab already showing: back to the top of its list.
   if (t.dataset.tab === state.group) listEl.scrollTo({ top: 0, behavior: 'smooth' });
   else setGroup(t.dataset.tab);
@@ -2210,6 +2251,9 @@ $('#moreBtn').addEventListener('click', () => {
   m.setAttribute('role', 'menu');
   m.innerHTML = items.map(([k, label, icon]) => `<button type="button" role="menuitem" data-more="${k}" aria-label="${label}" title="${label}">${icon}</button>`).join('');
   document.body.appendChild(m);
+  // (+ held here: Add's menu, as when + itself is held; see editing.js.)
+  const add = m.querySelector('[data-more="add"]');
+  if (add) addHold(add, closeMoreMenu);
   const r = $('#moreBtn').getBoundingClientRect();
   m.style.left = Math.max(8, Math.min(window.innerWidth - m.offsetWidth - 8, r.right - m.offsetWidth)) + 'px';
   m.style.top = (r.bottom + 6) + 'px';
@@ -2218,6 +2262,7 @@ $('#moreBtn').addEventListener('click', () => {
     const b = ev.target.closest('[data-more]');
     if (!b) return;
     closeMoreMenu();
+    if (b.dataset.more === 'add' && AB.long) { AB.long = false; return; }
     $({ add: '#addBtn', select: '#selectBtn', recent: '#recentBtn' }[b.dataset.more]).click();
   });
 });

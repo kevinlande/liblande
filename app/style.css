@@ -731,6 +731,21 @@ body:has(#sheet:not([hidden])) .pick-bar { visibility: hidden; }
 @media (max-width: 699px) {
   .tab { font-size: 13.5px; padding: 5px 6px; max-width: 150px; }
   .tab .ct { display: none; }
+  /* On a phone, one button for the lists (with how many are open) and its
+     menu, instead of the strip of tabs and Recently viewed. */
+  .tb-tabs .tab-scroll-wrap, .tb-tabs #recentBtn { display: none; }
+  .tb-tabs .tab.pinned { max-width: 100%; min-width: 0; gap: 5px; }
+  .tab.pinned > .i:last-child { width: 13px; height: 13px; margin: 0 -2px 0 -1px; color: var(--muted); }
+}
+.tab-n { display: inline-grid; place-items: center; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px; background: var(--accent); color: var(--accent-ink); font: 700 11px var(--ui); font-variant-numeric: tabular-nums; }
+.menu-list.lists-menu .op-row button[data-tl] { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+.lists-menu [data-tl] > .i { width: 17px; height: 17px; flex: none; color: var(--muted); }
+.lists-menu .lm-nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lists-menu .lm-ct { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.lists-menu [aria-current="true"] .lm-nm { font-weight: 600; }
+.lists-menu [aria-current="true"] > .i { color: var(--accent); }
+.menu-sep { height: 1px; margin: 4px 0; background: var(--line); }
+@media (max-width: 699px) {
   .toolbar .tb-btn:not(.tb-back) { width: 32px; justify-content: center; padding: 0; }
   .toolbar .tb-back { padding: 0 6px 0 2px; gap: 2px; }
 }
@@ -1392,7 +1407,7 @@ a.ms-ib { text-decoration: none; }
 .open-menu .op-thumb img { width: 100%; height: 100%; object-fit: cover; object-position: top; }
 .open-menu .op-thumb .i { width: 18px; height: 18px; }
 .open-menu [aria-current="true"] .rc-title::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 7px; vertical-align: 2px; border-radius: 50%; background: var(--accent); }
-#readerBtn, #addBtn { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+#readerBtn, #addBtn, .icon-menu button, .add-menu { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 .menu-list.add-menu button.mi { display: flex; align-items: center; gap: 11px; }
 .add-menu .mi > .i { width: 20px; height: 20px; flex: none; }
 .recent-menu .rc-none { margin: 0; padding: 8px 10px; font-size: 13px; color: var(--muted); }

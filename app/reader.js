@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-23.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-23.05';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -886,7 +886,7 @@ function tabsMenu(side) {
 }
 $('#vTabsLeft').addEventListener('click', () => tabsMenu('left'));
 $('#vTabsRight').addEventListener('click', () => tabsMenu('right'));
-document.addEventListener('pointerdown', ev => { if ($('#tabsMenu') && !ev.target.closest('#tabsMenu, .v-tabs-more')) closeTabsMenu(); }, true);
+document.addEventListener('pointerdown', ev => { if ($('#tabsMenu') && !ev.target.closest('#tabsMenu, .v-tabs-more, #tabs .tab.pinned')) closeTabsMenu(); }, true);
 document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && $('#tabsMenu')) { ev.stopPropagation(); closeTabsMenu(); } }, true);
 // Where the front tab's paper is (only while it's showing).
 function rememberTab() {
