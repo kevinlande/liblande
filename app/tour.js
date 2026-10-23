@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-10-23.03';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-10-23.04';
 /* -------------------------------------------------------------- features */
 // What LibLande does, by area: each feature, what it's for, where to find
 // it, and its icon (see featIcon). Shown from the sidebar's foot (Features), with a box to find
@@ -25,7 +25,8 @@ const FEATURES = [
     ['Keyboard shortcuts', 'Shortcuts for most things, and you can change them.', 'Keyboard shortcuts at the foot of the sidebar, or ?', 'path:M3.5 7h17v10h-17zM7 10.5h.01M10 10.5h.01M13 10.5h.01M16 10.5h.01M8 14h8'],
   ] },
   { area: 'Adding and editing', items: [
-    ['Add a publication', 'Search by title (and author; title: and author: say which is which) and choose from what\u2019s found, or give a DOI, ISBN or arXiv ID (the details are looked up), or paste a BibTeX entry.', '+ in the toolbar', '#addBtn'],
+    ['Add a publication', 'Search by title (and author; title: and author: say which is which) and choose from what\u2019s found, or give a DOI, ISBN or arXiv ID (the details are looked up), or paste a BibTeX entry. On an iPad or iPhone, hold + to paste or take a photo at once.', '+ in the toolbar', '#addBtn'],
+    ['Add from a photo', 'Take or choose a photo of a paper\u2019s first page or a book\u2019s cover: a DOI or ISBN in it is looked up, or else its title and authors are searched for, to choose from.', 'Add \u203a the camera button (or, on an iPad or iPhone, hold +)', 'path:M4 8.5A1.5 1.5 0 0 1 5.5 7h2.3l1.4-2h5.6l1.4 2h2.3A1.5 1.5 0 0 1 20 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5zM15.4 12.8a3.4 3.4 0 1 1-6.8 0a3.4 3.4 0 1 1 6.8 0'],
     ['Find a PDF', 'Its free copy (open access, found through OpenAlex and Unpaywall\u2019s data), or the article through your library\u2019s proxy, opened in a new tab: save the PDF, then drop it on the publication.', 'Find PDF in the details; library proxies in Settings', 'path:M7 3.5h7l4 4V13M14 3.5v4h4M7 3.5a1.5 1.5 0 0 0-1.5 1.5v14A1.5 1.5 0 0 0 7 20.5h4M16.5 14a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM18.7 19.2l2 2'],
     ['Attach a PDF', 'Drop a PDF on a publication, or use Attach. A book\u2019s PDF is read for its ISBN, to fill in its details. With several, they go round as a carousel beside the details (\u2039 \u203a, a swipe, or the arrow keys).', 'The details pane', 'ICON:clip'],
     ['Edit the details', 'Every field: authors, title, venue, keywords, notes, the cite key, a rating. Or click the title, or a piece of the citation line, to change it in place. From the reader, Edit opens in its sidebar, beside the paper.', 'Edit, in the details pane, or in the reader\u2019s Citation tab', 'ICON:pencil'],
@@ -170,7 +171,7 @@ const TOUR_STEPS = [
   { lib: true, sel: '#tabs', title: 'Open lists', text: 'The lists you\u2019ve opened, as tabs; and the reading list (Queue) of papers to read next.', before: async () => { closeSidebarIfOverlay(); await tourWait(350); } },
   { lib: true, sel: '#readerPair', title: 'Your open papers', text: 'Back to the papers you have open. Rest the pointer on it (on an iPad or iPhone, tap \u25be or hold it) to list them, each with a picture of its first page, and go straight to one, or close one with its \u00d7.' },
   { lib: true, sel: '#selectBtn', title: 'Select several', text: 'Give several publications keywords and groups at once, add them to your reading list, join versions of one, or export them with their PDFs.' },
-  { lib: true, sel: '#addBtn', title: 'Add a publication', text: 'Search by title and choose from what\u2019s found, or give a DOI, ISBN or arXiv ID, which LibLande looks up, or paste a BibTeX entry. Drop a PDF on a publication to attach it.' },
+  { lib: true, sel: '#addBtn', title: 'Add a publication', text: 'Search by title and choose from what\u2019s found, or give a DOI, ISBN or arXiv ID, which LibLande looks up, or paste a BibTeX entry, or take a photo of the paper or book. Drop a PDF on a publication to attach it.' },
   { lib: true, sel: '#refreshBtn', title: 'Reload the library', text: 'Check Google Drive for changes now: made in BibDesk, or on another device. (LibLande also looks by itself when it opens; on an iPhone or iPad, pull down on the list.)' },
   { lib: true, sel: '#searchBtn', title: 'Search', text: 'Find publications by any words in them (\u2318F or /), choose which fields to search, and save a search as a group.' },
   { lib: true, sel: '#list', title: 'The publications', text: 'Sort by any column (the menu at the foot), choose the columns, and type letters to jump. The reading list keeps its own sort and columns, with Length (the PDF\u2019s pages) there too. Return opens the PDF.' },

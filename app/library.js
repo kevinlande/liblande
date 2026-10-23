@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-23.03';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-23.04';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -37,6 +37,8 @@ const ICON = {
   bib: '<svg class="i" viewBox="0 0 24 24"><path d="M9 4.5c-1.8 0-2.6.9-2.6 2.6v2.3c0 1.4-.7 2.3-2 2.6 1.3.3 2 1.2 2 2.6v2.3c0 1.7.8 2.6 2.6 2.6"/><path d="M15 4.5c1.8 0 2.6.9 2.6 2.6v2.3c0 1.4.7 2.3 2 2.6-1.3.3-2 1.2-2 2.6v2.3c0 1.7-.8 2.6-2.6 2.6"/></svg>',
   apa: '<svg class="i" viewBox="0 0 24 24"><path d="M4 6h16M7.5 10h12.5M7.5 14h12.5M4 18h11"/></svg>',
   intext: '<svg class="i" viewBox="0 0 24 24"><path d="M8 4.5c-3 2.5-3 12.5 0 15M16 4.5c3 2.5 3 12.5 0 15M10 12h4"/></svg>',
+  paste: '<svg class="i" viewBox="0 0 24 24"><path d="M9 4.5H7.5A1.5 1.5 0 0 0 6 6v13a1.5 1.5 0 0 0 1.5 1.5h9A1.5 1.5 0 0 0 18 19V6a1.5 1.5 0 0 0-1.5-1.5H15"/><path d="M9 3.5h6v2.5H9zM9 11h6M9 14.5h6M9 18h3.5"/></svg>',
+  camera: '<svg class="i" viewBox="0 0 24 24"><path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2.3l1.4-2h5.6l1.4 2h2.3A1.5 1.5 0 0 1 20 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5z"/><circle cx="12" cy="12.8" r="3.4"/></svg>',
   qr: '<svg class="i" viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4z"/><path d="M14 14h2.5v2.5H14zM17.5 17.5H20V20h-2.5zM14 20h2M20 14v2"/></svg>',
   eraser: '<svg class="i" viewBox="0 0 24 24"><path d="M9 20h11"/><path d="M4.7 14.3l8.6-8.6a2 2 0 0 1 2.8 0l3.2 3.2a2 2 0 0 1 0 2.8L12 19H8l-3.3-3.3a1 1 0 0 1 0-1.4z"/><path d="M9.3 9.7l5 5"/></svg>',
   download: '<svg class="i" viewBox="0 0 24 24"><path d="M12 3v12"/><path d="M8 11l4 4 4-4"/><path d="M5 17v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/></svg>',

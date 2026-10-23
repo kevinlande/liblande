@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-10-23.03';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-10-23.04';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -370,6 +370,9 @@ function openAdd(pdf) {
     `<input id="doiLookup" type="text" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="A title (and author), a DOI, ISBN or arXiv ID, or BibTeX" aria-controls="tsList">` +
     `<button type="button" class="btn" id="doiGo">Fill in</button>` +
     (navigator.clipboard && navigator.clipboard.readText ? `<button type="button" class="btn" id="bibPaste" title="Fill in from the DOI or BibTeX entry you copied">Paste</button>` : '') +
+    // (A photo of the paper or book: see titlesearch.js.)
+    `<button type="button" class="btn photo-go" id="photoGo" title="From a photo of the paper or book" aria-label="From a photo">${ICON.camera}</button>` +
+    `<input type="file" id="photoIn" accept="image/*" hidden>` +
     `</div><div class="ts-list" id="tsList" hidden></div></div>` +
     `<div class="fld"><label for="addType">Type</label><select id="addType">${TYPE_CHOICES.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></div>` +
     `<div class="fields-grid" id="addFields"></div>` + keywordEditor([]) +
@@ -502,12 +505,18 @@ function fillFromBox() {
   tsClose();
   lookupIntoForm();
 }
-// Paste: what was copied, read straight from the clipboard (Safari asks
-// first).
-async function pasteIntoForm() {
+// Paste: what was copied, read straight from the clipboard. (Safari,
+// and a web app added to the Dock, asks first with a Paste bubble, and
+// may refuse: then the box is ready for \u2318V, which always works.)
+// (Or what was read already, from +'s menu: the clipboard has to be
+// asked at the tap itself.)
+async function pasteIntoForm(read) {
   let t = '';
-  try { t = await navigator.clipboard.readText(); } catch (err) {
-    sheetMsg('LibLande couldn\u2019t read what you copied. Paste it into the box instead.', true);
+  try { t = await (read || navigator.clipboard.readText()); } catch (err) {
+    const box = $('#doiLookup');
+    box.focus(); box.select();
+    sheetMsg(coarseMQ.matches ? 'The browser didn\u2019t let LibLande read what you copied. Touch and hold the box, then choose Paste.'
+      : 'The browser didn\u2019t let LibLande read what you copied. Press \u2318V to paste it into the box.');
     return;
   }
   if (!t.trim()) { sheetMsg('Nothing has been copied. Copy a DOI or a BibTeX entry first.', true); return; }
@@ -531,8 +540,10 @@ async function lookupIntoForm() {
       (r.fields.isbn && ENTRIES.find(x => String(x.f.isbn || '').split(/[,;\s]+/).map(digits).includes(r.fields.isbn)));
     sheetMsg(have ? 'Already in your library: \u201c' + (have.f.title || have.k) + '\u201d. You can still add it.'
       : 'Filled in from ' + (r.source || 'Crossref') + '. Check the details, then add it.', !!have);
+    return true;
   } catch (err) {
     sheetMsg(errText(err), true);
+    return false;
   } finally {
     $('#doiGo').disabled = false;
   }
@@ -883,10 +894,19 @@ $('#sheetBody').addEventListener('keydown', ev => {
 });
 // A BibTeX entry pasted into the DOI box fills in the form at once (with
 // its line breaks, which a one-line box would drop).
-$('#sheetBody').addEventListener('paste', ev => {
-  if (ev.target.id !== 'doiLookup') return;
+// (And \u2318V in Add, outside a box: into the DOI box, as if pasted
+// there.)
+document.addEventListener('paste', ev => {
+  if (!sheet || sheet.mode !== 'add' || $('#sheet').hidden) return;
+  const inBox = ev.target.id === 'doiLookup';
+  if (!inBox && ev.target.closest && ev.target.closest('input, textarea, select, [contenteditable="true"]')) return;
   const t = ev.clipboardData && ev.clipboardData.getData('text');
-  if (t && looksLikeBibtex(t)) { ev.preventDefault(); fillFromBibtex(t); }
+  if (!t || !t.trim()) return;
+  if (looksLikeBibtex(t)) { ev.preventDefault(); tsClose(); fillFromBibtex(t); return; }
+  if (inBox) return;
+  ev.preventDefault();
+  $('#doiLookup').value = t.trim().replace(/\s+/g, ' ');
+  fillFromBox();
 });
 $('#sheetBody').addEventListener('input', ev => {
   if (ev.target.id === 'kwInput') kwSuggest(ev.target, [...$('#kwEdit').querySelectorAll('.kw-chip')].map(c => c.dataset.kw));
@@ -902,7 +922,62 @@ $('#sheetBody').addEventListener('change', ev => {
   }
 });
 document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && !$('#sheet').hidden && !$('#sheetCancel').disabled) closeSheet(); });
-$('#addBtn').addEventListener('click', () => openAdd());
+$('#addBtn').addEventListener('click', () => {
+  // (Not after a long press, which showed its menu.)
+  if (AB.long) { AB.long = false; return; }
+  openAdd();
+});
+// On a touch screen, + held: Paste (a BibTeX entry, a DOI or ISBN, or a
+// title, from the clipboard) or From a photo (the camera, or a photo
+// chosen), each opening Add with that under way.
+const AB = { t: 0, long: false, x: 0, y: 0 };
+function closeAddMenu() { const m = $('#addMenu'); if (m) m.remove(); }
+function openAddMenu() {
+  closeAddMenu();
+  const btn = $('#addBtn');
+  if (btn.hidden) return;
+  const m = document.createElement('div');
+  m.className = 'menu-list pdf-menu link-menu recent-menu add-menu';
+  m.id = 'addMenu';
+  m.setAttribute('role', 'menu');
+  m.setAttribute('aria-label', 'Add a publication');
+  m.innerHTML = `<div class="menu-head">Add a publication</div>` +
+    (navigator.clipboard && navigator.clipboard.readText ? `<button type="button" role="menuitem" class="mi" data-add="paste">${ICON.paste}<span class="op-text"><span class="rc-title">Paste</span><span class="rc-sub">A BibTeX entry, DOI or title you copied</span></span></button>` : '') +
+    `<button type="button" role="menuitem" class="mi" data-add="photo">${ICON.camera}<span class="op-text"><span class="rc-title">From a photo</span><span class="rc-sub">Take one, or choose one</span></span></button>`;
+  document.body.appendChild(m);
+  const r = btn.getBoundingClientRect();
+  m.style.left = Math.max(8, Math.min(window.innerWidth - m.offsetWidth - 8, r.right - m.offsetWidth)) + 'px';
+  m.style.top = (r.bottom + 6) + 'px';
+  m.addEventListener('click', ev => {
+    const b = ev.target.closest('[data-add]');
+    if (!b) return;
+    closeAddMenu();
+    if (b.dataset.add === 'paste') {
+      // (Asked now, at the tap, as browsers require.)
+      let read;
+      try { read = navigator.clipboard.readText(); } catch (err) { read = Promise.reject(err); }
+      read.catch(() => {});
+      openAdd();
+      pasteIntoForm(read);
+    } else {
+      openAdd();
+      $('#photoIn').click();
+    }
+  });
+}
+$('#addBtn').addEventListener('pointerdown', ev => {
+  if (ev.pointerType === 'mouse') return;
+  AB.long = false;
+  AB.x = ev.clientX; AB.y = ev.clientY;
+  clearTimeout(AB.t);
+  AB.t = setTimeout(() => { AB.long = true; openAddMenu(); }, 450);
+});
+$('#addBtn').addEventListener('pointermove', ev => { if (ev.pointerType !== 'mouse' && Math.hypot(ev.clientX - AB.x, ev.clientY - AB.y) > 10) clearTimeout(AB.t); });
+['pointerup', 'pointercancel'].forEach(n => $('#addBtn').addEventListener(n, ev => { if (ev.pointerType !== 'mouse') clearTimeout(AB.t); }));
+$('#addBtn').addEventListener('contextmenu', ev => { if (AB.long || $('#addMenu')) ev.preventDefault(); });
+document.addEventListener('pointerdown', ev => { if ($('#addMenu') && !ev.target.closest('#addMenu, #addBtn')) closeAddMenu(); }, true);
+document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && $('#addMenu')) { ev.stopPropagation(); closeAddMenu(); } }, true);
+window.addEventListener('resize', closeAddMenu);
 
 // Rebuild and load the library without messages (nothing visible changes).
 async function quietRefresh() {

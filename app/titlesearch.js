@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/titlesearch.js'] = '2026-10-23.03';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/titlesearch.js'] = '2026-10-23.04';
 /* ------------------------------------------------------------ title search */
 // A title (with an author or a year, if you like) typed in Add's lookup
 // box, instead of a DOI: candidates from Crossref (articles, chapters, and
@@ -270,4 +270,111 @@ $('#sheetBody').addEventListener('keydown', ev => {
     ev.preventDefault();
     if (at === 0) $('#doiLookup').focus(); else items[at - 1].focus();
   }
+});
+
+/* ------------------------------------------------------------ from a photo */
+// A photo of a paper's first page or a book's cover (or its copyright
+// page), taken or chosen with the camera button: its words read (with
+// Tesseract, as OCR reads scans), and a DOI or ISBN in them looked up; or
+// else its title (the biggest words) and the names under it put in the
+// box and searched for, to choose from.
+const PHOTO = { seq: 0 };
+// Big enough for Tesseract to read a page's small print, small enough
+// for a phone.
+const PHOTO_MAX = 2400;
+async function photoCanvas(file) {
+  // (The way the camera held it, from the photo's own note of that.)
+  const img = await createImageBitmap(file, { imageOrientation: 'from-image' }).catch(() => createImageBitmap(file));
+  const scale = Math.min(1, PHOTO_MAX / Math.max(img.width, img.height));
+  const c = document.createElement('canvas');
+  c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale);
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+  img.close && img.close();
+  return c;
+}
+// Tesseract's lines: { text, h (its letters' height), y, conf }.
+function photoLines(data) {
+  const out = [];
+  for (const b of (data && data.blocks) || []) for (const p of b.paragraphs || []) for (const l of p.lines || []) {
+    const words = (l.words || []).filter(w => w.confidence >= 40 && (w.text || '').trim());
+    if (!words.length) continue;
+    // (The middle height of its words: one tall capital doesn't make a
+    // line big.)
+    const hs = words.map(w => w.bbox.y1 - w.bbox.y0).sort((a, b) => a - b);
+    out.push({ text: words.map(w => w.text.normalize('NFKC').trim()).join(' '), h: hs[hs.length >> 1], y: l.bbox.y0, y1: l.bbox.y1, conf: l.confidence });
+  }
+  return out;
+}
+// A DOI in the photo's words (Tesseract can put spaces about its slash,
+// or break it over two lines).
+function photoDoi(text) {
+  const m = /\b(10\.\d{4,9})\s*\/\s*([^\s"<>]+(?:-\s+[^\s"<>]+)?)/.exec(String(text).replace(/\s*\n\s*/g, ' '));
+  return m ? (m[1] + '/' + m[2].replace(/-\s+/, '-')).replace(/[.,;:)\]]+$/, '') : '';
+}
+// What to search for: the title (the biggest lines, next to each other,
+// not a journal's name, a link or a date) and the authors' surnames from
+// the line under it, if it's a list of names.
+function photoQuery(lines) {
+  const words = s => (s.match(/\p{L}{2,}/gu) || []);
+  const fit = lines.filter(l => words(l.text).length && words(l.text).join('').length >= 4 && l.conf >= 45 &&
+    !/\b(doi|https?|www\.|vol\.?|issn|isbn|journal|received|accepted|copyright|©)\b/i.test(l.text));
+  if (!fit.length) return '';
+  const top = Math.max(...fit.map(l => l.h));
+  const at = fit.findIndex(l => l.h >= top * 0.8);
+  const title = [fit[at]];
+  for (let i = at + 1; i < fit.length && title.length < 4; i++) {
+    const l = fit[i], last = title[title.length - 1];
+    if (l.h < top * 0.7 || l.y - last.y1 > top * 1.6) break;
+    title.push(l);
+  }
+  const t = title.map(l => l.text).join(' ').replace(/-\s+(?=\p{Ll})/gu, '').replace(/[^\p{L}\p{N}'’:,&\s-]/gu, ' ');
+  // The authors: the next line, if it reads as names (each a few
+  // capitalized words, with commas or "and" between).
+  let who = '';
+  const next = fit[fit.indexOf(title[title.length - 1]) + 1];
+  if (next && next.y - title[title.length - 1].y1 < top * 5 && next.text.length < 160) {
+    const names = next.text.replace(/[\d*†‡§¹²³⁴⁵⁶⁷⁸⁹]+/g, ' ').split(/\s*(?:,|;|\band\b|&)\s*/).map(s => s.trim()).filter(Boolean);
+    if (names.length && names.every(n => /^(\p{Lu}[\p{L}.'’-]*\s+){1,3}\p{Lu}[\p{L}'’-]+$/u.test(n)))
+      who = names.slice(0, 3).map(n => n.split(/\s+/).pop()).join(' ');
+  }
+  return (t.replace(/\s+/g, ' ').trim().split(' ').slice(0, 18).join(' ') + (who ? ' ' + who : '')).trim();
+}
+async function fromPhoto(file) {
+  if (!sheet || sheet.mode !== 'add' || !file) return;
+  const seq = ++PHOTO.seq, s = sheet;
+  const btn = $('#photoGo');
+  if (btn) btn.disabled = true;
+  tsClose();
+  sheetMsg('Reading the photo…');
+  try {
+    const c = await photoCanvas(file);
+    const worker = await ocrWorker();
+    let data;
+    try { ({ data } = await worker.recognize(c, {}, { text: true, blocks: true })); } finally { c.width = c.height = 0; ocrWorkerDone(); }
+    if (seq !== PHOTO.seq || sheet !== s) return;
+    const lines = photoLines(data), text = lines.map(l => l.text).join('\n');
+    // A DOI or ISBN: looked up (and if that doesn't work, the title
+    // searched for instead).
+    const doi = photoDoi(text), isbn = doi ? '' : isbnIn(text);
+    if (doi || isbn) {
+      $('#doiLookup').value = doi || 'ISBN ' + isbn;
+      if (await lookupIntoForm()) return;
+      if (seq !== PHOTO.seq || sheet !== s) return;
+    }
+    const q = photoQuery(lines);
+    if (!q || !tsIsQuery(q)) { $('#doiLookup').value = ''; sheetMsg('No title could be read in the photo. Try a closer, sharper photo of the title, or type it.', true); return; }
+    $('#doiLookup').value = q;
+    sheetMsg('Read from the photo. Choose a match, or fix the words in the box.');
+    tsSearch(q);
+  } catch (err) {
+    if (seq === PHOTO.seq && sheet === s) sheetMsg(errText(err), true);
+  } finally {
+    if (btn && btn.isConnected) btn.disabled = false;
+  }
+}
+$('#sheetBody').addEventListener('click', ev => {
+  if (ev.target.closest('#photoGo')) { const i = $('#photoIn'); i.value = ''; i.click(); }
+});
+$('#sheetBody').addEventListener('change', ev => {
+  if (ev.target.id === 'photoIn' && ev.target.files[0]) fromPhoto(ev.target.files[0]);
 });
