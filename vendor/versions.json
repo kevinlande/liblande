@@ -31,5 +31,11 @@
     "npm": "@tesseract.js-data/eng",
     "version": "1.0.0",
     "sub": ""
+  },
+  {
+    "dir": "qrcode-generator",
+    "npm": "qrcode-generator",
+    "version": "2.0.4",
+    "sub": "dist/"
   }
 ]

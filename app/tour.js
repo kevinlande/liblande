@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-10-23.02';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-10-23.03';
 /* -------------------------------------------------------------- features */
 // What LibLande does, by area: each feature, what it's for, where to find
 // it, and its icon (see featIcon). Shown from the sidebar's foot (Features), with a box to find
@@ -31,6 +31,7 @@ const FEATURES = [
     ['Edit the details', 'Every field: authors, title, venue, keywords, notes, the cite key, a rating. Or click the title, or a piece of the citation line, to change it in place. From the reader, Edit opens in its sidebar, beside the paper.', 'Edit, in the details pane, or in the reader\u2019s Citation tab', 'ICON:pencil'],
     ['Suggested keywords', 'Keywords suggested from those of the publications most like it, and new ones from OpenAlex; tap one to add it. In Add, Edit and the details.', 'Under the keywords', 'ICON:tag'],
     ['Book covers', 'Covers for your books, from Open Library.', 'Settings (the gear in the sidebar)', 'path:M6 3.5h11a1.5 1.5 0 0 1 1.5 1.5v14a1.5 1.5 0 0 1-1.5 1.5H6zM6 3.5v17M9.5 8h6M9.5 11h4'],
+    ['QR code of references', 'A QR code that, scanned with a phone, shows the reference (or a selection\u2019s, some 10 to 15) as APA has it, to copy or open by DOI. Save it as a picture for a slide or handout.', 'Copy \u203a QR code\u2026, in the details, the reader\u2019s Citation tab, or for a selection', 'path:M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 18h2v2h-2zM14 18h2M18 14h2'],
     ['Copy a citation', 'APA, APA in text, BibTeX or the cite key, one publication or several; in the reader, the open paper\u2019s.', 'Copy, in the details pane; or the shortcuts (\u2325A for APA, \u21e7\u2325A in text, in the library or the reader)', 'ICON:quote'],
     ['Possible duplicates', 'Publications that look like the same one, to join as versions of one (the main one shown, the others under it) or to mark as different.', 'Possible duplicates in the sidebar', 'ICON:copy'],
     ['Forthcoming', 'Papers listed as forthcoming, checked for whether they\u2019ve been published since.', 'Forthcoming in the sidebar', 'ICON:forth'],
@@ -173,7 +174,7 @@ const TOUR_STEPS = [
   { lib: true, sel: '#refreshBtn', title: 'Reload the library', text: 'Check Google Drive for changes now: made in BibDesk, or on another device. (LibLande also looks by itself when it opens; on an iPhone or iPad, pull down on the list.)' },
   { lib: true, sel: '#searchBtn', title: 'Search', text: 'Find publications by any words in them (\u2318F or /), choose which fields to search, and save a search as a group.' },
   { lib: true, sel: '#list', title: 'The publications', text: 'Sort by any column (the menu at the foot), choose the columns, and type letters to jump. The reading list keeps its own sort and columns, with Length (the PDF\u2019s pages) there too. Return opens the PDF.' },
-  { lib: true, sel: '#detail', title: 'The details', text: 'Everything about the publication: read its PDF, copy a citation (APA or BibTeX), add it to your reading list, rate it, or Edit it. Click the title, or a piece of the citation line, to change it there and then.', before: async () => {
+  { lib: true, sel: '#detail', title: 'The details', text: 'Everything about the publication: read its PDF, copy a citation (APA or BibTeX, or as a QR code to scan), add it to your reading list, rate it, or Edit it. Click the title, or a piece of the citation line, to change it there and then.', before: async () => {
     if (phoneMQ.matches) return 'skip';
     if (!state.selKey) { const r = $('#rows .row'); if (r) r.click(); await tourWait(400); }
   } },

@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-23.02';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-23.03';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -5221,7 +5221,7 @@ function showInfo() {
     links.push([u, host]);
   });
   h += `<div class="vi-row"><details class="menu"><summary class="btn" title="Copy the citation">${ICON.copy}<span>Copy</span>${ICON.chev}</summary><div class="menu-list" role="menu">` +
-    [['apa', 'APA'], ['apa-short', 'In-text'], ['bibtex', 'BibTeX']].map(([k, l]) => `<button type="button" role="menuitem" data-icopy="${k}">${l}</button>`).join('') + `</div></details>` +
+    [['apa', ICON.apa, 'APA'], ['apa-short', ICON.intext, 'In-text'], ['bibtex', ICON.bib, 'BibTeX'], ['qr', ICON.qr, 'QR code\u2026']].map(([k, i, l]) => `<button type="button" role="menuitem" class="mi" data-icopy="${k}">${i}<span>${l}</span></button>`).join('') + `</div></details>` +
     (links.length === 1 ? `<a class="btn" href="${esc(links[0][0])}" target="_blank" rel="noopener" title="${esc(links[0][0])}">${ICON.link}<span>${esc(links[0][1])}</span></a>`
       : links.length ? `<details class="menu"><summary class="btn" title="Open a link">${ICON.link}<span>Links</span>${ICON.chev}</summary><div class="menu-list" role="menu">` +
         links.map(([u, l]) => `<a role="menuitem" href="${esc(u)}" target="_blank" rel="noopener" title="${esc(u)}">${esc(l)}</a>`).join('') + `</div></details>` : '') +
@@ -5309,6 +5309,7 @@ $('#vSide').addEventListener('click', ev => {
       if (ic.matches('.vi-ref-copy')) { ic.innerHTML = ICON.check; ic.classList.add('done'); setTimeout(() => { if (ic.isConnected) { ic.innerHTML = ICON.copy; ic.classList.remove('done'); } }, 1500); }
     }
     else if (kind === 'apa-short') { const cite = apaInText(e); copy(cite.text, 'Copied APA in-text citation', cite.html); }
+    else if (kind === 'qr') openQr([e]);
     else copy(kind === 'key' ? e.k : bibtex(e), kind === 'key' ? 'Copied cite key' : 'Copied BibTeX');
     return;
   }

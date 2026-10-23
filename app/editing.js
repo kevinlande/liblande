@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-10-23.02';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-10-23.03';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -854,7 +854,7 @@ function reopenAdd(snap, why) {
 $('#sheetForm').addEventListener('submit', ev => {
   ev.preventDefault();
   if (!sheet || $('#sheetSave').disabled) return;
-  if (sheet.mode === 'edit') saveEdit(); else if (sheet.mode === 'forth') saveForth(); else if (sheet.mode === 'join') saveJoin(); else if (sheet.mode === 'export') runExport(); else if (sheet.mode === 'export-save') saveExport(); else if (sheet.mode === 'help' || sheet.mode === 'msreport' || sheet.mode === 'newpapers') closeSheet(); else if (sheet.mode === 'npfollow') saveFollow(); else if (sheet.mode === 'mscheck') runMsCheck(); else if (sheet.mode === 'msfix') runMsFix(); else if (sheet.mode === 'smart') saveSmart(); else if (sheet.mode === 'bulk') saveBulk(); else if (sheet.mode === 'kwtidy') saveKwTidy(); else if (sheet.mode === 'attach') { const a = sheet, mode = ($('#sheetBody').querySelector('[name=attachMode]:checked') || {}).value; closeSheet(); runAttach(a.entry, a.file, mode === 'replace'); } else saveAdd();
+  if (sheet.mode === 'edit') saveEdit(); else if (sheet.mode === 'forth') saveForth(); else if (sheet.mode === 'join') saveJoin(); else if (sheet.mode === 'export') runExport(); else if (sheet.mode === 'export-save') saveExport(); else if (sheet.mode === 'help' || sheet.mode === 'msreport' || sheet.mode === 'newpapers' || sheet.mode === 'qr') closeSheet(); else if (sheet.mode === 'npfollow') saveFollow(); else if (sheet.mode === 'mscheck') runMsCheck(); else if (sheet.mode === 'msfix') runMsFix(); else if (sheet.mode === 'smart') saveSmart(); else if (sheet.mode === 'bulk') saveBulk(); else if (sheet.mode === 'kwtidy') saveKwTidy(); else if (sheet.mode === 'attach') { const a = sheet, mode = ($('#sheetBody').querySelector('[name=attachMode]:checked') || {}).value; closeSheet(); runAttach(a.entry, a.file, mode === 'replace'); } else saveAdd();
 });
 $('#sheetCancel').addEventListener('click', closeSheet);
 $('#sheetBody').addEventListener('click', ev => { const x = ev.target.closest('[data-sheet-cancel]'); if (x && !x.disabled) closeSheet(); });
@@ -1104,9 +1104,10 @@ function selectionHTML() {
       `<button type="button" class="btn" data-bulk-rl>${ICON.bookmark}<span>Add to reading list</span></button>` : '') +
     (gs && LIBS.list.length && list.some(x => !x.ib) ? `<button type="button" class="btn" data-copy-lib-sel>${ICON.lib}<span>Copy to another library\u2026</span></button>` : '') +
     `<details class="menu"><summary class="btn">${ICON.copy}<span>Copy</span>${ICON.chev}</summary>` +
-    `<div class="menu-list" role="menu"><button type="button" role="menuitem" data-copy-sel="bibtex">BibTeX<kbd>${esc(keyHint('copyBib'))}</kbd></button>` +
-    `<button type="button" role="menuitem" data-copy-sel="apa">APA (long)<kbd>${esc(keyHint('copyApa'))}</kbd></button>` +
-    `<button type="button" role="menuitem" data-copy-sel="short">APA (short)<kbd>${esc(keyHint('copyShort'))}</kbd></button></div></details>` +
+    `<div class="menu-list" role="menu"><button type="button" role="menuitem" class="mi" data-copy-sel="bibtex">${ICON.bib}<span>BibTeX</span><kbd>${esc(keyHint('copyBib'))}</kbd></button>` +
+    `<button type="button" role="menuitem" class="mi" data-copy-sel="apa">${ICON.apa}<span>APA (long)</span><kbd>${esc(keyHint('copyApa'))}</kbd></button>` +
+    `<button type="button" role="menuitem" class="mi" data-copy-sel="short">${ICON.intext}<span>APA (short)</span><kbd>${esc(keyHint('copyShort'))}</kbd></button>` +
+    `<button type="button" role="menuitem" class="mi" data-copy-sel="qr">${ICON.qr}<span>QR code\u2026</span></button></div></details>` +
     `<button type="button" class="btn" data-pick-clear>Clear selection</button></div>` +
     `<section class="d-sec"><h3>References (APA)</h3><div class="apa-refs">` +
     apaOrder(list).slice(0, SHOW_REFS).map(e => `<p>${apaCitation(e).html}</p>`).join('') +
@@ -1977,8 +1978,94 @@ function copyAs(kind) {
     copy(list.map(e => bibtex(e)).join('\n'), 'Copied BibTeX' + many);
   } else if (kind === 'key') {
     copy(list.map(e => e.k).join(','), n > 1 ? 'Copied ' + n + ' cite keys' : 'Copied cite key');
+  } else if (kind === 'qr') openQr(list);
+}
+
+/* ---- a QR code of references */
+// For one publication or several (a selection, as a group's): a QR code
+// that, scanned with a phone, opens a page on LibLande's site showing
+// them, APA, with Copy and their DOIs. The references are in the link
+// itself (deflated, in base64url): nothing is uploaded or kept anywhere.
+// A QR code holds about 2,900 characters: some 10 to 15 references.
+const QRLIB = './vendor/qrcode-generator/2.0.4/qrcode.js';
+let qrReady = null;
+function loadQrLib() {
+  if (!qrReady) {
+    qrReady = new Promise((ok, no) => {
+      const s = document.createElement('script');
+      s.src = QRLIB;
+      s.onload = () => ok(window.qrcode);
+      s.onerror = () => no(new Error('The QR code maker couldn\u2019t load. Check your internet connection and try again.'));
+      document.head.appendChild(s);
+    });
+    qrReady.catch(() => { qrReady = null; });
+  }
+  return qrReady;
+}
+// (The page: on LibLande's own site, as this copy is, or the public one.)
+const qrPage = () => /\.github\.io$/.test(location.hostname) ? new URL('cite.html', location.href).href.split('#')[0] : 'https:\/\/kevinlande.github.io/liblande/cite.html';
+async function qrLink(list) {
+  const refs = apaOrder(list).map(e => {
+    const doi = String(e.f.doi || '').trim().replace(/^https?:\/\/(dx\.)?doi\.org\//i, '');
+    return [apaCitation(e).html.replace(/<(?!\/?i>)[^>]*>/g, ''), doi || '', doi ? '' : ((e.u || []).find(u => safeUrl(u)) || '')];
+  });
+  const bytes = new Uint8Array(await new Response(new Blob([JSON.stringify(refs)]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer());
+  let bin = '';
+  bytes.forEach(b => { bin += String.fromCharCode(b); });
+  return qrPage() + '#r=' + btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+// The code drawn on a canvas, with a margin; null if the link is too long
+// for one.
+function qrCanvas(qrcode, link) {
+  let qr = null;
+  for (const level of ['M', 'L']) {
+    try { qr = qrcode(0, level); qr.addData(link, 'Byte'); qr.make(); break; } catch (err) { qr = null; }
+  }
+  if (!qr) return null;
+  const n = qr.getModuleCount(), cell = Math.max(4, Math.floor(512 / (n + 8))), size = (n + 8) * cell;
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const g = c.getContext('2d');
+  g.fillStyle = '#fff'; g.fillRect(0, 0, size, size);
+  g.fillStyle = '#000';
+  for (let r = 0; r < n; r++) for (let k = 0; k < n; k++) if (qr.isDark(r, k)) g.fillRect((k + 4) * cell, (r + 4) * cell, cell, cell);
+  return c;
+}
+async function openQr(list) {
+  if (!list.length) { toast('Select a publication first', 1800); return; }
+  const n = list.length, what = n === 1 ? '\u201c' + shortTitle(list[0].f.title || list[0].k) + '\u201d' : n + ' references';
+  sheet = { mode: 'qr' };
+  showSheet(`<h2>QR code</h2><p class="sheet-note">Making it\u2026</p>`, 'Close');
+  $('#sheetCancel').hidden = true;
+  const s = sheet;
+  try {
+    const [qrcode, link] = await Promise.all([loadQrLib(), qrLink(list)]);
+    if (sheet !== s) return;
+    const c = qrCanvas(qrcode, link);
+    if (!c) {
+      $('#sheetBody').innerHTML = `<h2>QR code</h2><p class="sheet-note">${n} references are too many for one QR code (it holds about 2,900 characters, some 10 to 15 references). Select fewer, and make one for each part.</p>`;
+      return;
+    }
+    s.link = link; s.canvas = c; s.name = n === 1 ? list[0].k : n + ' references';
+    $('#sheetBody').innerHTML = `<h2>QR code</h2><p class="sheet-note">Scan with a phone\u2019s camera to see the ${n === 1 ? 'citation' : 'citations'}.</p>` +
+      `<div class="qr-box"></div><div class="qr-acts"><button type="button" class="btn" data-qr-copy>${ICON.copy}<span>Copy link</span></button>` +
+      `<button type="button" class="btn" data-qr-save>${ICON.download}<span>Save image</span></button>` +
+      `<a class="btn" href="${esc(link)}" target="_blank" rel="noopener">${ICON.drive}<span>Open the page</span></a></div>`;
+    $('#sheetBody .qr-box').appendChild(c);
+    c.setAttribute('role', 'img');
+    c.setAttribute('aria-label', 'QR code for ' + what);
+  } catch (err) {
+    if (sheet === s) $('#sheetBody').innerHTML = `<h2>QR code</h2><p class="setup-error">${esc(errText(err))}</p>`;
   }
 }
+$('#sheetBody').addEventListener('click', ev => {
+  if (!sheet || sheet.mode !== 'qr' || !sheet.link) return;
+  if (ev.target.closest('[data-qr-copy]')) copy(sheet.link, 'Copied the link');
+  if (ev.target.closest('[data-qr-save]')) {
+    const name = 'QR code - ' + sheet.name.replace(/[\\/:*?"<>|]/g, '') + '.png';
+    sheet.canvas.toBlob(b => { if (b) b.arrayBuffer().then(buf => openIn(new Uint8Array(buf), name, 'image/png', 'Saving ' + name + '.', 'download')); }, 'image/png');
+  }
+});
 
 /* ---- keyboard shortcuts, the changeable ones yours to set */
 // A shortcut is a key (KeyboardEvent.code) with any of Ctrl, Alt, Shift

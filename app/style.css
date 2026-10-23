@@ -1505,6 +1505,11 @@ a.ms-ib { text-decoration: none; }
 .v-marks { padding: 2px 0 24px; }
 .v-marks-page { padding: 12px 12px 4px; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--faint); }
 /* A mark's Copy and Quote, at its top right. */
+/* A QR code of references, and what can be done with it. */
+.qr-box { display: grid; place-items: center; margin: 10px 0 14px; }
+.qr-box canvas { width: min(300px, 78vw); height: auto; border-radius: 8px; image-rendering: pixelated; }
+.qr-acts { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.qr-acts .btn .i { width: 16px; height: 16px; }
 .v-mark-wrap { position: relative; }
 .v-mark-acts { position: absolute; top: 3px; right: 6px; display: flex; gap: 2px; }
 .v-mark-acts button { display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--faint); cursor: pointer; }

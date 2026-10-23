@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-23.02';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-23.03';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -32,6 +32,12 @@ const ICON = {
   versions: '<svg class="i" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M4 16V6a2 2 0 0 1 2-2h10"/></svg>',
   read: '<svg class="i" viewBox="0 0 24 24"><path d="M2 5h6a4 4 0 0 1 4 4v11a3 3 0 0 0-3-3H2z"/><path d="M22 5h-6a4 4 0 0 0-4 4v11a3 3 0 0 1 3-3h7z"/></svg>',
   share: '<svg class="i" viewBox="0 0 24 24"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>',
+  // (Copy's kinds: BibTeX's braces; a reference's hanging indent; an
+  // in-text citation's parentheses.)
+  bib: '<svg class="i" viewBox="0 0 24 24"><path d="M9 4.5c-1.8 0-2.6.9-2.6 2.6v2.3c0 1.4-.7 2.3-2 2.6 1.3.3 2 1.2 2 2.6v2.3c0 1.7.8 2.6 2.6 2.6"/><path d="M15 4.5c1.8 0 2.6.9 2.6 2.6v2.3c0 1.4.7 2.3 2 2.6-1.3.3-2 1.2-2 2.6v2.3c0 1.7-.8 2.6-2.6 2.6"/></svg>',
+  apa: '<svg class="i" viewBox="0 0 24 24"><path d="M4 6h16M7.5 10h12.5M7.5 14h12.5M4 18h11"/></svg>',
+  intext: '<svg class="i" viewBox="0 0 24 24"><path d="M8 4.5c-3 2.5-3 12.5 0 15M16 4.5c3 2.5 3 12.5 0 15M10 12h4"/></svg>',
+  qr: '<svg class="i" viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4z"/><path d="M14 14h2.5v2.5H14zM17.5 17.5H20V20h-2.5zM14 20h2M20 14v2"/></svg>',
   eraser: '<svg class="i" viewBox="0 0 24 24"><path d="M9 20h11"/><path d="M4.7 14.3l8.6-8.6a2 2 0 0 1 2.8 0l3.2 3.2a2 2 0 0 1 0 2.8L12 19H8l-3.3-3.3a1 1 0 0 1 0-1.4z"/><path d="M9.3 9.7l5 5"/></svg>',
   download: '<svg class="i" viewBox="0 0 24 24"><path d="M12 3v12"/><path d="M8 11l4 4 4-4"/><path d="M5 17v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/></svg>',
   drive: '<svg class="i" viewBox="0 0 24 24"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>',
@@ -2696,9 +2702,10 @@ function renderDetail() {
   // Copy: straight after View (or whatever opens the paper).
   const view = btns.findIndex(b => b.indexOf('act-read') >= 0);
   btns.splice(view + 1, 0, `<details class="menu"><summary class="btn" title="Copy the citation">${ICON.copy}<span>Copy</span>${ICON.chev}</summary>` +
-    `<div class="menu-list" role="menu"><button type="button" role="menuitem" data-copy="bibtex">BibTeX<kbd>${esc(keyHint('copyBib'))}</kbd></button>` +
-    `<button type="button" role="menuitem" data-copy="apa">APA (long)<kbd>${esc(keyHint('copyApa'))}</kbd></button>` +
-    `<button type="button" role="menuitem" data-copy="apa-short">APA (short)<kbd>${esc(keyHint('copyShort'))}</kbd></button></div></details>`);
+    `<div class="menu-list" role="menu"><button type="button" role="menuitem" class="mi" data-copy="bibtex">${ICON.bib}<span>BibTeX</span><kbd>${esc(keyHint('copyBib'))}</kbd></button>` +
+    `<button type="button" role="menuitem" class="mi" data-copy="apa">${ICON.apa}<span>APA (long)</span><kbd>${esc(keyHint('copyApa'))}</kbd></button>` +
+    `<button type="button" role="menuitem" class="mi" data-copy="apa-short">${ICON.intext}<span>APA (short)</span><kbd>${esc(keyHint('copyShort'))}</kbd></button>` +
+    `<button type="button" role="menuitem" class="mi" data-copy="qr">${ICON.qr}<span>QR code\u2026</span></button></div></details>`);
   if (gs && !e.ib && LIBS.list.length) more.push(`<button type="button" role="menuitem" data-copy-lib="${esc(e.k)}">${ICON.lib}<span>Copy to another library\u2026</span></button>`);
   if (more.length) btns.push(`<details class="menu act-more"><summary class="btn" title="More: ${more.length > 1 ? 'Google Drive, Attach, links' : 'more'}" aria-label="More">` +
     `<svg class="i dots" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="18" cy="12" r="1.4"/></svg>${wide ? '<span>More</span>' : ''}</summary>` +
@@ -3027,6 +3034,7 @@ detailEl.addEventListener('click', ev => {
     if (menu) menu.open = false;
     if (kind === 'apa') { const cite = apaCitation(e); copy(cite.text, 'Copied APA citation', cite.html); }
     else if (kind === 'apa-short') { const cite = apaInText(e); copy(cite.text, 'Copied APA in-text citation', cite.html); }
+    else if (kind === 'qr') openQr([e]);
     else copy(kind === 'key' ? e.k : bibtex(e), kind === 'key' ? 'Copied cite key' : 'Copied BibTeX');
     return;
   }
