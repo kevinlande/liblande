@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-10-23.06';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-10-23.08';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -221,6 +221,14 @@ function sheetMsg(msg, isError) {
   // far down the form, and isn't scrolled to then.)
   const busy = $('#sheet').querySelectorAll('.btn.busy');
   if (msg && !isError) busy.forEach(b => { b.textContent = msg; });
+  // In Add, a pop-up over the form instead (its lookups are at the top,
+  // and the line is at the foot of a long form: no jump down to it),
+  // with a spinner while it's still at work.
+  if (sheet && sheet.mode === 'add') {
+    if (msg) toast(msg, isError ? 6000 : /\u2026$/.test(msg) ? 30000 : 4000, null, !isError && /\u2026$/.test(msg));
+    else if ($('#toast').classList.contains('busy')) $('#toast').classList.remove('show');
+    return;
+  }
   // (The form can be long, with Add at the top.)
   if (msg && (isError || !busy.length)) (isError ? e : s).scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
@@ -239,6 +247,8 @@ function sheetBusy(on) {
 // report when it closes, saved or not.)
 function closeSheet() {
   const back = sheet && sheet.msBack, np = sheet && sheet.npBack, info = sheet && sheet.infoBack;
+  // (Add's "Scanning text\u2026" and the like go with it.)
+  if (sheet && sheet.mode === 'add' && $('#toast').classList.contains('busy')) $('#toast').classList.remove('show');
   $('#sheet').hidden = true;
   undockSheet();
   sheet = null;

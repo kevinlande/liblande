@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/titlesearch.js'] = '2026-10-23.06';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/titlesearch.js'] = '2026-10-23.08';
 /* ------------------------------------------------------------ title search */
 // A title (with an author or a year, if you like) typed in Add's lookup
 // box, instead of a DOI: candidates from Crossref (articles, chapters, and
@@ -352,13 +352,61 @@ function photoQuery(lines) {
   }
   return (t.replace(/\s+/g, ' ').trim().split(' ').slice(0, 18).join(' ') + (who ? ' ' + who : '')).trim();
 }
+// The searches to try: the title as photoQuery reads it; the other
+// runs of lines in big letters (a heading can be bigger than the title);
+// and the photo's opening words, as a reference would have them.
+function photoAsks(lines, q) {
+  const words = s => (s.match(/\p{L}{2,}/gu) || []);
+  const ok = lines.filter(l => l.conf >= 50 && words(l.text).some(w => w.length >= 4));
+  const runs = [];
+  ok.forEach((l, i) => {
+    const last = runs[runs.length - 1], prev = ok[i - 1];
+    if (last && prev && Math.abs(l.h - prev.h) <= prev.h * 0.25 && l.y - prev.y1 < prev.h * 1.6 && last.lines.length < 3) last.lines.push(l);
+    else runs.push({ lines: [l] });
+  });
+  const said = r => r.lines.map(l => l.text).join(' ').replace(/[^\p{L}\p{N}'’:,&\s-]/gu, ' ').replace(/\s+/g, ' ').trim();
+  const big = runs.map(r => ({ text: said(r), h: Math.max(...r.lines.map(l => l.h)) }))
+    .filter(r => words(r.text).length >= 4 && !PHOTO_HEAD.test(r.text)).sort((a, b) => b.h - a.h).slice(0, 3).map(r => r.text.split(' ').slice(0, 24).join(' '));
+  const opening = ok.map(l => l.text).join(' ').replace(/[^\p{L}\p{N}'’:,&\s-]/gu, ' ').replace(/\s+/g, ' ').trim().split(' ').slice(0, 40).join(' ');
+  return [...new Set([q, ...big, opening].filter(x => x && tsIsQuery(x)))].slice(0, 4);
+}
+// What the sources find for each, scored by how much of its title is in
+// the photo's words (a title wholly there, and its author's name, is
+// almost surely the one), best first; only those mostly there.
+async function photoFind(asks, text) {
+  const seen = new Set(tsWords(text));
+  const ctl = typeof AbortController === 'function' ? new AbortController() : null;
+  const found = [];
+  await Promise.all(asks.flatMap(q => TS_SOURCES.map(async ([, get]) => {
+    try { found.push(...await Promise.race([get(q, ctl && ctl.signal), new Promise((ok, no) => setTimeout(() => no(new Error('no answer')), 12000))])); } catch (err) { /* passed over */ }
+  })));
+  if (ctl) ctl.abort();
+  const out = [], byKey = new Map();
+  for (const c of found) {
+    const tw = tsWords(c.title).filter(w => w.length >= 3);
+    if (tw.length < 2) continue;
+    const cover = tw.filter(w => seen.has(w)).length / tw.length;
+    const named = c.people.slice(0, 3).some(p => tsWords(tsFamily(p)).some(w => w.length >= 3 && seen.has(w)));
+    const score = cover + (named ? 0.3 : 0) + Math.min(tw.length, 12) / 60 - (c.review ? 0.6 : 0);
+    if (cover < 0.8 || (!named && tw.length < 5)) continue;
+    const k = (c.doi || '').toLowerCase() || plainTitle(c.title) + '|' + norm(tsFamily(c.people[0]));
+    const same = byKey.get(k);
+    // (One for each; Crossref's, with a DOI, kept over the others.)
+    if (same) { if (!same.doi && c.doi) Object.assign(same, c, { score: same.score }); continue; }
+    const x = Object.assign({}, c, { score });
+    byKey.set(k, x);
+    out.push(x);
+  }
+  out.forEach(c => { c.have = tsHave(c); });
+  return out.sort((a, b) => b.score - a.score).slice(0, TS_MAX);
+}
 async function fromPhoto(file) {
   if (!sheet || sheet.mode !== 'add' || !file) return;
   const seq = ++PHOTO.seq, s = sheet;
   const btn = $('#photoGo');
   if (btn) btn.disabled = true;
   tsClose();
-  sheetMsg('Reading the photo…');
+  sheetMsg('Scanning text\u2026');
   try {
     const c = await photoCanvas(file);
     const worker = await ocrWorker();
@@ -375,7 +423,23 @@ async function fromPhoto(file) {
       if (seq !== PHOTO.seq || sheet !== s) return;
     }
     const q = photoQuery(lines);
-    if (!q || !tsIsQuery(q)) { $('#doiLookup').value = ''; sheetMsg('No title could be read in the photo. Try a closer, sharper photo of the title, or type it.', true); return; }
+    const asks = photoAsks(lines, q);
+    if (!asks.length) { $('#doiLookup').value = ''; sheetMsg('No title could be read in the photo. Try a closer, sharper photo of the title, or type it.', true); return; }
+    // What the photo's words can be searched for, each asked of the
+    // sources; the best found is the one whose title is in the photo.
+    sheetMsg('Finding matches\u2026');
+    const best = await photoFind(asks, text);
+    if (seq !== PHOTO.seq || sheet !== s) return;
+    if (best.length) {
+      const c = best[0], who = tsFamily(c.people[0] || '');
+      $('#doiLookup').value = TS.q = c.title + (who ? ' ' + who : '');
+      TS.list = best;
+      TS.cache.set(TS.q, { at: Date.now(), list: best, failed: [] });
+      tsRender(false);
+      sheetMsg('Found from the photo. Choose it, or fix the words in the box to search again.');
+      return;
+    }
+    if (!q || !tsIsQuery(q)) { $('#doiLookup').value = ''; sheetMsg('Nothing found for the photo. Try a closer, sharper photo of the title, or type it.', true); return; }
     $('#doiLookup').value = q;
     sheetMsg('Read from the photo. Choose a match, or fix the words in the box.');
     tsSearch(q);
