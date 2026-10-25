@@ -494,6 +494,8 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .chip.kw-sug { border-style: dashed; color: var(--muted); background: none; cursor: pointer; }
 .chip.kw-sug:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
 .chip.kw-sug.new { font-style: italic; }
+/* The original year: shaded, beside the year (optional, often empty). */
+[data-field="origdate"] { background: var(--side-hover) !important; }
 .kw-sugs-x { display: inline-grid; place-items: center; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--faint); cursor: pointer; }
 .kw-sugs-x:hover { color: var(--text); background: var(--side-hover); }
 .kw-sugs-x .i { width: 14px; height: 14px; }
@@ -1015,10 +1017,15 @@ button.fileicon { border: 0; background: none; cursor: pointer; }
 @media (pointer: coarse) { .book-disc { position: relative; } .book-disc::after { content: ''; position: absolute; inset: -8px; } }
 .ch-count { font: 500 11.5px var(--ui); color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 0 7px; line-height: 17px; white-space: nowrap; }
 .in-book { font: 500 11px var(--ui); color: var(--faint); white-space: nowrap; }
-.row.chap { background: color-mix(in srgb, var(--panel) 65%, transparent); }
+/* Rows under another (a version under its main one, a chapter under its
+   book): shaded, a little more than the stripes, to set them apart. */
+.row.child, .row.child.odd { background: color-mix(in srgb, var(--side-hover) 75%, var(--bg)); }
+.row.child:hover { background: var(--side-hover); }
 .card .t .book-disc { margin: -2px 2px 0 -4px; }
 .card .t .ch-count, .card .t .in-book { margin-left: 6px; vertical-align: 2px; }
-.card.chap { background: color-mix(in srgb, var(--panel) 65%, transparent); }
+.card.child { background: color-mix(in srgb, var(--side-hover) 75%, var(--bg)); }
+.row.child.sel { background: var(--sel); }
+.card.child.sel { background: var(--accent-soft); }
 /* In the details: a book's chapters, and a chapter's book. */
 .d-chapters h3 { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .ch-add { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); color: var(--text); font: 600 12.5px var(--ui); letter-spacing: 0; text-transform: none; cursor: pointer; }

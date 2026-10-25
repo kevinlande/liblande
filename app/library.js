@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-25.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-25.05';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -57,7 +57,7 @@ const ICON = {
 const TYPE_NAMES = { article: 'Journal article', incollection: 'Book chapter', inbook: 'Book section', book: 'Book',
   inproceedings: 'Conference paper', conference: 'Conference paper', proceedings: 'Proceedings', phdthesis: 'PhD thesis',
   mastersthesis: 'Master\u2019s thesis', techreport: 'Report', unpublished: 'Unpublished', misc: 'Other' };
-const FIELD_ORDER = ['author', 'editor', 'title', 'year', 'month', 'journal', 'booktitle', 'volume', 'number', 'pages',
+const FIELD_ORDER = ['author', 'editor', 'title', 'year', 'origdate', 'month', 'journal', 'booktitle', 'volume', 'number', 'pages',
   'publisher', 'address', 'edition', 'series', 'chapter', 'school', 'institution', 'doi', 'isbn', 'issn', 'url', 'keywords'];
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -3373,6 +3373,9 @@ function apaCitationOf(e) {
 
   if (doi) add(doi);
   else if (url && t !== 'article') add(url);
+  // (A republished work: when it first came out, at the end.)
+  const orig = origYear(e);
+  if (orig) add((out.length && !/\s$/.test(out[out.length - 1].t) ? ' ' : '') + '(Original work published ' + orig + ')');
 
   const text = out.map(s => s.t).join('').replace(/\s+/g, ' ').trim();
   const html = out.map(s => s.i ? '<i>' + esc(s.t) + '</i>' : esc(s.t)).join('').replace(/\s+/g, ' ').trim();
@@ -3450,8 +3453,15 @@ document.addEventListener('keydown', ev => {
 // (A & B, Year), or (A et al., Year). Without authors, editors stand in (as
 // in the reference list); without either, the first words of the title do,
 // in quotation marks for an article or chapter and in italics otherwise.
+// A republished work's original year (its origdate), if it isn't the year
+// of the one in hand.
+function origYear(e) {
+  const o = (/\d{4}/.exec(e.f.origdate || '') || [''])[0];
+  return o && o !== (/\d{4}/.exec(e.f.year || '') || [''])[0] ? o : '';
+}
 function apaInText(e) {
-  const year = (e.f.year || '').trim() || 'n.d.';
+  // (Republished: both years, the original first, as 1900/1953.)
+  const year = (origYear(e) ? origYear(e) + '/' : '') + ((e.f.year || '').trim() || 'n.d.');
   const names = e.a && e.a.length ? e.a : (e.e || []);
   if (names.length) {
     const L = names.map(n => n[0]);

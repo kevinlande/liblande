@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-10-25.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-10-25.05';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -21,8 +21,13 @@ const TYPE_FIELDS = {
 const FIELD_LABELS = { title: 'Title', author: 'Authors', editor: 'Editors', year: 'Year', journal: 'Journal',
   booktitle: 'Book title', volume: 'Volume', number: 'Number', pages: 'Pages', publisher: 'Publisher',
   edition: 'Edition', school: 'School', institution: 'Institution', howpublished: 'Published as', note: 'Note',
-  doi: 'DOI', url: 'URL', issn: 'ISSN', isbn: 'ISBN', abstract: 'Abstract', annote: 'Notes', month: 'Month', address: 'Place' };
-const SHORT_FIELDS = new Set(['year', 'month', 'volume', 'number', 'pages', 'edition']);
+  doi: 'DOI', url: 'URL', issn: 'ISSN', isbn: 'ISBN', abstract: 'Abstract', annote: 'Notes', month: 'Month', address: 'Place',
+  origdate: 'Original year' };
+const SHORT_FIELDS = new Set(['year', 'origdate', 'month', 'volume', 'number', 'pages', 'edition']);
+// A republished work (a book in a new printing, a translation, a chapter
+// reprinted in a collection): the year it first came out, beside the year
+// of the one in hand (biblatex's origdate; APA prints both).
+const ORIG_TYPES = new Set(['book', 'incollection', 'inbook']);
 const AREA_FIELDS = new Set(['abstract', 'annote', 'note']);
 const TYPE_CHOICES = [['article', 'Journal article'], ['incollection', 'Book chapter'], ['book', 'Book'],
   ['inproceedings', 'Conference paper'], ['phdthesis', 'PhD thesis'], ['techreport', 'Report'],
@@ -100,13 +105,14 @@ function makeCiteKey(v) {
 }
 
 function formFieldNames(type, present) {
-  const list = ['title', 'author', 'year'].concat(TYPE_FIELDS[type] || TYPE_FIELDS.misc, ['doi', 'url']);
+  const list = ['title', 'author', 'year'].concat(ORIG_TYPES.has(type) || present('origdate') ? ['origdate'] : [], TYPE_FIELDS[type] || TYPE_FIELDS.misc, ['doi', 'url']);
   Object.keys(FIELD_LABELS).forEach(n => { if (list.indexOf(n) < 0 && present(n) && !AREA_FIELDS.has(n)) list.push(n); });
   return list.concat(['abstract', 'annote'].filter(n => list.indexOf(n) < 0));
 }
 function fieldInput(n, value, lead) {
   const id = 'fld-' + n;
-  const hint = n === 'author' || n === 'editor' ? ' placeholder="Last, First and Last, First (or a list of full names)"' : '';
+  const hint = n === 'author' || n === 'editor' ? ' placeholder="Last, First and Last, First (or a list of full names)"'
+    : n === 'origdate' ? ' placeholder="Year of original publication" title="Year of original publication (if this is a reprint, new printing or translation)" inputmode="numeric"' : '';
   const input = AREA_FIELDS.has(n) || n === 'title'
     ? `<textarea id="${id}" data-field="${n}" rows="${n === 'abstract' ? 4 : 2}">${esc(value)}</textarea>`
     : `<input id="${id}" data-field="${n}" type="text" value="${esc(value)}" autocomplete="off"${hint}${n === 'doi' || n === 'url' ? ' autocapitalize="off" spellcheck="false"' : ''}>`;
@@ -1730,7 +1736,8 @@ async function saveJoin() {
     await joinUnder(main, others, (n, of) => sheetMsg(of > 1 ? 'Joining ' + n + ' of ' + of + '\u2026' : 'Joining\u2026'));
     closeSheet();
     setPicking(false);
-    toast('Joined ' + others.length + ' version' + (others.length === 1 ? '' : 's') + ' under \u201c' + (main.f.title || main.k) + '\u201d', 4000);
+    const orig = others.length === 1 ? origOffer(main, others[0]) : null;
+    toast('Joined ' + others.length + ' version' + (others.length === 1 ? '' : 's') + ' under \u201c' + (main.f.title || main.k) + '\u201d', orig ? 10000 : 4000, orig || undefined);
   } catch (err) {
     sheetMsg(errText(err), true);
   } finally {
@@ -1739,19 +1746,49 @@ async function saveJoin() {
 }
 // Dragged onto a row: joined under it at once (the row dropped on is the
 // main version), with Undo.
-async function joinByDrag(main, moved) {
+// (instead: the other thing the drop could have meant, offered with Undo:
+// see relateByDrag.)
+async function joinByDrag(main, moved, instead) {
   toast('Joining\u2026', 0);
   try {
     const before = await joinUnder(main, [moved]);
-    toast('\u201c' + (moved.f.title || moved.k) + '\u201d is now a version of \u201c' + (main.f.title || main.k) + '\u201d', 6000, { label: 'Undo', run: async () => {
+    const undo = async quiet => {
       try {
         for (const [x, was] of before) { const now = BYKEY.get(x.k); if (now) await writeEdit(now, { related: was }, [], []); }
         init(DATA, true); refresh(false);
-        toast('Undone', 2000);
-      } catch (err) { toast('Couldn\u2019t undo: ' + errText(err), 5000); }
-    } });
+        if (!quiet) toast('Undone', 2000);
+        return true;
+      } catch (err) { toast('Couldn\u2019t undo: ' + errText(err), 5000); return false; }
+    };
+    const orig = origOffer(main, moved);
+    toast('\u201c' + (moved.f.title || moved.k) + '\u201d is now a version of \u201c' + (main.f.title || main.k) + '\u201d', instead || orig ? 10000 : 6000,
+      [{ label: 'Undo', run: () => undo(false) }].concat(instead ? [{ label: instead.label, run: async () => { if (await undo(true)) instead.run(); } }] : [], orig ? [orig] : []));
   } catch (err) {
     toast('Couldn\u2019t join them: ' + errText(err), 6000);
+  }
+}
+// A later version of an earlier work: the earlier one's year offered as
+// its original year (a reprint, new printing or translation; not for a
+// new edition, which is a work of its own in APA's eyes, so it's offered,
+// not set).
+function origOffer(main, later) {
+  const y = (/\d{4}/.exec(main.f.year || '') || [''])[0], ly = (/\d{4}/.exec(later.f.year || '') || [''])[0];
+  if (!y || !ly || +y >= +ly || later.f.origdate || !gs || later.ib) return null;
+  return { label: 'Original year: ' + y, run: () => quickSet(later, { origdate: y }, 'Original year ' + y + ' set') };
+}
+// One publication dropped on another (dragged with the mouse, or held and
+// dragged with a finger): a chapter dropped on a book becomes a chapter of
+// it (crossref, as Link chapters does); anything else, a version of it
+// (related). Either way the other is offered after, with Undo; with the
+// mouse, Option (\u2325) held as it's dropped swaps them.
+const chapterOnBook = (target, moved) => (moved.t === 'incollection' || moved.t === 'inbook') && isBook(target);
+const dropMeans = (target, moved, alt) => (chapterOnBook(target, moved) && !alt ? 'chapter' : 'version');
+function relateByDrag(target, moved, alt) {
+  const can = chapterOnBook(target, moved);
+  if (dropMeans(target, moved, alt) === 'chapter') {
+    lcLinkTo(target, [moved], { label: 'Make it a version instead', run: () => joinByDrag(target, moved) });
+  } else {
+    joinByDrag(target, moved, can ? { label: 'Make it a chapter instead', run: () => lcLinkTo(target, [moved]) } : null);
   }
 }
 function unjoin(x) {
@@ -1855,22 +1892,50 @@ const ROW_DRAG = { on: false };
     h.ghost.textContent = h.keys.length > 1 ? h.keys.length + ' publications' : (h.e.f.title || h.e.k);
     document.body.appendChild(h.ghost);
     place(h.x0, h.y0);
-    // (The sidebar out, to drop on.)
-    if (tabletMQ.matches && !app.classList.contains('side-open')) { app.classList.add('side-open'); h.opened = true; }
-    else if (app.classList.contains('side-collapsed')) { app.classList.remove('side-collapsed'); h.uncollapsed = true; }
+    // (The sidebar comes out when the finger goes to the left edge: until
+    // then the list is there to drop on.)
     if (navigator.vibrate) navigator.vibrate(8);
     const sel = window.getSelection && window.getSelection();
     if (sel) sel.removeAllRanges();
   };
   const place = (x, y) => { h.ghost.style.left = x + 'px'; h.ghost.style.top = y + 'px'; };
+  // Another publication under the finger (not the one held, nor one in
+  // the inbox), to make this a chapter or version of.
+  const rowUnder = (x, y) => {
+    const el = document.elementFromPoint(x, y), r = el && el.closest('#rows .row[data-i], #rows .card[data-i]');
+    const e = r && state.view[+r.dataset.i];
+    return e && e !== h.e && !e.ib && h.keys.length === 1 ? { r, e } : null;
+  };
+  const over = (x, y) => {
+    h.x = x; h.y = y;
+    // (At the left edge: the sidebar out, to drop on a library or group.)
+    if (x < 44) {
+      if (tabletMQ.matches && !app.classList.contains('side-open')) { app.classList.add('side-open'); h.opened = true; }
+      else if (app.classList.contains('side-collapsed')) { app.classList.remove('side-collapsed'); h.uncollapsed = true; }
+    }
+    const b = libUnder(x, y);
+    libDropOn(b);
+    h.join = b ? null : rowUnder(x, y);
+    markJoin(h.join && h.join.r, h.join && h.join.e, h.e, false);
+  };
+  // (Held near the list's top or bottom, it scrolls, to reach the rest.)
+  const auto = () => {
+    if (!h || !h.on) return;
+    const r = list.getBoundingClientRect(), d = h.y < r.top + 56 ? -1 : h.y > r.bottom - 56 ? 1 : 0;
+    if (d && h.x > r.left && h.x < r.right) { list.scrollTop += d * 9; over(h.x, h.y); }
+    h.raf = requestAnimationFrame(auto);
+  };
   const stop = drop => {
     if (!h) return;
     clearTimeout(h.timer);
     if (h.on) {
-      const b = drop && libUnder(drop.x, drop.y);
+      cancelAnimationFrame(h.raf);
+      const b = drop && libUnder(drop.x, drop.y), j = drop && !b && h.join;
       h.ghost.remove();
       h.row.classList.remove('held');
       libDropOn(null);
+      markJoin(null);
+      if (j) relateByDrag(j.e, h.e, false);
       if (h.opened) setTimeout(closeDrawer, b ? 600 : 0);
       if (h.uncollapsed) app.classList.add('side-collapsed');
       if (b) dropOnSide(b, h.keys);
@@ -1884,14 +1949,14 @@ const ROW_DRAG = { on: false };
     if (h || ev.pointerType === 'mouse' || !gs || phoneMQ.matches) return;
     const row = ev.target.closest('.row[data-i], .card[data-i]'), e = row && state.view[+row.dataset.i];
     if (!e || e.ib) return;
-    h = { row, e, id: ev.pointerId, x0: ev.clientX, y0: ev.clientY, on: false };
-    h.timer = setTimeout(() => { if (h && !h.on) start(); }, 450);
+    h = { row, e, id: ev.pointerId, x0: ev.clientX, y0: ev.clientY, x: ev.clientX, y: ev.clientY, on: false };
+    h.timer = setTimeout(() => { if (h && !h.on) { start(); h.raf = requestAnimationFrame(auto); } }, 450);
   });
   list.addEventListener('pointermove', ev => {
     if (!h || ev.pointerId !== h.id) return;
     if (!h.on) { if (Math.hypot(ev.clientX - h.x0, ev.clientY - h.y0) > 8) stop(null); return; }
     place(ev.clientX, ev.clientY);
-    libDropOn(libUnder(ev.clientX, ev.clientY));
+    over(ev.clientX, ev.clientY);
   });
   list.addEventListener('pointerup', ev => { if (h && ev.pointerId === h.id) stop({ x: ev.clientX, y: ev.clientY }); });
   list.addEventListener('pointercancel', ev => { if (h && ev.pointerId === h.id) stop(null); });
@@ -1899,13 +1964,16 @@ const ROW_DRAG = { on: false };
   list.addEventListener('contextmenu', ev => { if (h) ev.preventDefault(); });
 })();
 let joinEl = null;
-function markJoin(r, e) {
+function markJoin(r, e, moved, alt) {
   if (joinEl && joinEl !== r) joinEl.classList.remove('join-on');
   joinEl = r || null;
   if (joinEl) joinEl.classList.add('join-on');
   const hint = $('#dropHint');
   hint.hidden = !r;
-  if (r) hint.textContent = 'Drop to make it a version of \u201c' + (e.f.title || e.k) + '\u201d (the main one)';
+  if (!r) return;
+  const chapter = moved && dropMeans(e, moved, alt) === 'chapter';
+  hint.textContent = chapter ? 'Drop to make it a chapter of \u201c' + (e.f.title || e.k) + '\u201d' + (coarseMQ.matches ? '' : ' (\u2325 for a version)')
+    : 'Drop to make it a version of \u201c' + (e.f.title || e.k) + '\u201d (the main one)' + (moved && chapterOnBook(e, moved) && !coarseMQ.matches ? ' (no \u2325 for a chapter)' : '');
 }
 // (Safari takes a row as somewhere to drop only if it says so as the drag
 // enters it, as well as while it's over it.)
@@ -1916,7 +1984,7 @@ const joinOver = ev => {
   if (!e || e.k === dragKey || e.ib) { markJoin(null); return; }
   ev.preventDefault();
   ev.dataTransfer.dropEffect = 'move';
-  markJoin(r, e);
+  markJoin(r, e, BYKEY.get(dragKey), ev.altKey);
 };
 rowsEl.addEventListener('dragenter', joinOver);
 rowsEl.addEventListener('dragover', joinOver);
@@ -1927,7 +1995,7 @@ rowsEl.addEventListener('drop', ev => {
   dragKey = null;
   markJoin(null);
   if (!e || !moved || e === moved) return;
-  joinByDrag(e, moved);
+  relateByDrag(e, moved, ev.altKey);
 });
 
 /* ------------------------------------------------------------ export */

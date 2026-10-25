@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/chapters.js'] = '2026-10-25.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/chapters.js'] = '2026-10-25.05';
 /* ------------------------------------------------------------ link chapters */
 // A chapter is linked to its book by its crossref field (see findChapters).
 // Chapters added before that are linked here, after you've looked:
@@ -291,8 +291,10 @@ async function undoLinkChapters(undo, removes, hashes) {
     init(DATA, true);
     afterWrite();
     toast('Undone: the chapters are as they were' + (removes.length ? ', and the books added are gone' : '') + '.', 4000);
+    return true;
   } catch (err) {
     toast('Couldn\u2019t undo: ' + errText(err), 8000);
+    return false;
   }
 }
 // Once on each device, when the library has chapters to link: a word, with
@@ -342,7 +344,8 @@ function lcOfferFor(book) {
   toast(chs.length + ' chapter' + (chs.length === 1 ? ' in your library is' : 's in your library are') + ' from \u201c' + shortTitle(book.f.title || book.k) + '\u201d.', 15000,
     { label: 'Link ' + (chs.length === 1 ? 'it' : 'them'), run: () => lcLinkTo(book, chs) });
 }
-async function lcLinkTo(book, chs) {
+// (instead: the other thing a drop could have meant, offered with Undo.)
+async function lcLinkTo(book, chs, instead) {
   if (isOffline()) { toast('Linking chapters needs a connection. Try again when you\u2019re online.', 5000); return; }
   const now = bibdeskTime(), b = lcBookFields(book), items = [], undo = [];
   chs.forEach(c => {
@@ -360,8 +363,9 @@ async function lcLinkTo(book, chs) {
     done.forEach(x => { const e = BYKEY.get(x.key); if (!e) return; e.h = res.hashes[x.key]; setFields(e, Object.assign({}, x.set, { 'date-modified': now })); });
     init(DATA, true);
     afterWrite();
-    toast('Linked ' + done.length + ' chapter' + (done.length === 1 ? '' : 's') + ' to \u201c' + shortTitle(book.f.title || book.k) + '\u201d.', 8000,
-      { label: 'Undo', run: () => undoLinkChapters(undo.filter(u => res.hashes[u.c.k]), [], res.hashes) });
+    const u = () => undoLinkChapters(undo.filter(x => res.hashes[x.c.k]), [], res.hashes);
+    toast((chs.length === 1 ? '\u201c' + shortTitle(chs[0].f.title || chs[0].k) + '\u201d is now a chapter of \u201c' : 'Linked ' + done.length + ' chapters to \u201c') + shortTitle(book.f.title || book.k) + '\u201d.', instead ? 10000 : 8000,
+      [{ label: 'Undo', run: u }].concat(instead ? [{ label: instead.label, run: async () => { if (await u()) instead.run(); } }] : []));
   } catch (err) {
     toast('Couldn\u2019t link the chapters: ' + errText(err), 8000);
   }
