@@ -1,8 +1,8 @@
 ﻿// LibLande: the library: data, the reading list, groups, search, the list and the details.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
+// index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-25.02';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-25.03';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -38,6 +38,8 @@ const ICON = {
   apa: '<svg class="i" viewBox="0 0 24 24"><path d="M4 6h16M7.5 10h12.5M7.5 14h12.5M4 18h11"/></svg>',
   intext: '<svg class="i" viewBox="0 0 24 24"><path d="M8 4.5c-3 2.5-3 12.5 0 15M16 4.5c3 2.5 3 12.5 0 15M10 12h4"/></svg>',
   paste: '<svg class="i" viewBox="0 0 24 24"><path d="M9 4.5H7.5A1.5 1.5 0 0 0 6 6v13a1.5 1.5 0 0 0 1.5 1.5h9A1.5 1.5 0 0 0 18 19V6a1.5 1.5 0 0 0-1.5-1.5H15"/><path d="M9 3.5h6v2.5H9zM9 11h6M9 14.5h6M9 18h3.5"/></svg>',
+  // (A chapter added to a book: the book, with a plus on its cover.)
+  addChapter: '<svg class="i" viewBox="0 0 24 24"><path d="M5 5.5A2.5 2.5 0 0 1 7.5 3H19v14H7.5A2.5 2.5 0 0 0 5 19.5z"/><path d="M5 19.5A2.5 2.5 0 0 0 7.5 22H19v-5"/><path d="M12 7v6M9 10h6"/></svg>',
   camera: '<svg class="i" viewBox="0 0 24 24"><path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2.3l1.4-2h5.6l1.4 2h2.3A1.5 1.5 0 0 1 20 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5z"/><circle cx="12" cy="12.8" r="3.4"/></svg>',
   qr: '<svg class="i" viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4z"/><path d="M14 14h2.5v2.5H14zM17.5 17.5H20V20h-2.5zM14 20h2M20 14v2"/></svg>',
   eraser: '<svg class="i" viewBox="0 0 24 24"><path d="M9 20h11"/><path d="M4.7 14.3l8.6-8.6a2 2 0 0 1 2.8 0l3.2 3.2a2 2 0 0 1 0 2.8L12 19H8l-3.3-3.3a1 1 0 0 1 0-1.4z"/><path d="M9.3 9.7l5 5"/></svg>',
@@ -244,6 +246,8 @@ function init(data, again) {
   }
   findDups();
   findVersions();
+  findChapters();
+  setTimeout(() => { if (typeof lcOffer === 'function') lcOffer(); }, 4000);
   GROUPS = data.groups.map(g => ({ name: g.name, items: g.keys.map(k => BYKEY.get(k)).filter(Boolean) }));
   KW_SORTED = [...KEYWORDS.keys()].sort(COLLATE.compare).map(k => [k, norm(k)]);
   warmSearch();
@@ -1093,18 +1097,53 @@ function findVersions() {
   }
   for (const list of VERSIONS.values()) list.sort((a, b) => a.yearN - b.yearN || cmpStr(a.k, b.k));
 }
+/* ------------------------------------------------------------ chapters */
+// A book's chapters: those naming it in their "crossref" field (BibTeX's,
+// which BibDesk shows too). In the book's order: by their first page, then
+// chapter number, then title.
+let CHAPTER_OF = new Map(), CHAPTERS = new Map();
+const crossrefKey = e => String((e.r && e.r.crossref) || e.f.crossref || '').replace(/[{}]/g, '').trim();
+const firstPage = e => { const m = /\d+/.exec(e.f.pages || ''); return m ? +m[0] : Infinity; };
+const isBook = e => !!e && /^(book|collection|proceedings|mvbook)$/.test(e.t);
+function findChapters() {
+  CHAPTER_OF = new Map(); CHAPTERS = new Map();
+  // (Keys as BibTeX matches them: whatever their case.)
+  const lower = new Map(ENTRIES.map(e => [e.k.toLowerCase(), e]));
+  for (const e of ENTRIES) {
+    const x = crossrefKey(e);
+    const b = x && (BYKEY.get(x) || lower.get(x.toLowerCase()));
+    if (!b || b === e) continue;
+    CHAPTER_OF.set(e.k, b.k);
+    if (!CHAPTERS.has(b.k)) CHAPTERS.set(b.k, []);
+    CHAPTERS.get(b.k).push(e);
+  }
+  for (const list of CHAPTERS.values()) list.sort((a, b) => firstPage(a) - firstPage(b) || (parseInt(a.f.chapter, 10) || 0) - (parseInt(b.f.chapter, 10) || 0) || cmpStr(a.f.title || '', b.f.title || ''));
+}
+// The books whose chapters are shown under them (each opened with its ▸;
+// remembered on this device).
+const OPEN_BOOKS = new Set(store.get('openBooks', []));
+function toggleBook(k) {
+  if (OPEN_BOOKS.has(k)) OPEN_BOOKS.delete(k); else OPEN_BOOKS.add(k);
+  store.set('openBooks', [...OPEN_BOOKS].slice(-300));
+  refresh(false);
+}
+
 // The list with each version just under its main one (when both are in
-// it); NESTED: the versions shown so.
-let NESTED = new Set();
+// it); NESTED: the versions shown so. And under a book opened with its ▸,
+// its chapters, in the book's order: each chapter also keeps its own place
+// in the list (under its author, say), so it's there twice;
+// CHAPTER_ROWS: the places of the copies under books.
+let NESTED = new Set(), CHAPTER_ROWS = new Set();
 function nestVersions(v) {
-  NESTED = new Set();
-  if (!VERSION_OF.size) return v;
+  NESTED = new Set(); CHAPTER_ROWS = new Set();
+  if (!VERSION_OF.size && !CHAPTERS.size) return v;
   const inView = new Set(v.map(e => e.k)), out = [];
   for (const e of v) {
     const main = VERSION_OF.get(e.k);
     if (main && inView.has(main)) continue;
     out.push(e);
     for (const c of VERSIONS.get(e.k) || []) if (inView.has(c.k)) { out.push(c); NESTED.add(c.k); }
+    if (OPEN_BOOKS.has(e.k)) for (const c of CHAPTERS.get(e.k) || []) { out.push(c); CHAPTER_ROWS.add(out.length - 1); }
   }
   return out;
 }
@@ -1220,7 +1259,7 @@ function librariesHTML() {
     (inboxCount || state.group === 'inbox' ? grpBtn('inbox', 'Inbox', inboxCount, ICON.inbox) : '') +
     (DUPS.size || state.group === 'dups' ? grpBtn('dups', 'Possible duplicates', DUPS.size, ICON.copy) : '') +
     ((n => (n || state.group === 'forth' ? grpBtn('forth', 'Forthcoming', n, ICON.forth) : ''))(ENTRIES.filter(isForthcoming).length)) + `</div>`;
-  return `<div class="sec" data-sec="libs"><div class="sec-row"><div class="sec-h">Libraries</div>` +
+  return `<div class="sec${secFold('libs')}" data-sec="libs"><div class="sec-row">${secHead('libs', 'Libraries')}` +
     `<button type="button" class="sec-add" data-new-lib title="New library" aria-label="New library"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button></div>` +
     LIBS.all.map(l => row(l) + (l.bibId === curId ? sub : '')).join('') + `</div>`;
 }
@@ -1299,25 +1338,32 @@ function endLibSwitch() {
   LIBS.pending = null;
   renderGroups();
 }
+// Each section of the sidebar can be folded away with its heading (kept on
+// this device): Libraries, Tools, Saved searches, Static groups, as
+// Keywords and Publication types are.
+const SIDE_FOLD = new Set(store.get('sideFold', []));
+const secHead = (id, label) => `<button type="button" class="sec-h" data-fold="${id}" aria-expanded="${!SIDE_FOLD.has(id)}">${ICON.chev}${label}</button>`;
+const secFold = id => (SIDE_FOLD.has(id) ? ' folded' : '');
 function renderGroups() {
   const inboxCount = ENTRIES.filter(e => e.ib).length;
   // (Signed in: the Libraries section, the open one's lists under it.
   // Otherwise, the one library as before.)
   const libs = librariesHTML();
-  let h = (libs || `<div class="sec" data-sec="lib"><div class="sec-h">Library</div>${grpBtn('all', 'Library', ENTRIES.length, ICON.lib)}` +
+  let h = (libs || `<div class="sec${secFold('lib')}" data-sec="lib">${secHead('lib', 'Library')}${grpBtn('all', 'Library', ENTRIES.length, ICON.lib)}` +
     (RECENT.seen.length || state.group === 'recent' ? grpBtn('recent', 'Recently viewed', groupItems('recent').length, ICON.history) : '') +
     (inboxCount || state.group === 'inbox' ? grpBtn('inbox', 'Inbox', inboxCount, ICON.inbox) : '') +
     (DUPS.size || state.group === 'dups' ? grpBtn('dups', 'Possible duplicates', DUPS.size, ICON.copy) : '') +
     ((n => (n || state.group === 'forth' ? grpBtn('forth', 'Forthcoming', n, ICON.forth) : ''))(ENTRIES.filter(isForthcoming).length)) +
     `</div>`) +
     // (Tools: not lists, so no count.)
-    `<div class="sec" data-sec="tools"><div class="sec-h">Tools</div><button type="button" class="grp" data-tool="mscheck" aria-label="Cite Check: check a manuscript\u2019s citations"${msToolTitle()}>${ICON.citecheck}<span class="nm">Cite Check</span>${msToolCount()}</button>` +
+    `<div class="sec${secFold('tools')}" data-sec="tools">${secHead('tools', 'Tools')}<button type="button" class="grp" data-tool="mscheck" aria-label="Cite Check: check a manuscript\u2019s citations"${msToolTitle()}>${ICON.citecheck}<span class="nm">Cite Check</span>${msToolCount()}</button>` +
       (gs ? `<button type="button" class="grp" data-tool="newpapers" aria-label="New papers" title="New papers that cite yours, by authors you follow, like ones you choose, and in your journals">${ICON.bell}<span class="nm">New papers</span>${npToolCount()}</button>` +
-        `<button type="button" class="grp" data-tool="kwtidy" aria-label="Tidy keywords" title="Keywords written more than one way, used once, or probably missing">${ICON.tag}<span class="nm">Tidy keywords</span></button>` : '') + `</div>`;
+        `<button type="button" class="grp" data-tool="kwtidy" aria-label="Tidy keywords" title="Keywords written more than one way, used once, or probably missing">${ICON.tag}<span class="nm">Tidy keywords</span></button>` +
+        `<button type="button" class="grp" data-tool="linkch" aria-label="Link chapters to books" title="Chapters linked to their books, and books added for chapters that have none">${ICON.addChapter}<span class="nm">Link chapters</span></button>` : '') + `</div>`;
   // (Saved searches just above the static groups.)
-  if (SMART.list.length) h += `<div class="sec" data-sec="q"><div class="sec-h">Saved searches</div>` + SMART.list.map(x => grpBtn('q:' + x.name, x.name, groupItems('q:' + x.name).length, ICON.search)).join('') + `</div>`;
+  if (SMART.list.length) h += `<div class="sec${secFold('q')}" data-sec="q">${secHead('q', 'Saved searches')}` + SMART.list.map(x => grpBtn('q:' + x.name, x.name, groupItems('q:' + x.name).length, ICON.search)).join('') + `</div>`;
   if (GROUPS.some(g => !(gs && g === readingGroup())) || gs) {
-    h += `<div class="sec" data-sec="s"><div class="sec-row"><div class="sec-h">Static groups</div>` +
+    h += `<div class="sec${secFold('s')}" data-sec="s"><div class="sec-row">${secHead('s', 'Static groups')}` +
       (gs ? `<button type="button" class="sec-add" data-new-group title="New static group" aria-label="New static group"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>` : '') + `</div>`;
     if (NG.open) h += newGroupRow();
     for (const g of GROUPS) if (!(gs && g === readingGroup())) h += grpBtn('s:' + g.name, g.name, g.items.length, ICON.folder);
@@ -1446,6 +1492,8 @@ $('#groups').addEventListener('click', ev => {
   if (ev.target.closest('[data-ng-go]')) { createNewGroup(); return; }
   if (ev.target.closest('[data-ng-cancel]')) { closeNewGroup(); return; }
   if (ev.target.closest('.ng-row')) return;
+  const fd = ev.target.closest('[data-fold]');
+  if (fd) { const k = fd.dataset.fold; if (SIDE_FOLD.has(k)) SIDE_FOLD.delete(k); else SIDE_FOLD.add(k); store.set('sideFold', [...SIDE_FOLD]); renderGroups(); return; }
   const t = ev.target.closest('[data-toggle]');
   if (t) { const k = t.dataset.toggle; state[k] = !state[k]; store.set(k, state[k]); renderGroups(); return; }
   if (ev.target.closest('.recent-edit')) return;
@@ -1457,6 +1505,7 @@ $('#groups').addEventListener('click', ev => {
   if (ev.target.closest('[data-tool="mscheck"]')) { closeDrawer(); openMsCheck(); return; }
   if (ev.target.closest('[data-tool="newpapers"]')) { closeDrawer(); openNewPapers(); return; }
   if (ev.target.closest('[data-tool="kwtidy"]')) { closeDrawer(); openKwTidy(); return; }
+  if (ev.target.closest('[data-tool="linkch"]')) { closeDrawer(); openLinkChapters(); return; }
   const b = ev.target.closest('.grp');
   if (!b) return;
   setGroup(b.dataset.g);
@@ -1805,7 +1854,7 @@ function refresh(resetSel) {
   const cmp = rl && state.sort === 'added' ? (a, b) => rlAt(a) - rlAt(b) : SORTS[state.sort] || colSort(state.sort, v) || SORTS.added;
   if (rl && state.sort === 'list') { if (state.dir < 0) v.reverse(); }
   else if (state.group !== 'dups' && state.group !== 'recent') v.sort(cmp.blank ? (a, b) => cmp.blank(a) - cmp.blank(b) || state.dir * cmp(a, b) : state.dir > 0 ? cmp : (a, b) => cmp(b, a));
-  if (state.group !== 'toread' && state.group !== 'dups' && state.group !== 'recent') v = nestVersions(v); else NESTED = new Set();
+  if (state.group !== 'toread' && state.group !== 'dups' && state.group !== 'recent') v = nestVersions(v); else { NESTED = new Set(); CHAPTER_ROWS = new Set(); }
   state.view = v;
   renderRLBar();
   renderForthBar();
@@ -1813,10 +1862,12 @@ function refresh(resetSel) {
   $('#searchSave').hidden = !match;
   renderTabs();
 
+  // (Each publication once: not again as a chapter under its book.)
+  const once = CHAPTER_ROWS.size ? v.filter((e, i) => !CHAPTER_ROWS.has(i)) : v;
   $('#statusL').textContent = toks.length
-    ? `${v.length.toLocaleString()} of ${base.length.toLocaleString()} publications match`
+    ? `${once.length.toLocaleString()} of ${base.length.toLocaleString()} publications match`
     : `${base.length.toLocaleString()} publications`;
-  const nf = v.filter(e => e.files).length;
+  const nf = once.filter(e => e.files).length;
   $('#statusR').textContent = `${nf.toLocaleString()} with files`;
   renderSortUI();
   lengthsWanted();
@@ -2171,9 +2222,10 @@ function rowHTML(e, i, top, h) {
     ? `<button type="button" class="fileicon${savedHere(e) ? ' saved' : ''}" data-open-pdf="${i}" title="${n > 1 ? 'Read one of its ' + n + ' PDFs' : 'Read ' + esc(f.n)}${savedHere(e) ? ' (saved on this device: opens offline)' : ''}" aria-label="Read the PDF">${ICON.doc}</button>`
     : f ? `<a class="fileicon" href="${esc(driveUrl(f))}" target="_blank" rel="noopener" title="Open ${esc(f.n)}" aria-label="Open linked file">${ICON.doc}</a>`
     : '';
-  return `<div class="row${e.k === state.selKey ? ' sel' : ''}${state.picked.has(e.k) ? ' picked' : ''}${i % 2 ? ' odd' : ''}${NESTED.has(e.k) ? ' child' : ''}" data-i="${i}"` +
+  const ch = CHAPTER_ROWS.has(i);
+  return `<div class="row${e.k === state.selKey ? ' sel' : ''}${state.picked.has(e.k) ? ' picked' : ''}${i % 2 ? ' odd' : ''}${NESTED.has(e.k) || ch ? ' child' : ''}${ch ? ' chap' : ''}" data-i="${i}"` +
     `${rowDrag() ? ' draggable="true"' : ''} style="top:${top}px;height:${h}px">` +
-    `<span class="c-file">${file}</span>` + COL_LIST.map(k => colCell(k, e)).join('') + `</div>`;
+    `<span class="c-file">${file}</span>` + COL_LIST.map(k => colCell(k, e, i)).join('') + `</div>`;
 }
 // Length's cell: the pages; waiting to be counted, a spinner; couldn't
 // be counted, a dash (why, on hover).
@@ -2184,9 +2236,21 @@ function lengthCell(e) {
   if (fl && (LEN.now === fl.id || LEN.queue.some(x => x.id === fl.id))) return `<span class="c-x c-len" title="Counting its pages\u2026"><i class="len-wait" aria-label="Counting its pages"></i></span>`;
   return `<span class="c-x c-len"></span>`;
 }
-function colCell(k, e) {
+// A book with chapters: its ▸ (to show them under it) and how many; a
+// chapter shown under its book: "in this book".
+function bookBits(e, i) {
+  if (CHAPTER_ROWS.has(i)) return { before: '', after: `<span class="in-book">in this book</span>` };
+  const n = (CHAPTERS.get(e.k) || []).length;
+  if (!n || state.group === 'toread' || state.group === 'dups' || state.group === 'recent') return { before: '', after: '' };
+  const open = OPEN_BOOKS.has(e.k);
+  return {
+    before: `<button type="button" class="book-disc${open ? ' open' : ''}" data-book="${esc(e.k)}" aria-expanded="${open}" aria-label="${open ? 'Hide' : 'Show'} its ${n} chapter${n > 1 ? 's' : ''}" title="${open ? 'Hide' : 'Show'} its chapters"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>`,
+    after: `<span class="ch-count">${n} chapter${n > 1 ? 's' : ''}</span>`,
+  };
+}
+function colCell(k, e, i) {
   if (k === 'length') return lengthCell(e);
-  if (k === 'title') return `<span class="c-title">${rlTag(e)}${esc(e.f.title || '(untitled)')}</span>`;
+  if (k === 'title') { const b = bookBits(e, i); return `<span class="c-title">${b.before}${rlTag(e)}<span class="t-text">${esc(e.f.title || '(untitled)')}</span>${b.after}</span>`; }
   if (k === 'author') return `<span class="c-author" title="${esc(e.authorsInit)}">${esc(e.authorsInit)}</span>`;
   if (k === 'added') return addedCell(e);
   const d = colDef(k), v = d ? d.cell(e) : '';
@@ -2202,8 +2266,9 @@ function cardWait(e) {
   return x ? ` <span class="${staleRL(x) ? 'stale' : ''}">\u00b7 ${esc(waited(x, true))}</span>` : '';
 }
 function cardHTML(e, i, top, h) {
-  return `<div class="card${e.k === state.selKey && !state.picking ? ' sel' : ''}${state.picked.has(e.k) ? ' picked' : ''}${h < CARD_H[1] ? ' one' : ''}${NESTED.has(e.k) ? ' child' : ''}" data-i="${i}" style="top:${top}px;height:${h}px">` +
-    (state.picking ? pickBox(e) : '') + `<div class="t">${esc(e.f.title || '(untitled)')}</div>` +
+  const ch = CHAPTER_ROWS.has(i), b = bookBits(e, i);
+  return `<div class="card${e.k === state.selKey && !state.picking ? ' sel' : ''}${state.picked.has(e.k) ? ' picked' : ''}${h < CARD_H[1] ? ' one' : ''}${NESTED.has(e.k) || ch ? ' child' : ''}${ch ? ' chap' : ''}" data-i="${i}" style="top:${top}px;height:${h}px">` +
+    (state.picking ? pickBox(e) : '') + `<div class="t">${b.before}<span class="t-text">${esc(e.f.title || '(untitled)')}</span>${b.after}</div>` +
     `<div class="m"><span>${esc(e.authorsInit)}${e.f.year ? ' \u00b7 ' + esc(e.f.year) : ''}${rlTag(e)}${cardWait(e)}</span></div>` +
     `<div class="m"><span class="v">${esc(e.venue)}</span>${!e.files ? '' : readablePdfs(e).length && !state.picking
       ? `<button type="button" class="pdf${savedHere(e) ? ' saved' : ''}" data-open-pdf="${i}" aria-label="Read the PDF${savedHere(e) ? ' (saved on this device)' : ''}">PDF${readablePdfs(e).length > 1 ? ' \u00b7 ' + readablePdfs(e).length : ''}</button>`
@@ -2286,6 +2351,8 @@ listEl.addEventListener('scroll', () => {
   });
 }, { passive: true });
 rowsEl.addEventListener('click', ev => {
+  const bk = ev.target.closest('[data-book]');
+  if (bk) { ev.stopPropagation(); ev.preventDefault(); toggleBook(bk.dataset.book); return; }
   const b = ev.target.closest('[data-open-pdf]');
   if (!b) return;
   ev.stopPropagation();
@@ -2693,6 +2760,7 @@ function renderDetail() {
   }
   const v = venueHTML(e);
   if (v) h += `<div class="d-venue d-cite">${v}</div>`;
+  h += inBookHTML(e);
   const rl = readingHTML(e);
 
   const btns = [];
@@ -2813,7 +2881,7 @@ function renderDetail() {
       (e.groups || []).map(g => `<button class="chip grp-chip" data-goto="${esc('s:' + g)}">${esc(g)}</button>`).join('') +
       e.kw.map(k => `<button class="chip" data-goto="${esc('k:' + k)}">${esc(k)}</button>`).join('') + kwAdd + `</div>` + kwsDetailRow(e);
   }
-  const vers = versionsHTML(e);
+  const vers = versionsHTML(e) + chaptersHTML(e);
   let abs = '', body = '';
   if (f.abstract) abs = `<section class="d-sec"><h3>Abstract</h3><p class="d-abstract">${esc(f.abstract)}</p></section>`;
   // Notes: click to write or change them, right here.
@@ -3042,6 +3110,7 @@ detailEl.addEventListener('click', ev => {
   if (gs && e && ka) { openKwAdd(ka); return; }
   if (e && ev.target.closest('[data-notdup]')) { notDuplicates(e); return; }
   if (gs && e && ev.target.closest('[data-rename]')) { editKey(e); return; }
+  if (gs && e && ev.target.closest('[data-add-chapter]')) { openAddChapter(e); return; }
   const vgo = ev.target.closest('[data-version]');
   if (vgo) { showTwin(vgo.dataset.version); return; }
   const un = ev.target.closest('[data-unjoin]');

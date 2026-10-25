@@ -1,8 +1,8 @@
 ﻿// LibLande: Keywords: suggested for a publication (in Add, Edit and its details), and Tidy keywords, for the whole library.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
+// index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/keywords.js'] = '2026-10-25.02';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/keywords.js'] = '2026-10-25.03';
 /* ------------------------------------------------------------ suggested keywords */
 // Suggested from your own keywords: those of the publications most like
 // this one (by the words of their titles and abstracts, their authors and

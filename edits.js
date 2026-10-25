@@ -19,7 +19,7 @@
  */
 (function (root) {
   'use strict';
-  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).edits = '2026-10-25.02';
+  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).edits = '2026-10-25.03';
   const FOLDER = 'application/vnd.google-apps.folder';
   const UPLOAD = 'https://www.googleapis.com/upload/drive/v3/';
   const READING_FILE = 'reading-list.json',
@@ -138,10 +138,30 @@
     // checked once. An entry that can't be edited is left out, with why.
     // An item can also go into static groups, or out of them (groups: {add,
     // remove}), which leaves its fields and date be.
-    saveMany(text, items, modified) {
+    // (Also new entries added (adds: {type, key, fields}, at the end, so a
+    // book comes after the chapters that name it, as BibTeX wants), and
+    // entries taken out (removes: {key, expectHash}, as Undo does with
+    // ones added so), in the same save.)
+    saveMany(text, items, modified, adds, removes) {
       const before = parseBib_(text)[0];
       let cur = text;
       const applied = [], skipped = [];
+      adds = adds || []; removes = removes || [];
+      const have = new Set(before.map(e => e[1]));
+      adds.forEach(a => {
+        if (have.has(a.key)) throw new Error('There\u2019s already a publication with the cite key ' + a.key + ', so LibLande didn\u2019t save the changes.');
+        have.add(a.key);
+        cur = appendEntry_(cur, bibEntryText_(a.type, a.key, a.fields));
+      });
+      const grouped = new Set(staticGroups_(parseBib_(text)[1]).flatMap(g => g.keys));
+      removes.forEach(r => {
+        if (r.expectHash && hashOf(cur, r.key) !== r.expectHash) throw new Error(r.key + ' has been changed since it was added, so LibLande didn\u2019t take it out.');
+        if (grouped.has(r.key)) throw new Error(r.key + ' is in a static group, so LibLande didn\u2019t take it out.');
+        const loc = locateEntry_(cur, r.key);
+        let s = loc.start;
+        while (s > 0 && /\s/.test(cur[s - 1])) s--;
+        cur = cur.slice(0, s) + cur.slice(loc.end);
+      });
       for (const it of items) {
         try {
           if (it.expectHash && hashOf(cur, it.key) !== it.expectHash) throw new Error('It has been changed since LibLande last read it (perhaps in BibDesk).');
@@ -157,9 +177,11 @@
           skipped.push({ key: it.key, reason: e.message });
         }
       }
-      if (!applied.length) return { text: null, hashes: {}, skipped };
+      if (!applied.length && !adds.length && !removes.length) return { text: null, hashes: {}, skipped };
       const after = parseBib_(cur)[0];
-      if (after.length !== before.length) throw new Error('The updates would have changed the number of entries, so LibLande didn\u2019t save them.');
+      if (after.length !== before.length + adds.length - removes.length) throw new Error('The updates would have changed the number of entries, so LibLande didn\u2019t save them.');
+      const keysAfter = new Set(after.map(e => e[1]));
+      if (adds.some(a => !keysAfter.has(a.key)) || removes.some(r => keysAfter.has(r.key))) throw new Error('The publications added or taken out didn\u2019t come out as expected, so LibLande didn\u2019t save the changes.');
       const byKey = new Map(after.map(e => [e[1], e]));
       applied.forEach(a => Object.keys(a.set).forEach(n => {
         const want = a.set[n] == null ? '' : String(a.set[n]), e = byKey.get(a.key);
@@ -173,6 +195,7 @@
       });
       const hashes = {};
       applied.forEach(a => { hashes[a.key] = hashOf(cur, a.key); });
+      adds.forEach(a => { hashes[a.key] = hashOf(cur, a.key); });
       return { text: cur, hashes, skipped, gh: groupsHashOf(parseBib_(cur)) };
     },
     // A new cite key (renameKey_ and checkRename_ in Build.gs).
@@ -595,7 +618,8 @@
       step('Waiting for an earlier change to finish');
       return serial(async () => {
       const items = (req.items || []).map(x => Object.assign({}, x, x.set ? { set: texSafe(Object.assign({}, x.set)) } : {}));
-      const out = await changeFile(await mainBibId(), text => run('saveMany', text, items, req.modified), req.backupName, step);
+      const adds = (req.adds || []).map(a => Object.assign({}, a, { fields: texSafe(Object.assign({}, a.fields)) }));
+      const out = await changeFile(await mainBibId(), text => run('saveMany', text, items, req.modified, adds, req.removes || []), req.backupName, step);
       return { stamp: out.stamp || null, hashes: out.hashes || {}, skipped: out.skipped || [], gh: out.gh || null };
       });
     };

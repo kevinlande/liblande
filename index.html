@@ -79,7 +79,7 @@ try {
       <button type="button" class="tb-btn net-badge" id="netBadge" data-net hidden aria-live="polite"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 18.5h9.8a3.7 3.7 0 0 0 .6-7.35A5.6 5.6 0 0 0 7.2 9.6a4.45 4.45 0 0 0 .3 8.9z"/><path class="net-slash" d="M4 4l16 16"/></svg><span class="net-n"></span></button>
       <button type="button" class="tb-btn select-btn" id="selectBtn" title="Select several publications to export or copy" aria-label="Select several publications" aria-pressed="false"><svg class="i" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><path d="M5.5 7l1.5 1.5 2.5-3"/><path d="M14 7h7M14 17h7"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/></svg></button>
       <button type="button" class="tb-btn tb-more" id="moreBtn" aria-label="More" title="More" aria-haspopup="menu" aria-expanded="false"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="18" cy="12" r="1.4"/></svg></button>
-      <button type="button" class="tb-btn" id="addBtn" hidden aria-label="Add a publication" title="Add a publication"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+      <span class="tb-add-pair"><button type="button" class="tb-btn" id="addBtn" hidden aria-label="Add a publication" title="Add a publication"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button><button type="button" class="tb-btn tb-add-more" id="addMore" hidden aria-label="More ways to add" title="Paste, From a photo, or a chapter of the selected book" aria-haspopup="menu" aria-expanded="false"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg></button></span>
       <button class="tb-btn tb-refresh" id="refreshBtn" hidden aria-label="Check for changes" title="Check Google Drive for changes">
         <svg class="i" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>
       </button>
@@ -286,7 +286,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-25.02</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-25.03</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -301,7 +301,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-25.02';
+      l.querySelector('small').textContent = 'Version 2026-10-25.03';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -313,14 +313,14 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-25.02): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-25.03): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
 })();
 </script>
 
-<script id="appLoader" data-parts="app/library.js app/reader.js app/editing.js app/citecheck.js app/newpapers.js app/ocr.js app/split.js app/outline.js app/findpdf.js app/titlesearch.js app/keywords.js app/tour.js app/start.js">
+<script id="appLoader" data-parts="app/library.js app/reader.js app/editing.js app/citecheck.js app/newpapers.js app/ocr.js app/split.js app/outline.js app/findpdf.js app/titlesearch.js app/keywords.js app/chapters.js app/tour.js app/start.js">
 // The app's scripts (app/), fetched together and run joined as one script,
 // in one go, inside one function: so nothing else runs between them (a
 // timer one sets can't find the next not yet there), and their names stay

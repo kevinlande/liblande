@@ -1,8 +1,8 @@
 ﻿// LibLande: adding and editing, BibTeX pasted in, selecting several, updates, cite keys, versions, export, the keyboard.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
+// index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-10-25.02';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-10-25.03';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -798,6 +798,12 @@ async function saveAdd() {
   if (kws.length) vals.keywords = kws.join('; ');
   // (Fields from a pasted BibTeX entry that the form has no box for.)
   Object.keys(sheet.extra || {}).forEach(n => { if (!vals[n]) vals[n] = sheet.extra[n]; });
+  // (A chapter added from its book: linked to it. Another chapter whose
+  // book is in the library, found by its title: linked to it too, and its
+  // book details it lacks filled in from the book; see chapters.js.)
+  if (sheet.chapterOf && BYKEY.has(sheet.chapterOf)) vals.crossref = sheet.chapterOf;
+  const bookOf = !vals.crossref && (type === 'incollection' || type === 'inbook') ? lcBookFor(vals) : null;
+  if (bookOf) Object.assign(vals, lcFill(vals, bookOf));
   if (vals.month) vals.month = tidyMonth(vals.month);
   Object.keys(vals).forEach(n => { if (!vals[n]) delete vals[n]; });
   // Already in the library? Say so once; a second press adds it anyway.
@@ -812,7 +818,17 @@ async function saveAdd() {
   const bad = Object.keys(vals).find(n => !balanced(vals[n]));
   if (bad) { sheetMsg('The ' + (FIELD_LABELS[bad] || bad) + ' field has unbalanced braces { }. Check it and try again.', true); return; }
   let key = makeCiteKey(vals);
-  const pdf = $('#addPdf').files[0] || sheet.pdf, toRead = $('#addRL').checked;
+  let pdf = $('#addPdf').files[0] || sheet.pdf;
+  const toRead = $('#addRL').checked;
+  // (A chapter's pages from its book's PDF, unless a PDF was chosen.)
+  if (!pdf && chPdfWanted()) {
+    const s = sheet;
+    $('#sheetSave').disabled = true;
+    sheetMsg('Taking the chapter\u2019s pages from the book\u2019s PDF\u2026');
+    try { pdf = await chPdfFile(); } catch (err) { if (sheet === s) { $('#sheetSave').disabled = false; sheetMsg('Couldn\u2019t take the pages from the book\u2019s PDF: ' + errText(err), true); } return; }
+    if (sheet !== s) return;
+    $('#sheetSave').disabled = false;
+  }
   if (pdf && isOffline()) { sheetMsg('Adding a publication with its PDF needs a connection. Add it without the PDF now, and attach the PDF when you\u2019re back online.', true); return; }
   // The panel closes, and the adding goes on with a bar to say so; if it
   // fails, Try again opens the panel again as you left it.
@@ -847,8 +863,11 @@ async function saveAdd() {
     }
     if (toRead) rlAdd(key);
     if (res && res.queued) { showDone(vals.title, 'Added on this device; it goes to ' + DATA.source + ' when you\u2019re back online'); return; }
-    showDone(vals.title, 'Added to ' + DATA.source + (res.file ? ', with its PDF in ' + res.file.p.replace(/[/][^/]*$/, '') : ''));
+    showDone(vals.title, 'Added to ' + DATA.source + (res.file ? ', with its PDF in ' + res.file.p.replace(/[/][^/]*$/, '') : '') +
+      (bookOf ? '; linked to its book, \u201c' + shortTitle(bookOf.f.title || bookOf.k) + '\u201d' : ''));
     afterWrite();
+    // (A book: its chapters already in the library, offered to link.)
+    if (isBook(e)) setTimeout(() => lcOfferFor(e), 1200);
   } catch (err) {
     toast('Couldn\u2019t add ' + name + ': ' + errText(err), 12000, { label: 'Try again', run: () => reopenAdd(snap, errText(err)) });
   }
@@ -866,6 +885,7 @@ function reopenAdd(snap, why) {
   const shown = new Set([...$('#sheetBody').querySelectorAll('[data-field]')].map(el => el.dataset.field));
   sheet.extra = {};
   Object.keys(f).forEach(n => { if (!shown.has(n)) sheet.extra[n] = f[n]; });
+  if (f.crossref && BYKEY.has(f.crossref)) { sheet.chapterOf = f.crossref; delete sheet.extra.crossref; }
   kws.forEach(addKeyword);
   $('#addRL').checked = snap.toRead;
   sheet.dupWarned = snap.dup;
@@ -875,7 +895,7 @@ function reopenAdd(snap, why) {
 $('#sheetForm').addEventListener('submit', ev => {
   ev.preventDefault();
   if (!sheet || $('#sheetSave').disabled) return;
-  if (sheet.mode === 'edit') saveEdit(); else if (sheet.mode === 'forth') saveForth(); else if (sheet.mode === 'join') saveJoin(); else if (sheet.mode === 'export') runExport(); else if (sheet.mode === 'export-save') saveExport(); else if (sheet.mode === 'help' || sheet.mode === 'msreport' || sheet.mode === 'newpapers' || sheet.mode === 'qr') closeSheet(); else if (sheet.mode === 'npfollow') saveFollow(); else if (sheet.mode === 'mscheck') runMsCheck(); else if (sheet.mode === 'msfix') runMsFix(); else if (sheet.mode === 'smart') saveSmart(); else if (sheet.mode === 'bulk') saveBulk(); else if (sheet.mode === 'kwtidy') saveKwTidy(); else if (sheet.mode === 'attach') { const a = sheet, mode = ($('#sheetBody').querySelector('[name=attachMode]:checked') || {}).value; closeSheet(); runAttach(a.entry, a.file, mode === 'replace'); } else saveAdd();
+  if (sheet.mode === 'edit') saveEdit(); else if (sheet.mode === 'forth') saveForth(); else if (sheet.mode === 'join') saveJoin(); else if (sheet.mode === 'export') runExport(); else if (sheet.mode === 'export-save') saveExport(); else if (sheet.mode === 'help' || sheet.mode === 'msreport' || sheet.mode === 'newpapers' || sheet.mode === 'qr') closeSheet(); else if (sheet.mode === 'npfollow') saveFollow(); else if (sheet.mode === 'mscheck') runMsCheck(); else if (sheet.mode === 'msfix') runMsFix(); else if (sheet.mode === 'smart') saveSmart(); else if (sheet.mode === 'bulk') saveBulk(); else if (sheet.mode === 'kwtidy') saveKwTidy(); else if (sheet.mode === 'linkch') saveLinkChapters(); else if (sheet.mode === 'attach') { const a = sheet, mode = ($('#sheetBody').querySelector('[name=attachMode]:checked') || {}).value; closeSheet(); runAttach(a.entry, a.file, mode === 'replace'); } else saveAdd();
 });
 $('#sheetCancel').addEventListener('click', closeSheet);
 $('#sheetBody').addEventListener('click', ev => { const x = ev.target.closest('[data-sheet-cancel]'); if (x && !x.disabled) closeSheet(); });
@@ -942,7 +962,7 @@ $('#addBtn').addEventListener('click', () => {
 // chosen), each opening Add with that under way. (On a phone, + can be
 // in the toolbar's More menu: held there, the same; see addHold.)
 const AB = { t: 0, long: false, x: 0, y: 0 };
-function closeAddMenu() { const m = $('#addMenu'); if (m) m.remove(); }
+function closeAddMenu() { const m = $('#addMenu'); if (m) m.remove(); $('#addMore').setAttribute('aria-expanded', 'false'); }
 function openAddMenu(btn) {
   closeAddMenu();
   btn = btn || $('#addBtn');
@@ -952,17 +972,29 @@ function openAddMenu(btn) {
   m.id = 'addMenu';
   m.setAttribute('role', 'menu');
   m.setAttribute('aria-label', 'Add a publication');
+  // (With a book selected, a chapter of it too, named by its title.)
+  const sel = state.selKey && BYKEY.get(state.selKey), book = !state.picking && isBook(sel) && !sel.ib ? sel : null;
   m.innerHTML = `<div class="menu-head">Add a publication</div>` +
     (navigator.clipboard && navigator.clipboard.readText ? `<button type="button" role="menuitem" class="mi" data-add="paste">${ICON.paste}<span class="op-text"><span class="rc-title">Paste</span><span class="rc-sub">A BibTeX entry, DOI or title you copied</span></span></button>` : '') +
-    `<button type="button" role="menuitem" class="mi" data-add="photo">${ICON.camera}<span class="op-text"><span class="rc-title">From a photo</span><span class="rc-sub">Take one, or choose one</span></span></button>`;
+    `<button type="button" role="menuitem" class="mi" data-add="photo">${ICON.camera}<span class="op-text"><span class="rc-title">From a photo</span><span class="rc-sub">Take one, or choose one</span></span></button>` +
+    (book ? `<button type="button" role="menuitem" class="mi" data-add="chapter">${ICON.addChapter}<span class="op-text"><span class="rc-title">Add a chapter</span><span class="rc-sub">To ${esc(shortTitle(book.f.title || book.k))}</span></span></button>` : '');
   document.body.appendChild(m);
+  $('#addMore').setAttribute('aria-expanded', 'true');
   const r = btn.getBoundingClientRect();
   m.style.left = Math.max(8, Math.min(window.innerWidth - m.offsetWidth - 8, r.right - m.offsetWidth)) + 'px';
   m.style.top = (r.bottom + 6) + 'px';
+  m.addEventListener('pointerenter', () => clearTimeout(AH.hide));
+  m.addEventListener('pointerleave', ev => { if (ev.pointerType === 'mouse') AH.hide = setTimeout(closeAddMenu, 250); });
+  m.addEventListener('keydown', ev => {
+    const items = [...m.querySelectorAll('[data-add]')], i = items.indexOf(document.activeElement);
+    if (ev.key === 'ArrowDown') { ev.preventDefault(); items[Math.min(items.length - 1, i + 1)].focus(); }
+    else if (ev.key === 'ArrowUp') { ev.preventDefault(); if (i > 0) items[i - 1].focus(); }
+  });
   m.addEventListener('click', ev => {
     const b = ev.target.closest('[data-add]');
     if (!b) return;
     closeAddMenu();
+    if (b.dataset.add === 'chapter') { if (book) openAddChapter(book); return; }
     if (b.dataset.add === 'paste') {
       // (Asked now, at the tap, as browsers require.)
       let read;
@@ -997,7 +1029,35 @@ function addHold(btn, shown) {
   btn.addEventListener('contextmenu', ev => { if (AB.long || $('#addMenu')) ev.preventDefault(); });
 }
 addHold($('#addBtn'));
-document.addEventListener('pointerdown', ev => { if ($('#addMenu') && !ev.target.closest('#addMenu, #addBtn')) closeAddMenu(); }, true);
+// With a mouse or trackpad, the menu comes when the pointer rests on +,
+// and goes once it has left both (as the open papers' list does); or Down
+// on + from the keyboard. On a touch screen (an iPad or iPhone), a \u25be
+// beside + as well as holding it, as the open papers' button has.
+const AH = { t: 0, hide: 0 };
+$('#addBtn').addEventListener('pointerenter', ev => {
+  if (ev.pointerType !== 'mouse') return;
+  clearTimeout(AH.hide);
+  if (!$('#addMenu')) { clearTimeout(AH.t); AH.t = setTimeout(() => openAddMenu(), 350); }
+});
+$('#addBtn').addEventListener('pointerleave', ev => {
+  if (ev.pointerType !== 'mouse') return;
+  clearTimeout(AH.t);
+  AH.hide = setTimeout(closeAddMenu, 250);
+});
+// (A click on + opens Add, so the menu resting on it brought goes; not the
+// click that can follow a hold, which showed the menu.)
+$('#addBtn').addEventListener('click', () => { clearTimeout(AH.t); if (!AB.long) closeAddMenu(); }, true);
+$('#addBtn').addEventListener('keydown', ev => { if (ev.key === 'ArrowDown') { ev.preventDefault(); openAddMenu(); const first = $('#addMenu [data-add]'); if (first) first.focus(); } });
+$('#addMore').addEventListener('click', ev => {
+  if ($('#addMenu')) { closeAddMenu(); return; }
+  openAddMenu();
+  if (ev.detail === 0) { const first = $('#addMenu [data-add]'); if (first) first.focus(); }
+});
+function addMoreShown() { $('#addMore').hidden = $('#addBtn').hidden || !coarseMQ.matches; }
+new MutationObserver(addMoreShown).observe($('#addBtn'), { attributes: true, attributeFilter: ['hidden'] });
+coarseMQ.addEventListener('change', addMoreShown);
+addMoreShown();
+document.addEventListener('pointerdown', ev => { if ($('#addMenu') && !ev.target.closest('#addMenu, #addBtn, #addMore')) closeAddMenu(); }, true);
 document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && $('#addMenu')) { ev.stopPropagation(); closeAddMenu(); } }, true);
 window.addEventListener('resize', closeAddMenu);
 
@@ -1575,6 +1635,46 @@ async function renameCore(e, newKey) {
 }
 
 /* ------------------------------------------------------------ versions: joining */
+/* ------------------------------------------------------------ chapters */
+// A chapter added from its book (Add chapter\u2026 in the book's details): the
+// chapter's type, the book's title, editors (or, for a book by one author,
+// its author), publisher, place, year, ISBN and series filled in, and the
+// link to the book (crossref) made when it's added. You give the title,
+// authors and pages.
+function openAddChapter(book) {
+  openAdd();
+  sheet.chapterOf = book.k;
+  $('#sheetBody .sheet-head h2').textContent = 'Add a chapter';
+  const raw = n => rawOf(book, n), f = { booktitle: raw('title') };
+  if (raw('editor')) f.editor = raw('editor'); else if (raw('author')) f.author = raw('author');
+  ['publisher', 'address', 'year', 'isbn', 'series', 'volume', 'edition'].forEach(n => { if (raw(n)) f[n] = raw(n); });
+  $('#addType').value = 'incollection';
+  renderAddFields(f);
+  $('#sheetBody .fld').insertAdjacentHTML('beforebegin', `<p class="add-in">${ICON.link}<span>In <b>${esc(book.f.title || book.k)}</b>, linked to it</span></p>`);
+  // (Its pages from the book's PDF, if it has one: see chapters.js.)
+  if (readablePdfs(book).length) chPdfSetup(book);
+  const t = $('#sheetBody [data-field="title"]');
+  if (t && !coarseMQ.matches) t.focus();
+}
+// In a book's details: its chapters in the library, in the book's order;
+// in a chapter's: its book.
+// (With "+ Add chapter" at its head: a book's chapter added, with the
+// book's details filled in. A book with none yet has just that.)
+function chaptersHTML(e) {
+  const list = CHAPTERS.get(e.k) || [], add = gs && !e.ib && isBook(e);
+  if (!list.length && !add) return '';
+  const btn = add ? `<button type="button" class="ch-add" data-add-chapter title="Add a chapter of this book, with the book\u2019s details filled in">${ICON.addChapter}<span>Add chapter</span></button>` : '';
+  if (!list.length) return `<section class="d-sec d-chapters"><h3><span>Chapters</span>${btn}</h3></section>`;
+  return `<section class="d-sec d-chapters"><h3><span>Chapters in your library \u00b7 ${list.length}</span>${btn}</h3><ul>` + list.map(c =>
+    `<li><button type="button" data-version="${esc(c.k)}"><span class="ch-t">${esc(c.f.title || c.k)}</span>${c.authorsShort ? `<span class="ch-a">${esc(c.authorsShort)}</span>` : ''}</button>` +
+    (c.f.pages ? `<span class="ch-pp">pp. ${esc(c.f.pages.replace(/-+/g, '\u2013'))}</span>` : '') + `</li>`).join('') + `</ul></section>`;
+}
+function inBookHTML(e) {
+  const b = CHAPTER_OF.has(e.k) && BYKEY.get(CHAPTER_OF.get(e.k));
+  if (!b) return '';
+  const who = [b.authorsShort, b.f.publisher].filter(Boolean).join(' \u00b7 ');
+  return `<div class="d-inbook">In: <button type="button" data-version="${esc(b.k)}">${esc(b.f.title || b.k)}</button>${who ? ` <span>\u00b7 ${esc(who)}</span>` : ''}</div>`;
+}
 function versionsHTML(e) {
   const mainK = VERSION_OF.get(e.k), main = mainK ? BYKEY.get(mainK) : (VERSIONS.has(e.k) ? e : null);
   if (!main) return '';
