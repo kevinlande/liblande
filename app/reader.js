@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-25.06';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-25.07';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -5630,10 +5630,12 @@ function joinBroken(t, pageText) {
   const page = norm(pageText || '');
   return t.replace(/(\p{L}+)[-\u2010] (\p{Ll}+)/gu, (m, a, b) => page.includes(norm(a + '-' + b)) ? a + '-' + b : a + b);
 }
+// (my: the sidebar's turn, to stop if it moves on; null for a paper not
+// in the sidebar, as Copy for AI reads from the details.)
 async function collectMarks(doc, my) {
   const marks = [];
   for (let n = 1; n <= doc.numPages; n++) {
-    if (my !== SIDE.token) return null;
+    if (my !== null && my !== SIDE.token) return null;
     const page = await doc.getPage(n);
     const anns = (await page.getAnnotations()).filter(a => MARK_NAMES[a.subtype]);
     if (!anns.length) continue;
@@ -5681,7 +5683,7 @@ async function showMarks() {
   }
   if (my !== SIDE.token || SIDE.tab !== 'marks') return;
   const unsaved = V.dirty || V.drawing ? `<p class="v-side-note">New marks appear here once they\u2019re saved.</p>` : '';
-  if (!SIDE.marks.length) { body.innerHTML = unsaved + `<p class="v-side-note">This paper has no annotations yet.</p>`; return; }
+  if (!SIDE.marks.length) { body.innerHTML = unsaved + `<p class="v-side-note">This paper has no annotations yet.</p><div class="v-marks-acts">${AI_BTN}</div>`; return; }
   // By colour: a chip for each colour used (with how many), to see only
   // those; the summary, then, is of those too.
   const cols = new Map();
@@ -5693,7 +5695,7 @@ async function showMarks() {
       `<i style="background:${c.css}"></i>${esc(c.name)} <span>${c.n}</span></button>`).join('') + `</div>` : '';
   const shown = SIDE.colour ? SIDE.marks.filter(m => (markColour(m) || {}).key === SIDE.colour) : SIDE.marks;
   const worded = shown.filter(m => m.text || m.note).length;
-  let h = unsaved + chips + (worded ? `<div class="v-marks-acts"><button type="button" class="btn" data-marks-copy title="Every highlight and note, by page, with the reference">${ICON.copy}<span>Copy summary</span></button>` +
+  let h = unsaved + chips + (worded ? `<div class="v-marks-acts"><button type="button" class="btn" data-marks-copy title="Every highlight and note, by page, with the reference">${ICON.copy}<span>Copy summary</span></button>` + AI_BTN +
     (gs ? `<button type="button" class="btn" data-marks-notes title="Added to the publication\u2019s Notes">${ICON.pencil}<span>Add to notes</span></button>` : '') + `</div>` : '') + `<div class="v-marks">`, last = 0;
   // (A mark of words, as a highlight or underline: Copy and Quote at its
   // top right.)
@@ -5745,6 +5747,71 @@ function marksSummary(withRef) {
     (m.text ? `: \u201c${esc(m.text)}\u201d` : '') + (m.note ? (m.text ? '<br>' : ': ') + `<i>${esc(m.note)}</i>` : '') + '</li>').join('') + '</ul>';
   return { text, html, n: list.length };
 }
+/* ---- Copy for AI */
+// A prompt to paste into Claude (or another AI): summarize this paper,
+// weighing my highlights and notes. With the paper's APA citation, its
+// text page by page (by the page numbers printed in it, where the PDF
+// gives them), and then the highlights and notes with their pages. Nothing
+// is sent anywhere by LibLande: it's copied, for you to paste. (A scan
+// without text says so; a very long PDF is cut short, and says where.)
+const AI_MAX = 600000;
+const AI_BTN = `<button type="button" class="btn" data-ai-copy title="A prompt to paste into Claude: summarize this paper, weighing your highlights and notes (with its citation and text)">${ICON.ai}<span>Copy for AI</span></button>`;
+async function aiPrompt(entry, doc, marks, pp) {
+  const labels = await doc.getPageLabels().catch(() => null), useL = labels && labels.some((l, i) => l !== String(i + 1));
+  const name = n => (pp && pp.get(n)) || (useL && labels[n - 1]) || String(n);
+  let body = '', letters = 0, cut = 0;
+  for (let n = 1; n <= doc.numPages; n++) {
+    const items = (await (await doc.getPage(n)).getTextContent()).items;
+    const t = items.map(it => it.str + (it.hasEOL ? '\n' : ' ')).join('').replace(/[ \t]+\n/g, '\n').replace(/[ \t]{2,}/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+    letters += t.replace(/\s/g, '').length;
+    if (body.length + t.length > AI_MAX) { cut = n; break; }
+    if (t) body += '\n\n[Page ' + name(n) + ']\n' + t;
+  }
+  const scan = !cut && letters < doc.numPages * 40;
+  const mk = (marks || []).filter(m => m.text || m.note);
+  const marksText = mk.map(m => 'p. ' + name(m.page) + ' \u2014 ' + m.name + (m.text ? ': \u201c' + quoteText(m.text) + '\u201d' : '') + (m.note ? (m.text ? '\n    My note: ' : ': ') + m.note : '')).join('\n');
+  const text = 'Please summarize the paper below for me. Give its main question, its argument or method, and its conclusions. ' +
+    'Put particular weight on the passages I highlighted or underlined, and take up my notes: what they ask, doubt or connect. Quote the paper where it helps, with page numbers.\n\n' +
+    'Citation (APA):\n' + apaCitation(entry).text + '\n\n' +
+    'The paper\u2019s text, page by page' + (useL || pp ? ' (page numbers as printed)' : '') + ':' +
+    (scan ? '\n\n(This PDF is a scan with little or no text to read, so its text isn\u2019t here: work from the citation and my highlights and notes, and say what you can\u2019t tell from them.)' : body) +
+    (cut ? '\n\n(The text stops before page ' + name(cut) + ' of ' + doc.numPages + ': the rest was too long to include.)' : '') + '\n\n' +
+    'My highlights and notes' + (mk.length ? ' (' + mk.length + '):\n' + marksText : ':\nI haven\u2019t highlighted or noted anything in this paper yet, so summarize it as a whole.') + '\n\n' +
+    'Remember to weigh my highlights and notes above in the summary.';
+  return { text, marks: mk.length, pages: cut ? cut - 1 : doc.numPages, scan, cut };
+}
+// Copied as soon as you click (Safari allows the clipboard only then), its
+// text filled in as it's read.
+function aiCopy(make) {
+  toast('Reading the paper\u2019s text for the prompt\u2026', 0, null, true);
+  const p = make();
+  const said = r => 'Copied a prompt for an AI: the citation, ' + (r.scan ? 'no text (a scan)' : r.pages + ' page' + (r.pages === 1 ? '' : 's') + ' of text') + ', and ' + r.marks + ' highlight' + (r.marks === 1 ? '' : 's') + ' and notes. Paste it into Claude.';
+  const failed = err => toast('Couldn\u2019t make the prompt: ' + errText(err), 6000);
+  try {
+    if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+      navigator.clipboard.write([new ClipboardItem({ 'text/plain': p.then(r => new Blob([r.text], { type: 'text/plain' })) })])
+        .then(() => p.then(r => toast(said(r), 6000)), () => p.then(r => copy(r.text, said(r)), failed));
+      return;
+    }
+  } catch (err) { /* as below */ }
+  p.then(r => copy(r.text, said(r)), failed);
+}
+// From the reader (the paper open, its marks as listed); or from a
+// publication's details (its first PDF read here).
+function aiCopyOpen() {
+  if (!V.doc || !V.entry) return;
+  const entry = V.entry, doc = V.doc;
+  aiCopy(async () => aiPrompt(entry, doc, SIDE.marks || await collectMarks(doc, null), SIDE.pp));
+}
+function aiCopyFor(e) {
+  const fl = readablePdfs(e)[0];
+  if (!fl) return;
+  aiCopy(async () => {
+    const doc = await openPdf(await loadPdfJs(), { data: (await getPdfBytes(fl)).slice(0) }).promise;
+    try { return await aiPrompt(e, doc, await collectMarks(doc, null)); } finally { closePdf(doc); }
+  });
+}
+$('#vSideBody').addEventListener('click', ev => { if (ev.target.closest('[data-ai-copy]')) aiCopyOpen(); });
 // A mark's words, copied; or as a quotation (as Quote does a selection),
 // with the journal's page. The icon ticks for a moment.
 $('#vSideBody').addEventListener('click', async ev => {

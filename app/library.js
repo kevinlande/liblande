@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-25.06';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-25.07';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -40,6 +40,8 @@ const ICON = {
   paste: '<svg class="i" viewBox="0 0 24 24"><path d="M9 4.5H7.5A1.5 1.5 0 0 0 6 6v13a1.5 1.5 0 0 0 1.5 1.5h9A1.5 1.5 0 0 0 18 19V6a1.5 1.5 0 0 0-1.5-1.5H15"/><path d="M9 3.5h6v2.5H9zM9 11h6M9 14.5h6M9 18h3.5"/></svg>',
   // (A chapter added to a book: the book, with a plus on its cover.)
   addChapter: '<svg class="i" viewBox="0 0 24 24"><path d="M5 5.5A2.5 2.5 0 0 1 7.5 3H19v14H7.5A2.5 2.5 0 0 0 5 19.5z"/><path d="M5 19.5A2.5 2.5 0 0 0 7.5 22H19v-5"/><path d="M12 7v6M9 10h6"/></svg>',
+  // (Copy for AI: a spark.)
+  ai: '<svg class="i" viewBox="0 0 24 24"><path d="M12 3.5l1.9 5.1 5.1 1.9-5.1 1.9-1.9 5.1-1.9-5.1-5.1-1.9 5.1-1.9z"/><path d="M18.5 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/></svg>',
   camera: '<svg class="i" viewBox="0 0 24 24"><path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2.3l1.4-2h5.6l1.4 2h2.3A1.5 1.5 0 0 1 20 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5z"/><circle cx="12" cy="12.8" r="3.4"/></svg>',
   qr: '<svg class="i" viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4z"/><path d="M14 14h2.5v2.5H14zM17.5 17.5H20V20h-2.5zM14 20h2M20 14v2"/></svg>',
   eraser: '<svg class="i" viewBox="0 0 24 24"><path d="M9 20h11"/><path d="M4.7 14.3l8.6-8.6a2 2 0 0 1 2.8 0l3.2 3.2a2 2 0 0 1 0 2.8L12 19H8l-3.3-3.3a1 1 0 0 1 0-1.4z"/><path d="M9.3 9.7l5 5"/></svg>',
@@ -2820,7 +2822,9 @@ function renderDetail() {
     `<div class="menu-list" role="menu"><button type="button" role="menuitem" class="mi" data-copy="bibtex">${ICON.bib}<span>BibTeX</span><kbd>${esc(keyHint('copyBib'))}</kbd></button>` +
     `<button type="button" role="menuitem" class="mi" data-copy="apa">${ICON.apa}<span>APA (long)</span><kbd>${esc(keyHint('copyApa'))}</kbd></button>` +
     `<button type="button" role="menuitem" class="mi" data-copy="apa-short">${ICON.intext}<span>APA (short)</span><kbd>${esc(keyHint('copyShort'))}</kbd></button>` +
-    `<button type="button" role="menuitem" class="mi" data-copy="qr">${ICON.qr}<span>QR code\u2026</span></button></div></details>`);
+    `<button type="button" role="menuitem" class="mi" data-copy="qr">${ICON.qr}<span>QR code\u2026</span></button>` +
+    // (A prompt to paste into Claude: see reader.js.)
+    (readable.length ? `<button type="button" role="menuitem" class="mi" data-copy="ai" title="A prompt to paste into Claude: summarize this paper, weighing your highlights and notes (with its text)">${ICON.ai}<span>For AI (summary prompt)</span></button>` : '') + `</div></details>`);
   if (gs && !e.ib && LIBS.list.length) more.push(`<button type="button" role="menuitem" data-copy-lib="${esc(e.k)}">${ICON.lib}<span>Copy to another library\u2026</span></button>`);
   if (more.length) btns.push(`<details class="menu act-more"><summary class="btn" title="More: ${more.length > 1 ? 'Google Drive, Attach, links' : 'more'}" aria-label="More">` +
     `<svg class="i dots" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="18" cy="12" r="1.4"/></svg>${wide ? '<span>More</span>' : ''}</summary>` +
@@ -3153,6 +3157,7 @@ detailEl.addEventListener('click', ev => {
     if (kind === 'apa') { const cite = apaCitation(e); copy(cite.text, 'Copied APA citation', cite.html); }
     else if (kind === 'apa-short') { const cite = apaInText(e); copy(cite.text, 'Copied APA in-text citation', cite.html); }
     else if (kind === 'qr') openQr([e]);
+    else if (kind === 'ai') aiCopyFor(e);
     else copy(kind === 'key' ? e.k : bibtex(e), kind === 'key' ? 'Copied cite key' : 'Copied BibTeX');
     return;
   }

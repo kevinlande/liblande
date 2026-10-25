@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-10-25.06';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-10-25.07';
 /* -------------------------------------------------------------- features */
 // What LibLande does, by area: each feature, what it's for, where to find
 // it, and its icon (see featIcon). Shown from the sidebar's foot (Features), with a box to find
@@ -31,6 +31,7 @@ const FEATURES = [
     ['Link chapters to books', 'Chapters already in your library linked to their books: those whose book is here, and, where you have several chapters of a book with no entry, the book added from what they share. Their book details brought in line; you look first (each shows the book title it\u2019s matched by, and can be dismissed), and it can be undone.', 'Tools \u203a Link chapters', '[data-tool="linkch"]'],
     ['Fold the sidebar', 'Each section of the sidebar folds away with its heading: Libraries, Tools, Saved searches, Static groups, Keywords and Publication types.', 'A heading in the sidebar', '#sideToggle'],
     ['Original year', 'For a reprint, new printing or translation, the year it first came out (biblatex\u2019s origdate), beside the year: APA citations then give both, as (Freud, 1900/1953), with \u201c(Original work published 1900)\u201d at the end. Offered when you make one publication a version of an earlier one.', 'Year of original publication, beside Year in Add and Edit (books and chapters)', 'ICON:clock'],
+    ['Copy for AI', 'A ready-made prompt to paste into Claude: summarize this paper, weighing your highlights and notes. With its APA citation, its text page by page, and your highlights and notes with their pages. Nothing is sent anywhere; it\u2019s copied for you to paste.', 'Copy for AI in the reader\u2019s Marks tab; Copy \u203a For AI in the details', 'ICON:ai'],
     ['Add from a photo', 'Take or choose a photo of a paper\u2019s first page or a book\u2019s cover: a DOI or ISBN in it is looked up, or else its title and authors are searched for, to choose from.', 'Add \u203a the camera button; or rest the pointer on + (on an iPad or iPhone, its \u25be, or hold it)', 'path:M4 8.5A1.5 1.5 0 0 1 5.5 7h2.3l1.4-2h5.6l1.4 2h2.3A1.5 1.5 0 0 1 20 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5zM15.4 12.8a3.4 3.4 0 1 1-6.8 0a3.4 3.4 0 1 1 6.8 0'],
     ['Find a PDF', 'Its free copy (open access, found through OpenAlex and Unpaywall\u2019s data), or the article through your library\u2019s proxy, opened in a new tab: save the PDF, then drop it on the publication.', 'Find PDF in the details; library proxies in Settings', 'path:M7 3.5h7l4 4V13M14 3.5v4h4M7 3.5a1.5 1.5 0 0 0-1.5 1.5v14A1.5 1.5 0 0 0 7 20.5h4M16.5 14a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM18.7 19.2l2 2'],
     ['Attach a PDF', 'Drop a PDF on a publication, or use Attach. A book\u2019s PDF is read for its ISBN, to fill in its details. With several, they go round as a carousel beside the details (\u2039 \u203a, a swipe, or the arrow keys).', 'The details pane', 'ICON:clip'],
