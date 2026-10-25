@@ -1438,6 +1438,10 @@ a.ms-ib { text-decoration: none; }
    track jumps there), and the page number shown briefly on a new page. */
 .v-rail { position: absolute; z-index: 4; top: calc(var(--top-h, 48px) + 6px); bottom: 6px; right: 0; width: 22px; touch-action: none; cursor: default; }
 .v-rail[hidden] { display: none; }
+/* (With the top bar hidden, the scroll bar runs from the window's top.) */
+.v-rail { transition: top .3s cubic-bezier(.2, .8, .2, 1); }
+.viewer.bars-hidden .v-rail { top: calc(env(safe-area-inset-top, 0px) + 6px); }
+@media (prefers-reduced-motion: reduce) { .v-rail { transition: none; } }
 .l-rail { z-index: 6; }
 .v-grab-tip:empty { display: none; }
 .v-grab { position: absolute; right: 3px; width: 7px; min-height: 36px; border-radius: 999px; background: rgba(27, 35, 33, .62); box-shadow: 0 0 0 1px rgba(255, 255, 255, .45), 0 1px 3px rgba(0, 0, 0, .2); transition: width .15s, background .15s, opacity .3s; }
@@ -1661,6 +1665,9 @@ a.ms-ib { text-decoration: none; }
    tool for its other kind, made the iPad start selecting there.) */
 .v-palette, .v-palette *, .vp-show, .vp-panel, .vp-panel * { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .v-palette.placed, .vp-show.placed { bottom: auto; right: auto; transform: none; }
+/* (Snapping to an edge as a column, or back to a row: a short glide.) */
+.v-palette.snapping, .vp-show.snapping { transition: left .18s cubic-bezier(.2, .8, .2, 1), top .18s cubic-bezier(.2, .8, .2, 1); }
+@media (prefers-reduced-motion: reduce) { .v-palette.snapping, .vp-show.snapping { transition: none; } }
 /* On a phone the toolbar sits at the bottom or the top, nowhere else. */
 .v-palette.at-top, .vp-show.at-top { bottom: auto; top: calc(var(--top-h, 48px) + 8px); }
 .viewer.bars-hidden .v-palette.at-top, .viewer.bars-hidden .vp-show.at-top { top: calc(env(safe-area-inset-top, 0px) + 8px); }

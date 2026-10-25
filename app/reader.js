@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-24.01';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-25.01';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -2176,9 +2176,11 @@ function savePalettePlace() {
   if (!gs || !window.google || !google.script || !google.script.run) return;
   google.script.run.withFailureHandler(() => {}).savePrefs({ ['palette.' + deviceKind()]: { pos: store.get('palettePos', null), snap: store.get('paletteSnap', 'bottom'), pencil: !!store.get('pencil', false) } });
 }
-// Dropped near the left or right edge (on a screen at least 600px wide),
-// the palette docks there as a column; dragged away, it's a row again.
-const DOCK_EDGE = 60;
+// Dragged near the left or right edge of the pages (beside the sidebar,
+// if it's open; on a screen at least 600px wide), the palette snaps there
+// as a column; dragged well away again, it's a row. (Two distances, so it
+// doesn't flicker between the two along the line.)
+const DOCK_EDGE = 90, UNDOCK_EDGE = 150;
 const canDock = () => window.innerWidth >= 600;
 function placePalette() {
   if (phoneMQ.matches) {
@@ -2347,22 +2349,41 @@ function snapDrag(ev, h, box, isShow) {
   h.addEventListener('pointerdown', ev => {
     if (phoneMQ.matches) { snapDrag(ev, h, $(boxSel), handle === '#vpShow'); return; }
     const box = $(boxSel), r = box.getBoundingClientRect(), dx = ev.clientX - r.left, dy = ev.clientY - r.top, x0 = ev.clientX, y0 = ev.clientY;
-    let moved = false;
-    h.setPointerCapture(ev.pointerId);
-    const move = e => {
-      if (!moved && Math.hypot(e.clientX - x0, e.clientY - y0) < 5) return;
-      moved = true;
-      const b = $('.v-body').getBoundingClientRect(), W = b.width, H = b.height;
+    let moved = false, frame = 0, last = null, dock = box.dataset.dock || null;
+    try { h.setPointerCapture(ev.pointerId); } catch (err) { /* fine without */ }
+    // (At most once a frame.)
+    const place = () => {
+      frame = 0;
+      const e = last, b = $('.v-body').getBoundingClientRect(), W = b.width, H = b.height;
       const x = e.clientX - b.left, y = e.clientY - b.top;
-      const dock = canDock() ? (x < DOCK_EDGE ? 'left' : x > W - DOCK_EDGE ? 'right' : null) : null;
+      const inset = $('#viewer').classList.contains('side-open') ? $('#vSide').offsetWidth : 0;
+      const fromLeft = x - inset, fromRight = W - x;
+      const was = dock;
+      if (!canDock()) dock = null;
+      else if (dock === 'left' && fromLeft > UNDOCK_EDGE) dock = null;
+      else if (dock === 'right' && fromRight > UNDOCK_EDGE) dock = null;
+      if (!dock && canDock()) dock = fromLeft < DOCK_EDGE ? 'left' : fromRight < DOCK_EDGE ? 'right' : null;
+      // Turning from a row to a column (or back), it glides there.
+      if (dock !== was) {
+        box.classList.add('snapping');
+        clearTimeout(box.snapTimer);
+        box.snapTimer = setTimeout(() => box.classList.remove('snapping'), 220);
+      }
       // Docked, the grip is at the top of the column, so follow the pointer.
-      hidePanel();
       store.set('palettePos', dock
         ? { x: (x - dx) / W, y: (y - Math.min(dy, 18)) / H, dock }
         : { x: (x - Math.min(dx, 14)) / W, y: (y - dy) / H });
       placePalette();
     };
+    const move = e => {
+      if (!moved && Math.hypot(e.clientX - x0, e.clientY - y0) < 5) return;
+      if (!moved) hidePanel();
+      moved = true;
+      last = e;
+      if (!frame) frame = requestAnimationFrame(place);
+    };
     const up = () => {
+      if (frame) { cancelAnimationFrame(frame); place(); }
       h.removeEventListener('pointermove', move);
       h.removeEventListener('pointerup', up);
       h.removeEventListener('pointercancel', up);
@@ -6579,6 +6600,10 @@ function barsHidden(on) {
   const v = $('#viewer');
   if (on === v.classList.contains('bars-hidden')) return;
   v.classList.toggle('bars-hidden', on);
+  // (The scroll bar grows or shrinks with it: its thumb drawn again, as
+  // it slides and once it's there.)
+  const t0 = performance.now(), each = () => { drawRail(); if (performance.now() - t0 < 340) requestAnimationFrame(each); };
+  requestAnimationFrame(each);
 }
 const keepBars = () => !TOUCH_UI.matches || !$('#vFind').hidden || sideOpen() || !$('#vComment').hidden || !$('#vpPanel').hidden || $('#vShare').open || $('#vRLMenu').open || V.selected;
 // (Scrolling leaves them as they are: only a tap hides or shows them.)
