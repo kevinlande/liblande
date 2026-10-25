@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-10-25.03';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-10-25.04';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -1651,8 +1651,10 @@ function openAddChapter(book) {
   $('#addType').value = 'incollection';
   renderAddFields(f);
   $('#sheetBody .fld').insertAdjacentHTML('beforebegin', `<p class="add-in">${ICON.link}<span>In <b>${esc(book.f.title || book.k)}</b>, linked to it</span></p>`);
-  // (Its pages from the book's PDF, if it has one: see chapters.js.)
+  // (Its pages from the book's PDF, if it has one; and its chapters not
+  // yet in the library, suggested: see chapters.js.)
   if (readablePdfs(book).length) chPdfSetup(book);
+  chSuggest(book);
   const t = $('#sheetBody [data-field="title"]');
   if (t && !coarseMQ.matches) t.focus();
 }

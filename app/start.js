@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-10-25.03';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-10-25.04';
 // On GitHub Pages, every part of the app must be from the same version: a
 // part kept from an older one (the offline copy, served when the network
 // was slow) lacks what this page needs. Then the kept copies go, and the
@@ -407,6 +407,7 @@ if (RELOADING) {
       progressMerge(status.prefs);
       positionsMerge(status.prefs);
       if (notDupsMerge(status.prefs) && ENTRIES.length) { findDups(); refresh(false); }
+      lcNoMerge(status.prefs);
       if (ENTRIES.length) renderGroups();
     }
     // So is where the markup toolbar was left, on this kind of device.

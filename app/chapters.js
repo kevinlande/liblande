@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/chapters.js'] = '2026-10-25.03';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/chapters.js'] = '2026-10-25.04';
 /* ------------------------------------------------------------ link chapters */
 // A chapter is linked to its book by its crossref field (see findChapters).
 // Chapters added before that are linked here, after you've looked:
@@ -31,6 +31,21 @@ function lcMost(values, key) {
   for (const list of n.values()) if (!best || list.length > best.length) best = list;
   return best ? best[0] : '';
 }
+// Suggestions dismissed (\u00d7): a chapter and the book it was matched to
+// ("c:chapter>book"), or a book to add for chapters with that book title
+// ("g:title"). Kept with your preferences too, so every device knows.
+const LC_NO = new Set(store.get('lcNo', []));
+function lcNoMerge(prefs) {
+  const before = LC_NO.size;
+  (prefs && prefs.lcNo || []).forEach(k => LC_NO.add(k));
+  if (LC_NO.size !== before) store.set('lcNo', [...LC_NO]);
+}
+function lcNoSave() {
+  store.set('lcNo', [...LC_NO]);
+  if (window.google && google.script && google.script.run) google.script.run.withFailureHandler(() => {}).savePrefs({ lcNo: [...LC_NO] });
+}
+const lcPairId = x => 'c:' + x.c.k + '>' + x.b.k;
+const lcGroupId = g => 'g:' + lcNorm(g.fields.title);
 function lcFind() {
   const books = ENTRIES.filter(e => isBook(e) && !e.ib), byFull = new Map(), byMain = new Map();
   const add = (m, k, b) => { if (k) m.set(k, (m.get(k) || []).concat([b])); };
@@ -82,7 +97,11 @@ function lcFind() {
     return { key, fields, chapters: list, why };
   }).sort((a, b) => !!a.why - !!b.why || b.chapters.length - a.chapters.length);
   const single = [...loose.values()].filter(list => list.length === 1).length;
-  return { sure, near, groups, single };
+  // (Dismissed ones set aside, to bring back if you like.)
+  const no = x => LC_NO.has(x.id);
+  sure.forEach(x => { x.id = lcPairId(x); }); near.forEach(x => { x.id = lcPairId(x); }); groups.forEach(g => { g.id = lcGroupId(g); });
+  const dismissed = sure.filter(no).concat(near.filter(no), groups.filter(no));
+  return { sure: sure.filter(x => !no(x)), near: near.filter(x => !no(x)), groups: groups.filter(g => !no(g)), single, dismissed };
 }
 // A chapter's changes to link it to a book (whose fields, as written, are
 // given): crossref, and its book details made to agree.
@@ -123,8 +142,11 @@ function lcRender() {
   const meta = e => [who(e), e.f.year, pp(e)].filter(Boolean).join(' \u00b7 ');
   const bookMeta = b => [b.authorsShort, b.f.year].filter(Boolean).join(' \u00b7 ');
   const box = (id, on) => `<input type="checkbox" class="lc-ck" data-lc="${id}"${on ? ' checked' : ''} aria-label="Link">`;
-  const pair = (x, i, kind) => `<label class="lc-pair">${box(kind + ':' + i, x.on)}<span class="lc-c"><span class="lc-t">${esc(x.c.f.title || x.c.k)}</span><span class="lc-m">${esc(meta(x.c))}</span></span>` +
-    `<span class="lc-arrow" aria-hidden="true">\u2192</span><span class="lc-b"><span class="lc-t">${esc(x.b.f.title || x.b.k)}</span><span class="lc-m">${esc(bookMeta(x.b))}${x.why ? ` \u00b7 <span class="lc-why">${esc(x.why)}</span>` : ''}</span></span></label>`;
+  // (The chapter's own "book title", which it was matched by.)
+  const bt = c => `<span class="lc-bt">Book title: <q>${esc(c.f.booktitle || '')}</q></span>`;
+  const no = id => `<button type="button" class="lc-no" data-lc-no="${esc(id)}" title="Dismiss: not this one, and don\u2019t suggest it again" aria-label="Dismiss this suggestion">${ICON.x}</button>`;
+  const pair = (x, i, kind) => `<div class="lc-pair-row"><label class="lc-pair">${box(kind + ':' + i, x.on)}<span class="lc-c"><span class="lc-t">${esc(x.c.f.title || x.c.k)}</span><span class="lc-m">${esc(meta(x.c))}</span>${bt(x.c)}</span>` +
+    `<span class="lc-arrow" aria-hidden="true">\u2192</span><span class="lc-b"><span class="lc-t">${esc(x.b.f.title || x.b.k)}</span><span class="lc-m">${esc(bookMeta(x.b))}${x.why ? ` \u00b7 <span class="lc-why">${esc(x.why)}</span>` : ''}</span></span></label>${no(x.id)}</div>`;
   const SHOW = 6;
   const list = (items, kind) => {
     const all = s.more.has(kind), shown = all ? items : items.slice(0, SHOW);
@@ -134,11 +156,14 @@ function lcRender() {
   const grp = (g, i) => {
     const f = g.fields, all = s.more.has('g' + i), shown = all ? g.chapters : g.chapters.slice(0, 4);
     const tidy = g.chapters.filter(c => Object.keys(lcChanges(c, g.key, f)).length > 1).length;
-    return `<div class="lc-grp${g.why ? ' series' : ''}"><label class="lc-gh">${box('grp:' + i, g.on)}<span class="lc-c">` +
+    // (The chapters' book titles, as they're written: one way, or several.)
+    const ways = [...new Set(g.chapters.map(c => c.f.booktitle || ''))];
+    return `<div class="lc-grp${g.why ? ' series' : ''}"><div class="lc-gh-row"><label class="lc-gh">${box('grp:' + i, g.on)}<span class="lc-c">` +
       `<span class="lc-t">${esc(shownValue(f.title))}</span>` +
+      `<span class="lc-bt">${ways.length === 1 ? 'Its chapters\u2019 book title' : 'Its chapters\u2019 book title, written ' + ways.length + ' ways'}: ${ways.slice(0, 3).map(w => '<q>' + esc(w) + '</q>').join(', ')}${ways.length > 3 ? '\u2026' : ''}</span>` +
       (g.why ? `<span class="lc-flag">${esc(g.why)}</span>` : `<span class="lc-new">Adds the book: <b>${esc([f.editor ? shownValue(f.editor) + ' (Ed' + (f.editor.split(' and ').length > 1 ? 's' : '') + '.)' : '', shownValue(f.publisher || ''), f.year].filter(Boolean).join(' \u00b7 '))}</b></span>`) +
       (tidy && !g.why ? `<span class="lc-fix">Also brings ${tidy === g.chapters.length ? 'its chapters\u2019' : tidy + ' of its chapters\u2019'} book details in line with it.</span>` : '') +
-      `</span><span class="lc-cnt">${g.chapters.length} chapters</span></label>` +
+      `</span><span class="lc-cnt">${g.chapters.length} chapters</span></label>${no(g.id)}</div>` +
       `<ul class="lc-chs">${shown.map(c => `<li><span class="lc-ct">${esc(c.f.title || c.k)}</span><span class="lc-ca">${esc(who(c))}</span><span class="lc-pp">${esc((c.f.pages || '').replace(/-+/g, '\u2013'))}</span></li>`).join('')}</ul>` +
       (g.chapters.length > 4 ? `<button type="button" class="lc-more" data-lc-more="g${i}">${all ? 'Show fewer' : 'Show ' + (g.chapters.length - 4) + ' more'}</button>` : '') + `</div>`;
   };
@@ -151,6 +176,13 @@ function lcRender() {
     const nch = r.groups.reduce((n, g) => n + g.chapters.length, 0);
     h += `<section class="lc-sec">${head('Several chapters, no book entry', r.groups.length + (r.groups.length === 1 ? ' book' : ' books') + ' \u00b7 ' + nch + ' chapters',
       `<button type="button" class="lc-all" data-lc-all="grp">${r.groups.filter(g => !g.why).every(g => g.on) ? 'Untick all' : 'Tick all but series'}</button>`)}${r.groups.map(grp).join('')}</section>`;
+  }
+  if (r.dismissed.length) {
+    const open = s.more.has('dismissed');
+    h += `<section class="lc-sec lc-dis"><h3 class="lc-h"><span>Dismissed</span><span class="lc-n">${r.dismissed.length}</span><button type="button" class="lc-all" data-lc-more="dismissed">${open ? 'Hide' : 'Show'}</button></h3>` +
+      (open ? `<div class="lc-list">` + r.dismissed.map(x => `<div class="lc-pair-row lc-gone"><span class="lc-c"><span class="lc-t">${esc(x.c ? x.c.f.title || x.c.k : shownValue(x.fields.title))}</span>` +
+        `<span class="lc-m">${esc(x.c ? '\u2192 ' + (x.b.f.title || x.b.k) : 'A book to add, for ' + x.chapters.length + ' chapters')}</span></span>` +
+        `<button type="button" class="lc-back" data-lc-back="${esc(x.id)}">Bring back</button></div>`).join('') + `</div>` : '') + `</section>`;
   }
   if (r.single) h += `<p class="lc-note">${r.single} chapter${r.single === 1 ? ' is' : 's are'} from books with only that chapter in your library. They\u2019re left as they are; each is linked by itself if you add its book later.</p>`;
   const top = $('#sheetBody').scrollTop;
@@ -180,6 +212,21 @@ $('#sheetBody').addEventListener('click', ev => {
   if (!sheet || sheet.mode !== 'linkch') return;
   const m = ev.target.closest('[data-lc-more]');
   if (m) { const k = m.dataset.lcMore; if (sheet.more.has(k)) sheet.more.delete(k); else sheet.more.add(k); lcRender(); return; }
+  const x = ev.target.closest('[data-lc-no], [data-lc-back]');
+  if (x) {
+    ev.preventDefault();
+    if (x.dataset.lcNo) LC_NO.add(x.dataset.lcNo); else LC_NO.delete(x.dataset.lcBack);
+    lcNoSave();
+    // (Found again, with the ticks you'd set kept.)
+    const was = new Map(), r0 = sheet.r;
+    r0.sure.concat(r0.near, r0.groups).forEach(y => was.set(y.id, y.on));
+    const r = sheet.r = lcFind();
+    r.sure.forEach(y => { y.on = was.has(y.id) ? was.get(y.id) : true; });
+    r.near.forEach(y => { y.on = was.has(y.id) ? was.get(y.id) : false; });
+    r.groups.forEach(g => { g.on = was.has(g.id) ? was.get(g.id) : !g.why; });
+    lcRender();
+    return;
+  }
   const a = ev.target.closest('[data-lc-all]');
   if (a) {
     const r = sheet.r;
@@ -491,3 +538,159 @@ async function chPdfFile() {
   (await out.copyPages(src, idx)).forEach(p => out.addPage(p));
   return new File([await out.save()], 'chapter.pdf', { type: 'application/pdf' });
 }
+
+/* ------------------------------------------------------------ suggested chapters */
+// Add chapter: the book's chapters not yet in the library, suggested as
+// keywords are (dashed chips, under the panel's head); one picked fills in
+// its title, authors and pages (and DOI), and its pages are then found in
+// the book's PDF. From Crossref (many edited books register each chapter:
+// found by the book's ISBN, or else by its title), or else from the book's
+// PDF's outline (titles and pages, no authors).
+const CHS = { seq: 0, list: [] };
+async function chFromCrossref(book) {
+  const isbn = (book.f.isbn || '').split(/[,;\s]+/).map(x => x.replace(/[^\dXx]/g, '')).find(x => x.length === 13 || x.length === 10);
+  const t = lcNorm(book.f.title);
+  const url = TS_CR + '?rows=200&select=DOI,title,subtitle,author,page,container-title&filter=type:book-chapter' +
+    (isbn ? ',isbn:' + isbn : '') + (isbn ? '' : '&query.bibliographic=' + encodeURIComponent(shownValue(book.f.title || '')));
+  const r = await npFetch(url);
+  if (!r.ok) return [];
+  const names = list => (list || []).map(a => a.family ? (a.given ? a.family + ', ' + a.given : a.family) : a.name || '').map(tsClean).filter(Boolean);
+  return ((await r.json()).message.items || [])
+    // (By title: only those in this book.)
+    .filter(w => isbn || (w['container-title'] || []).some(c => lcNorm(c) === t))
+    .filter(w => (w.title || [])[0])
+    .map(w => ({ title: tsClean(w.title[0] + ((w.subtitle || [])[0] ? ': ' + w.subtitle[0] : '')), author: names(w.author).join(' and '),
+      pages: String(w.page || '').replace(/\s*[-\u2013]\s*/, '--'), doi: w.DOI || '' }));
+}
+// The printed page of a PDF page (its label, or by the numbers printed on
+// pages near it), or null.
+async function chPrinted(doc, n) {
+  const L = await doc.getPageLabels().catch(() => null);
+  if (L && L.some((l, i) => l !== String(i + 1)) && /^\d+$/.test(L[n - 1] || '')) return +L[n - 1];
+  const votes = new Map(), N = doc.numPages;
+  for (let i = Math.max(1, n - 3), k = 0; i <= N && k < 8; i++, k++) for (const x of await chNumbers(doc, i)) { const off = i - x; votes.set(off, (votes.get(off) || 0) + 1); }
+  let best = null;
+  for (const [off, c] of votes) if (c >= 2 && (!best || c > best[1])) best = [off, c];
+  return best && n - best[0] > 0 ? n - best[0] : null;
+}
+const CH_SKIP = /^(cover|half[- ]title|title page|copyright|contents|table of contents|list of (figures|tables|contributors)|notes on contributors|contributors|index|(name|subject) index|bibliography|references|acknowledg\w*|dedication)\b/i;
+async function chFromOutline(book) {
+  const doc = await chDoc(book), out = await doc.getOutline().catch(() => null);
+  if (!out || !out.length) return [];
+  // (The top level; or, if it's just a few parts, the chapters in them.)
+  let items = out.filter(o => o.title && !CH_SKIP.test(o.title.trim()));
+  if (items.length < 3 && items.some(o => o.items && o.items.length)) items = items.flatMap(o => (o.items && o.items.length ? o.items : [o])).filter(o => o.title && !CH_SKIP.test(o.title.trim()));
+  const at = async o => {
+    try {
+      const d = typeof o.dest === 'string' ? await doc.getDestination(o.dest) : o.dest;
+      return d && d[0] ? (await doc.getPageIndex(d[0])) + 1 : null;
+    } catch (err) { return null; }
+  };
+  const starts = [];
+  for (const o of items) starts.push(await at(o));
+  const res = [];
+  for (let i = 0; i < items.length; i++) {
+    const a = starts[i];
+    if (!a) continue;
+    const next = starts.slice(i + 1).find(Boolean), p1 = await chPrinted(doc, a), p2 = next ? await chPrinted(doc, next - 1) : null;
+    res.push({ title: items[i].title.replace(/\s+/g, ' ').replace(/^(chapter\s+)?\d+[.:]?\s+/i, '').trim(), author: '', pages: p1 ? p1 + (p2 && p2 >= p1 ? '--' + p2 : '') : '', doi: '' });
+  }
+  return res;
+}
+// A book's chapters as found (Crossref's, kept half an hour for each
+// book; or, if asked for and Crossref has none, the book's PDF's outline),
+// in its order, each marked with the publication it is if it's already in
+// the library (have).
+const CH_FOUND = new Map();
+async function chFind(book, outline) {
+  const kept = CH_FOUND.get(book.k);
+  let list = kept && Date.now() - kept.at < 30 * 60000 ? kept.list : null;
+  if (!list) {
+    list = [];
+    try { if (!isOffline()) list = await chFromCrossref(book); } catch (err) { list = []; }
+    if (list.length >= 2 || !isOffline()) CH_FOUND.set(book.k, { at: Date.now(), list });
+  }
+  if (list.length < 2 && outline && readablePdfs(book).length) { try { list = await chFromOutline(book); } catch (err) { /* none */ } }
+  const have = new Map();
+  (CHAPTERS.get(book.k) || []).concat(ENTRIES.filter(e => (e.t === 'incollection' || e.t === 'inbook') && lcNorm(e.f.booktitle) === lcNorm(book.f.title)))
+    .forEach(e => have.set(lcNorm(e.f.title), e));
+  return list.filter(c => c.title).map(c => Object.assign({}, c, { have: have.get(lcNorm(c.title)) || null }))
+    .sort((a, b) => (parseInt(a.pages, 10) || 1e9) - (parseInt(b.pages, 10) || 1e9));
+}
+async function chSuggest(book) {
+  const s = sheet, seq = ++CHS.seq;
+  CHS.list = [];
+  const head = $('#sheetBody .add-in');
+  if (!head) return;
+  head.insertAdjacentHTML('afterend', `<details class="ch-pick" id="chSugs" open><summary><span class="ch-pick-h">Its chapters</span><span class="ch-pick-n">Looking\u2026</span></summary></details>`);
+  const list = await chFind(book, true);
+  if (seq !== CHS.seq || sheet !== s) return;
+  CHS.list = list;
+  const box = $('#chSugs');
+  if (!box) return;
+  if (!list.length) { box.remove(); return; }
+  const n = list.filter(c => c.have).length;
+  box.querySelector('.ch-pick-n').textContent = list.length + (n ? ' \u00b7 ' + n + ' in your library' : '');
+  box.insertAdjacentHTML('beforeend', `<div class="ch-not ch-in-panel"><ul>${chRows(list, 'data-ch-sug')}</ul></div>`);
+}
+// A book's chapters as rows (in the details, and in Add a chapter): each
+// with its authors and pages, and + to add it; one already in the library
+// marked so (\u2713), to go to.
+function chRows(list, attr) {
+  const who = c => parseNamesLite(c.author || '').map(([l]) => l).slice(0, 3).join(', ');
+  return list.map((c, i) => `<li${c.have ? ' class="have"' : ''}><button type="button" ${attr}="${i}" title="${c.have ? 'Already in your library: go to it' : 'Add this chapter, filled in'}">` +
+    `<span class="ch-t">${esc(c.title)}</span>${c.author || c.have ? `<span class="ch-a">${c.have ? `<span class="ch-here">${ICON.check}In your library</span>` : ''}${esc(c.author ? who(c) : '')}</span>` : ''}</button>` +
+    `${c.pages ? `<span class="ch-pp">pp. ${esc(c.pages.replace('--', '\u2013'))}</span>` : ''}<span class="ch-plus" aria-hidden="true">${c.have ? '' : ICON.plus}</span></li>`).join('');
+}
+$('#sheetBody').addEventListener('click', ev => {
+  const b = sheet && sheet.chapterOf && ev.target.closest('[data-ch-sug]');
+  const c = b && CHS.list[+b.dataset.chSug];
+  if (!c) return;
+  chPick(c, b);
+});
+// One picked: filled in (or, one already here, gone to).
+function chPick(c, b) {
+  // (One already here: gone to, the panel closed if nothing's typed yet.)
+  if (c.have) {
+    const typed = ['title', 'author'].some(n => ($('#sheetBody [data-field="' + n + '"]') || {}).value);
+    if (typed) { toast('\u201c' + shortTitle(c.title) + '\u201d is already in your library.', 3000); return; }
+    closeSheet();
+    showTwin(c.have.k);
+    return;
+  }
+  const put = (n, v) => { const el = $('#sheetBody [data-field="' + n + '"]'); if (el && v != null) { el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); } };
+  put('title', c.title);
+  if (c.author) put('author', c.author);
+  put('pages', c.pages);
+  if (c.doi) put('doi', c.doi);
+  // (The list folds away, saying which was picked; open it to pick another.)
+  document.querySelectorAll('#chSugs li.on').forEach(x => x.classList.remove('on'));
+  const i = CHS.list.findIndex(x => x.title === c.title), row = $('#chSugs [data-ch-sug="' + i + '"]');
+  if (row) row.closest('li').classList.add('on');
+  const box = $('#chSugs');
+  if (box) { box.open = false; box.querySelector('.ch-pick-n').textContent = 'Picked: ' + shortTitle(c.title); }
+}
+// In a book's details, under its chapters here: those not yet here, from
+// Crossref (not the PDF's outline: that would mean downloading the book),
+// each to add with the book's details and its own filled in.
+let CH_DETAIL = { k: null, list: [] };
+async function chDetailSuggest(book) {
+  const sec = $('#detail .d-chapters');
+  if (!sec) return;
+  const list = (await chFind(book, false)).filter(c => !c.have);
+  if (state.selKey !== book.k || !list.length) return;
+  CH_DETAIL = { k: book.k, list };
+  const box = $('#detail .d-chapters');
+  if (!box || box.querySelector('.ch-not')) return;
+  box.insertAdjacentHTML('beforeend', `<div class="ch-not"><h4>Not in your library \u00b7 ${list.length}</h4><ul>${chRows(list, 'data-ch-add')}</ul></div>`);
+}
+$('#detail').addEventListener('click', ev => {
+  const b = ev.target.closest('[data-ch-add]');
+  if (!b) return;
+  const book = BYKEY.get(CH_DETAIL.k), c = CH_DETAIL.list[+b.dataset.chAdd];
+  if (!book || !c) return;
+  openAddChapter(book);
+  // (Filled in once the panel's own suggestions are drawn, or straight away.)
+  CHS.list = CHS.list.length ? CHS.list : [c];
+  chPick(c, null);
+});

@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-25.03';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-25.04';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -2913,6 +2913,8 @@ function renderDetail() {
   detailEl.scrollTop = 0;
   $('#fieldsBox').addEventListener('toggle', ev => store.set('fieldsOpen', ev.target.open));
   loadThumbs();
+  // (A book: its chapters not yet here, under its own; see chapters.js.)
+  if (gs && isBook(e) && !e.ib) chDetailSuggest(e);
 }
 
 // Book covers, from Open Library: found by ISBN, or else by title (which
