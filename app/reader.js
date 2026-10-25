@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-25.01';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-25.02';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -683,7 +683,14 @@ async function openReader(entry, file, pos) {
     }
     if (sideOpen()) showSideTab(SIDE.tab);
   } catch (err) {
-    if (my === V.token) vStatus(errText(err), true);
+    if (my !== V.token) return;
+    // Offline, a request that couldn't be made (the browser's own words for
+    // it are no help): said plainly.
+    const net = /load failed|failed to fetch|networkerror|respondwith|network connection/i.test(errText(err));
+    if (net && isOffline()) {
+      vStatus(SAVED.has(file.id) ? 'This paper couldn\u2019t be opened offline: something it needs isn\u2019t on this device yet. Open it once while you\u2019re online, and it will open offline after that.'
+        : 'You\u2019re offline, and this paper isn\u2019t saved on this device. Papers are kept here once you\u2019ve opened them while online.', true);
+    } else vStatus(errText(err), true);
   }
 }
 
