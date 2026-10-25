@@ -158,7 +158,7 @@ try {
     <span class="v-page" id="vPage"></span>
     <div class="v-tools">
       <button type="button" class="tb-btn" id="vFindBtn" aria-label="Search in this paper" title="Search in this paper (&#x2318;F)" aria-pressed="false"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg></button>
-      <button type="button" class="tb-btn" id="vDarkBtn" aria-pressed="false" aria-label="Dark pages" title="Dark pages: light on dark"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg></button>
+      <span class="v-tone-pair"><button type="button" class="tb-btn" id="vDarkBtn" aria-pressed="false" aria-label="Page tone" title="Page tone: tap to switch; rest the pointer here for the choices"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg></button><button type="button" class="tb-btn v-tone-more" id="vToneMore" hidden aria-label="Page tones" title="Page tones" aria-haspopup="dialog" aria-expanded="false"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg></button></span>
       <button type="button" class="tb-btn v-split" id="vSplitBtn" aria-pressed="false" aria-label="Split screen" title="Split screen: a second view of this paper below, to scroll on its own"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4" width="17" height="16" rx="2"/><path d="M3.5 12h17"/><path d="M11 8h2M11 16h2" opacity=".55"/></svg></button>
       <button type="button" class="tb-btn v-zoomctl" id="vZoomOut" aria-label="Zoom out" title="Zoom out">&#x2212;</button>
       <button type="button" class="v-zoom" id="vZoomLevel" title="Fit the page to the screen" aria-label="Zoom 100%: tap to fit the page to the screen">100%</button>
@@ -286,7 +286,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-25.05</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-25.06</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -301,7 +301,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-25.05';
+      l.querySelector('small').textContent = 'Version 2026-10-25.06';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -313,7 +313,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-25.05): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-10-25.06): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });

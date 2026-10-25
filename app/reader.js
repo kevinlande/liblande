@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-25.05';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-25.06';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -4491,14 +4491,92 @@ function quoteSelection() {
   const pa = +a.closest('.page').dataset.pageNumber, pb = +b.closest('.page').dataset.pageNumber;
   return { text, from: Math.min(pa, pb), to: Math.max(pa, pb), rect: r.getBoundingClientRect(), range: r.cloneRange() };
 }
-// Dark pages: kept for this device.
-function setDarkPages(on) {
-  store.set('darkPages', !!on);
-  $('#viewer').classList.toggle('dark-pages', !!on);
-  $('#vDarkBtn').setAttribute('aria-pressed', String(!!on));
+// The pages' tone: light (as the PDF is), sepia (warm paper), dark (the
+// page turned negative) or dark sepia (dark, in browns); and how warm
+// (blue light cut, 0 to 100), with any of them. A layer over the page
+// only: the PDF isn't changed. Kept for this device. The moon: a tap
+// switches between the last two tones; resting the pointer on it (on a
+// touch screen, holding it or its \u25be) shows the choices.
+const TONES = [['light', 'Light', '#ffffff'], ['sepia', 'Sepia', '#f4e6c8'], ['dark', 'Dark', '#111111'], ['darksepia', 'Dark sepia', '#1b1610']];
+const TONE = { now: store.get('pageTone', store.get('darkPages', false) ? 'dark' : 'light'), prev: store.get('pageTonePrev', null), warm: +store.get('pageWarm', 0) || 0, t: 0, hide: 0, long: false };
+const isDarkTone = t => t === 'dark' || t === 'darksepia';
+function applyTone() {
+  const v = $('#viewer'), t = TONE.now;
+  v.classList.toggle('dark-pages', isDarkTone(t));
+  v.classList.toggle('tone-sepia', t === 'sepia');
+  v.classList.toggle('tone-darksepia', t === 'darksepia');
+  // (One tint multiplied over each page: sepia's paper, and the warmth's
+  // amber, mixed.)
+  const base = t === 'sepia' ? [244, 230, 200] : [255, 255, 255], amber = [255, 168, 88], w = TONE.warm / 100 * 0.55;
+  const tint = base.map((c, i) => Math.round(c * (1 - w) + amber[i] * w));
+  v.classList.toggle('tinted', t === 'sepia' || TONE.warm > 0);
+  v.style.setProperty('--page-tint', 'rgb(' + tint.join(',') + ')');
+  $('#vDarkBtn').setAttribute('aria-pressed', String(t !== 'light'));
+  $('#vDarkBtn').dataset.tone = t;
+  const box = $('#darkPagesBox');
+  if (box) box.checked = isDarkTone(t);
+  const p = $('#vTone');
+  if (p) p.querySelectorAll('[data-tone]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tone === t)));
 }
-setDarkPages(store.get('darkPages', false));
-$('#vDarkBtn').addEventListener('click', () => setDarkPages(!$('#viewer').classList.contains('dark-pages')));
+function setTone(t) {
+  if (t === TONE.now) return;
+  TONE.prev = TONE.now; TONE.now = t;
+  store.set('pageTone', t); store.set('pageTonePrev', TONE.prev); store.set('darkPages', isDarkTone(t));
+  applyTone();
+}
+// (Settings' "Dark pages" switch: dark, or back to light.)
+function setDarkPages(on) { setTone(on ? (TONE.now === 'sepia' ? 'darksepia' : isDarkTone(TONE.now) ? TONE.now : 'dark') : (TONE.now === 'darksepia' ? 'sepia' : 'light')); }
+applyTone();
+$('#vDarkBtn').addEventListener('click', () => {
+  if (TONE.long) { TONE.long = false; return; }
+  closeTone();
+  setTone(TONE.prev && TONE.prev !== TONE.now ? TONE.prev : isDarkTone(TONE.now) ? 'light' : 'dark');
+});
+function closeTone() { clearTimeout(TONE.hide); const p = $('#vTone'); if (p) p.remove(); $('#vToneMore').setAttribute('aria-expanded', 'false'); }
+function openTone() {
+  closeTone();
+  const p = document.createElement('div');
+  p.id = 'vTone';
+  p.className = 'v-tone';
+  p.setAttribute('role', 'dialog');
+  p.setAttribute('aria-label', 'Page tone');
+  p.innerHTML = `<div class="v-tone-h">Page tone</div><div class="v-tone-sw">` + TONES.map(([k, label, c]) =>
+    `<button type="button" data-tone="${k}" aria-pressed="${k === TONE.now}"><i style="background:${c}"></i>${label}</button>`).join('') + `</div>` +
+    `<label class="v-tone-warm"><span>Warmth</span><input type="range" min="0" max="100" step="5" value="${TONE.warm}" aria-label="Warmth (less blue light)"></label>`;
+  document.body.appendChild(p);
+  const r = $('#vDarkBtn').getBoundingClientRect();
+  p.style.left = Math.max(8, Math.min(innerWidth - p.offsetWidth - 8, r.left + r.width / 2 - p.offsetWidth / 2)) + 'px';
+  p.style.top = (r.bottom + 6) + 'px';
+  $('#vToneMore').setAttribute('aria-expanded', 'true');
+  p.addEventListener('click', ev => { const b = ev.target.closest('[data-tone]'); if (b) setTone(b.dataset.tone); });
+  p.querySelector('input').addEventListener('input', ev => { TONE.warm = +ev.target.value; store.set('pageWarm', TONE.warm); applyTone(); });
+  p.addEventListener('pointerenter', () => clearTimeout(TONE.hide));
+  p.addEventListener('pointerleave', ev => { if (ev.pointerType === 'mouse') TONE.hide = setTimeout(closeTone, 300); });
+}
+$('#vDarkBtn').addEventListener('pointerenter', ev => {
+  if (ev.pointerType !== 'mouse') return;
+  clearTimeout(TONE.hide);
+  if (!$('#vTone')) { clearTimeout(TONE.t); TONE.t = setTimeout(openTone, 350); }
+});
+$('#vDarkBtn').addEventListener('pointerleave', ev => {
+  if (ev.pointerType !== 'mouse') return;
+  clearTimeout(TONE.t);
+  TONE.hide = setTimeout(closeTone, 300);
+});
+$('#vDarkBtn').addEventListener('pointerdown', ev => {
+  if (ev.pointerType === 'mouse') return;
+  TONE.long = false;
+  clearTimeout(TONE.t);
+  TONE.t = setTimeout(() => { TONE.long = true; openTone(); }, 450);
+});
+['pointerup', 'pointercancel', 'pointermove'].forEach(n => $('#vDarkBtn').addEventListener(n, ev => { if (ev.pointerType !== 'mouse' && (n !== 'pointermove' || !TONE.long)) clearTimeout(TONE.t); }));
+$('#vDarkBtn').addEventListener('contextmenu', ev => { if (TONE.long || $('#vTone')) ev.preventDefault(); });
+$('#vToneMore').addEventListener('click', () => { if ($('#vTone')) closeTone(); else openTone(); });
+function toneMoreShown() { $('#vToneMore').hidden = !coarseMQ.matches; }
+coarseMQ.addEventListener('change', toneMoreShown);
+toneMoreShown();
+document.addEventListener('pointerdown', ev => { if ($('#vTone') && !ev.target.closest('#vTone, #vDarkBtn, #vToneMore')) closeTone(); }, true);
+document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && $('#vTone')) { ev.stopPropagation(); closeTone(); } }, true);
 function hideQuote() { if (QUOTE.el) QUOTE.el.hidden = true; QUOTE.sel = null; }
 function quoteDismiss() {
   if (QUOTE.el && QUOTE.el.contains(document.activeElement)) document.activeElement.blur();

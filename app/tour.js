@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-10-25.05';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-10-25.06';
 /* -------------------------------------------------------------- features */
 // What LibLande does, by area: each feature, what it's for, where to find
 // it, and its icon (see featIcon). Shown from the sidebar's foot (Features), with a box to find
@@ -48,7 +48,7 @@ const FEATURES = [
     ['Recently closed', 'Open again a paper you closed lately.', 'The page with an arrow, beside the title', '#vRecentBtn'],
     ['Search in the paper', 'Every match highlighted; Return for the next one.', '\u2318F, or the magnifier', '#vFindBtn'],
     ['Zoom and fit', 'Pinch, double-tap, or + and \u2212. Tap the percentage to go round the whole page, the page\u2019s width, and actual size.', 'The reader\u2019s toolbar', 'path:M11 4.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM20 20l-4.2-4.2M11 8.5v5M8.5 11h5'],
-    ['Dark pages', 'Light text on dark pages, for reading at night.', 'The moon in the reader\u2019s toolbar', '#vDarkBtn'],
+    ['Page tones', 'The pages light, sepia (warm paper), dark, or dark sepia; and a Warmth slider that cuts blue light with any of them. The PDF isn\u2019t changed. A tap on the moon switches between your last two.', 'The moon in the reader\u2019s toolbar: rest the pointer on it (on an iPad or iPhone, hold it or tap its \u25be)', '#vDarkBtn'],
     ['Split screen', 'A second view of the paper below, to scroll on its own (to the references, say).', 'The split box in the reader\u2019s toolbar', '#vSplitBtn'],
     ['Links inside the paper', 'Go to a reference or figure, or look at it in a panel without losing your place; Back to page n brings you back.', 'Tap a link', '#vBackGo'],
     ['Where you left off', 'Each paper opens where you were, on this device or another.', '', 'ICON:history'],
@@ -192,7 +192,7 @@ const TOUR_STEPS = [
   { sel: '#vTop', title: 'Reading a paper', text: 'Papers open in tabs (with more than one open; with many, a count at each end lists the rest, to go to or close). Library goes back to your library and keeps them open.', before: async () => (await toReader()) ? null : 'skip-reader' },
   { sel: '#vRecentBtn', title: 'Recently closed', text: 'The papers you\u2019ve closed lately, to open again with a tap.' },
   { sel: '#vFindBtn', title: 'Search in the paper', text: 'Every match highlighted; Return for the next. A scan can be made searchable first.' },
-  { sel: '#vDarkBtn', title: 'Dark pages', text: 'Light text on dark pages, for reading at night.' },
+  { sel: '#vDarkBtn', title: 'Page tones', text: 'A tap: dark pages, and back. Rest the pointer on it (or hold it) for sepia, dark sepia and a warmth slider.' },
   { sel: '#vSplitBtn', title: 'Split screen', text: 'A second view of the paper below, to keep the references (say) in sight while you read.' },
   { sel: '#vZoomLevel', title: 'Fit to the screen', text: 'Tap the percentage to go round: the whole page, the page\u2019s width, and actual size. Or zoom with \u2212 and +, or pinch.' },
   { sel: '#vShare', title: 'Share a copy', text: 'Send the PDF to Mail or any app, as it is or as a clean copy without your marks. Share sends its citation too (in Mail, the message\u2019s text); Download saves it. Clean, at each one\u2019s end, leaves out your marks. Shortcuts: \u2325M to share and \u2325S to download, with \u21e7 for clean.' },
