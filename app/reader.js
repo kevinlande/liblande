@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-23.08';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-10-24.01';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -3586,16 +3586,22 @@ document.addEventListener('pointerdown', ev => {
 // or a picture of what's inside, or select the marks it touches to
 // delete, recolour, comment on or move them together.
 // PDF.js, with its highlighting on (as it is while a mark you tapped is
-// picked up, or for a moment after a tool is put down), takes a drag on
-// the page for a new freehand highlight: only the highlighter, chosen,
+// picked up, for a moment after a tool is put down, and with the
+// highlighter highlighting text), takes a drag on the page off the words
+// for a new freehand highlight: only the freehand highlighter, chosen,
+// and used with the Pencil (or a finger, if it's the finger's tool),
 // draws one. Otherwise the press goes no further than LibLande's own
 // handling (selecting text, scrolling, picking up a mark); presses on a
-// mark or its toolbar still reach it.
+// mark or its toolbar still reach it, and with the text highlighter, on
+// the words.
 $('#vScroll').addEventListener('pointerdown', ev => {
-  if (!V.viewer || !V.lib || (V.tool !== 'read' && V.tool !== 'select')) return;
+  if (!V.viewer || !V.lib) return;
   if (V.viewer.annotationEditorMode !== V.lib.AnnotationEditorType.HIGHLIGHT) return;
+  const free = V.tool === 'highlight' && MARK.hlMode === 'free' && !(ev.pointerType === 'touch' && V.pencil);
+  if (free) return;
   const t = ev.target;
   if (!t.closest || !t.closest('#vPages') || t.closest('.annotationEditorLayer > [id], .editToolbar, .note-pin')) return;
+  if (V.tool === 'highlight' && t.closest('.textLayer span')) return;
   ev.stopPropagation();
 }, true);
 (() => {
@@ -4303,7 +4309,7 @@ document.addEventListener('selectionchange', ev => {
 // journal's: from the PDF's own page labels, or the publication's page
 // range lined up with the PDF (a cover page skipped), or the number printed
 // at the top or foot of the page. A guess is marked, and can be changed.
-const QUOTE = { el: null, sel: null, timer: 0, run: 0 };
+const QUOTE = { el: null, sel: null, timer: 0, run: 0, down: new Set() };
 const LIGATURES = { 'ﬀ': 'ff', 'ﬁ': 'fi', 'ﬂ': 'fl', 'ﬃ': 'ffi', 'ﬄ': 'ffl', 'ﬅ': 'st', 'ﬆ': 'st' };
 function quoteText(raw) {
   let t = String(raw).replace(/­/g, '').replace(/[ﬀ-ﬆ]/g, c => LIGATURES[c])
@@ -4486,10 +4492,17 @@ async function showQuote() {
     QUOTE.el = document.createElement('div');
     QUOTE.el.className = 'quote-bar';
     QUOTE.el.innerHTML = `<button type="button" class="quote-go" title="Copy the passage as a quotation, with its citation (${esc(keyHint('quote'))})">${ICON.quote}<span>Quote</span></button>` +
-      `<label class="quote-pg"><span>p.</span><input type="text" inputmode="numeric" autocomplete="off" aria-label="Page"></label>`;
+      `<label class="quote-pg"><span>p.</span><input type="text" inputmode="numeric" autocomplete="off" aria-label="Page" readonly></label>`;
     QUOTE.el.querySelector('.quote-go').addEventListener('click', quoteCopy);
-    // (Pressing in the bar keeps the selection.)
-    QUOTE.el.addEventListener('pointerdown', ev => { if (!ev.target.closest('input')) ev.preventDefault(); });
+    // (Pressing in the bar keeps the selection.) The page box can be
+    // written in only once pressed: otherwise the iPad's Scribble takes a
+    // Pencil passing near it for handwriting.
+    QUOTE.el.addEventListener('pointerdown', ev => {
+      const inp = ev.target.closest('input');
+      if (!inp) { ev.preventDefault(); return; }
+      if (inp.readOnly) { inp.readOnly = false; setTimeout(() => { inp.focus(); inp.select(); }, 0); }
+    });
+    QUOTE.el.querySelector('input').addEventListener('blur', ev => { ev.target.readOnly = true; });
     QUOTE.el.querySelector('input').addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); quoteCopy(); } });
     // (Wide enough for what's typed: 327–345, say.)
     QUOTE.el.querySelector('input').addEventListener('input', ev => { ev.target.size = Math.max(3, ev.target.value.length + 1); });
@@ -4567,13 +4580,22 @@ function quoteCopy() {
 // and the passage it had stay.)
 const quoteEditing = () => !!(QUOTE.el && !QUOTE.el.hidden && QUOTE.el.contains(document.activeElement));
 // (Where a drag or press over the paper ended, to put the bar there.)
-document.addEventListener('pointerup', ev => {
-  if (ev.target && ev.target.closest && ev.target.closest('#vPages')) QUOTE.up = { x: ev.clientX, y: ev.clientY, at: Date.now() };
+// (Not while the passage is still being chosen, with a press down on the
+// paper: the bar would come up under the Pencil or finger. It comes when
+// it's lifted.)
+document.addEventListener('pointerdown', ev => {
+  if (ev.target && ev.target.closest && ev.target.closest('#vPages')) QUOTE.down.add(ev.pointerId);
 }, true);
+['pointerup', 'pointercancel'].forEach(n => document.addEventListener(n, ev => {
+  if (!QUOTE.down.delete(ev.pointerId)) return;
+  if (n === 'pointerup') QUOTE.up = { x: ev.clientX, y: ev.clientY, at: Date.now() };
+  if (!QUOTE.down.size && !$('#viewer').hidden && !quoteEditing()) { clearTimeout(QUOTE.timer); QUOTE.timer = setTimeout(showQuote, 150); }
+}, true));
 document.addEventListener('selectionchange', () => {
   if ($('#viewer').hidden || quoteEditing()) return;
   clearTimeout(QUOTE.timer);
   if (QUOTE.el && !QUOTE.el.hidden && !quoteSelection()) hideQuote();
+  if (QUOTE.down.size) { if (QUOTE.el) QUOTE.el.hidden = true; return; }
   QUOTE.timer = setTimeout(showQuote, 250);
 });
 $('#vScroll').addEventListener('scroll', () => {
@@ -6592,11 +6614,17 @@ $('#vScroll').addEventListener('pointerup', ev => {
   if (!d || (V.tool !== 'read' && !fingerOnly) || !TOUCH_UI.matches) return;
   if (Math.hypot(ev.clientX - d.x, ev.clientY - d.y) > 8 || Date.now() - d.t > 400) return;
   if (d.gliding || d.palm || BARS.active.size > 1 || Date.now() - BARS.multiAt < 400) return;
-  if (ev.target.closest('a, button, .annotationLayer section, .editToolbar')) return;
-  // Not when the tap ends a text selection.
-  if (!getSelection().isCollapsed) return;
-  // A tap on a mark picks it up (see above), rather than the bars.
-  if (LP.took || readMarkAt(ev.clientX, ev.clientY)) return;
+  // (Hidden, a tap brings them back wherever it lands on the paper: on a
+  // mark, which it also picks up, or ending a selection.)
+  const hiddenNow = $('#viewer').classList.contains('bars-hidden');
+  if (ev.target.closest('a, button, .editToolbar') || LP.took) return;
+  if (!hiddenNow) {
+    if (ev.target.closest('.annotationLayer section')) return;
+    // Not when the tap ends a text selection.
+    if (!getSelection().isCollapsed) return;
+    // A tap on a mark picks it up (see above), rather than the bars.
+    if (readMarkAt(ev.clientX, ev.clientY)) return;
+  }
   // A tap just beside a link within the paper (they can be tiny, like a
   // footnote's star) is a tap on the link, not on the page.
   const near = linkNear(ev.clientX, ev.clientY, 24);

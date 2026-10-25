@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/newpapers.js'] = '2026-10-23.08';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/newpapers.js'] = '2026-10-24.01';
 /* ------------------------------------------------------------ new papers */
 // Found with OpenAlex (citations, authors, journals) and Semantic Scholar
 // (papers like your examples), asked from this page: no key, and no email
