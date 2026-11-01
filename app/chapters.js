@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/chapters.js'] = '2026-10-25.07';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/chapters.js'] = '2026-11-01.01';
 /* ------------------------------------------------------------ link chapters */
 // A chapter is linked to its book by its crossref field (see findChapters).
 // Chapters added before that are linked here, after you've looked:
@@ -698,3 +698,23 @@ $('#detail').addEventListener('click', ev => {
   CHS.list = CHS.list.length ? CHS.list : [c];
   chPick(c, null);
 });
+
+/* ------------------------------------------------------------ not linked yet */
+// In a book's details: chapters in the library that name it (the same book
+// title) but aren't linked to it, in its order; not ones dismissed as not
+// its chapters in Link chapters. Each linked with Link (or all at once).
+function chLoose(book) {
+  const t = lcNorm(book.f.title);
+  if (!t) return [];
+  return ENTRIES.filter(c => (c.t === 'incollection' || c.t === 'inbook') && !c.ib && !CHAPTER_OF.has(c.k) && lcNorm(c.f.booktitle) === t && !LC_NO.has('c:' + c.k + '>' + book.k))
+    .sort((a, b) => firstPage(a) - firstPage(b) || cmpStr(a.f.title || '', b.f.title || ''));
+}
+$('#detail').addEventListener('click', ev => {
+  const one = ev.target.closest('[data-ch-link]'), all = ev.target.closest('[data-ch-link-all]');
+  if (!one && !all) return;
+  ev.stopPropagation();
+  const book = BYKEY.get(state.selKey);
+  if (!book) return;
+  const chs = all ? chLoose(book) : [BYKEY.get(one.dataset.chLink)].filter(Boolean);
+  if (chs.length) lcLinkTo(book, chs);
+}, true);

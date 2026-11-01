@@ -286,7 +286,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-10-25.07</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-11-01.01</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -301,7 +301,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-10-25.07';
+      l.querySelector('small').textContent = 'Version 2026-11-01.01';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -313,7 +313,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-10-25.07): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-11-01.01): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
@@ -328,12 +328,18 @@ try {
 (function () {
   var parts = document.getElementById('appLoader').getAttribute('data-parts').split(' ');
   var base = window.LIBLANDE_APP_BASE || '';
-  Promise.all(parts.map(function (p) {
+  // (A part that fails to come, as a request dropped on a weak
+  // connection can, is asked for again, twice, before giving up.)
+  function get(p, tries) {
     return fetch(base + p).then(function (r) {
       if (!r.ok) throw new Error('LibLande couldn\u2019t load ' + p + ' (' + r.status + '). Check your connection and open it again.');
       return r.text();
+    }).catch(function (err) {
+      if (tries <= 1) throw err;
+      return new Promise(function (ok) { setTimeout(ok, 400); }).then(function () { return get(p, tries - 1); });
     });
-  })).then(function (texts) {
+  }
+  Promise.all(parts.map(function (p) { return get(p, 3); })).then(function (texts) {
     var s = document.createElement('script');
     s.textContent = '(() => {\n' + texts.join('\n') + '\n})();\n//# sourceURL=liblande-app.js';
     document.body.appendChild(s);

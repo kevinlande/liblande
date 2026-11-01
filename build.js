@@ -726,10 +726,10 @@ function ensureStaticGroup_(text, name) {
 }
 
 // A new cite key for an entry: the entry itself, the static groups that
-// list it, and other entries' crossref, xdata and related fields that
+// list it, and other entries' crossref, xdata, related and versionof fields that
 // name it. (LaTeX documents that cite the old key aren't LibLande's to
 // change.)
-const KEY_LINK_FIELDS_ = ['crossref', 'xdata', 'related'];
+const KEY_LINK_FIELDS_ = ['crossref', 'xdata', 'related', 'versionof'];
 function renameKey_(text, oldKey, newKey) {
   newKey = String(newKey || '').trim();
   if (!newKey) throw new Error('Type the new cite key.');
@@ -777,4 +777,4 @@ function checkRename_(before, after, oldKey, newKey) {
   return b;
 }
 
-;if (self.document) (self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {}).build = '2026-10-25.07';
+;if (self.document) (self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {}).build = '2026-11-01.01';

@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-10-25.07';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-01.01';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -1624,7 +1624,7 @@ async function renameCore(e, newKey) {
     e.k = newKey; e.h = res.hash;
     if (res.gh) DATA.gh = res.gh;
     (DATA.groups || []).forEach(g => { g.keys = g.keys.map(k => (k === old ? newKey : k)); });
-    ENTRIES.forEach(x => ['crossref', 'related'].forEach(n => {
+    ENTRIES.forEach(x => ['crossref', 'related', 'versionof'].forEach(n => {
       [x.f, x.r].forEach(o => { if (o && o[n]) o[n] = o[n].split(',').map(k => (k.trim() === old ? newKey : k)).join(','); });
     }));
     RECENT.seen.forEach(x => { if (x[0] === old) x[0] = newKey; });
@@ -1668,14 +1668,18 @@ function openAddChapter(book) {
 // in a chapter's: its book.
 // (With "+ Add chapter" at its head: a book's chapter added, with the
 // book's details filled in. A book with none yet has just that.)
+// (And those in the library that name this book but aren't linked to it
+// yet, each to link with a tap, or all at once: see chapters.js.)
 function chaptersHTML(e) {
-  const list = CHAPTERS.get(e.k) || [], add = gs && !e.ib && isBook(e);
+  const list = CHAPTERS.get(e.k) || [], add = gs && !e.ib && isBook(e), loose = add ? chLoose(e) : [];
   if (!list.length && !add) return '';
   const btn = add ? `<button type="button" class="ch-add" data-add-chapter title="Add a chapter of this book, with the book\u2019s details filled in">${ICON.addChapter}<span>Add chapter</span></button>` : '';
-  if (!list.length) return `<section class="d-sec d-chapters"><h3><span>Chapters</span>${btn}</h3></section>`;
-  return `<section class="d-sec d-chapters"><h3><span>Chapters in your library \u00b7 ${list.length}</span>${btn}</h3><ul>` + list.map(c =>
-    `<li><button type="button" data-version="${esc(c.k)}"><span class="ch-t">${esc(c.f.title || c.k)}</span>${c.authorsShort ? `<span class="ch-a">${esc(c.authorsShort)}</span>` : ''}</button>` +
-    (c.f.pages ? `<span class="ch-pp">pp. ${esc(c.f.pages.replace(/-+/g, '\u2013'))}</span>` : '') + `</li>`).join('') + `</ul></section>`;
+  const row = (c, link) => `<li><button type="button" data-version="${esc(c.k)}"><span class="ch-t">${esc(c.f.title || c.k)}</span>${c.authorsShort ? `<span class="ch-a">${esc(c.authorsShort)}</span>` : ''}</button>` +
+    (c.f.pages ? `<span class="ch-pp">pp. ${esc(c.f.pages.replace(/-+/g, '\u2013'))}</span>` : '') +
+    (link ? `<button type="button" class="ch-link" data-ch-link="${esc(c.k)}" title="Link it to this book">Link</button>` : '') + `</li>`;
+  const looseHTML = loose.length ? `<div class="ch-loose"><h4><span>Not linked yet \u00b7 ${loose.length}</span>${loose.length > 1 ? `<button type="button" class="ch-link" data-ch-link-all>Link all</button>` : ''}</h4><ul>${loose.map(c => row(c, true)).join('')}</ul></div>` : '';
+  if (!list.length) return `<section class="d-sec d-chapters"><h3><span>Chapters</span>${btn}</h3>${looseHTML}</section>`;
+  return `<section class="d-sec d-chapters"><h3><span>Chapters in your library \u00b7 ${list.length}</span>${btn}</h3><ul>` + list.map(c => row(c, false)).join('') + `</ul>${looseHTML}</section>`;
 }
 function inBookHTML(e) {
   const b = CHAPTER_OF.has(e.k) && BYKEY.get(CHAPTER_OF.get(e.k));
@@ -1696,7 +1700,7 @@ function versionsHTML(e) {
   };
   return `<section class="d-sec d-versions"><h3>Versions</h3><ul>${family.map(line).join('')}</ul></section>`;
 }
-// Join: the other publications name the main one in their related field.
+// Join: the other publications name the main one in their versionof field.
 // From a selection: a small panel to choose the main version.
 function openJoin(list) {
   list = list.filter(Boolean);
@@ -1712,16 +1716,18 @@ function openJoin(list) {
       `<span class="jc-main">Main</span></label>`).join('') + `</div>`, 'Join');
   $('#sheet').classList.add('head-mode', 'compact', 'pop', 'join-sheet');
 }
-// Join `others` under `main`: each names it in its related field (in place
+// Join `others` under `main`: each names it in its versionof field (in place
 // of any main version it had before). Returns what each had, for Undo.
 async function joinUnder(main, others, progress) {
   const before = [];
   let n = 0;
   for (const x of others) {
     if (progress) progress(++n, others.length);
-    before.push([x, rawOf(x, 'related').trim()]);
+    // (In versionof; an older untyped "related" of LibLande's moves there.)
+    const was = { versionof: rawOf(x, 'versionof').trim(), related: rawOf(x, 'related').trim() };
+    before.push([x, was]);
     const keep = relatedKeys(x).filter(k => k !== main.k && k !== VERSION_OF.get(x.k));
-    await writeEdit(x, { related: [main.k].concat(keep).join(',') }, [], []);
+    await writeEdit(x, Object.assign({ versionof: [main.k].concat(keep).join(',') }, x.f.relatedtype ? {} : { related: '' }), [], []);
   }
   init(DATA, true);
   state.selKey = main.k; refresh(false); revealSelected();
@@ -1754,7 +1760,7 @@ async function joinByDrag(main, moved, instead) {
     const before = await joinUnder(main, [moved]);
     const undo = async quiet => {
       try {
-        for (const [x, was] of before) { const now = BYKEY.get(x.k); if (now) await writeEdit(now, { related: was }, [], []); }
+        for (const [x, was] of before) { const now = BYKEY.get(x.k); if (now) await writeEdit(now, now.f.relatedtype ? { versionof: was.versionof } : was, [], []); }
         init(DATA, true); refresh(false);
         if (!quiet) toast('Undone', 2000);
         return true;
@@ -1795,7 +1801,7 @@ function unjoin(x) {
   if (!x) return;
   const mainK = VERSION_OF.get(x.k);
   const rest = relatedKeys(x).filter(k => k !== mainK).join(',');
-  quickSet(x, { related: rest }, 'Shown as a separate publication');
+  quickSet(x, Object.assign({ versionof: rest }, x.f.relatedtype ? {} : { related: '' }), 'Shown as a separate publication');
 }
 // On a computer: drag a row onto another to join it under that one.
 const rowDrag = () => !!gs && !coarseMQ.matches;

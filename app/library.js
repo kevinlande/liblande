@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-10-25.07';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-01.01';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -1073,10 +1073,14 @@ function isForthcoming(e) {
 /* ------------------------------------------------------------ versions */
 // Versions of one work (an article and its reprint in a collection, two
 // editions of a book): a later version names the main one in its
-// "related" field (BibLaTeX's), so the link is kept in the .bib. Each
-// version is shown under its main one.
+// "versionof" field, so the link is kept in the .bib. (Not biblatex's
+// "related": without a relatedtype, biblatex, biblatex-apa too, prints the
+// related entry after it, garbled. An older "related" with no type, as
+// LibLande wrote before November 2026, is still read.) Each version is
+// shown under its main one.
 let VERSION_OF = new Map(), VERSIONS = new Map();
-const relatedKeys = e => String((e.r && e.r.related) || e.f.related || '').split(',').map(k => k.trim()).filter(Boolean);
+const linkKeys = v => String(v || '').split(',').map(k => k.trim()).filter(Boolean);
+const relatedKeys = e => [...new Set(linkKeys((e.r && e.r.versionof) || e.f.versionof).concat(e.f.relatedtype ? [] : linkKeys((e.r && e.r.related) || e.f.related)))];
 function findVersions() {
   VERSION_OF = new Map(); VERSIONS = new Map();
   const mainOf = e => relatedKeys(e).map(k => BYKEY.get(k)).find(x => x && x !== e);
@@ -2894,7 +2898,7 @@ function renderDetail() {
 
   const skip = new Set(['abstract', 'annote', 'keywords', 'date-added', 'read', 'rating']);
   // (Related: shown as Versions, when it names publications in the library.)
-  if (VERSION_OF.has(e.k) || relatedKeys(e).every(k => BYKEY.has(k))) skip.add('related');
+  if (VERSION_OF.has(e.k) || relatedKeys(e).every(k => BYKEY.has(k))) { skip.add('versionof'); if (!f.relatedtype) skip.add('related'); }
   const keys = Object.keys(f).filter(k => !skip.has(k)).sort((a, b) => {
     const ia = FIELD_ORDER.indexOf(a), ib = FIELD_ORDER.indexOf(b);
     return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b);
