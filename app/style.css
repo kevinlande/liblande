@@ -1427,13 +1427,16 @@ body.is-offline .fileicon:not(.saved), body.is-offline .pdf:not(.saved) { opacit
   -webkit-backdrop-filter: invert(1) hue-rotate(180deg) brightness(.92); backdrop-filter: invert(1) hue-rotate(180deg) brightness(.92);
 }
 .viewer.dark-pages #vPages .page, .viewer.dark-pages #vPeekPages .page { background: #111; }
-/* Dark sepia: the negative page in browns. Sepia and warmth: a tint
-   multiplied over each page (its picture and highlights; not the marks'
-   toolbars). */
+/* Dark sepia: the negative page in browns. Sepia and warmth: the page's
+   picture tinted by a colour filter (#llTint: each colour multiplied, so
+   white becomes the tint and black stays black). (Not a layer over the
+   page blended by multiply: Safari then didn't draw the panel below the
+   pages, for a link's destination or split screen, at all.) */
 .viewer.dark-pages.tone-darksepia #vPages .canvasWrapper > canvas, .viewer.dark-pages.tone-darksepia #vPeekPages .canvasWrapper > canvas { filter: invert(1) hue-rotate(180deg) contrast(.86) sepia(.7) brightness(.9); }
 .viewer.dark-pages.tone-darksepia #vPages .page, .viewer.dark-pages.tone-darksepia #vPeekPages .page { background: #17120c; }
-.viewer.tinted #vPages .canvasWrapper::after, .viewer.tinted #vPeekPages .canvasWrapper::after { content: ''; position: absolute; inset: 0; background: var(--page-tint, #fff); mix-blend-mode: multiply; pointer-events: none; }
-.viewer.tinted #vPages .canvasWrapper, .viewer.tinted #vPeekPages .canvasWrapper { position: absolute; inset: 0; }
+.viewer.tinted:not(.dark-pages) #vPages .canvasWrapper > canvas, .viewer.tinted:not(.dark-pages) #vPeekPages .canvasWrapper > canvas { filter: url(#llTint); }
+.viewer.tinted.dark-pages #vPages .canvasWrapper > canvas, .viewer.tinted.dark-pages #vPeekPages .canvasWrapper > canvas { filter: invert(1) hue-rotate(180deg) url(#llTint); }
+.viewer.tinted.dark-pages.tone-darksepia #vPages .canvasWrapper > canvas, .viewer.tinted.dark-pages.tone-darksepia #vPeekPages .canvasWrapper > canvas { filter: invert(1) hue-rotate(180deg) contrast(.86) sepia(.7) brightness(.9) url(#llTint); }
 /* The moon's choices: the tones, and how warm. */
 .v-tone-pair { display: inline-flex; align-items: center; }
 .v-tools .tb-btn.v-tone-more { width: 18px; min-width: 18px; padding: 0; margin-left: -4px; color: var(--muted); }

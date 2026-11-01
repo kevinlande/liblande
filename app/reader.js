@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-01.01';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-01.02';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -93,7 +93,12 @@ function pdfJsFix(src) {
   const start = /static startDrawing\((\w+),(\w+),(\w+),(\w+)\)\{/.exec(out);
   if (clean && start && /CurrentPointers\.clearPointerType\(\)/.test(out)) {
     const [, C, sl, al, ol, rl] = clean, ev = start[4];
-    const fresh = `if(!globalThis.__llOthersDown||!globalThis.__llOthersDown(${ev}.pointerId)){if(${C}.#${rl}){${C}.#${rl}.abort();${C}.#${rl}=null}CurrentPointers.clearPointerIds();CurrentPointers.clearPointerType();const _ll=${C}.#${sl};if(_ll&&(typeof _ll.startNew!=="function"||!this._currentParent)){${C}.#${sl}=null;${C}.#${al}=null;${C}.#${ol}=null}}`;
+    // (A drawing under way of another kind (a freehand highlight's, before
+    // a pen stroke) is let go whatever else is touching the screen: iPadOS
+    // doesn't always say a finger has lifted, and kept, it threw
+    // "DrawingEditor.#sl.startNew is not a function".)
+    const fresh = `{const _lk=${C}.#${sl};if(_lk&&typeof _lk.startNew!=="function"){if(${C}.#${rl}){${C}.#${rl}.abort();${C}.#${rl}=null}${C}.#${sl}=null;${C}.#${al}=null;${C}.#${ol}=null}}` +
+      `if(!globalThis.__llOthersDown||!globalThis.__llOthersDown(${ev}.pointerId)){if(${C}.#${rl}){${C}.#${rl}.abort();${C}.#${rl}=null}CurrentPointers.clearPointerIds();CurrentPointers.clearPointerType();const _ll=${C}.#${sl};if(_ll&&(typeof _ll.startNew!=="function"||!this._currentParent)){${C}.#${sl}=null;${C}.#${al}=null;${C}.#${ol}=null}}`;
     out = out.slice(0, start.index + start[0].length) + fresh + out.slice(start.index + start[0].length);
   }
   return out;
@@ -3622,6 +3627,16 @@ document.addEventListener('pointerdown', ev => {
 // handling (selecting text, scrolling, picking up a mark); presses on a
 // mark or its toolbar still reach it, and with the text highlighter, on
 // the words.
+// Reading (no tool chosen, nothing picked up): a touch on the page first
+// makes sure PDF.js has no tool on, which ends a drawing it was still
+// keeping under way (iPadOS can leave one, missing a finger's lift; every
+// drag then drew a freehand highlight).
+$('#vScroll').addEventListener('pointerdown', ev => {
+  if (!V.viewer || !V.lib || V.tool !== 'read' || V.selected) return;
+  const T = V.lib.AnnotationEditorType, m = V.viewer.annotationEditorMode;
+  if (m === T.NONE || m === T.DISABLE) return;
+  try { V.viewer.annotationEditorMode = { mode: T.NONE }; } catch (err) { /* not ready: left */ }
+}, true);
 $('#vScroll').addEventListener('pointerdown', ev => {
   if (!V.viewer || !V.lib) return;
   if (V.viewer.annotationEditorMode !== V.lib.AnnotationEditorType.HIGHLIGHT) return;
@@ -4511,6 +4526,19 @@ function applyTone() {
   const tint = base.map((c, i) => Math.round(c * (1 - w) + amber[i] * w));
   v.classList.toggle('tinted', t === 'sepia' || TONE.warm > 0);
   v.style.setProperty('--page-tint', 'rgb(' + tint.join(',') + ')');
+  // (The filter itself: each of red, green and blue multiplied by the
+  // tint's; see #llTint in the styles.)
+  let f = document.getElementById('llTintSvg');
+  if (!f) {
+    f = document.createElementNS('http:\/\/www.w3.org/2000/svg', 'svg');
+    f.id = 'llTintSvg';
+    f.setAttribute('width', '0'); f.setAttribute('height', '0'); f.setAttribute('aria-hidden', 'true');
+    f.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden';
+    f.innerHTML = '<filter id="llTint" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values=""/></filter>';
+    document.body.appendChild(f);
+  }
+  const [r, g, b] = tint.map(c => (c / 255).toFixed(4));
+  f.querySelector('feColorMatrix').setAttribute('values', `${r} 0 0 0 0  0 ${g} 0 0 0  0 0 ${b} 0 0  0 0 0 1 0`);
   $('#vDarkBtn').setAttribute('aria-pressed', String(t !== 'light'));
   $('#vDarkBtn').dataset.tone = t;
   const box = $('#darkPagesBox');
