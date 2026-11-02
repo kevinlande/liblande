@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/notes.js'] = '2026-11-02.10';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/notes.js'] = '2026-11-02.11';
 /* ------------------------------------------------------------ notes */
 // The details pane shows Details or Notes (a switch at its top, or Alt-N;
 // the choice kept). Notes has your notes, in a box you type in, formatted
@@ -155,7 +155,7 @@ function noteEditor(el, md, changed) {
     }
     if (mod && /^b$/i.test(ev.key)) { ev.preventDefault(); nvExec('bold'); }
     else if (mod && /^i$/i.test(ev.key)) { ev.preventDefault(); nvExec('italic'); }
-    else if (mod && /^k$/i.test(ev.key)) { ev.preventDefault(); nvLink(); }
+    else if (mod && /^k$/i.test(ev.key)) { ev.preventDefault(); nvLink(el); }
     ev.stopPropagation();
   });
   el.addEventListener('paste', ev => {
@@ -168,9 +168,45 @@ function noteEditor(el, md, changed) {
     if (a && (ev.metaKey || ev.ctrlKey)) { ev.preventDefault(); window.open(a.href, '_blank', 'noopener'); }
   });
 }
-function nvLink() {
-  const u = prompt('The link\u2019s address:', 'https:\/\/');
-  if (u && safeUrl(u.trim())) nvExec('createLink', u.trim());
+// A link, its address typed in a little box at the selection (not the
+// browser's prompt, which some don't allow): the words selected become
+// the link, or, with none, the address itself. Return adds it; Esc, or a
+// click elsewhere, doesn't.
+function nvLink(el) {
+  const sel = getSelection();
+  if (!sel.rangeCount) return;
+  const range = sel.getRangeAt(0).cloneRange();
+  const at = range.getBoundingClientRect(), host = el || range.commonAncestorContainer.parentElement.closest('[contenteditable="true"]');
+  if (!host) return;
+  document.querySelectorAll('.nv-linkbox').forEach(x => x.remove());
+  const box = document.createElement('form');
+  box.className = 'nv-linkbox';
+  // (Not the browser's own check of the address: "example.org" is taken, with https:// added.)
+  box.noValidate = true;
+  box.innerHTML = `<input type="text" inputmode="url" autocapitalize="off" placeholder="https:\/\/\u2026" aria-label="The link\u2019s address" autocomplete="off" spellcheck="false"><button type="submit" class="btn primary">Add link</button>`;
+  document.body.appendChild(box);
+  const r = at.width || at.height ? at : host.getBoundingClientRect();
+  box.style.left = Math.max(8, Math.min(innerWidth - box.offsetWidth - 8, r.left)) + 'px';
+  box.style.top = Math.min(innerHeight - box.offsetHeight - 8, r.bottom + 6) + 'px';
+  const input = box.querySelector('input');
+  input.focus();
+  const done = add => {
+    document.removeEventListener('pointerdown', away, true);
+    const u = input.value.trim();
+    box.remove();
+    host.focus();
+    const s = getSelection(); s.removeAllRanges(); s.addRange(range);
+    if (!add || !u) return;
+    const url = /^[a-z]+:/i.test(u) ? u : 'https:\/\/' + u;
+    if (!safeUrl(url)) { toast('That isn\u2019t a web address.', 3000); return; }
+    if (range.collapsed) nvExec('insertHTML', `<a href="${esc(url)}">${esc(u)}</a>&nbsp;`);
+    else nvExec('createLink', url);
+    host.dispatchEvent(new Event('input'));
+  };
+  const away = ev => { if (!box.contains(ev.target)) done(false); };
+  document.addEventListener('pointerdown', away, true);
+  box.addEventListener('submit', ev => { ev.preventDefault(); done(true); });
+  input.addEventListener('keydown', ev => { if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); done(false); } });
 }
 
 /* ---- saving */
@@ -413,7 +449,7 @@ function openNotesPop(e) {
     NOTES.pop = null;
     if (state.selKey === e.k) renderDetail();
   };
-  const onKey = ev => { if (ev.key === 'Escape' && !wrap.querySelector('.np-cite:not([hidden])')) { ev.preventDefault(); ev.stopPropagation(); close(); } };
+  const onKey = ev => { if (ev.key === 'Escape' && !wrap.querySelector('.np-cite:not([hidden])') && !document.querySelector('.nv-linkbox')) { ev.preventDefault(); ev.stopPropagation(); close(); } };
   document.addEventListener('keydown', onKey, true);
   NOTES.pop = { e, close };
   // The buttons keep the caret where it was.
@@ -429,7 +465,7 @@ function openNotesPop(e) {
       else if (k === 'quote') nvToggleBlock(ed, 'blockquote');
       else if (k === 'ul') nvExec('insertUnorderedList');
       else if (k === 'ol') nvExec('insertOrderedList');
-      else if (k === 'link') nvLink();
+      else if (k === 'link') nvLink(ed);
       else nvExec(k);
       ed.dispatchEvent(new Event('input'));
       return;
