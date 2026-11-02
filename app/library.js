@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-02.03';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-02.04';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -2174,7 +2174,7 @@ const listHeight = () => (phoneMQ.matches ? cardTops()[state.view.length] : stat
 let listOver = 0, overWatch = null;
 function glassOver() {
   const main = $('#main'), tb = main.querySelector('.toolbar');
-  const on = document.documentElement.hasAttribute('data-glass') && app.dataset.view !== 'detail';
+  const on = document.documentElement.hasAttribute('data-glass');
   const bars = [...listEl.parentNode.children].filter(el => el !== listEl && !el.classList.contains('pull') && !el.classList.contains('status') &&
     (el.compareDocumentPosition(listEl) & Node.DOCUMENT_POSITION_FOLLOWING));
   if (!overWatch && window.ResizeObserver) {

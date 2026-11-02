@@ -129,8 +129,10 @@
 :root[data-glass] .v-bar, :root[data-glass] .v-tabs {
   background: color-mix(in srgb, var(--panel) 68%, transparent);
   -webkit-backdrop-filter: saturate(180%) blur(22px); backdrop-filter: saturate(180%) blur(22px);
-  border-bottom-color: var(--glass-edge); box-shadow: inset 0 1px 0 var(--glass-rim);
+  border-bottom-color: var(--glass-edge);
 }
+/* (The light rim along a glass top edge only on what floats: on the bars
+   at the top of the screen it drew a thin line under the status bar.) */
 :root[data-glass] .v-palette, :root[data-glass] .vp-show, :root[data-glass] .menu-list, :root[data-glass] .quote-bar, :root[data-glass] .v-tone {
   background: color-mix(in srgb, var(--panel) 62%, transparent);
   -webkit-backdrop-filter: saturate(190%) blur(26px); backdrop-filter: saturate(190%) blur(26px);
@@ -142,18 +144,28 @@
 :root[data-glass] .v-palette { border-radius: 22px; }
 /* The library in glass: its toolbar, and the bars and headings above the
    list, float over the list, which scrolls up under them (as in Mail). Their heights are
-   measured into --tb-h and --bars-h (glassOver, in library.js). Not on a
-   phone's publication, which the toolbar stays above. (The strip behind
+   measured into --tb-h and --bars-h (glassOver, in library.js). On a
+   phone, a publication's details scroll up under the toolbar too. (The strip behind
    the status bar is clear, so the bars reach up to the status bar: the
    system's own frame above it is the same colour either way, and solid,
    the strip only made it look taller.) */
 :root[data-glass] .status-cap { background: transparent; }
 :root[data-glass] .main { position: relative; }
-:root[data-glass] .app:not([data-view="detail"]) .toolbar { position: absolute; top: 0; left: 0; right: 0; z-index: 30;
+:root[data-glass] .toolbar { position: absolute; top: 0; left: 0; right: 0; z-index: 30;
   background: color-mix(in srgb, var(--panel) 68%, transparent);
   -webkit-backdrop-filter: saturate(180%) blur(22px); backdrop-filter: saturate(180%) blur(22px);
-  border-bottom-color: var(--glass-edge); box-shadow: inset 0 1px 0 var(--glass-rim); }
-:root[data-glass] .app:not([data-view="detail"]) .listwrap { padding-top: var(--tb-h, 0px); }
+  border-bottom-color: var(--glass-edge); }
+:root[data-glass] .listwrap { padding-top: var(--tb-h, 0px); }
+:root[data-glass] .app[data-view="detail"] .detail { padding-top: var(--tb-h, 0px); scroll-padding-top: var(--tb-h, 0px); }
+/* The sidebar, where it slides out over the list (an iPad upright, or a
+   narrow window): glass, the list showing through. (Beside the list, on a
+   wide screen, there's nothing under it to show; on a phone it's a page of
+   its own.) */
+@media (min-width: 700px) and (max-width: 1099px) {
+  :root[data-glass] .sidebar { background: color-mix(in srgb, var(--side) 60%, transparent);
+    -webkit-backdrop-filter: saturate(180%) blur(28px); backdrop-filter: saturate(180%) blur(28px);
+    border-right-color: var(--glass-edge); }
+}
 :root[data-glass] .listwrap > :is(.pick-bar, .rl-list-bar, .colhead) { position: relative; z-index: 2;
   background: color-mix(in srgb, var(--panel) 68%, transparent);
   -webkit-backdrop-filter: saturate(180%) blur(22px); backdrop-filter: saturate(180%) blur(22px); }
