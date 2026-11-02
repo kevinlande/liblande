@@ -1,8 +1,8 @@
 ﻿// LibLande: the PDF reader: pages, marks, tools, saving, the sidebar.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, reader, editing, cite, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
+// index.html: library, reader, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-02.09';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-02.10';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -1293,6 +1293,8 @@ async function saveMarkup(force, auto, now) {
       recentPdfs.delete(file.id); recentPdfs.set(file.id, bytes); trimRecentPdfs();
       if (V.md5) recentMd5.set(file.id, V.md5); else recentMd5.delete(file.id);
       THUMBS.delete(file.id);
+      // (Its highlights, read again for the Notes view: see notes.js.)
+      NOTES.marks.delete(file.id);
       V.savedSinceOpen = true;
       if (doc === V.doc) {
         doc.annotationStorage.resetModified();

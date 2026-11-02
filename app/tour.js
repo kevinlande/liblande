@@ -1,8 +1,8 @@
 ﻿// LibLande: Features (everything LibLande does, in one list) and the tour (played through the app itself).
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, reader, editing, cite, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
+// index.html: library, reader, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-11-02.09';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-11-02.10';
 /* -------------------------------------------------------------- features */
 // What LibLande does, by area: each feature, what it's for, where to find
 // it, and its icon (see featIcon). Shown from the sidebar's foot (Features), with a box to find
@@ -49,6 +49,7 @@ const FEATURES = [
     ['Recently closed', 'Open again a paper you closed lately.', 'The page with an arrow, beside the title', '#vRecentBtn'],
     ['Search in the paper', 'Every match highlighted; Return for the next one.', '\u2318F, or the magnifier', '#vFindBtn'],
     ['Zoom and fit', 'Pinch, double-tap, or + and \u2212. Tap the percentage to go round the whole page, the page\u2019s width, and actual size.', 'The reader\u2019s toolbar', 'path:M11 4.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM20 20l-4.2-4.2M11 8.5v5M8.5 11h5'],
+    ['Notes', 'A Notes view in the details pane (Details | Notes, or \u2325N): your notes, formatted as you type (headings, bold, italics, lists, quotations, links; kept in the .bib\u2019s Notes field as Markdown), in a box you can make taller; and the PDF\u2019s highlights and notes, page by page, each opening the reader at its page. Pop out (\u2325\u21e7N) for a large editor with formatting buttons, Cite (another publication\u2019s in-text citation) and the highlights to insert as quotations.', 'Details | Notes, at the top of the details', 'ICON:pencil'],
     ['Citation styles', 'Any citation style for Copy, Quote, the QR code, Export and Cite Check: APA by default, or Chicago, MLA, Harvard, a journal\u2019s own: any of the 10,000-odd Zotero uses, found by name. Downloaded once, then kept for offline use; the choice goes with your account. The Copy menu\u2019s Style row picks another for one copy. Cite Check puts your References into the style, leaving entries it doesn\u2019t recognise as you wrote them.', 'Settings \u203a Citing', 'ICON:quote'],
     ['Adding from the web', 'A paper added from its own page with one click: the page\u2019s DOI or citation read, and LibLande opened at Add, filled in from Crossref, with Find PDF ready. Make the button in Safari with Describe Extension (from a description LibLande gives you), or use the bookmark. A PDF dropped on Add with no DOI in its text is looked up by the title and author it gives.', 'Settings \u203a Adding from the web', 'ICON:link'],
     ['Glass', 'Any theme as glass: the library\u2019s toolbar (the list, or on a phone a publication, scrolling up under it), the sidebar where it slides out over the list, the reader\u2019s bars, the markup toolbar and menus translucent, what\u2019s under them showing softly through, in the theme\u2019s own colours; or flat. Kept with your account.', 'Settings \u203a Appearance \u203a Glass', 'ICON:copy'],

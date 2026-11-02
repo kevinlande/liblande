@@ -1,8 +1,8 @@
 ﻿// LibLande: the library: data, the reading list, groups, search, the list and the details.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, reader, editing, cite, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
+// index.html: library, reader, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-02.09';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-02.10';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -2694,41 +2694,6 @@ function showTwin(key) {
   state.selKey = key;
   paint(); renderDetail(); revealSelected();
 }
-// Notes, written in place: \u2318/Ctrl-Return or leaving the box keeps
-// them; Esc doesn't.
-function editNotes(box) {
-  const e = BYKEY.get(state.selKey);
-  if (!e) return;
-  const old = rawOf(e, 'annote').trim();
-  const ta = document.createElement('textarea');
-  ta.className = 'notes-edit';
-  ta.value = old;
-  ta.setAttribute('aria-label', 'Notes');
-  const hint = document.createElement('div');
-  hint.className = 'notes-hint';
-  hint.textContent = (/Mac|iP/.test(navigator.platform) ? '\u2318' : 'Ctrl-') + 'Return or click away to save \u00b7 Esc to cancel';
-  const grow = () => { ta.style.height = 'auto'; ta.style.height = Math.max(ta.scrollHeight + 2, 96) + 'px'; };
-  box.replaceWith(ta);
-  ta.after(hint);
-  grow();
-  ta.focus();
-  ta.setSelectionRange(ta.value.length, ta.value.length);
-  let done = false;
-  const finish = save => {
-    if (done) return;
-    done = true;
-    const v = ta.value.trim();
-    if (!save || v === old) { renderDetail(); return; }
-    if (!balanced(v)) { toast('Those notes have unbalanced braces { }, so they weren\u2019t saved.', 4000); renderDetail(); return; }
-    quickSet(e, { annote: v }, v ? 'Saved your notes' : 'Removed your notes');
-  };
-  ta.addEventListener('input', grow);
-  ta.addEventListener('keydown', ev => {
-    if (ev.key === 'Enter' && (ev.metaKey || ev.ctrlKey)) { ev.preventDefault(); finish(true); }
-    else if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); finish(false); }
-  });
-  ta.addEventListener('blur', () => finish(true));
-}
 document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && $('#citeMenu')) { ev.stopPropagation(); closeCiteMenu(); } }, true);
 /* ---- recently viewed */
 // A publication counts as viewed once its details have been showing for
@@ -2821,10 +2786,13 @@ function renderDetail() {
   const wide = detailWide(), stack = wide && !(hasPdf || cover);
   let h = '';
   h += `<div class="d-kicker"><span class="d-type">${esc(TYPE_NAMES[e.t] || e.t)}</span>` +
-    `<button class="citekey" data-copy="key" title="Copy cite key"><span class="ck">${esc(e.k)}</span>${ICON.copy}</button>` +
-    (gs && !e.ib ? `<button type="button" class="citekey-edit" data-rename title="Change the cite key" aria-label="Change the cite key">${ICON.pencil}</button>` : '') +
+    // (The key's box: copy it, and, beside the copy icon, change it.)
+    `<span class="citekey-box"><button class="citekey" data-copy="key" title="Copy cite key"><span class="ck">${esc(e.k)}</span>${ICON.copy}</button>` +
+    (gs && !e.ib ? `<button type="button" class="citekey-edit" data-rename title="Change the cite key" aria-label="Change the cite key">${ICON.pencil}</button>` : '') + `</span>` +
     (e.ib ? `<span class="pill">Inbox</span>` : '') +
     (e.offline ? `<span class="pill pend" title="Changed while offline: it goes to Google Drive when you\u2019re back online">On this device</span>` : '') +
+    // (Details or Notes: see notes.js.)
+    notesSeg(e) +
     (gs && !wide ? `<button type="button" class="btn d-edit" data-edit>${ICON.pencil}<span>Edit</span></button>` : '') + `</div>`;
   // (Click it to change it: see editTitle.)
   h += `<h1 class="d-title"${gs ? ' data-title-edit title="Click to edit the title"' : ''}>${esc(f.title || '(untitled)')}</h1>`;
@@ -2965,9 +2933,9 @@ function renderDetail() {
   const vers = versionsHTML(e) + chaptersHTML(e);
   let abs = '', body = '';
   if (f.abstract) abs = `<section class="d-sec"><h3>Abstract</h3><p class="d-abstract">${esc(f.abstract)}</p></section>`;
-  // Notes: click to write or change them, right here.
-  if (gs) body += `<section class="d-sec d-notes"><h3>Notes</h3><div class="d-abstract notes-body${f.annote ? '' : ' notes-empty'}" data-notes>${f.annote ? esc(f.annote) : 'Add notes\u2026'}</div></section>`;
-  else if (f.annote) body += `<section class="d-sec"><h3>Notes</h3><p class="d-abstract">${esc(f.annote)}</p></section>`;
+  // (Notes: in the Notes view, instead of all this. See notes.js.)
+  const notesOn = NOTES.view === 'notes';
+  if (notesOn) { abs = ''; body = notesViewHTML(e); }
 
   const skip = new Set(['abstract', 'annote', 'keywords', 'date-added', 'read', 'rating']);
   // (Related: shown as Versions, when it names publications in the library.)
@@ -2976,23 +2944,25 @@ function renderDetail() {
     const ia = FIELD_ORDER.indexOf(a), ib = FIELD_ORDER.indexOf(b);
     return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b);
   });
-  const fields = `<details class="d-sec"${store.get('fieldsOpen', false) ? ' open' : ''} id="fieldsBox"><summary>All fields</summary><table class="fields"><tbody>` +
+  const fields = notesOn ? '' : `<details class="d-sec"${store.get('fieldsOpen', false) ? ' open' : ''} id="fieldsBox"><summary>All fields</summary><table class="fields"><tbody>` +
     keys.map(k => `<tr><th>${esc(k)}</th><td>${safeUrl(f[k]) ? `<a href="${esc(f[k])}" target="_blank" rel="noopener">${esc(f[k])}</a>` : esc(f[k])}</td></tr>`).join('') +
     (e.files || []).map((x, j) => `<tr><th>file ${j + 1}</th><td>${esc(x.p)}</td></tr>`).join('') +
     `</tbody></table></details>`;
   if (wide) {
-    h = `<div class="d-two"><div class="d-inner">${h}${notices}${abs}${chips}${body}${vers}${fields}</div>` +
+    h = `<div class="d-two"><div class="d-inner">${h}${notices}${abs}${notesOn ? '' : chips}${body}${notesOn ? '' : vers}${fields}</div>` +
       // (Edit in the top corner, wherever the details are shown.)
       `<aside class="d-side${stack ? ' d-stack' : ''}">${gs ? `<button type="button" class="btn d-edit" data-edit>${ICON.pencil}<span>Edit</span></button>` : ''}` +
       `${sideThumbs ? `<div class="thumbs t-side${pdfs.length > 1 ? ' car' : ''}"${pdfs.length > 1 ? ` data-car="${esc(e.k)}" aria-label="PDFs: ${pdfs.length}"` : ' aria-label="PDFs"'}>${sideThumbs}</div>` : ''}${acts}${rl}${metaH}</aside></div>`;
   } else {
     // (Rating and Read, looked at less than the abstract, after it.)
-    h = `<div class="d-inner">${h}${rl}${acts}${thumbs ? `<div class="thumbs t-inline">${thumbs}</div>` : ''}${notices}${abs}${chips}${body}${metaH}${vers}${fields}</div>`;
+    h = `<div class="d-inner">${h}${rl}${acts}${thumbs ? `<div class="thumbs t-inline">${thumbs}</div>` : ''}${notices}${abs}${notesOn ? '' : chips}${body}${metaH}${notesOn ? '' : vers}${fields}</div>`;
   }
   detailEl.innerHTML = h;
   detailEl.dataset.wide = wide ? '1' : '';
   detailEl.scrollTop = 0;
-  $('#fieldsBox').addEventListener('toggle', ev => store.set('fieldsOpen', ev.target.open));
+  if ($('#fieldsBox')) $('#fieldsBox').addEventListener('toggle', ev => store.set('fieldsOpen', ev.target.open));
+  if (notesOn) notesMount(e);
+  notesSegFit();
   loadThumbs();
   // (A book: its chapters not yet here, under its own; see chapters.js.)
   if (gs && isBook(e) && !e.ib) chDetailSuggest(e);
@@ -3200,8 +3170,6 @@ detailEl.addEventListener('click', ev => {
   if (gs && un) { unjoin(BYKEY.get(un.dataset.unjoin)); return; }
   const twin = ev.target.closest('[data-twin]');
   if (twin) { showTwin(twin.dataset.twin); return; }
-  const notes = ev.target.closest('[data-notes]');
-  if (gs && e && notes && getSelection().isCollapsed) { editNotes(notes); return; }
   const tt = ev.target.closest('[data-title-edit]');
   if (gs && e && tt && !ev.target.closest('.d-title-input') && getSelection().isCollapsed) { editTitle(tt); return; }
   if (gs && e && ev.target.closest('[data-cite-add]')) { openCiteMenu(ev.target.closest('[data-cite-add]')); return; }

@@ -1,8 +1,8 @@
 ﻿// LibLande: adding and editing, BibTeX pasted in, selecting several, updates, cite keys, versions, export, the keyboard.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, reader, editing, cite, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
+// index.html: library, reader, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-02.09';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-02.10';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -1634,7 +1634,7 @@ async function saveForth() {
 /* ------------------------------------------------------------ cite keys */
 // The cite key, changed in place: Return saves, Esc or leaving cancels.
 function editKey(e) {
-  const btn = detailEl.querySelector('.citekey');
+  const btn = detailEl.querySelector('.citekey-box') || detailEl.querySelector('.citekey');
   if (!btn) return;
   const input = document.createElement('input');
   input.className = 'citekey-input';
@@ -1642,7 +1642,8 @@ function editKey(e) {
   input.setAttribute('aria-label', 'New cite key');
   input.autocapitalize = 'off'; input.spellcheck = false;
   btn.replaceWith(input);
-  detailEl.querySelector('[data-rename]').hidden = true;
+  const ren = detailEl.querySelector('[data-rename]');
+  if (ren) ren.hidden = true;
   input.focus(); input.select();
   let over = false;
   const finish = go => {
@@ -2424,6 +2425,8 @@ const KEY_ACTS = [
   { id: 'copyBib', scope: 'lib', def: 'Alt+KeyB', label: 'Copy BibTeX' },
   { id: 'copyKey', scope: 'lib', def: 'Alt+KeyK', label: 'Copy cite key' },
   { id: 'edit', scope: 'lib', def: 'Alt+KeyE', label: 'Edit the publication' },
+  { id: 'notesView', scope: 'lib', def: 'Alt+KeyN', label: 'Details or Notes, in the details pane' },
+  { id: 'notesPop', scope: 'lib', def: 'Alt+Shift+KeyN', label: 'Notes, large (pop out)' },
   { id: 'quote', scope: 'pdf', def: 'Alt+KeyC', label: 'Copy the selected passage as a quotation, with its citation' },
   { id: 'closeTab', scope: 'pdf', def: 'Alt+KeyW', label: 'Close the paper’s tab' },
   { id: 'done', scope: 'pdf', def: 'Alt+KeyD', label: 'Done with the paper (marked read, and off your reading list)' },
