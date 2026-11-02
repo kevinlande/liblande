@@ -141,10 +141,12 @@
   box-shadow: inset 0 1px 0 var(--glass-rim), inset 0 0 0 .5px var(--glass-rim), var(--shadow); }
 :root[data-glass] .v-palette { border-radius: 22px; }
 /* The library in glass: its toolbar, and the bars and headings above the
-   list, float over the list, which scrolls up under them (as in Mail), and
-   the strip behind the status bar lets them show. Their heights are
+   list, float over the list, which scrolls up under them (as in Mail). Their heights are
    measured into --tb-h and --bars-h (glassOver, in library.js). Not on a
-   phone's publication, which the toolbar stays above. */
+   phone's publication, which the toolbar stays above. (The strip behind
+   the status bar stays solid: Safari and the Home Screen app fill the
+   frame above the page with one colour read from it, and with it clear
+   they filled it black.) */
 :root[data-glass] .main { position: relative; }
 :root[data-glass] .app:not([data-view="detail"]) .toolbar { position: absolute; top: 0; left: 0; right: 0; z-index: 30;
   background: color-mix(in srgb, var(--panel) 68%, transparent);
@@ -156,7 +158,6 @@
   -webkit-backdrop-filter: saturate(180%) blur(22px); backdrop-filter: saturate(180%) blur(22px); }
 :root[data-glass] .list { margin-top: calc(-1 * (var(--tb-h, 0px) + var(--bars-h, 0px))); padding-top: calc(var(--tb-h, 0px) + var(--bars-h, 0px)); }
 :root[data-glass] .pull { top: calc(var(--tb-h, 0px) + var(--bars-h, 0px) + 6px); }
-:root[data-glass] .status-cap { background: transparent; }
 /* (The pages kept to their own layer, under the bars: in dark pages, a
    saved highlight is drawn with a backdrop filter of its own, and without
    this the browser painted it over the reader's bar.) */
