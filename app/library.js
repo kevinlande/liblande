@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-01.03';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-02.01';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -128,6 +128,7 @@ applyStyle(store.get('style', 'liblande'));
 // until you choose.)
 function applyGlass(on) {
   document.documentElement.toggleAttribute('data-glass', !!on);
+  requestAnimationFrame(glassOver);
   const box = $('#glassBox');
   if (box) box.checked = !!on;
 }
@@ -2166,6 +2167,27 @@ const rowTop = i => (phoneMQ.matches ? cardTops()[i] : i * rowH());
 const rowHt = i => (phoneMQ.matches ? cardTops()[i + 1] - cardTops()[i] : rowH());
 const listHeight = () => (phoneMQ.matches ? cardTops()[state.view.length] : state.view.length * rowH());
 // The row at a height in the list.
+// Glass: the toolbar and the bars above the list float over it (see
+// style.css), their heights kept in --tb-h and --bars-h, and listOver, the
+// room at the top of the list they cover, which the drawing of rows and
+// the scrolling to one allow for.
+let listOver = 0, overWatch = null;
+function glassOver() {
+  const main = $('#main'), tb = main.querySelector('.toolbar');
+  const on = document.documentElement.hasAttribute('data-glass') && app.dataset.view !== 'detail';
+  const bars = [...listEl.parentNode.children].filter(el => el !== listEl && !el.classList.contains('pull') && !el.classList.contains('status') &&
+    (el.compareDocumentPosition(listEl) & Node.DOCUMENT_POSITION_FOLLOWING));
+  if (!overWatch && window.ResizeObserver) {
+    overWatch = new ResizeObserver(() => requestAnimationFrame(glassOver));
+    [tb, ...bars].forEach(el => overWatch.observe(el));
+  }
+  const t = on ? tb.offsetHeight : 0, b = on ? bars.reduce((n, el) => n + el.offsetHeight, 0) : 0;
+  if (t + b === listOver && main.style.getPropertyValue('--tb-h') === t + 'px') return;
+  main.style.setProperty('--tb-h', t + 'px');
+  main.style.setProperty('--bars-h', b + 'px');
+  listOver = t + b;
+  if (typeof paint === 'function' && state.view) paint();
+}
 function rowAt(y) {
   const n = state.view.length;
   if (!phoneMQ.matches) return Math.max(0, Math.min(n - 1, Math.floor(y / rowH())));
@@ -2183,7 +2205,7 @@ function paint() {
     rowsEl.innerHTML = `<div class="empty">${state.q ? 'No publications match \u201c' + esc(state.q) + '\u201d.' : 'This group is empty.'}</div>`;
     return;
   }
-  const top = listEl.scrollTop, vh = listEl.clientHeight || 600;
+  const top = Math.max(0, listEl.scrollTop - listOver), vh = listEl.clientHeight || 600;
   const s = Math.max(0, rowAt(top) - 6), e = Math.min(v.length, rowAt(top + vh) + 7);
   painted = { view: v, s, e };
   const phone = phoneMQ.matches;
@@ -2359,7 +2381,7 @@ listEl.addEventListener('scroll', () => {
   paintQueued = true;
   requestAnimationFrame(() => {
     paintQueued = false;
-    const v = state.view, top = listEl.scrollTop, vh = listEl.clientHeight || 600;
+    const v = state.view, top = Math.max(0, listEl.scrollTop - listOver), vh = listEl.clientHeight || 600;
     // Rows actually on screen, plus two rows either side.
     const s = Math.max(0, rowAt(top) - 2), e = Math.min(v.length, rowAt(top + vh) + 3);
     if (painted && painted.view === v && painted.s <= s && painted.e >= e) return;
@@ -2415,7 +2437,7 @@ function revealSelected() {
   if (i < 0) return;
   const h = rowHt(i), top = rowTop(i), st = listEl.scrollTop, vh = listEl.clientHeight;
   if (top < st) listEl.scrollTop = top;
-  else if (top + h > st + vh) listEl.scrollTop = top + h - vh;
+  else if (top + h > st + vh - listOver) listEl.scrollTop = top + h - vh + listOver;
   paint();
 }
 

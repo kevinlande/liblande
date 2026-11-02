@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-11-01.03';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-11-02.01';
 /* -------------------------------------------------------------- features */
 // What LibLande does, by area: each feature, what it's for, where to find
 // it, and its icon (see featIcon). Shown from the sidebar's foot (Features), with a box to find
@@ -49,7 +49,7 @@ const FEATURES = [
     ['Recently closed', 'Open again a paper you closed lately.', 'The page with an arrow, beside the title', '#vRecentBtn'],
     ['Search in the paper', 'Every match highlighted; Return for the next one.', '\u2318F, or the magnifier', '#vFindBtn'],
     ['Zoom and fit', 'Pinch, double-tap, or + and \u2212. Tap the percentage to go round the whole page, the page\u2019s width, and actual size.', 'The reader\u2019s toolbar', 'path:M11 4.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM20 20l-4.2-4.2M11 8.5v5M8.5 11h5'],
-    ['Glass', 'Any theme as glass: the reader\u2019s bars, the markup toolbar and menus translucent, the page showing softly through them, in the theme\u2019s own colours; or flat. Kept with your account.', 'Settings \u203a Appearance \u203a Glass', 'ICON:copy'],
+    ['Glass', 'Any theme as glass: the library\u2019s toolbar (the list scrolling up under it), the reader\u2019s bars, the markup toolbar and menus translucent, what\u2019s under them showing softly through, in the theme\u2019s own colours; or flat. Kept with your account.', 'Settings \u203a Appearance \u203a Glass', 'ICON:copy'],
     ['Page tones', 'The pages light, sepia (warm paper), dark, or dark sepia; and a Warmth slider that cuts blue light with any of them. The PDF isn\u2019t changed. A tap on the moon switches between your last two.', 'The moon in the reader\u2019s toolbar: rest the pointer on it (on an iPad or iPhone, hold it or tap its \u25be)', '#vDarkBtn'],
     ['Split screen', 'A second view of the paper below, to scroll on its own (to the references, say).', 'The split box in the reader\u2019s toolbar', '#vSplitBtn'],
     ['Links inside the paper', 'Go to a reference or figure, or look at it in a panel without losing your place; Back to page n brings you back.', 'Tap a link', '#vBackGo'],
