@@ -144,9 +144,10 @@
    list, float over the list, which scrolls up under them (as in Mail). Their heights are
    measured into --tb-h and --bars-h (glassOver, in library.js). Not on a
    phone's publication, which the toolbar stays above. (The strip behind
-   the status bar stays solid: Safari and the Home Screen app fill the
-   frame above the page with one colour read from it, and with it clear
-   they filled it black.) */
+   the status bar is clear, so the bars reach up to the status bar: the
+   system's own frame above it is the same colour either way, and solid,
+   the strip only made it look taller.) */
+:root[data-glass] .status-cap { background: transparent; }
 :root[data-glass] .main { position: relative; }
 :root[data-glass] .app:not([data-view="detail"]) .toolbar { position: absolute; top: 0; left: 0; right: 0; z-index: 30;
   background: color-mix(in srgb, var(--panel) 68%, transparent);
