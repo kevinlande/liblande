@@ -1,8 +1,8 @@
 ﻿// LibLande: Cite Check: a manuscript's citations against its references and the library.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
+// index.html: library, reader, editing, cite, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/citecheck.js'] = '2026-11-02.08';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/citecheck.js'] = '2026-11-02.09';
 /* ------------------------------------------------------------ manuscript check */
 // A manuscript's citations checked: a Google Doc, or a Word file from Google
 // Drive or this device, read (never changed). Each APA author-date citation
@@ -439,13 +439,13 @@ async function runMsCheck(src) {
 // (A & B, 2020), (A et al., 2020).
 const msInText = (names, year) => '(' + (names.length === 1 ? names[0] : names.length === 2 ? names[0] + ' & ' + names[1] : names[0] + ' et al.') + ', ' + year + ')';
 // The References section the manuscript should have: every work cited, in
-// APA style from the library where it's there, otherwise as the manuscript
+// your citation style from the library where it's there, otherwise as the manuscript
 // has it, in alphabetical order. Works cited with neither are counted.
 function msReferences(rep) {
   const seen = new Set(), items = [];
   let left = 0;
   for (const w of rep.works) {
-    if (w.lib) { if (!seen.has(w.lib.e.k)) { seen.add(w.lib.e.k); const r = apaCitation(w.lib.e); items.push({ text: r.text, html: r.html }); } }
+    if (w.lib) { if (!seen.has(w.lib.e.k)) { seen.add(w.lib.e.k); const r = citeRef(w.lib.e); items.push({ text: r.text, html: r.html }); } }
     else if (w.refs.length === 1) { if (!seen.has(w.refs[0].raw)) { seen.add(w.refs[0].raw); items.push({ text: w.refs[0].raw, html: esc(w.refs[0].raw) }); } }
     else left++;
   }
@@ -474,7 +474,7 @@ function showMsReport(rep) {
   // and its buttons.)
   const ib = (attr, icon, label) => `<button type="button" class="ms-ib" ${attr} aria-label="${esc(label)}" title="${esc(label)}">${icon}</button>`;
   const cite = w => `<span class="ms-cite">${esc(w.who + ', ' + w.year)}</span>` + (w.n > 1 ? `<span class="ms-n">×${w.n}</span>` : '');
-  const full = (e, raw) => `<div class="apa-refs ms-ref"><p>${e ? apaCitation(e).html : esc(raw)}</p></div>`;
+  const full = (e, raw) => `<div class="apa-refs ms-ref"><p>${e ? citeRef(e).html : esc(raw)}</p></div>`;
   const ctx = c => `<div class="ms-ctx">${esc(c.b)}<mark>${esc(c.m)}</mark>${esc(c.a)}</div>`;
   const where = w => !w.ctxs || !w.ctxs.length ? '' : ctx(w.ctxs[0]) +
     (w.ctxs.length > 1 ? `<details class="ms-more"><summary>${w.ctxs.length - 1} more place${w.ctxs.length === 2 ? '' : 's'}</summary>${w.ctxs.slice(1).map(ctx).join('')}</details>` : '');
@@ -483,7 +483,7 @@ function showMsReport(rep) {
   const acts = [];
   const act = x => { acts.push(x); return acts.length - 1; };
   const hide = id => ib(`data-ms-hide="${act({ id })}"`, ICON.x, 'Dismiss: it’s fine as it is');
-  const libActs = e => ib(`data-ms-ref="${act({ e })}"`, ICON.copy, 'Copy the APA reference') + ib(`data-ms-show="${esc(e.k)}"`, ICON.lib, 'Show in the library');
+  const libActs = e => ib(`data-ms-ref="${act({ e })}"`, ICON.copy, 'Copy the reference (' + citeShort() + ')') + ib(`data-ms-show="${esc(e.k)}"`, ICON.lib, 'Show in the library');
   const citeAct = text => ib(`data-ms-cite="${act({ text })}"`, ICON.quote, 'Copy the in-text citation ' + text);
   const sec = (key, icon, title, list, open) => list.length ? `<details class="ms-sec ms-${key}"${open ? ' open' : ''}><summary>${icon}<span>${esc(title)}</span><span class="ms-ct">${list.length}</span>${ICON.chev}</summary>` +
     `<ul class="ms-list">${list.join('')}</ul></details>` : '';
@@ -492,11 +492,11 @@ function showMsReport(rep) {
     where(w) + (w.lib ? full(w.lib.e) : `<div class="ms-dim">Not in your library either.</div>`),
     (w.lib ? libActs(w.lib.e) : gs ? ib(`data-ms-addw="${act({ w })}"`, ICON.plus, 'Add to your library') : '') + hide('m:' + w.id)));
   const uncited = v.uncited.map(r => {
-    const e = r.lib && r.lib.e, intext = e ? apaInText(e).text : msInText(r.names, r.yk === 'forth' ? 'in press' : r.yk === 'nd' ? 'n.d.' : r.yk);
+    const e = r.lib && r.lib.e, intext = e ? citeInText(e).text : msInText(r.names, r.yk === 'forth' ? 'in press' : r.yk === 'nd' ? 'n.d.' : r.yk);
     return item('', full(e, r.raw), citeAct(intext) + (e ? libActs(e) : '') + hide('u:' + r.id));
   });
   const flags = v.flags.map(f => {
-    const e = f.pub || (f.w && f.w.lib && f.w.lib.e), fix = e && (f.short || f.pub) ? apaInText(e).text : '', said = fix && f.short ? f.short : f.msg;
+    const e = f.pub || (f.w && f.w.lib && f.w.lib.e), fix = e && (f.short || f.pub) ? citeInText(e).text : '', said = fix && f.short ? f.short : f.msg;
     return item(f.w ? cite(f.w) : '', (f.w ? where(f.w) : '') + `<div class="ms-msg">${esc(said.charAt(0).toUpperCase() + said.slice(1))}${fix && f.w ? `: <span class="ms-fix">${esc(fix)}</span>` : '.'}</div>` +
       (f.pub ? full(f.pub) : f.r ? full(f.r.lib && f.r.lib.e, f.r.raw) : ''),
       (fix ? citeAct(fix) : '') + (f.pub ? libActs(f.pub) : '') + hide(f.id));
@@ -518,7 +518,7 @@ function showMsReport(rep) {
     (rep.refs ? '' : `<p class="ms-note">${ICON.alert}<span>No References section was found (a heading such as “References”), so the citations are checked against your library only.</span></p>`) +
     (fine ? `<p class="ms-note ms-good">${ICON.check}<span>Every citation has its reference, and every reference is cited.</span></p>` : '') +
     `<div class="actions ms-top">` +
-      (R.items.length ? `<button type="button" class="btn primary" data-ms-allrefs title="Every work cited, in APA style, in order; references never cited are left out">${ICON.copy}<span>Copy References (${R.items.length})</span></button>` : '') +
+      (R.items.length ? `<button type="button" class="btn primary" data-ms-allrefs title="Every work cited, in your citation style (${esc(citeShort())}), in order; references never cited are left out">${ICON.copy}<span>Copy References (${R.items.length})</span></button>` : '') +
       (v.missing.some(w => w.lib) ? `<button type="button" class="btn" data-ms-missing>${ICON.copy}<span>Copy missing (${v.missing.filter(w => w.lib).length})</span></button>` : '') +
       (rep.kind === 'gdoc' && rep.id && rep.refs && gs && msFixes(rep).length ? `<button type="button" class="btn" data-ms-fix title="Add missing references, bring old ones up to date, take out ones never cited: in the Google Doc itself">${ICON.pencil}<span>Fix in the document\u2026</span></button>` : '') +
       `<button type="button" class="btn" data-ms-again>${ICON.doc}<span>Check another</span></button></div>` +
@@ -546,7 +546,7 @@ $('#sheetBody').addEventListener('click', ev => {
   const show = ev.target.closest('[data-ms-show]');
   if (show) { closeSheet(); showTwin(show.dataset.msShow); return; }
   const one = ev.target.closest('[data-ms-ref]');
-  if (one) { const r = apaCitation(A[+one.dataset.msRef].e); copy(r.text, 'Copied the APA reference', r.html); return; }
+  if (one) { const r = citeRef(A[+one.dataset.msRef].e); copy(r.text, citeSaid('reference'), r.html); return; }
   const c = ev.target.closest('[data-ms-cite]');
   if (c) { const t = A[+c.dataset.msCite].text; copy(t, 'Copied ' + t); return; }
   // (Dismissed or brought back: remembered for this manuscript.)
@@ -562,10 +562,10 @@ $('#sheetBody').addEventListener('click', ev => {
   }
   if (ev.target.closest('[data-ms-unhide]')) { MS.hidden[msDoc(rep)] = { at: Date.now(), ids: [] }; msRemember(rep); showMsReport(rep); return; }
   // (Pasted into Word or a Google Doc with APA's hanging indent.)
-  const refsCopy = list => copy(list.map(r => r.text).join('\n\n'), 'Copied ' + list.length + ' APA reference' + (list.length === 1 ? '' : 's'),
+  const refsCopy = list => copy(list.map(r => r.text).join('\n\n'), citeSaid('reference', list.length),
     list.map(r => '<p style="margin:0 0 0 0.5in;text-indent:-0.5in">' + r.html + '</p>').join(''));
   if (ev.target.closest('[data-ms-allrefs]')) { refsCopy(msReferences(rep).items); return; }
-  if (ev.target.closest('[data-ms-missing]')) { refsCopy(apaOrder(msVisible(rep).missing.filter(w => w.lib).map(w => w.lib.e)).map(apaCitation)); return; }
+  if (ev.target.closest('[data-ms-missing]')) { refsCopy(citeList(msVisible(rep).missing.filter(w => w.lib).map(w => w.lib.e))); return; }
   const add = ev.target.closest('[data-ms-add]');
   if (add) {
     // The Add panel, with the reference's DOI looked up, or its title and
@@ -635,6 +635,13 @@ function msFixes(rep) {
     const r = f.r || (f.pub && f.w && f.w.refs.length === 1 ? f.w.refs[0] : null), e = f.pub || (f.r && f.r.lib && f.r.lib.e);
     if (r && e && !out.some(x => x.r === r)) out.push({ kind: 'update', r, e, on: true });
   });
+  // (Every other reference LibLande recognises, put in your style, if it
+  // differs from it in more than punctuation and spacing; those it
+  // doesn't, left as written.)
+  (rep.refs || []).forEach(r => {
+    const e = r.lib && !r.unread && r.lib.e;
+    if (e && !out.some(x => x.r === r) && msSquash(r.raw) !== msSquash(citeRef(e).text)) out.push({ kind: 'restyle', r, e, on: true });
+  });
   v.uncited.forEach(r => out.push({ kind: 'remove', r, on: false }));
   return out;
 }
@@ -642,12 +649,12 @@ function openMsFix(rep) {
   const fixes = msFixes(rep);
   sheet = { mode: 'msfix', rep, fixes, msBack: rep };
   const row = (x, i) => `<label class="msf-row"><input type="checkbox" data-msf="${i}"${x.on ? ' checked' : ''}>` +
-    `<span><b>${{ add: 'Add', update: 'Bring up to date', remove: 'Take out' }[x.kind]}</b> ` +
-    (x.kind === 'remove' ? esc(x.r.raw) : apaCitation(x.e).html) + (x.kind === 'update' ? `<span class="ms-dim"> (was: ${esc(x.r.raw)})</span>` : '') + `</span></label>`;
+    `<span><b>${{ add: 'Add', update: 'Bring up to date', restyle: 'Reformat', remove: 'Take out' }[x.kind]}</b> ` +
+    (x.kind === 'remove' ? esc(x.r.raw) : citeRef(x.e).html) + (x.kind === 'update' || x.kind === 'restyle' ? `<span class="ms-dim"> (was: ${esc(x.r.raw)})</span>` : '') + `</span></label>`;
   const part = (kind, title) => { const ix = fixes.map((x, i) => [x, i]).filter(([x]) => x.kind === kind); return ix.length ? `<h3 class="msf-h">${title}</h3>` + ix.map(([x, i]) => row(x, i)).join('') : ''; };
   showSheet(`<h2>Fix the References</h2>` +
-    `<p class="sheet-note">In “${esc(rep.name)}” itself, in one go. Its citations in the text stay as they are. To undo, use the document’s version history (File › Version history).</p>` +
-    (fixes.length ? part('add', 'Missing from the References') + part('update', 'Out of date') + part('remove', 'Never cited')
+    `<p class="sheet-note">In “${esc(rep.name)}” itself, in one go, in your citation style (${esc(citeTitle())}). References LibLande doesn’t recognise are left as they are, and its citations in the text stay as they are. Untick any you’d rather keep as written. To undo, use the document’s version history (File › Version history).</p>` +
+    (fixes.length ? part('add', 'Missing from the References') + part('update', 'Out of date') + part('restyle', 'Not in ' + citeShort() + '\u2019s form') + part('remove', 'Never cited')
       : `<p class="ms-dim">Nothing in the References for LibLande to change.</p>`), fixes.length ? 'Make the changes' : 'Close');
 }
 $('#sheetBody').addEventListener('change', ev => {
@@ -684,17 +691,17 @@ function msFixRequests(doc, fixes) {
     const tail = p === last;
     ops.push({ at: p.start, rank: 0, reqs: [{ deleteContentRange: { range: { startIndex: tail ? p.start - 1 : p.start, endIndex: tail ? p.end - 1 : p.end } } }] });
   });
-  fixes.filter(x => x.on && x.kind === 'update').forEach(x => {
+  fixes.filter(x => x.on && (x.kind === 'update' || x.kind === 'restyle')).forEach(x => {
     const p = find(x.r);
     if (!p || gone.has(p)) { if (!p) missed.push(x); return; }
-    const run = msRuns(apaCitation(x.e).html);
+    const run = msRuns(citeRef(x.e).html);
     ops.push({ at: p.start, rank: 0, reqs: [{ deleteContentRange: { range: { startIndex: p.start, endIndex: p.end - 1 } } }, { insertText: { location: { index: p.start }, text: run.text } }].concat(styled(p.start, run)) });
   });
   // (A new one goes before the first that follows it in the alphabet, or
   // after the last; after the heading if there are none.)
   const kept = refs.filter(p => !gone.has(p));
   fixes.filter(x => x.on && x.kind === 'add').forEach(x => {
-    const run = msRuns(apaCitation(x.e).html), key = norm(run.text);
+    const run = msRuns(citeRef(x.e).html), key = norm(run.text);
     const next = kept.find(p => norm(p.text).localeCompare(key) > 0);
     if (next) { ops.push({ at: next.start, rank: 1, key, reqs: [{ insertText: { location: { index: next.start }, text: run.text + '\n' } }].concat(styled(next.start, run)) }); return; }
     const after = kept.length ? kept[kept.length - 1] : h[0];

@@ -1,8 +1,8 @@
 ﻿// LibLande: Search by title, in Add a publication: candidates from Crossref, OpenAlex and Open Library, one chosen to fill in the form.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
+// index.html: library, reader, editing, cite, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/titlesearch.js'] = '2026-11-02.08';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/titlesearch.js'] = '2026-11-02.09';
 /* ------------------------------------------------------------ title search */
 // A title (with an author or a year, if you like) typed in Add's lookup
 // box, instead of a DOI: candidates from Crossref (articles, chapters, and

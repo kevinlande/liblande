@@ -1,8 +1,8 @@
 ﻿// LibLande: messages, navigation, and starting up.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
+// index.html: library, reader, editing, cite, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-11-02.08';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-11-02.09';
 // On GitHub Pages, every part of the app must be from the same version: a
 // part kept from an older one (the offline copy, served when the network
 // was slow) lacks what this page needs. Then the kept copies go, and the
@@ -396,6 +396,7 @@ if (RELOADING) {
     } else if (saved && saved !== store.get('theme', 'auto')) { store.set('theme', saved); applyTheme(saved); }
     const look = status.prefs && status.prefs.style;
     if (look && look !== store.get('style', 'liblande') && $('#setup').hidden) { store.set('style', look); applyStyle(look); }
+    citeMerge(status.prefs);
     if (status.prefs && typeof status.prefs.glass === 'boolean' && status.prefs.glass !== glassNow()) { store.set('glass', status.prefs.glass); applyGlass(status.prefs.glass); }
     // And what you looked at lately.
     if (status.prefs) {
@@ -695,6 +696,9 @@ if (RELOADING) {
       $('#glassBox').checked = !!glassNow();
       $('#coversBox').checked = coversOn();
       renderProxies();
+      $('#citeFind').value = '';
+      citeSettings();
+      citeLabels();
       $('#setup').querySelectorAll('[data-sync]').forEach(b => { b.checked = SYNC[b.dataset.sync] !== false; });
       $('#curBib').textContent = st.bibName || '';
       // (Other libraries: with the .bib file and folder, in Settings.)
@@ -901,6 +905,6 @@ if (RELOADING) {
 }
 // For the test suite (_test/suite.html) only: a few of the reader's
 // insides, when the test page asks for them.
-if (window.LIBLANDE_TEST) window.LL = { addFromLink, addLinkTake, pdfMetaQuery, webAddBookmark, webAddDescription, aiPrompt, aiCopyFor, aiCopyOpen, relateByDrag, apaCitation, origYear, chPdfPage, chPdfFile, CHP, lcFind, openLinkChapters, lcOffer, SIDE_FOLD, CHAPTERS: () => CHAPTERS, CHAPTER_ROWS: () => CHAPTER_ROWS, CHAPTER_OF: () => CHAPTER_OF, findChapters, toggleBook, OPEN_BOOKS, openAddChapter, fromPhoto, photoQuery, photoAsks, photoFind, photoDoi, photoLines, PHOTO, openQr, qrLink, LEN, countPdfPages, setSort, setCols, pageCount, setGroup, REACH, reachCheck, apaCitation, apaInText, loadPdfLib, entries: () => ENTRIES, KWS, kwsSuggest, kwsKey, kwsWithOA, ktFind, openKwTidy, TS, tsSearch, tsMerge, tsIsQuery, tsClose, PROGRESS, progressMerge, progressReset, PROXIES, proxyPrefix, proxyLink, findPdf, renderProxies, TOUR, startTour, endTour, openFeatures, FEATURES, toggleBookmark, OLE, oleMake, headingOutline, pageRows, writeOutline, SPLIT, foldOf, splitStart, splitApply, printedContents, pageLines, OCR, makeSearchable, ocrLayer, textlessPages, openMsCheck, runMsCheck, LIBS, renderGroups, SMART, NP, npCheck, openNewPapers, openFollow, sweepCovers, COVERS, V, BM, JOURNAL, LOCAL, AUTO, saveMarkup, setTool, setReading, renderRLBar, netBadge, placeToast, POS, MARK, PDFJS, pdfJsFix, pdfViewerFix, findEndPage, refHeading, combineMarks, makeZip, MARK_ERASER: () => MARK.eraserSize,
+if (window.LIBLANDE_TEST) window.LL = { apaCitation, renderDetail, state, CITE, citeRef, citeInText, citeInTextMany, citeList, citeChoose, citeLoad, citeShort, msFixes, quoteWith, addFromLink, addLinkTake, pdfMetaQuery, webAddBookmark, webAddDescription, aiPrompt, aiCopyFor, aiCopyOpen, relateByDrag, apaCitation, origYear, chPdfPage, chPdfFile, CHP, lcFind, openLinkChapters, lcOffer, SIDE_FOLD, CHAPTERS: () => CHAPTERS, CHAPTER_ROWS: () => CHAPTER_ROWS, CHAPTER_OF: () => CHAPTER_OF, findChapters, toggleBook, OPEN_BOOKS, openAddChapter, fromPhoto, photoQuery, photoAsks, photoFind, photoDoi, photoLines, PHOTO, openQr, qrLink, LEN, countPdfPages, setSort, setCols, pageCount, setGroup, REACH, reachCheck, apaCitation, apaInText, loadPdfLib, entries: () => ENTRIES, KWS, kwsSuggest, kwsKey, kwsWithOA, ktFind, openKwTidy, TS, tsSearch, tsMerge, tsIsQuery, tsClose, PROGRESS, progressMerge, progressReset, PROXIES, proxyPrefix, proxyLink, findPdf, renderProxies, TOUR, startTour, endTour, openFeatures, FEATURES, toggleBookmark, OLE, oleMake, headingOutline, pageRows, writeOutline, SPLIT, foldOf, splitStart, splitApply, printedContents, pageLines, OCR, makeSearchable, ocrLayer, textlessPages, openMsCheck, runMsCheck, LIBS, renderGroups, SMART, NP, npCheck, openNewPapers, openFollow, sweepCovers, COVERS, V, BM, JOURNAL, LOCAL, AUTO, saveMarkup, setTool, setReading, renderRLBar, netBadge, placeToast, POS, MARK, PDFJS, pdfJsFix, pdfViewerFix, findEndPage, refHeading, combineMarks, makeZip, MARK_ERASER: () => MARK.eraserSize,
   lib: () => ({ ENTRIES, BYKEY, DATA, VERSION_OF, VERSIONS, NESTED, state, TABS, groupName }), init, refresh, openEdit, isForthcoming, forthChanges, parseBibtexEntry,
   oldLineMarks, convertOldLines, fetchAhead, PTABS, renderPaperTabs, openPdf, loadPdfJs, addStreamIteration, msCheck, msCites, msRef, msDocx, MS, msVisible };

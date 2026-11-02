@@ -1,8 +1,8 @@
 ﻿// LibLande: adding and editing, BibTeX pasted in, selecting several, updates, cite keys, versions, export, the keyboard.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
+// index.html: library, reader, editing, cite, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-02.08';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-02.09';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -1332,12 +1332,12 @@ function selectionHTML() {
     (gs && LIBS.list.length && list.some(x => !x.ib) ? `<button type="button" class="btn" data-copy-lib-sel>${ICON.lib}<span>Copy to another library\u2026</span></button>` : '') +
     `<details class="menu"><summary class="btn">${ICON.copy}<span>Copy</span>${ICON.chev}</summary>` +
     `<div class="menu-list" role="menu"><button type="button" role="menuitem" class="mi" data-copy-sel="bibtex">${ICON.bib}<span>BibTeX</span><kbd>${esc(keyHint('copyBib'))}</kbd></button>` +
-    `<button type="button" role="menuitem" class="mi" data-copy-sel="apa">${ICON.apa}<span>APA (long)</span><kbd>${esc(keyHint('copyApa'))}</kbd></button>` +
-    `<button type="button" role="menuitem" class="mi" data-copy-sel="short">${ICON.intext}<span>APA (short)</span><kbd>${esc(keyHint('copyShort'))}</kbd></button>` +
+    `<button type="button" role="menuitem" class="mi" data-copy-sel="apa">${ICON.apa}<span>References <small class="mi-style" data-cite-label>${esc(citeShort())}</small></span><kbd>${esc(keyHint('copyApa'))}</kbd></button>` +
+    `<button type="button" role="menuitem" class="mi" data-copy-sel="short">${ICON.intext}<span>In-text <small class="mi-style" data-cite-label>${esc(citeShort())}</small></span><kbd>${esc(keyHint('copyShort'))}</kbd></button>` +
     `<button type="button" role="menuitem" class="mi" data-copy-sel="qr">${ICON.qr}<span>QR code\u2026</span></button></div></details>` +
     `<button type="button" class="btn" data-pick-clear>Clear selection</button></div>` +
-    `<section class="d-sec"><h3>References (APA)</h3><div class="apa-refs">` +
-    apaOrder(list).slice(0, SHOW_REFS).map(e => `<p>${apaCitation(e).html}</p>`).join('') +
+    `<section class="d-sec"><h3>References (${esc(citeShort())})</h3><div class="apa-refs">` +
+    citeList(list.slice(0, 400)).slice(0, SHOW_REFS).map(r => `<p>${r.html}</p>`).join('') +
     (n > SHOW_REFS ? `<p class="d-venue">and ${(n - SHOW_REFS).toLocaleString()} more. Copy and Export include them all.</p>` : '') +
     `</div></section></div>`;
 }
@@ -2123,7 +2123,7 @@ async function runExport() {
       const own = pdfs.filter(p => p.e === e).map(p => ':' + p.name + ':PDF');
       return bibtex(e, own.length ? { file: own.join(';') } : null);
     }).join('\n');
-  const refs = apaOrder(list).map(apaCitation);
+  const refs = citeList(list);
   const docs = { rtf: apaRtf(refs) };
   if (dest === 'device') { await exportToDevice(name, bib, docs, pdfs, mode); return; }
   sheetBusy(true);
@@ -2313,12 +2313,12 @@ function copyAs(kind) {
   if (!n) { toast('Select a publication first', 1800); return; }
   const many = n > 1 ? ' for ' + n + ' publications' : '';
   if (kind === 'apa') {
-    const refs = apaOrder(list).map(apaCitation);
-    copy(refs.map(r => r.text).join('\n\n'), n > 1 ? 'Copied ' + n + ' APA references' : 'Copied APA citation',
+    const refs = citeList(list);
+    copy(refs.map(r => r.text).join('\n\n'), citeSaid('reference', n),
       n > 1 ? refs.map(r => '<p>' + r.html + '</p>').join('') : refs[0].html);
   } else if (kind === 'short') {
-    const c = n > 1 ? apaInTextMany(list) : apaInText(list[0]);
-    copy(c.text, 'Copied APA in-text citation' + many, c.html);
+    const c = citeInTextMany(list);
+    copy(c.text, 'Copied the ' + citeShort() + ' in-text citation' + many, c.html);
   } else if (kind === 'bibtex') {
     copy(list.map(e => bibtex(e)).join('\n'), 'Copied BibTeX' + many);
   } else if (kind === 'key') {
@@ -2350,9 +2350,9 @@ function loadQrLib() {
 // (The page: on LibLande's own site, as this copy is, or the public one.)
 const qrPage = () => /\.github\.io$/.test(location.hostname) ? new URL('cite.html', location.href).href.split('#')[0] : 'https:\/\/kevinlande.github.io/liblande/cite.html';
 async function qrLink(list) {
-  const refs = apaOrder(list).map(e => {
-    const doi = String(e.f.doi || '').trim().replace(/^https?:\/\/(dx\.)?doi\.org\//i, '');
-    return [apaCitation(e).html.replace(/<(?!\/?i>)[^>]*>/g, ''), doi || '', doi ? '' : ((e.u || []).find(u => safeUrl(u)) || '')];
+  const refs = citeList(list).map(r => {
+    const e = r.e, doi = String(e.f.doi || '').trim().replace(/^https?:\/\/(dx\.)?doi\.org\//i, '');
+    return [r.html.replace(/<(?!\/?i>)[^>]*>/g, ''), doi || '', doi ? '' : ((e.u || []).find(u => safeUrl(u)) || '')];
   });
   const bytes = new Uint8Array(await new Response(new Blob([JSON.stringify(refs)]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer());
   let bin = '';
@@ -2419,8 +2419,8 @@ $('#sheetBody').addEventListener('click', ev => {
 // the open paper's). Yours are kept with your preferences, so your other
 // devices have them too.
 const KEY_ACTS = [
-  { id: 'copyApa', scope: 'both', def: 'Alt+KeyA', label: 'Copy APA citation (long)' },
-  { id: 'copyShort', scope: 'both', def: 'Alt+Shift+KeyA', label: 'Copy APA in-text citation (short)' },
+  { id: 'copyApa', scope: 'both', def: 'Alt+KeyA', label: 'Copy the reference (your citation style)' },
+  { id: 'copyShort', scope: 'both', def: 'Alt+Shift+KeyA', label: 'Copy the in-text citation (your citation style)' },
   { id: 'copyBib', scope: 'lib', def: 'Alt+KeyB', label: 'Copy BibTeX' },
   { id: 'copyKey', scope: 'lib', def: 'Alt+KeyK', label: 'Copy cite key' },
   { id: 'edit', scope: 'lib', def: 'Alt+KeyE', label: 'Edit the publication' },
@@ -2532,8 +2532,8 @@ function runPdfKey(id) {
   else if (id === 'copyApa' || id === 'copyShort') {
     const e = V.entry;
     if (!e) return;
-    if (id === 'copyApa') { const r = apaCitation(e); copy(r.text, 'Copied APA citation', r.html); }
-    else { const c = apaInText(e); copy(c.text, 'Copied APA in-text citation', c.html); }
+    if (id === 'copyApa') { const r = citeRef(e); copy(r.text, citeSaid('reference'), r.html); }
+    else { const c = citeInText(e); copy(c.text, citeSaid('in-text citation'), c.html); }
   }
   else if (SHARE_KEYS[id]) { const b = $(`#vShare [data-vshare="${SHARE_KEYS[id]}"]`); if (b && V.file) b.click(); }
   else tog(id);

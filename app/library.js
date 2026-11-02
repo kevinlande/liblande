@@ -1,8 +1,8 @@
 ﻿// LibLande: the library: data, the reading list, groups, search, the list and the details.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
+// index.html: library, reader, editing, cite, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-02.08';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-02.09';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -2895,11 +2895,13 @@ function renderDetail() {
   const view = btns.findIndex(b => b.indexOf('act-read') >= 0);
   btns.splice(view + 1, 0, `<details class="menu"><summary class="btn" title="Copy the citation">${ICON.copy}<span>Copy</span>${ICON.chev}</summary>` +
     `<div class="menu-list" role="menu"><button type="button" role="menuitem" class="mi" data-copy="bibtex">${ICON.bib}<span>BibTeX</span><kbd>${esc(keyHint('copyBib'))}</kbd></button>` +
-    `<button type="button" role="menuitem" class="mi" data-copy="apa">${ICON.apa}<span>APA (long)</span><kbd>${esc(keyHint('copyApa'))}</kbd></button>` +
-    `<button type="button" role="menuitem" class="mi" data-copy="apa-short">${ICON.intext}<span>APA (short)</span><kbd>${esc(keyHint('copyShort'))}</kbd></button>` +
+    `<button type="button" role="menuitem" class="mi" data-copy="apa">${ICON.apa}<span>Reference <small class="mi-style" data-cite-label>${esc(citeShort())}</small></span><kbd>${esc(keyHint('copyApa'))}</kbd></button>` +
+    `<button type="button" role="menuitem" class="mi" data-copy="apa-short">${ICON.intext}<span>In-text <small class="mi-style" data-cite-label>${esc(citeShort())}</small></span><kbd>${esc(keyHint('copyShort'))}</kbd></button>` +
     `<button type="button" role="menuitem" class="mi" data-copy="qr">${ICON.qr}<span>QR code\u2026</span></button>` +
     // (A prompt to paste into Claude: see reader.js.)
-    (readable.length ? `<button type="button" role="menuitem" class="mi" data-copy="ai" title="A prompt to paste into Claude: summarize this paper, weighing your highlights and notes (with its text)">${ICON.ai}<span>For AI (summary prompt)</span></button>` : '') + `</div></details>`);
+    (readable.length ? `<button type="button" role="menuitem" class="mi" data-copy="ai" title="A prompt to paste into Claude: a compact outline of this paper (its question, claim, argument and sections), weighing your highlights and notes (with its text)">${ICON.ai}<span>For AI (summary prompt)</span></button>` : '') +
+    // (Another style, for this copy: see cite.js.)
+    citeOnceHTML() + `</div></details>`);
   if (gs && !e.ib && LIBS.list.length) more.push(`<button type="button" role="menuitem" data-copy-lib="${esc(e.k)}">${ICON.lib}<span>Copy to another library\u2026</span></button>`);
   if (more.length) btns.push(`<details class="menu act-more"><summary class="btn" title="More: ${more.length > 1 ? 'Google Drive, Attach, links' : 'more'}" aria-label="More">` +
     `<svg class="i dots" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="18" cy="12" r="1.4"/></svg>${wide ? '<span>More</span>' : ''}</summary>` +
@@ -3229,8 +3231,9 @@ detailEl.addEventListener('click', ev => {
     const kind = c.dataset.copy;
     const menu = c.closest('details');
     if (menu) menu.open = false;
-    if (kind === 'apa') { const cite = apaCitation(e); copy(cite.text, 'Copied APA citation', cite.html); }
-    else if (kind === 'apa-short') { const cite = apaInText(e); copy(cite.text, 'Copied APA in-text citation', cite.html); }
+    const style = (menu && menu.dataset.citeOnce) || CITE.id, said = citeShort(style);
+    if (kind === 'apa') { const cite = citeRef(e, style); copy(cite.text, 'Copied the ' + said + ' reference', cite.html); }
+    else if (kind === 'apa-short') { const cite = citeInText(e, '', style); copy(cite.text, 'Copied the ' + said + ' in-text citation', cite.html); }
     else if (kind === 'qr') openQr([e]);
     else if (kind === 'ai') aiCopyFor(e);
     else copy(kind === 'key' ? e.k : bibtex(e), kind === 'key' ? 'Copied cite key' : 'Copied BibTeX');

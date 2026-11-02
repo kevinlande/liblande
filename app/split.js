@@ -1,8 +1,8 @@
 ﻿// LibLande: Split pages: a scan of an open book, two pages to each page of the PDF, made one page each.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
+// index.html: library, reader, editing, cite, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/split.js'] = '2026-11-02.08';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/split.js'] = '2026-11-02.09';
 /* ---------------------------------------------------------- split pages */
 // From a page's thumbnail (Split), or all the wide pages at once (Split
 // all). A dashed line shows where the page will be cut, at the fold

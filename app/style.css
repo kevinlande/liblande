@@ -1258,6 +1258,31 @@ button.fileicon { border: 0; background: none; cursor: pointer; }
 .menu-list .mi-row:hover { background: var(--side-hover); }
 .menu-list .mi-row > .mi { flex: 1; min-width: 0; background: none; }
 .menu-list .mi kbd { float: none; margin-left: auto; padding-left: 14px; }
+/* Citation styles (cite.js): the style named in Copy menus; the choice of
+   another, for one copy; and Settings > Citing. */
+.menu-list .mi-style { color: var(--faint); font-size: 12px; margin-left: 4px; }
+.menu-list .cite-more .i { transform: rotate(-90deg); transition: transform var(--dur-q) var(--ease); }
+.menu-list .cite-more[aria-expanded="true"] .i { transform: none; }
+.menu-list .cite-more b { font-weight: 600; }
+.cite-once { display: grid; padding-left: 12px; }
+.cite-once [aria-pressed="false"] .i { visibility: hidden; }
+.cite-once [aria-pressed="true"] .i { color: var(--accent); }
+.cite-find { display: flex; align-items: center; gap: 8px; margin: 6px 0 8px; padding: 0 10px; height: 34px; border: 1px solid var(--line); border-radius: var(--r-m); background: var(--bg); color: var(--muted); }
+.cite-find:focus-within { border-color: var(--accent); }
+.cite-find input { flex: 1; min-width: 0; border: 0; background: none; outline: none; height: 100%; font-size: 14px; color: var(--text); }
+.cite-list { display: grid; max-height: 290px; overflow-y: auto; border: 1px solid var(--line); border-radius: var(--r-m); }
+.cite-list > .hint { margin: 0; padding: 10px 12px; }
+.cite-st { display: flex; align-items: center; gap: 10px; padding: 8px 12px; cursor: pointer; font-size: 14px; font-weight: 400; color: var(--text); margin: 0; }
+.cite-st + .cite-st { border-top: 1px solid var(--line); }
+.cite-st input { margin: 0; accent-color: var(--accent); flex: none; }
+.cite-st span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cite-st small { margin-left: auto; padding-left: 10px; color: var(--muted); font-size: 12px; white-space: nowrap; }
+.cite-st.on { background: var(--accent-soft); }
+.cite-st.on span { color: var(--accent); font-weight: 600; }
+.cite-prev { margin-top: 10px; padding: 10px 12px; border-radius: var(--r-m); background: var(--raise, var(--bg)); border: 1px solid var(--line); font: 14px/1.5 var(--serif); }
+.cite-prev p { margin: 0 0 8px; padding-left: 2em; text-indent: -2em; }
+.cite-prev p:last-child { margin: 0; }
+.cite-lbl { display: block; font: 600 11px var(--ui, inherit); letter-spacing: .06em; text-transform: uppercase; color: var(--faint); margin-bottom: 2px; }
 .menu-list button.mi-side { display: flex; align-items: center; gap: 5px; padding: 0 12px; border-left: 1px solid var(--line); border-radius: 0 6px 6px 0; color: var(--muted); font-size: 12.5px; white-space: nowrap; }
 .menu-list button.mi-side:hover { background: var(--accent-soft); color: var(--accent); }
 .menu-list button.mi-side .i { width: 15px; height: 15px; }
@@ -1756,6 +1781,10 @@ a.ms-ib { text-decoration: none; }
 .vi-ref-copy .i { width: 15px; height: 15px; }
 .v-info .vi-ref, .v-info .vi-sec p, .v-info .vi-fields dd, .vi-title, .vi-authors { user-select: text; -webkit-user-select: text; }
 .vi-row { display: flex; flex-wrap: wrap; gap: 6px; }
+/* (Too narrow for all three in a row: icons only, their names still said
+   to screen readers. See viRowFit.) */
+.vi-row.tight > .btn > span, .vi-row.tight > .menu > summary > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.vi-row.tight > .btn, .vi-row.tight > .menu > summary { padding-left: 10px; padding-right: 10px; }
 .v-info .btn { min-height: 30px; padding: 4px 9px; font-size: 12.5px; }
 .v-info .btn .i { width: 14px; height: 14px; }
 .v-info .menu > summary svg:last-child { width: 12px; height: 12px; }

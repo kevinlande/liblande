@@ -33,6 +33,12 @@
     "sub": ""
   },
   {
+    "dir": "citeproc",
+    "npm": "citeproc",
+    "version": "2.4.63",
+    "sub": ""
+  },
+  {
     "dir": "qrcode-generator",
     "npm": "qrcode-generator",
     "version": "2.0.4",

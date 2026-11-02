@@ -1,8 +1,8 @@
 ﻿// LibLande: the PDF reader: pages, marks, tools, saving, the sidebar.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
+// index.html: library, reader, editing, cite, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-02.08';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-02.09';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -4668,15 +4668,16 @@ async function showQuote() {
   QUOTE.el.style.left = Math.max(8, Math.min(innerWidth - w - 8, x - w / 2)) + 'px';
   return sel;
 }
-// A passage as APA quotes it: "the passage" (Lee, 2026, p. 4); at 40
+// A passage quoted: "the passage" (Lee, 2026, p. 4), its citation in your
+// citation style (as here, APA's; see cite.js); at 40
 // words or more, a block quotation (no quotation marks, the citation after
 // its end). Plain text only, so it takes on the document's own font and
 // colour where it's pasted (formatted text came into Word with a colour of
 // its own: invisible on a dark page).
 function quoteWith(passage, pg) {
   pg = String(pg || '').trim().replace(/-+/g, '–');
-  const base = apaInText(V.entry).text;
-  const cite = pg ? base.slice(0, -1) + ', ' + (/–/.test(pg) ? 'pp. ' : 'p. ') + pg + ')' : base;
+  // (In your citation style, the page its way: see cite.js.)
+  const cite = citeInText(V.entry, pg).text;
   const block = passage.split(/\s+/).length >= 40;
   return { cite, block, text: block ? passage + ' ' + cite : '“' + passage.replace(/[.,;:]+$/, '') + '” ' + cite };
 }
@@ -5357,6 +5358,19 @@ function showSideTab(tab) {
 // Citation: the paper's entry in the library (as it is now, with any
 // edits), to read and copy.
 const infoEntry = () => (V.entry && BYKEY.get(V.entry.k)) || V.entry;
+// The row of Copy, the link (DOI) and Edit: their words go, leaving the
+// icons, when the sidebar's too narrow for all three in one row (and come
+// back when it's wide enough again).
+let viRowWatch = null;
+function viRowFit() {
+  const row = $('#vSideBody .vi-row');
+  if (!row) return;
+  row.classList.remove('tight');
+  const tops = new Set([...row.children].map(c => c.offsetTop));
+  if (tops.size > 1) row.classList.add('tight');
+  if (window.ResizeObserver && !viRowWatch) viRowWatch = new ResizeObserver(() => requestAnimationFrame(viRowFit));
+  if (viRowWatch) { viRowWatch.disconnect(); viRowWatch.observe($('#vSideBody')); }
+}
 function showInfo() {
   const body = $('#vSideBody'), e = infoEntry();
   if (!e) { body.innerHTML = `<p class="v-side-note">This paper has no entry in the library.</p>`; return; }
@@ -5367,7 +5381,7 @@ function showInfo() {
   h += `<h3 class="vi-title">${esc(f.title || '(untitled)')}</h3>`;
   if (people.length) h += `<p class="vi-authors">${people.map(n => esc(fullName(n))).join(', ')}${!(e.a && e.a.length) && e.e ? ' (Eds.)' : ''}</p>`;
   // (Copied in one click, with the button at its corner.)
-  h += `<div class="vi-ref-box"><p class="vi-ref">${apaCitation(e).html}</p>` +
+  h += `<div class="vi-ref-box"><p class="vi-ref">${citeRef(e).html}</p>` +
     `<button type="button" class="vi-ref-copy" data-icopy="apa" title="Copy the citation (${esc(keyHint('copyApa'))})" aria-label="Copy the citation">${ICON.copy}</button></div>`;
   // Copy, the links and Edit, in one row (one link: just a button).
   const links = [];
@@ -5377,7 +5391,7 @@ function showInfo() {
     links.push([u, host]);
   });
   h += `<div class="vi-row"><details class="menu"><summary class="btn" title="Copy the citation">${ICON.copy}<span>Copy</span>${ICON.chev}</summary><div class="menu-list" role="menu">` +
-    [['apa', ICON.apa, 'APA'], ['apa-short', ICON.intext, 'In-text'], ['bibtex', ICON.bib, 'BibTeX'], ['qr', ICON.qr, 'QR code\u2026']].map(([k, i, l]) => `<button type="button" role="menuitem" class="mi" data-icopy="${k}">${i}<span>${l}</span></button>`).join('') + `</div></details>` +
+    [['apa', ICON.apa, 'Reference (' + citeShort() + ')'], ['apa-short', ICON.intext, 'In-text'], ['bibtex', ICON.bib, 'BibTeX'], ['qr', ICON.qr, 'QR code\u2026']].map(([k, i, l]) => `<button type="button" role="menuitem" class="mi" data-icopy="${k}">${i}<span>${l}</span></button>`).join('') + `</div></details>` +
     (links.length === 1 ? `<a class="btn" href="${esc(links[0][0])}" target="_blank" rel="noopener" title="${esc(links[0][0])}">${ICON.link}<span>${esc(links[0][1])}</span></a>`
       : links.length ? `<details class="menu"><summary class="btn" title="Open a link">${ICON.link}<span>Links</span>${ICON.chev}</summary><div class="menu-list" role="menu">` +
         links.map(([u, l]) => `<a role="menuitem" href="${esc(u)}" target="_blank" rel="noopener" title="${esc(u)}">${esc(l)}</a>`).join('') + `</div></details>` : '') +
@@ -5393,6 +5407,7 @@ function showInfo() {
   h += `<details class="vi-sec"><summary>All fields</summary><dl class="vi-fields">` +
     keys.map(k => `<dt>${esc(k)}</dt><dd>${safeUrl(f[k]) ? `<a href="${esc(f[k])}" target="_blank" rel="noopener">${esc(f[k])}</a>` : esc(f[k])}</dd>`).join('') + `</dl></details>`;
   body.innerHTML = h + `</div>`;
+  viRowFit();
   body.scrollTop = 0;
 }
 $('#vSideBtn').addEventListener('click', () => toggleSide());
@@ -5459,12 +5474,12 @@ $('#vSide').addEventListener('click', ev => {
     const e = infoEntry(), kind = ic.dataset.icopy;
     if (!e) return;
     if (kind === 'apa') {
-      const cite = apaCitation(e);
-      copy(cite.text, 'Copied APA citation', cite.html);
+      const cite = citeRef(e);
+      copy(cite.text, citeSaid('reference'), cite.html);
       // (The corner button says so, with a tick, for a moment.)
       if (ic.matches('.vi-ref-copy')) { ic.innerHTML = ICON.check; ic.classList.add('done'); setTimeout(() => { if (ic.isConnected) { ic.innerHTML = ICON.copy; ic.classList.remove('done'); } }, 1500); }
     }
-    else if (kind === 'apa-short') { const cite = apaInText(e); copy(cite.text, 'Copied APA in-text citation', cite.html); }
+    else if (kind === 'apa-short') { const cite = citeInText(e); copy(cite.text, citeSaid('in-text citation'), cite.html); }
     else if (kind === 'qr') openQr([e]);
     else copy(kind === 'key' ? e.k : bibtex(e), kind === 'key' ? 'Copied cite key' : 'Copied BibTeX');
     return;
@@ -5768,7 +5783,7 @@ $('#vSideBody').addEventListener('click', ev => {
 });
 function marksSummary(withRef) {
   const list = (SIDE.marks || []).filter(m => (m.text || m.note) && (!SIDE.colour || (markColour(m) || {}).key === SIDE.colour)), pg = n => (SIDE.pp && SIDE.pp.get(n)) || String(n);
-  const ref = apaCitation(V.entry);
+  const ref = citeRef(V.entry);
   const text = (withRef ? ref.text + '\n\n' : '') + list.map(m => 'p. ' + pg(m.page) + ' \u2014 ' + m.name +
     (m.text ? ': \u201c' + m.text + '\u201d' : '') + (m.note ? (m.text ? '\n    Note: ' : ': ') + m.note : '')).join('\n');
   const html = (withRef ? '<p>' + ref.html + '</p>' : '') + '<ul>' + list.map(m => `<li><b>p. ${esc(pg(m.page))}</b> ${esc(m.name)}` +
@@ -5798,14 +5813,19 @@ async function aiPrompt(entry, doc, marks, pp) {
   const scan = !cut && letters < doc.numPages * 40;
   const mk = (marks || []).filter(m => m.text || m.note);
   const marksText = mk.map(m => 'p. ' + name(m.page) + ' \u2014 ' + m.name + (m.text ? ': \u201c' + quoteText(m.text) + '\u201d' : '') + (m.note ? (m.text ? '\n    My note: ' : ': ') + m.note : '')).join('\n');
-  const text = 'Please summarize the paper below for me. Give its main question, its argument or method, and its conclusions. ' +
-    'Put particular weight on the passages I highlighted or underlined, and take up my notes: what they ask, doubt or connect. Quote the paper where it helps, with page numbers.\n\n' +
-    'Citation (APA):\n' + apaCitation(entry).text + '\n\n' +
+  // (A compact outline, about a page or two: the question, the claim, the
+  // argument, then each section's main point.)
+  const text = 'Please summarize the paper below for me as a compact outline, about one to two pages long. ' +
+    'Begin with three short parts: its key question; its main claim (its thesis or conclusion); and its argument for that claim, step by step. ' +
+    'Then go through the paper section by section, in order: for each, its heading (or a short name, if it has none) and pages, and its main point in one or two sentences. ' +
+    'Use headings and brief bullet points rather than long paragraphs. ' +
+    'Where the passages I highlighted or underlined bear on a point, bring them in, and take up my notes: what they ask, doubt or connect. Quote the paper only briefly, with page numbers.\n\n' +
+    'Citation (' + citeShort() + '):\n' + citeRef(entry).text + '\n\n' +
     'The paper\u2019s text, page by page' + (useL || pp ? ' (page numbers as printed)' : '') + ':' +
     (scan ? '\n\n(This PDF is a scan with little or no text to read, so its text isn\u2019t here: work from the citation and my highlights and notes, and say what you can\u2019t tell from them.)' : body) +
     (cut ? '\n\n(The text stops before page ' + name(cut) + ' of ' + doc.numPages + ': the rest was too long to include.)' : '') + '\n\n' +
     'My highlights and notes' + (mk.length ? ' (' + mk.length + '):\n' + marksText : ':\nI haven\u2019t highlighted or noted anything in this paper yet, so summarize it as a whole.') + '\n\n' +
-    'Remember to weigh my highlights and notes above in the summary.';
+    'Remember: a compact outline of about one to two pages (the key question, claim and argument, then each section\u2019s main point), with my highlights and notes weighed in.';
   return { text, marks: mk.length, pages: cut ? cut - 1 : doc.numPages, scan, cut };
 }
 // Copied as soon as you click (Safari allows the clipboard only then), its
@@ -7341,7 +7361,7 @@ const cleanName = name => name.replace(/\s*\.pdf$/i, '') + ' (clean).pdf';
 // under it, to click; quicker, the share sheet opens at once. A download
 // is saved as soon as it's ready. The last clean copy is kept, for the same
 // PDF. (mail: the citation to go with it; see openIn.)
-const mailOf = e => ({ subject: String(e.f.title || e.k).replace(/[{}]/g, ''), text: apaCitation(e).text });
+const mailOf = e => ({ subject: String(e.f.title || e.k).replace(/[{}]/g, ''), text: citeRef(e).text });
 const CLEAN = { src: null, made: null };
 function shareProgress(anchor) {
   if (!anchor || !anchor.getBoundingClientRect().width) return { set() {}, creep() {}, done() {}, none: true };
