@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-02.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-02.05';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -1898,13 +1898,15 @@ const ROW_DRAG = { on: false };
     h.ghost.textContent = h.keys.length > 1 ? h.keys.length + ' publications' : (h.e.f.title || h.e.k);
     document.body.appendChild(h.ghost);
     place(h.x0, h.y0);
-    // (The sidebar comes out when the finger goes to the left edge: until
+    // (The sidebar comes out when the finger nears the left edge: until
     // then the list is there to drop on.)
     if (navigator.vibrate) navigator.vibrate(8);
     const sel = window.getSelection && window.getSelection();
     if (sel) sel.removeAllRanges();
   };
-  const place = (x, y) => { h.ghost.style.left = x + 'px'; h.ghost.style.top = y + 'px'; };
+  // (Kept on the screen: centred above the finger, near the left edge it
+  // went half off.)
+  const place = (x, y) => { const half = Math.min(h.ghost.offsetWidth, 260) / 2 + 8; h.ghost.style.left = Math.max(half, Math.min(innerWidth - half, x)) + 'px'; h.ghost.style.top = y + 'px'; };
   // Another publication under the finger (not the one held, nor one in
   // the inbox), to make this a chapter or version of.
   const rowUnder = (x, y) => {
@@ -1914,8 +1916,11 @@ const ROW_DRAG = { on: false };
   };
   const over = (x, y) => {
     h.x = x; h.y = y;
-    // (At the left edge: the sidebar out, to drop on a library or group.)
-    if (x < 44) {
+    // (Near the left edge: the sidebar out, to drop on a library or group.
+    // Not only at the very edge, on an iPad, which is the system's own
+    // swipe; but only for a finger that's gone left to get there, not one
+    // that began there, or is going down the list's left side.)
+    if (x < 44 || (tabletMQ.matches && x < 120 && x < h.x0 - 60)) {
       if (tabletMQ.matches && !app.classList.contains('side-open')) { app.classList.add('side-open'); h.opened = true; }
       else if (app.classList.contains('side-collapsed')) { app.classList.remove('side-collapsed'); h.uncollapsed = true; }
     }

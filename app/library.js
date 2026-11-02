@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-02.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-02.05';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -2211,7 +2211,17 @@ function paint() {
   const phone = phoneMQ.matches;
   let out = '';
   for (let i = s; i < e; i++) out += phone ? cardHTML(v[i], i, rowTop(i), rowHt(i)) : rowHTML(v[i], i, rowTop(i), h);
+  // (A publication held by a finger, to drag (editing.js), is kept: the
+  // touch's events go on going to the element it began on, and a new one
+  // in its place left them going nowhere: the drag stopped, nothing lit
+  // up, and the drop was lost.)
+  const held = rowsEl.querySelector('.held');
   rowsEl.innerHTML = out;
+  if (held) {
+    const now = rowsEl.querySelector(`[data-i="${held.dataset.i}"]`);
+    if (now) { held.style.visibility = ''; now.replaceWith(held); }
+    else { held.style.visibility = 'hidden'; rowsEl.appendChild(held); }
+  }
 }
 // Papers saved on this device (sw.js keeps them), by file id: marked in
 // the list, and the others faded while offline.
