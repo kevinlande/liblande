@@ -110,21 +110,44 @@
     --sel: #8a5524; --sel-text: #fff6ea; --sel-muted: #f0d6b4; --star: #e0a449;
     --warn: #f0a08e; --scrim: rgba(0, 0, 0, .5); --paper-bg: #120f0c; --shadow: 0 12px 32px rgba(0, 0, 0, .55);
 }
-/* Apple: frosted glass for the reader's bars, the markup toolbar and menus
-   (the page shows through, softly, as it scrolls under them), and rounder
-   corners, as in iOS and macOS today. */
-:root[data-style="apple"] .v-bar, :root[data-style="apple"] .v-tabs {
-  background: color-mix(in srgb, var(--panel) 72%, transparent);
-  -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
+/* Shared measures, for every theme: corners (small, medium, large,
+   capsule), motion, and depth (in dark, raised surfaces a step lighter
+   than the background, as iOS shows depth). And Glass: with any theme, the
+   reader's bars, the markup toolbar, menus and floating pills translucent,
+   the page showing softly through them, tinted by the theme's own panel
+   colour, with a lit edge and a fine rim. */
+:root {
+  --r-s: 7px; --r-m: 10px; --r-l: 14px; --r-cap: 999px;
+  --ease: cubic-bezier(.2, .8, .2, 1); --dur-q: .15s; --dur: .22s;
+  --raise: var(--bg);
+  --glass-rim: rgba(255, 255, 255, .72); --glass-edge: rgba(0, 0, 0, .08);
 }
-:root[data-style="apple"] .v-palette, :root[data-style="apple"] .vp-show, :root[data-style="apple"] .menu-list {
-  background: color-mix(in srgb, var(--bg) 74%, transparent);
-  -webkit-backdrop-filter: saturate(180%) blur(24px); backdrop-filter: saturate(180%) blur(24px);
-  border-color: color-mix(in srgb, var(--line) 70%, transparent);
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --raise: color-mix(in srgb, var(--bg), #ffffff 4%); --glass-rim: rgba(255, 255, 255, .12); --glass-edge: rgba(0, 0, 0, .45); }
 }
-:root[data-style="apple"] .v-palette { border-radius: 20px; }
-:root[data-style="apple"] .menu-list { border-radius: 14px; }
-:root[data-style="apple"] .btn { border-radius: 10px; }
+:root[data-theme="dark"] { --raise: color-mix(in srgb, var(--bg), #ffffff 4%); --glass-rim: rgba(255, 255, 255, .12); --glass-edge: rgba(0, 0, 0, .45); }
+:root[data-glass] .v-bar, :root[data-glass] .v-tabs {
+  background: color-mix(in srgb, var(--panel) 68%, transparent);
+  -webkit-backdrop-filter: saturate(180%) blur(22px); backdrop-filter: saturate(180%) blur(22px);
+  border-bottom-color: var(--glass-edge); box-shadow: inset 0 1px 0 var(--glass-rim);
+}
+:root[data-glass] .v-palette, :root[data-glass] .vp-show, :root[data-glass] .menu-list, :root[data-glass] .quote-bar, :root[data-glass] .v-tone {
+  background: color-mix(in srgb, var(--panel) 62%, transparent);
+  -webkit-backdrop-filter: saturate(190%) blur(26px); backdrop-filter: saturate(190%) blur(26px);
+  border-color: var(--glass-edge); box-shadow: inset 0 1px 0 var(--glass-rim), inset 0 0 0 .5px var(--glass-rim), var(--shadow);
+}
+:root[data-glass] .v-back { background: color-mix(in srgb, var(--panel) 62%, transparent); color: var(--accent);
+  -webkit-backdrop-filter: saturate(190%) blur(26px); backdrop-filter: saturate(190%) blur(26px);
+  box-shadow: inset 0 1px 0 var(--glass-rim), inset 0 0 0 .5px var(--glass-rim), var(--shadow); }
+:root[data-glass] .v-palette { border-radius: 22px; }
+/* (The pages kept to their own layer, under the bars: in dark pages, a
+   saved highlight is drawn with a backdrop filter of its own, and without
+   this the browser painted it over the reader's bar.) */
+#vScroll, #vPeekBody { isolation: isolate; }
+.menu-list { border-radius: var(--r-l); }
+.btn { border-radius: var(--r-m); }
+/* A keyboard's place: a ring in the accent (not for the mouse or a tap). */
+:where(button, a, summary, [tabindex], input, select, textarea):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 :root[data-theme="dark"] {
   color-scheme: dark;
   --bg: #131716; --side: #1a1f1e; --side-hover: #242b29; --panel: #171c1b;
@@ -289,11 +312,11 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .grp .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .grp .ct { font-size: 12px; color: var(--faint); font-variant-numeric: tabular-nums; }
 .grp svg { color: var(--muted); }
-.grp.on { background: var(--sel); color: var(--sel-text); }
-.grp.on .ct, .grp.on svg { color: var(--sel-muted); }
+.grp.on { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font-weight: 600; }
+.grp.on .ct, .grp.on svg { color: var(--accent); }
 /* The keyword icon, drawn once by the stylesheet (there can be hundreds). */
 .gi-tag { width: 16px; height: 16px; flex: none; background: var(--accent); -webkit-mask: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.7%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3%2012V4h8l10%2010-8%208z%22%2F%3E%3Ccircle%20cx%3D%227.5%22%20cy%3D%228.5%22%20r%3D%221.3%22%2F%3E%3C%2Fsvg%3E") center / 16px no-repeat; mask: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.7%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3%2012V4h8l10%2010-8%208z%22%2F%3E%3Ccircle%20cx%3D%227.5%22%20cy%3D%228.5%22%20r%3D%221.3%22%2F%3E%3C%2Fsvg%3E") center / 16px no-repeat; }
-.grp.on .gi-tag { background: var(--sel-muted); }
+.grp.on .gi-tag { background: var(--accent); }
 .kwfilter {
   display: block; width: calc(100% - 12px); margin: 4px 6px 6px; padding: 4px 8px;
   border: 1px solid var(--line); border-radius: 6px; background: var(--bg); font-size: 13px;
@@ -579,7 +602,8 @@ body:has(#sheet:not([hidden])) .pick-bar { visibility: hidden; }
 .d-two > .d-inner { flex: 1 1 auto; min-width: 0; max-width: none; padding-right: 8px; }
 .d-two .d-abstract { max-width: none; }
 .d-side { flex: none; width: 226px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; align-content: start; padding: 22px 24px 40px 12px; }
-.d-side .thumbs { display: flex; flex-direction: column; margin: 0; padding: 0; overflow: visible; }
+.d-side .thumbs { display: flex; flex-direction: column; align-items: center; margin: 0; padding: 0; overflow: visible; }
+.d-side .thumb-name { text-align: center; }
 /* A book's cover: its own shape, not cropped to a page's. */
 .thumb-img.cover { height: auto; min-height: 60px; background: none; }
 .thumb-img.cover img { height: auto; object-fit: contain; background: none; }
@@ -873,7 +897,7 @@ body:has(#sheet:not([hidden])) .pick-bar { visibility: hidden; }
   display: grid; align-items: center;
   grid-template-columns: var(--cols, 30px minmax(110px, 20%) 52px minmax(0, 1fr) minmax(90px, 20%) 86px);
 }
-.colhead { border-bottom: 1px solid var(--line); background: var(--panel); font-size: 12px; color: var(--muted); }
+.colhead { border-bottom: 1px solid var(--line); background: var(--panel); font-size: 12px; color: var(--muted); padding: 0 6px; }
 .colhead button {
   display: flex; align-items: center; gap: 3px; min-width: 0;
   border: 0; border-left: 1px solid var(--line); background: none; padding: 4px 8px; text-align: left; font-weight: 500; color: inherit;
@@ -913,7 +937,8 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .col-add .btn { min-height: 30px; padding: 3px 10px; }
 .col-menu .linkish { margin: 4px 8px 4px; font-size: 12.5px; }
 .rows { position: relative; }
-.row { position: absolute; left: 0; right: 0; cursor: default; font-size: 13px; }
+.row { position: absolute; left: 6px; right: 6px; cursor: default; font-size: 13px; border-radius: var(--r-s); }
+@media (hover: hover) { .row:not(.sel):hover { background: var(--side-hover); } }
 /* Behind a row being swiped (as in Mail): the action, in its colour once
    the swipe is far enough to leave it open, deeper once far enough to do
    it; a row left open has the action as a button. */
@@ -967,7 +992,7 @@ button.fileicon { border: 0; background: none; cursor: pointer; }
 .splitter::after { content: ""; position: absolute; left: 50%; top: 2px; width: 36px; height: 1px; margin-left: -18px; background: var(--faint); box-shadow: 0 2px 0 var(--faint); opacity: .6; }
 
 /* ---------- detail ---------- */
-.detail { flex: 1 1 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; container-type: inline-size; }
+.detail { flex: 1 1 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; container-type: inline-size; background: var(--raise); }
 /* (minmax: a long cite key shortens rather than widening the page.) */
 .d-inner { max-width: 760px; padding: 18px 24px 40px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
 .d-kicker { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
@@ -1148,7 +1173,12 @@ button.fileicon { border: 0; background: none; cursor: pointer; }
 .cs-add:hover { color: var(--accent); border-color: var(--accent); }
 .cs::before { content: ''; position: absolute; left: 1px; right: 1px; bottom: 10px; height: 3px; border: 1px solid var(--faint); border-top: 0; border-radius: 0 0 2px 2px; opacity: .6; }
 .cs::after { content: attr(data-l); position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); font-size: 8.5px; line-height: 10px; font-style: normal; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--faint); white-space: nowrap; }
-.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.actions { display: flex; flex-wrap: nowrap; gap: 8px; min-width: 0; }
+/* (Capsules, in one row: each can shrink; too narrow for their names, the
+   buttons other than the first show just their icons.) */
+.actions > .btn, .actions > .menu > summary.btn { border-radius: var(--r-cap); }
+.actions > .btn, .actions > .menu { flex: 0 1 auto; min-width: 0; }
+@container (max-width: 440px) { .d-inner .actions > :not(:first-child) > .btn > span, .d-inner .actions > .btn:not(:first-child) > span, .d-inner .actions > .menu:not(:first-child) > summary > span { display: none; } }
 .btn {
   display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 6px 12px;
   border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--text);

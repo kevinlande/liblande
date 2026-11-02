@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-01.02';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-01.03';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -123,6 +123,16 @@ function applyStyle(id) {
   barColour();
 }
 applyStyle(store.get('style', 'liblande'));
+// Glass (translucent bars, toolbar and menus) or flat, with any theme: kept
+// with your account. (Before, only the Apple theme had glass: it keeps it,
+// until you choose.)
+function applyGlass(on) {
+  document.documentElement.toggleAttribute('data-glass', !!on);
+  const box = $('#glassBox');
+  if (box) box.checked = !!on;
+}
+const glassNow = () => store.get('glass', store.get('style', 'liblande') === 'apple');
+applyGlass(glassNow());
 function renderThemePicks() {
   const dark = document.documentElement.getAttribute('data-theme') === 'dark' || (document.documentElement.getAttribute('data-theme') !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
   const cur = document.documentElement.getAttribute('data-style') || 'liblande';

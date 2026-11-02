@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-11-01.02';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-11-01.03';
 // On GitHub Pages, every part of the app must be from the same version: a
 // part kept from an older one (the offline copy, served when the network
 // was slow) lacks what this page needs. Then the kept copies go, and the
@@ -395,6 +395,7 @@ if (RELOADING) {
     } else if (saved && saved !== store.get('theme', 'auto')) { store.set('theme', saved); applyTheme(saved); }
     const look = status.prefs && status.prefs.style;
     if (look && look !== store.get('style', 'liblande') && $('#setup').hidden) { store.set('style', look); applyStyle(look); }
+    if (status.prefs && typeof status.prefs.glass === 'boolean' && status.prefs.glass !== glassNow()) { store.set('glass', status.prefs.glass); applyGlass(status.prefs.glass); }
     // And what you looked at lately.
     if (status.prefs) {
       recentMerge(status.prefs);
@@ -690,6 +691,7 @@ if (RELOADING) {
       STYLE_WAS = store.get('style', 'liblande');
       renderThemePicks();
       $('#darkPagesBox').checked = !!store.get('darkPages', false);
+      $('#glassBox').checked = !!glassNow();
       $('#coversBox').checked = coversOn();
       renderProxies();
       $('#setup').querySelectorAll('[data-sync]').forEach(b => { b.checked = SYNC[b.dataset.sync] !== false; });
@@ -714,6 +716,12 @@ if (RELOADING) {
   };
   // (These take effect at once, on this device.)
   $('#darkPagesBox').addEventListener('change', ev => setDarkPages(ev.target.checked));
+  // (Glass: as soon as it's switched, and on your other devices too.)
+  $('#glassBox').addEventListener('change', ev => {
+    store.set('glass', ev.target.checked);
+    applyGlass(ev.target.checked);
+    if (window.google && google.script && google.script.run) google.script.run.withFailureHandler(() => {}).savePrefs({ glass: ev.target.checked });
+  });
   $('#coversBox').addEventListener('change', ev => { store.set('coversOn', ev.target.checked); sweepCovers(); renderDetail(); });
   $('#setup').querySelectorAll('[data-sync]').forEach(b => b.addEventListener('change', () => {
     SYNC[b.dataset.sync] = b.checked;
