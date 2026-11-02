@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-02.05';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-02.08';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -403,6 +403,70 @@ function openAdd(pdf) {
   // (A PDF chosen here is read for its DOI or ISBN too, as one dropped is.)
   $('#addPdf').addEventListener('change', ev => { const f = ev.target.files[0]; if (f && sheet && f !== sheet.pdf) setAddPdf(f); });
   if (pdf) setAddPdf(pdf);
+}
+// Adding from a paper's web page: a link to LibLande ending
+// "#add=<DOI, arXiv ID, ISBN, or 'title: ... author: ...'>&from=<the page>",
+// as the bookmark and the Safari extension (Settings › Adding from the web)
+// open, opens Add filled in: from Crossref (as a DOI typed would be), or
+// the title search's matches to choose from; then Find PDF opened. Kept
+// for the page's session until the library's open (and a sign-in, if one
+// comes first), then cleared, so reloading doesn't add it again.
+const ADD_LINK_KEY = 'landelib.addLink';
+function addLinkTake() {
+  try {
+    const h = new URLSearchParams(location.hash.slice(1)), q = h.get('add');
+    if (!q) return;
+    sessionStorage.setItem(ADD_LINK_KEY, JSON.stringify({ q: q.trim(), from: h.get('from') || '' }));
+    history.replaceState(null, '', location.pathname + location.search);
+  } catch (err) { /* (no session storage: the link is just ignored) */ }
+}
+addLinkTake();
+window.addEventListener('hashchange', () => { addLinkTake(); if (ENTRIES && ENTRIES.length) addFromLink(); });
+async function addFromLink() {
+  let p = null;
+  try { p = JSON.parse(sessionStorage.getItem(ADD_LINK_KEY) || 'null'); sessionStorage.removeItem(ADD_LINK_KEY); } catch (err) { p = null; }
+  if (!p || !p.q) return;
+  if (!gs || $('#addBtn').hidden) { toast('Sign in to LibLande to add “' + p.q.replace(/^title:\s*/, '').replace(/\s+author:.*$/, '') + '”.', 8000); return; }
+  if (sheet) closeSheet();
+  openAdd();
+  let host = '';
+  try { host = new URL(p.from).hostname.replace(/^www\./, ''); } catch (err) { host = ''; }
+  $('#sheetBody .fld').insertAdjacentHTML('beforebegin', `<p class="add-from">${ICON.link}<span><b>From the page you were on</b>${host ? `<span class="add-from-src">${esc(host)}</span>` : ''}</span></p>`);
+  $('#doiLookup').value = p.q;
+  // (A title: its matches, to choose one; a DOI or ID: filled in.)
+  if (tsIsQuery(p.q)) { tsSearch(p.q); sheetMsg('No DOI on the page; these match its title. Choose one.'); return; }
+  if (!(await lookupIntoForm()) || !sheet || sheet.mode !== 'add') return;
+  const url = $('#sheetBody').querySelector('[data-field="url"]');
+  if (url && !url.value && /^https?:/.test(p.from) && !/doi\.org\//.test(p.from)) url.value = p.from;
+  const find = $('#addFind');
+  if (find) find.open = true;
+}
+// Settings › Adding from the web: the bookmark (dragged to the bar, or its
+// code copied), and the description for Safari's Describe Extension, both
+// opening this LibLande's address.
+function webAddBase() { return location.origin + location.pathname; }
+function webAddBookmark() {
+  const js = "(function(){var m=function(n){var e=document.querySelector('meta[name=\"'+n+'\" i]');return e?e.content:''};" +
+    "var d=m('citation_doi')||m('dc.identifier')||m('prism.doi')||m('bepress_citation_doi'),x=d.match(/10\\.\\d{4,9}\\/[^\\s\"<>]+/);" +
+    "if(!x){var a=document.querySelector('a[href*=\"doi.org/10.\"]');x=a&&a.href.match(/10\\.\\d{4,9}\\/[^\\s\"<>?#]+/)}" +
+    "var q=x?x[0].replace(/[.,;)]+$/,''):'';if(!q&&m('citation_arxiv_id'))q='arXiv:'+m('citation_arxiv_id');" +
+    "if(!q){var t=m('citation_title')||m('dc.title')||document.title,au=(m('citation_author')||m('dc.creator')).split(',')[0].trim().split(/\\s+/).pop();q='title: '+t+(au?' author: '+au:'')}" +
+    "window.open('" + webAddBase() + "#add='+encodeURIComponent(q)+'&from='+encodeURIComponent(location.href),'_blank')})()";
+  return 'javascript:' + encodeURIComponent(js);
+}
+function webAddDescription() {
+  return 'Add a toolbar button called "Add to LibLande". When clicked, read the current page’s citation details from its meta tags: ' +
+    'the DOI (citation_doi, dc.identifier, prism.doi, or failing those the first doi.org link on the page), the arXiv ID (citation_arxiv_id), ' +
+    'the title (citation_title) and the first author (the first citation_author). Then open a new tab at ' + webAddBase() + '#add= followed by, URL-encoded: ' +
+    'the DOI if there is one; otherwise "arXiv:" and the arXiv ID; otherwise "title: " and the title, then " author: " and the first author’s surname. ' +
+    'Then add &from= and the URL-encoded address of the page. If the page has no title meta tag, use the page’s own title.';
+}
+if ($('#webBm')) {
+  $('#webBm').href = webAddBookmark();
+  $('#webBm').addEventListener('click', ev => { ev.preventDefault(); toast('Drag it to your bookmarks bar (it does nothing here).', 4000); });
+  const copy = (text, what) => navigator.clipboard.writeText(text).then(() => toast(what, 6000), () => toast('Couldn’t copy it.', 4000));
+  $('#webExtCopy').addEventListener('click', () => copy(webAddDescription(), 'Copied. In Safari, open the address bar’s menu, choose Describe Extension, and paste it in.'));
+  $('#webBmCopy').addEventListener('click', () => copy(decodeURIComponent(webAddBookmark()), 'Copied. Bookmark any page, name it “Add to LibLande”, then edit it and paste this in place of its address.'));
 }
 function renderAddFields(values) {
   const type = $('#addType').value;
@@ -1933,7 +1997,10 @@ const ROW_DRAG = { on: false };
   const auto = () => {
     if (!h || !h.on) return;
     const r = list.getBoundingClientRect(), d = h.y < r.top + 56 ? -1 : h.y > r.bottom - 56 ? 1 : 0;
-    if (d && h.x > r.left && h.x < r.right) { list.scrollTop += d * 9; over(h.x, h.y); }
+    // (Only with the finger over the list itself: not below it, nor over
+    // the sidebar out on top of it, where it scrolled on and on unseen.)
+    const on = d && h.x > r.left && h.x < r.right && h.y > r.top && h.y < r.bottom && (document.elementFromPoint(h.x, h.y) || list).closest('#list');
+    if (on) { list.scrollTop += d * 9; over(h.x, h.y); }
     h.raf = requestAnimationFrame(auto);
   };
   const stop = drop => {

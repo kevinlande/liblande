@@ -127,10 +127,15 @@
 }
 :root[data-theme="dark"] { --raise: color-mix(in srgb, var(--bg), #ffffff 4%); --glass-rim: rgba(255, 255, 255, .12); --glass-edge: rgba(0, 0, 0, .45); }
 :root[data-glass] .v-bar, :root[data-glass] .v-tabs {
-  background: color-mix(in srgb, var(--panel) 68%, transparent);
   -webkit-backdrop-filter: saturate(180%) blur(22px); backdrop-filter: saturate(180%) blur(22px);
   border-bottom-color: var(--glass-edge);
 }
+/* (The bars solid at the top, in the colour the system gives the status
+   bar above them, so there's no step there, and clearer going down: the
+   bar to 80%, the tabs under it from 80% to 55%.) */
+:root[data-glass] .v-bar { background: linear-gradient(to bottom, var(--panel) 30%, color-mix(in srgb, var(--panel) 80%, transparent)); }
+:root[data-glass] .v-bar { border-bottom-color: transparent; }
+:root[data-glass] .v-tabs { background: linear-gradient(to bottom, color-mix(in srgb, var(--panel) 80%, transparent), color-mix(in srgb, var(--panel) 55%, transparent)); }
 /* (The light rim along a glass top edge only on what floats: on the bars
    at the top of the screen it drew a thin line under the status bar.) */
 :root[data-glass] .v-palette, :root[data-glass] .vp-show, :root[data-glass] .menu-list, :root[data-glass] .quote-bar, :root[data-glass] .v-tone {
@@ -152,7 +157,7 @@
 :root[data-glass] .status-cap { background: transparent; }
 :root[data-glass] .main { position: relative; }
 :root[data-glass] .toolbar { position: absolute; top: 0; left: 0; right: 0; z-index: 30;
-  background: color-mix(in srgb, var(--panel) 68%, transparent);
+  background: linear-gradient(to bottom, var(--panel) 35%, color-mix(in srgb, var(--panel) 60%, transparent));
   -webkit-backdrop-filter: saturate(180%) blur(22px); backdrop-filter: saturate(180%) blur(22px);
   border-bottom-color: var(--glass-edge); }
 :root[data-glass] .listwrap { padding-top: var(--tb-h, 0px); }
@@ -780,6 +785,13 @@ body:has(#sheet:not([hidden])) .pick-bar { visibility: hidden; }
 @keyframes vrl-glow { 0%, 100% { box-shadow: 0 0 6px 1px color-mix(in srgb, var(--accent) 30%, transparent); } 50% { box-shadow: 0 0 10px 3px color-mix(in srgb, var(--accent) 45%, transparent); } }
 @media (prefers-reduced-motion: reduce) { .vrl-burst { animation-duration: .01s; } #vRL.pop svg, #vRL.ready { animation: none; } }
 #vRLMenu .menu-list hr { border: 0; border-top: 1px solid var(--line); margin: 4px 2px; }
+/* Adding from the web: in Settings, and the note at the top of Add. */
+.web-add-row { margin: 2px 0 10px; }
+.btn.web-bm, .btn.web-bm:hover { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; cursor: grab; text-decoration: none; }
+.add-from { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; padding: 8px 11px; border-radius: var(--r-m); background: var(--accent-soft); font-size: 13px; }
+.add-from .i { color: var(--accent); flex: none; width: 16px; height: 16px; }
+.add-from b { color: var(--accent); font-weight: 600; }
+.add-from-src { color: var(--muted); margin-left: 6px; }
 .linkish { border: 0; background: none; color: var(--accent); padding: 4px 2px; font-size: 13px; }
 .pick-bar .btn { min-height: 28px; padding: 3px 12px; font-size: 13px; }
 .pickbox { width: 18px; height: 18px; border: 1.5px solid var(--faint); border-radius: 50%; display: inline-grid; place-items: center; flex: none; }

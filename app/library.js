@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-02.05';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-02.08';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -245,6 +245,8 @@ const builtText = d => typeof d.built === 'number'
   ? new Date(d.built).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
   : d.built;
 function init(data, again) {
+  // (A paper sent from its web page, once the library's open: see addFromLink.)
+  if (!again) requestAnimationFrame(() => addFromLink());
   DATA = data;
   overlayOffline(data);
   ENTRIES = data.entries;
@@ -962,6 +964,14 @@ async function setAddPdf(file) {
   try { id = await idFromPdf(file); } catch (err) { id = null; }
   if (!sheet || sheet.mode !== 'add' || sheet.pdf !== file) return;
   if (!id) { sheetMsg('There\u2019s no DOI or ISBN in the PDF\u2019s first pages. Paste one, or fill in the details yourself.'); return; }
+  if (id.query) {
+    // (No DOI or ISBN, but a title (and author) in the PDF's own details:
+    // searched as one typed would be, to choose from.)
+    $('#doiLookup').value = id.query;
+    sheetMsg('No DOI in the PDF; searched by the title' + (/author:/.test(id.query) ? ' and author' : '') + ' it gives. Choose the match.');
+    tsSearch(id.query);
+    return;
+  }
   $('#doiLookup').value = id.doi || 'ISBN ' + id.isbn;
   lookupIntoForm();
 }
@@ -977,8 +987,10 @@ function isbnIn(text) {
   }
   return found.find(d => d.length === 13) || found[0] || '';
 }
-// {doi} from the first two pages, or else {isbn} from the first ten (or
-// the last two); null if neither.
+// {doi} from the first two pages, or from the PDF's own details (its
+// metadata, where publishers put it); or else {isbn} from the first ten
+// pages (or the last two); or else {query}, its own title and first
+// author's surname, to search by; null if none of these.
 async function idFromPdf(file) {
   const lib = await loadPdfJs();
   const pdf = await openPdf(lib, { data: new Uint8Array(await file.arrayBuffer()) }).promise;
@@ -991,11 +1003,28 @@ async function idFromPdf(file) {
     const pages = [];
     for (let p = 1; p <= Math.min(10, pdf.numPages); p++) pages.push(p);
     for (let p = Math.max(11, pdf.numPages - 1); p <= pdf.numPages; p++) pages.push(p);
+    let meta = null;
+    try { meta = await pdf.getMetadata(); } catch (err) { meta = null; }
+    const info = (meta && meta.info) || {}, xmp = meta && meta.metadata && meta.metadata.getAll ? meta.metadata.getAll() : {};
+    const doi = /\b(10\.\d{4,9}[/][^\s"<>]+)/.exec([...Object.values(xmp), info.Subject, info.Keywords, info.doi].flat().filter(v => typeof v === 'string').join(' '));
+    if (doi) return { doi: doi[1].replace(/[.,;:)\]]+$/, '') };
     for (const p of pages) { const isbn = isbnIn(await textOf(p)); if (isbn) return { isbn }; }
-    return null;
+    const q = pdfMetaQuery(info.Title || xmp['dc:title'], info.Author || xmp['dc:creator']);
+    return q ? { query: q } : null;
   } finally {
     closePdf(pdf);
   }
+}
+
+// A PDF's own title and author, as a title search ("title: ... author:
+// ..."); '' if the title is the file's (as "Microsoft Word - draft3.docx")
+// or none. (An author that's a user name, with no space, isn't used.)
+function pdfMetaQuery(title, author) {
+  title = String(Array.isArray(title) ? title[0] || '' : title || '').replace(/\s+/g, ' ').trim();
+  if (title.length < 8 || /^(microsoft (word|powerpoint)|untitled|document\d*$|title$)|\.(docx?|pdf|tex|indd|rtf|odt)\b|^[\w-]+\.\w{2,4}$/i.test(title) || !/\s/.test(title)) return '';
+  const first = String(Array.isArray(author) ? author[0] || '' : author || '').split(/;|,|&|\band\b/)[0].trim();
+  const surname = /\s/.test(first) ? first.split(/\s+/).pop() : '';
+  return 'title: ' + title + (surname ? ' author: ' + surname : '');
 }
 
 /* ------------------------------------------------------------ groups */
@@ -2211,17 +2240,17 @@ function paint() {
   const phone = phoneMQ.matches;
   let out = '';
   for (let i = s; i < e; i++) out += phone ? cardHTML(v[i], i, rowTop(i), rowHt(i)) : rowHTML(v[i], i, rowTop(i), h);
-  // (A publication held by a finger, to drag (editing.js), is kept: the
-  // touch's events go on going to the element it began on, and a new one
-  // in its place left them going nowhere: the drag stopped, nothing lit
-  // up, and the drop was lost.)
+  // (A publication held by a finger, to drag (editing.js), is kept, and
+  // never taken out of the page, even for a moment: the touch's events go
+  // on going to the element it began on, and with a new one in its place
+  // (or the old one out and back) Safari let the drag go.)
   const held = rowsEl.querySelector('.held');
-  rowsEl.innerHTML = out;
-  if (held) {
-    const now = rowsEl.querySelector(`[data-i="${held.dataset.i}"]`);
-    if (now) { held.style.visibility = ''; now.replaceWith(held); }
-    else { held.style.visibility = 'hidden'; rowsEl.appendChild(held); }
-  }
+  if (!held) { rowsEl.innerHTML = out; return; }
+  [...rowsEl.children].forEach(c => { if (c !== held) c.remove(); });
+  rowsEl.insertAdjacentHTML('beforeend', out);
+  const now = rowsEl.querySelector(`[data-i="${held.dataset.i}"]:not(.held)`);
+  if (now) { held.style.top = now.style.top; now.remove(); }
+  held.style.visibility = now ? '' : 'hidden';
 }
 // Papers saved on this device (sw.js keeps them), by file id: marked in
 // the list, and the others faded while offline.
