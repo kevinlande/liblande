@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/notes.js'] = '2026-11-03.01';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/notes.js'] = '2026-11-03.02';
 /* ------------------------------------------------------------ notes */
 // The details pane shows Details or Notes (a switch at its top, or Alt-N;
 // the choice kept). Notes has your notes, in a box you type in, formatted
@@ -608,49 +608,69 @@ function openNotesPop(e) {
 // notes and editor as the details pane's, saved as you type. Add to notes
 // (beside a passage you select) puts it in as a quotation with its page,
 // and highlights it; a page tag goes to that page of the paper.
-const RN = { e: null, ed: null, host: null, where: null, timer: 0, range: null, from: null };
+const RN = { e: null, ed: null, host: null, where: null, timer: 0, range: null, from: null, last: null };
 const rnFor = e => !!(RN.ed && RN.ed.isConnected && RN.e && e && RN.e.k === e.k);
 const rnShown = () => !!(RN.ed && RN.ed.isConnected && !$('#viewer').hidden && (RN.where === 'bottom' ? !$('#vPeek').hidden : sideOpen() && SIDE.tab === 'notes'));
 // (The page would be under 480px beside the notes: below it instead. On a
 // phone, the sidebar's Notes tab, which fills the screen there.)
+// (Moved with the button for it: kept, for the screen held that way, wide
+// or tall.)
+const rnWhereKey = () => innerWidth > innerHeight ? 'notesWhereWide' : 'notesWhereTall';
 function rnWhere() {
   if (handheld()) return 'side';
+  const chosen = store.get(rnWhereKey(), null);
+  if (chosen === 'side' || chosen === 'bottom') return chosen;
   const w = $('#viewer').clientWidth || innerWidth;
   const side = Math.max(320, Math.min(store.get('notesSideW', 380), w * 0.5));
   return sidePhone() || w - side < 480 ? 'bottom' : 'side';
 }
-function rnHTML(e) {
+// The button that moves them: beside the page, or below it.
+const RN_MOVE = {
+  side: ['Move your notes beside the page', '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M10 4.5v15"/><path d="M5.5 9h2.5M5.5 12h2.5" opacity=".6"/></svg>'],
+  bottom: ['Move your notes below the page', '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 13h17"/><path d="M7 16.3h10" opacity=".6"/></svg>'],
+};
+function rnHTML(e, where) {
   const b = (k, title, icon) => `<button type="button" data-rn="${k}" title="${esc(title)}" aria-label="${esc(title)}">${icon}</button>`;
   const I = d => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
   return `<div class="rn">` + (gs ? `<div class="rn-tools">` +
-    b('h', 'Heading', '<b>H</b>') + b('bold', 'Bold (⌘B)', '<b>B</b>') + b('italic', 'Italic (⌘I)', '<i>I</i>') + '<span class="rn-sep"></span>' +
+    b('h', 'Heading', '<b>H</b>') + b('bold', 'Bold (\u2318B)', '<b>B</b>') + b('italic', 'Italic (\u2318I)', '<i>I</i>') + '<span class="rn-sep"></span>' +
     b('ul', 'Bulleted list', I('<path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/>')) +
     b('quote', 'Quotation', I('<path d="M5 17c2.5-.4 4-2.2 4-5V7H5v5h3"/><path d="M14 17c2.5-.4 4-2.2 4-5V7h-4v5h3"/>')) +
-    b('link', 'Link (⌘K)', I('<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>')) +
-    (handheld() ? '' : b('pop', 'Notes, large, with Cite (' + keyHint('notesPop') + ')', POP_ICON)) +
+    b('link', 'Link (\u2318K)', I('<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>')) +
+    // (At the right, after Saved: where the notes go, not how they look.)
     `<span class="rn-state" aria-live="polite">Saved</span>` +
+    (handheld() ? '' : b('move', RN_MOVE[where === 'bottom' ? 'side' : 'bottom'][0], RN_MOVE[where === 'bottom' ? 'side' : 'bottom'][1]) +
+      b('pop', 'Notes, large, with Cite (' + keyHint('notesPop') + ')', POP_ICON)) +
     (handheld() ? `<button type="button" class="rn-done" data-rn="done">Done</button>` : '') + `</div>` : '') +
-    `<div class="rn-edit notes-rich" role="textbox" aria-multiline="true" aria-label="Your notes" data-placeholder="${gs ? 'Write your notes… (select a passage in the paper, then Add to notes, to quote it)' : 'No notes.'}"></div>` +
+    `<div class="rn-edit notes-rich" role="textbox" aria-multiline="true" aria-label="Your notes" data-placeholder="${gs ? 'Write your notes\u2026 (select a passage in the paper, then Add to notes, to quote it)' : 'No notes.'}"></div>` +
     `<div class="rn-marks" hidden></div>` +
-    `<div class="rn-foot"><span>In the .bib’s Notes field</span>` + (gs ? `<button type="button" class="linkish" data-rn-marks aria-expanded="false">Highlights</button>` : '') + `</div></div>`;
+    `<div class="rn-foot"><span>In the .bib\u2019s Notes field</span>` + (gs ? `<button type="button" class="linkish" data-rn-marks aria-expanded="false">Highlights</button>` : '') + `</div></div>`;
 }
 function rnFlush() {
   clearTimeout(RN.timer);
   if (!RN.ed || !RN.e || !gs) return Promise.resolve(true);
-  const ed = RN.ed, k = RN.e.k, st = RN.host && RN.host.querySelector('.rn-state');
-  return notesSave(k, htmlToMd(ed), true).then(ok => { if (st && st.isConnected && RN.ed === ed) st.textContent = ok ? 'Saved' : 'Not saved'; return ok; });
+  const ed = RN.ed, k = RN.e.k, st = RN.host && RN.host.querySelector('.rn-state'), md = htmlToMd(ed);
+  const last = RN.last = { k, md };
+  return notesSave(k, md, true).then(ok => {
+    if (ok && RN.last === last) RN.last = null;
+    if (st && st.isConnected && RN.ed === ed) st.textContent = ok ? 'Saved' : 'Not saved';
+    return ok;
+  });
 }
 function rnMount(host, e, where) {
   if (RN.ed && RN.ed !== host.querySelector('.rn-edit')) rnFlush();
   Object.assign(RN, { e, host, where, ed: null, range: null });
   if (!e) { host.innerHTML = `<p class="v-side-note">This paper has no entry in the library, so no notes.</p>`; return; }
-  host.innerHTML = rnHTML(e);
+  host.innerHTML = rnHTML(e, where);
   const ed = host.querySelector('.rn-edit'), st = host.querySelector('.rn-state');
   RN.ed = ed;
-  noteEditor(ed, rawOf(e, 'annote'), () => {
+  // (Just moved, or another tab and back: what was written, though its
+  // save may not be done yet.)
+  const md = RN.last && RN.last.k === e.k ? RN.last.md : rawOf(e, 'annote');
+  noteEditor(ed, md, () => {
     if (st) st.textContent = 'Edited';
     clearTimeout(RN.timer);
-    RN.timer = setTimeout(() => { if (st) st.textContent = 'Saving…'; rnFlush(); }, 1500);
+    RN.timer = setTimeout(() => { if (st) st.textContent = 'Saving\u2026'; rnFlush(); }, 1500);
   });
   nvTagPages(ed);
   ed.addEventListener('blur', () => { if (RN.ed === ed) { nvTagPages(ed); rnFlush(); } });
@@ -676,6 +696,7 @@ function rnClick(ev) {
     const k = t.dataset.rn;
     if (k === 'pop') { const e = BYKEY.get(RN.e.k); if (e) openNotesPop(e); return; }
     if (k === 'done') { closeReaderNotes(); return; }
+    if (k === 'move') { rnMove(RN.where === 'bottom' ? 'side' : 'bottom'); return; }
     rnBack();
     if (k === 'h') nvToggleBlock(ed, 'h3');
     else if (k === 'quote') nvToggleBlock(ed, 'blockquote');
@@ -708,7 +729,7 @@ async function rnMarks() {
   box.hidden = !open;
   btn.setAttribute('aria-expanded', String(open));
   if (!open || !V.doc) return;
-  box.innerHTML = '<p class="nv-none">Reading the highlights…</p>';
+  box.innerHTML = '<p class="nv-none">Reading the highlights\u2026</p>';
   const doc = V.doc;
   try {
     const marks = ((await collectMarks(doc, null)) || []).filter(m => m.text || m.note);
@@ -716,8 +737,8 @@ async function rnMarks() {
     try { labels = await doc.getPageLabels(); } catch (err) { labels = null; }
     if (!box.isConnected) return;
     RN.marks = { marks, labels };
-    box.innerHTML = marks.length ? nvMarksHTML(RN.marks, true) : '<p class="nv-none">No highlights or notes in the PDF yet (saved ones: those just made come once it’s saved).</p>';
-  } catch (err) { if (box.isConnected) box.innerHTML = `<p class="nv-none">Couldn’t read them: ${esc(errText(err))}</p>`; }
+    box.innerHTML = marks.length ? nvMarksHTML(RN.marks, true) : '<p class="nv-none">No highlights or notes in the PDF yet (saved ones: those just made come once it\u2019s saved).</p>';
+  } catch (err) { if (box.isConnected) box.innerHTML = `<p class="nv-none">Couldn\u2019t read them: ${esc(errText(err))}</p>`; }
 }
 // Open (beside the paper or below it), or close.
 function openReaderNotes() {
@@ -741,6 +762,14 @@ function closeReaderNotes() {
   else showSideTab(f && f.tab && f.tab !== 'notes' ? f.tab : 'pages');
   rnPressed();
 }
+// Beside the page, or below it: kept for the screen held this way.
+function rnMove(to) {
+  store.set(rnWhereKey(), to);
+  if (RN.where === 'bottom') { closePeek(); RN.ed = null; }
+  else closeReaderNotes();
+  openReaderNotes();
+  if (RN.ed) rnBack();
+}
 function toggleReaderNotes() { if (rnShown()) closeReaderNotes(); else { openReaderNotes(); if (RN.ed) rnBack(); } }
 function rnPressed() { const b = $('#vNotesBtn'); if (b) b.setAttribute('aria-pressed', String(rnShown())); }
 // Below the paper: the split screen's panel, showing the notes instead.
@@ -759,6 +788,7 @@ function rnBottom() {
   }
   rnMount($('#vPeekNotes'), V.entry && (BYKEY.get(V.entry.k) || null), 'bottom');
   showBack();
+  peekRoom();
 }
 // (The panel goes back to being the split screen: notes kept first.)
 function rnBottomOff() {
@@ -780,10 +810,16 @@ function rnBottomOff() {
 function rnAddQuote() {
   const s = QUOTE.sel;
   if (!s || !V.entry || !gs || !BYKEY.get(V.entry.k)) return;
-  const pg = String(QUOTE.el.querySelector('input').value || '').trim().replace(/-+/g, '–');
-  const q = '“' + s.text.replace(/[.,;:]+$/, '') + '”' + (pg ? ' (p. ' + pg + ')' : '');
+  const pg = String(QUOTE.el.querySelector('input').value || '');
   rnHighlight(s.range);
   hideQuote();
+  rnAddPassage(s.text, pg);
+}
+// (A highlight's words too: see markQuote.)
+function rnAddPassage(text, pg) {
+  if (!V.entry || !gs || !BYKEY.get(V.entry.k)) return;
+  pg = String(pg || '').trim().replace(/-+/g, '\u2013');
+  const q = '\u201c' + text.replace(/[.,;:]+$/, '') + '\u201d' + (pg ? ' (p. ' + pg + ')' : '');
   if (handheld() && !rnShown()) {
     // (After any save still going, so two in a row both stay.)
     const k = V.entry.k;
@@ -827,7 +863,7 @@ function rnHighlight(range) {
 async function rnGo(label) {
   if (!V.doc || !V.viewer) return;
   const n = await rnPageOf(String(label));
-  if (!n) { toast('Page ' + label + ' isn’t in this PDF.', 2500); return; }
+  if (!n) { toast('Page ' + label + ' isn\u2019t in this PDF.', 2500); return; }
   pushBack();
   V.viewer.currentPageNumber = n;
   const pv = V.viewer.getPageView(n - 1);

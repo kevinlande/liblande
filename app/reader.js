@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-03.01';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-03.02';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -2286,6 +2286,10 @@ function savePalettePlace() {
 // doesn't flicker between the two along the line.)
 const DOCK_EDGE = 90, UNDOCK_EDGE = 150;
 const canDock = () => window.innerWidth >= 600;
+// The height the panel below the page takes (0 when it's shut).
+function peekTaken() { const p = $('#vPeek'); return p && !p.hidden && !p.classList.contains('leaving') ? p.offsetHeight : 0; }
+// (The toolbar's place when not put anywhere: just above that panel.)
+function peekRoom() { $('#viewer').style.setProperty('--peek-h', peekTaken() + 'px'); placePalette(); }
 function placePalette() {
   if (phoneMQ.matches) {
     const top = store.get('paletteSnap', 'bottom') === 'top';
@@ -2305,8 +2309,12 @@ function placePalette() {
     el.dataset.dock = dock || '';
     if (!pos) { el.style.left = el.style.top = ''; el.classList.remove('placed'); return; }
     el.classList.add('placed');
-    // Positions are within the page area (below the reader's top bar).
-    const body = $('.v-body'), W = body.clientWidth, H = body.clientHeight, w = el.offsetWidth || 60, h = el.offsetHeight || 44;
+    // Positions are within the page area (below the reader's top bar, and
+    // above the panel below the page, while it's open: pushed up, and a
+    // tall toolbar made shorter, scrolling, if it must).
+    const body = $('.v-body'), W = body.clientWidth, H = body.clientHeight - peekTaken(), w = el.offsetWidth || 60;
+    el.style.maxHeight = el.classList.contains('vertical') ? Math.max(120, H - $('#vTop').offsetHeight - 16) + 'px' : '';
+    const h = el.offsetHeight || 44;
     const inset = $('#viewer').classList.contains('side-open') ? $('#vSide').offsetWidth : 0;
     const left = dock === 'left' ? inset + 8 : dock === 'right' ? W - w - 8 : pos.x * W;
     el.style.left = Math.max(inset + 8, Math.min(W - w - 8, left)) + 'px';
@@ -3705,6 +3713,16 @@ document.addEventListener('pointerdown', ev => {
   hideRegionMenu();
 }, true);
 
+// Not words, in the text layer: the layer itself, its end, and the
+// pictures PDF.js puts in it (a figure, a boxed panel's image). PDF.js
+// starts a freehand highlight from a press on any of these, in its
+// highlighting mode: a stray mark, with the text highlighter.
+function blankOfText(t) {
+  if (!t || !t.closest || !t.closest('.textLayer')) return false;
+  const c = t.classList;
+  return c.contains('textLayer') || c.contains('endOfContent') || c.contains('textLayerImages') || c.contains('textLayerImagePlaceholder') || t.getAttribute('role') === 'img' || !!t.closest('.textLayerImages');
+}
+
 /* ---- the select tool */
 // Tap a mark to pick it up (then drag to move it; pen strokes and text
 // boxes can be resized). Or drag a box on empty page: then copy the text
@@ -3736,7 +3754,7 @@ $('#vScroll').addEventListener('pointerdown', ev => {
   if (free) return;
   const t = ev.target;
   if (!t.closest || !t.closest('#vPages') || t.closest('.annotationEditorLayer > [id], .editToolbar, .note-pin')) return;
-  if (V.tool === 'highlight' && t.closest('.textLayer span')) return;
+  if (V.tool === 'highlight' && t.closest('.textLayer span') && !blankOfText(t)) return;
   ev.stopPropagation();
 }, true);
 (() => {
@@ -3890,6 +3908,8 @@ function colourList(tb) {
 function iconEditToolbar(root) {
   root.querySelectorAll('.editToolbar').forEach(colourList);
   if (root.matches && root.matches('.editToolbar')) colourList(root);
+  root.querySelectorAll('.editToolbar').forEach(markQuoteButtons);
+  if (root.matches && root.matches('.editToolbar')) markQuoteButtons(root);
   for (const [cls, [name, svg]] of Object.entries(EDIT_ICONS)) {
     root.querySelectorAll('.editToolbar button.' + cls + ':not(.has-icon)').forEach(b => {
       b.classList.add('has-icon');
@@ -3898,6 +3918,62 @@ function iconEditToolbar(root) {
       if (!b.title) b.title = name;
     });
   }
+}
+// A highlight's toolbar (one over words, picked up): Quote, as the Quote
+// bar does for a selection, and Add to notes.
+const QUOTE_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 17c2.5-.4 4-2.2 4-5V7H5v5h3"/><path d="M14 17c2.5-.4 4-2.2 4-5V7h-4v5h3"/></svg>';
+const NOTE_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v11l-5 5H5z"/><path d="M14 20v-5h5"/><path d="M8.5 9h7M8.5 12.5h4"/></svg>';
+function markQuoteButtons(tb) {
+  const div = tb.parentElement;
+  if (!div || tb.querySelector('.ll-mq') || !div.classList.contains('highlightEditor') || div.classList.contains('free')) return;
+  const row = tb.querySelector('.buttons') || tb;
+  const del = row.querySelector('button.delete, .deleteButton');
+  const make = (cls, label, svg) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'll-mq ' + cls + ' has-icon';
+    b.title = label;
+    b.setAttribute('aria-label', label);
+    b.innerHTML = svg;
+    row.insertBefore(b, del && del.parentElement === row ? del : null);
+    return b;
+  };
+  make('ll-mq-quote', 'Quote: copy the words as a quotation, with the citation', QUOTE_SVG).addEventListener('click', ev => { ev.stopPropagation(); markQuote(div.id, 'copy'); });
+  if (gs && V.entry && BYKEY.get(V.entry.k)) make('ll-mq-note', 'Add to notes, as a quotation with its page', NOTE_SVG).addEventListener('click', ev => { ev.stopPropagation(); markQuote(div.id, 'notes'); });
+}
+// A highlight's words (from the page's text under it) and its page as printed.
+async function markWords(id) {
+  const ed = V.ui && V.ui.getEditor(id);
+  if (!ed || !V.doc) return null;
+  let s = null;
+  try { s = ed.serialize(false); } catch (err) { s = null; }
+  const n = (s && s.pageIndex != null ? s.pageIndex : ed.pageIndex) + 1;
+  if (!n) return null;
+  const page = await V.doc.getPage(n);
+  let qp = s && s.quadPoints;
+  // (One in the PDF, not changed here: PDF.js gives nothing for it, so
+  // its place comes from the file.)
+  if (!qp && ed.annotationElementId) {
+    const a = (await page.getAnnotations()).find(x => x.id === ed.annotationElementId);
+    qp = a && a.quadPoints;
+  }
+  if (!qp) return null;
+  const items = (await page.getTextContent()).items;
+  const text = quoteText(textInQuads(items, qp));
+  if (!text) return null;
+  return { text, page: (await printedPage(n)).page };
+}
+async function markQuote(id, how) {
+  const w = await markWords(id);
+  if (!w) { toast('Couldn\u2019t read the words under this highlight.', 3000); return; }
+  if (how === 'copy') {
+    const { block, text } = quoteWith(w.text, w.page);
+    copy(text, block ? 'Copied the block quotation, with its citation' : 'Copied the quotation, with its citation');
+  } else rnAddPassage(w.text, w.page);
+  // Put down, as a tap off it does (back to reading, if it was picked up
+  // while reading).
+  if (V.ui) { try { V.ui.unselectAll(); } catch (err) { /* nothing picked up */ } }
+  if (V.tool === 'select' && V.fromRead) setTool(V.fromRead === true ? 'read' : V.fromRead);
 }
 new MutationObserver(list => {
   for (const m of list) for (const n of m.addedNodes) {
@@ -4339,7 +4415,7 @@ $('#vPages').addEventListener('pointerdown', ev => { if (ev.target.closest('.not
     if (!active() || (ev.pointerType === 'touch' && V.pencil)) return;
     // In text mode, a press on blank page (not on words) doesn't start a
     // freehand highlight, which is what PDF.js would otherwise do.
-    if (ev.target.classList && (ev.target.classList.contains('textLayer') || ev.target.classList.contains('endOfContent'))) ev.stopPropagation();
+    if (blankOfText(ev.target)) ev.stopPropagation();
     // A press on a highlight of another colour starts a new highlight over
     // it (one of the same colour is made longer instead: see ext).
     const onHl = ev.target.closest && ev.target.closest('.annotationEditorLayer > .highlightEditor:not(.free)');
@@ -5452,7 +5528,12 @@ function showSideTab(tab) {
   document.querySelectorAll('#vSide [data-vtab]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.vtab === tab)));
   sideWidthFor(tab);
   setTimeout(rnPressed, 0);
-  if (tab === 'notes') { rnMount($('#vSideBody'), V.entry && BYKEY.get(V.entry.k), 'side'); return; }
+  if (tab === 'notes') {
+    // (Below the page already: moved up here instead.)
+    if ($('#vPeek').classList.contains('notes') && !$('#vPeek').hidden) { closePeek(); RN.ed = null; }
+    rnMount($('#vSideBody'), V.entry && BYKEY.get(V.entry.k), 'side');
+    return;
+  }
   if (tab === 'info') { showInfo(); return; }
   if (!V.doc) { $('#vSideBody').innerHTML = `<p class="v-side-note">Opening\u2026</p>`; return; }
   if (tab === 'pages') showThumbs();
@@ -6575,6 +6656,7 @@ async function showPeek(dest, where) {
   }
   $('#vSplitBtn').setAttribute('aria-pressed', 'true');
   showBack();
+  peekRoom();
 }
 function closePeek() {
   const panel = $('#vPeek');
@@ -6583,7 +6665,8 @@ function closePeek() {
   if (panel.hidden) return;
   if (panel.classList.contains('notes') && RN.where === 'bottom') { rnFlush(); RN.ed = null; }
   panel.classList.add('leaving');
-  setTimeout(() => { panel.hidden = true; panel.classList.remove('leaving'); rnBottomOff(); showBack(); }, 220);
+  peekRoom();
+  setTimeout(() => { panel.hidden = true; panel.classList.remove('leaving'); rnBottomOff(); showBack(); peekRoom(); }, 220);
 }
 $('#vPeekX').addEventListener('click', closePeek);
 // (A tap of the Apple Pencil on the panel's buttons, acted on as it
@@ -6611,6 +6694,7 @@ function peekHeight(share) {
   const { H, min, max } = peekLimits();
   const px = Math.max(min, Math.min(max, share * H));
   $('#vPeek').style.height = px + 'px';
+  if (!$('#vPeek').hidden) requestAnimationFrame(peekRoom);
   return px / H;
 }
 // Dragging the handle, or anywhere on the header but its buttons, resizes
@@ -6654,6 +6738,7 @@ function peekHeight(share) {
     store.set('peekH', h / lim.H);
     if (PEEK.viewer && PEEK.viewer.pdfDocument) PEEK.viewer.update();
     showBack();
+    peekRoom();
   };
   panel.addEventListener('pointerup', up);
   panel.addEventListener('pointercancel', up);

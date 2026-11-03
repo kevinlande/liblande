@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/keywords.js'] = '2026-11-03.01';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/keywords.js'] = '2026-11-03.02';
 /* ------------------------------------------------------------ suggested keywords */
 // Suggested from your own keywords: those of the publications most like
 // this one (by the words of their titles and abstracts, their authors and

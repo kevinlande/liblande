@@ -639,8 +639,13 @@ body:has(#sheet:not([hidden])) .pick-bar { visibility: hidden; }
    a column on the right. */
 .d-two { display: flex; align-items: flex-start; }
 .d-two > .d-inner { flex: 1 1 auto; min-width: 0; max-width: none; padding-right: 8px; }
+/* Two columns: the kicker's row (with Details | Notes) level with Edit
+   beside it: the same top, and as tall, its parts centred on it. */
+.d-two > .d-inner { padding-top: 10px; }
+.d-two > .d-inner > .d-kicker { min-height: 34px; }
+.d-two > .d-inner > .d-kicker .nv-seg button { padding-top: 5px; padding-bottom: 5px; }
 .d-two .d-abstract { max-width: none; }
-.d-side { flex: none; width: 226px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; align-content: start; padding: 22px 24px 40px 12px; }
+.d-side { flex: none; width: 226px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; align-content: start; padding: 10px 24px 40px 12px; }
 .d-side .thumbs { display: flex; flex-direction: column; align-items: center; margin: 0; padding: 0; overflow: visible; }
 .d-side .thumb-name { text-align: center; }
 /* A book's cover: its own shape, not cropped to a page's. */
@@ -1046,7 +1051,7 @@ button.fileicon { border: 0; background: none; cursor: pointer; }
 /* ---------- detail ---------- */
 .detail { flex: 1 1 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; container-type: inline-size; background: var(--raise); }
 /* (minmax: a long cite key shortens rather than widening the page.) */
-.d-inner { max-width: 760px; padding: 18px 24px 40px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.d-inner { max-width: 760px; padding: 10px 24px 40px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
 .d-kicker { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
 .d-type { text-transform: uppercase; letter-spacing: .08em; font-weight: 600; font-size: 11px; color: var(--muted); }
 .citekey { font-family: var(--mono); font-size: 12px; border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; background: var(--panel); color: var(--text); display: inline-flex; align-items: center; gap: 5px; }
@@ -1067,6 +1072,10 @@ button.fileicon { border: 0; background: none; cursor: pointer; }
 .d-authors button { border: 0; background: none; padding: 0; color: var(--text); text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
 .d-authors button:hover { color: var(--accent); text-decoration-color: currentColor; }
 .d-venue { margin: 0; color: var(--muted); font-size: 14.5px; }
+/* The title, authors and where it appeared, closer together (the
+   grid's gap kept around them). */
+.d-inner > .d-title { margin-top: -6px; }
+.d-inner > .d-authors, .d-inner > .d-venue { margin-top: -8px; }
 .d-venue i { color: var(--text); }
 /* The citation's pieces, each with a bracket and a label under it. */
 .d-cite { color: var(--text); font-size: 13px; line-height: 1.35; font-variant-numeric: tabular-nums; }
@@ -1767,6 +1776,8 @@ a.ms-ib { text-decoration: none; }
 .v-back button:hover { opacity: 1; }
 .v-side { position: absolute; left: 0; top: var(--top-h, 48px); bottom: 0; width: var(--side-w, 200px); z-index: 4; display: flex; flex-direction: column; background: var(--panel); border-right: 1px solid var(--line); }
 .viewer.side-open .v-scroll { left: var(--side-w, 200px); }
+/* The panel below the page: under the page, beside the sidebar (not over it). */
+.viewer.side-open .v-peek { left: var(--side-w, 200px); }
 /* Its right edge: drag to make it wider or narrower. */
 .v-side-grip { position: absolute; z-index: 2; top: 0; bottom: 0; right: -7px; width: 14px; cursor: col-resize; touch-action: none; outline: none; }
 .v-side-grip::after { content: ""; position: absolute; top: 50%; left: 5px; width: 4px; height: 40px; margin-top: -20px; border-radius: 2px; background: var(--line); transition: background .15s; }
@@ -1967,7 +1978,7 @@ a.ms-ib { text-decoration: none; }
 .v-status { z-index: 6; }
 .v-status-acts { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 12px; }
 .v-status-acts .btn { min-height: 32px; padding: 4px 12px; font-size: 13px; }
-.v-palette { position: absolute; z-index: 5; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+.v-palette { position: absolute; z-index: 5; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom, 0px) + var(--peek-h, 0px)); transform: translateX(-50%);
   display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 2px; width: max-content; max-width: calc(100% - 16px);
   padding: 4px 6px 4px 2px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: 0 6px 24px rgba(0, 0, 0, .2); }
 /* (Nothing in the toolbar is text to select: a long press, holding a
@@ -2015,7 +2026,7 @@ a.ms-ib { text-decoration: none; }
 .v-palette.vertical #vpMin svg { transform: rotate(var(--min-rot, 90deg)); }
 .v-palette.vertical[data-dock="right"] { --min-rot: -90deg; }
 
-.vp-show { position: absolute; z-index: 5; right: calc(16px + env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+.vp-show { position: absolute; z-index: 5; right: calc(16px + env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px) + var(--peek-h, 0px));
   width: 48px; height: 48px; border-radius: 50%; border: 0; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center;
   box-shadow: 0 6px 20px rgba(0, 0, 0, .25); touch-action: none; }
 .vp-show .i { width: 22px; height: 22px; }
@@ -2481,7 +2492,7 @@ a.ms-ib { text-decoration: none; }
 .rn-tools > button i { font-family: var(--serif); }
 .rn-tools .i { width: 16px; height: 16px; }
 .rn-sep { width: 1px; height: 16px; background: var(--line); margin: 0 4px; }
-.rn-state { margin-left: auto; padding-left: 8px; font: 500 11.5px var(--ui); color: var(--faint); }
+.rn-state { margin-left: auto; padding: 0 6px 0 8px; font: 500 11.5px var(--ui); color: var(--faint); }
 .rn-tools > .rn-done { margin-left: 8px; padding: 0 12px; font: 600 14px var(--ui); color: var(--accent); }
 .rn-edit { position: relative; flex: 1 1 auto; min-height: 80px; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding: 12px 14px 24px; outline: none; font-size: 14.5px; }
 .rn-marks { flex: 0 1 auto; max-height: 40%; overflow-y: auto; padding: 4px 14px 8px; border-top: 1px solid var(--line); font-size: 13px; }
