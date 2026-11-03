@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-02.12';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-03.01';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -502,14 +502,14 @@ function ensureViewer(lib, VL) {
     scrollTo(params);
     if (!$('#viewer').classList.contains('bars-hidden')) $('#vScroll').scrollTop -= topH();
   };
-  // A link tapped on the page (not the outline) on a desktop or iPad asks
-  // where to show its destination first (see LINKTAP).
+  // A link tapped on the page (not the outline) asks where to show its
+  // destination first (see LINKTAP); on a phone, it goes there.
   const goTo = link.goToDestination.bind(link);
   link.goTo = goTo;
   link.goToDestination = dest => {
     const tap = LINKTAP.at;
     LINKTAP.at = null;
-    if (tap && !phoneMQ.matches) { linkChoice(dest, tap); return Promise.resolve(); }
+    if (tap && !handheld()) { linkChoice(dest, tap); return Promise.resolve(); }
     return goTo(dest);
   };
   Object.assign(V, { lib, viewer, bus, link, VL });
@@ -850,6 +850,7 @@ function shutReader() {
   }
 }
 function unloadDoc() {
+  if (RN.ed) { rnFlush(); RN.ed = null; }
   V.token++;
   if (V.doc) {
     const doc = V.doc;
@@ -4717,8 +4718,10 @@ async function showQuote() {
     QUOTE.el = document.createElement('div');
     QUOTE.el.className = 'quote-bar';
     QUOTE.el.innerHTML = `<button type="button" class="quote-go" title="Copy the passage as a quotation, with its citation (${esc(keyHint('quote'))})">${ICON.quote}<span>Quote</span></button>` +
-      `<label class="quote-pg"><span>p.</span><input type="text" inputmode="numeric" autocomplete="off" aria-label="Page" readonly></label>`;
+      `<label class="quote-pg"><span>p.</span><input type="text" inputmode="numeric" autocomplete="off" aria-label="Page" readonly></label>` +
+      `<button type="button" class="quote-note" title="Add to your notes, as a quotation with its page; and highlight it">${NOTE_ICON}<span>Add to notes</span></button>`;
     QUOTE.el.querySelector('.quote-go').addEventListener('click', quoteCopy);
+    QUOTE.el.querySelector('.quote-note').addEventListener('click', rnAddQuote);
     // (Pressing in the bar keeps the selection.) The page box can be
     // written in only once pressed: otherwise the iPad's Scribble takes a
     // Pencil passing near it for handwriting.
@@ -4734,6 +4737,7 @@ async function showQuote() {
     document.body.appendChild(QUOTE.el);
   }
   QUOTE.sel = sel;
+  QUOTE.el.querySelector('.quote-note').hidden = !gs || !BYKEY.get(V.entry.k);
   // (Another passage chosen: the last copy's tidying up is called off.)
   const go = QUOTE.el.querySelector('.quote-go');
   if (go.classList.contains('done') && QUOTE.copied !== sel.text) { clearTimeout(QUOTE.doneT); go.classList.remove('done'); go.innerHTML = ICON.quote + '<span>Quote</span>'; }
@@ -5399,9 +5403,13 @@ const ERASER_SIZES = [6, 12, 24];
 // and the PDF's outline (the table of contents built into some PDFs).
 const SIDE = { tab: store.get('readerTab', 'pages'), io: null, thumbs: [], queue: [], busy: false, marks: null, outline: null, token: 0 };
 const sideOpen = () => !$('#vSide').hidden;
-const sidePhone = () => window.innerWidth < 600;
+// (Over the page, the whole width: a narrow window, or a phone either way up.)
+const sidePhone = () => window.innerWidth < 600 || handheld();
+// (The sidebar's width for a tab: see the grip, below. Not while Edit has it.)
+function sideWidthFor() { if (SIDE.width && !$('#vSide').classList.contains('editing')) SIDE.width(); }
 
 function resetSide() {
+  if (SIDE.tab === 'notes' && RN.where === 'side') { rnFlush(); RN.ed = null; }
   SIDE.token++;
   if (SIDE.io) SIDE.io.disconnect();
   if (SIDE.far) SIDE.far.disconnect();
@@ -5411,6 +5419,7 @@ function resetSide() {
 }
 function toggleSide(open) {
   if (open == null) open = !sideOpen();
+  if (!open && SIDE.tab === 'notes' && RN.where === 'side') { rnFlush(); RN.ed = null; setTimeout(rnPressed, 0); }
   $('#vSide').hidden = !open;
   const was = $('#viewer').classList.contains('side-open');
   $('#viewer').classList.toggle('side-open', open && !sidePhone());
@@ -5436,9 +5445,14 @@ function showSideTab(tab) {
     SIDE.token++;
     Object.assign(SIDE, { io: null, far: null, thumbs: [], queue: [], marks: null, outline: null, pp: null, forDoc: V.doc });
   }
+  // (Your notes kept as you leave them.)
+  if (SIDE.tab === 'notes' && tab !== 'notes' && RN.where === 'side') { rnFlush(); RN.ed = null; }
   SIDE.tab = tab;
   store.set('readerTab', tab);
   document.querySelectorAll('#vSide [data-vtab]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.vtab === tab)));
+  sideWidthFor(tab);
+  setTimeout(rnPressed, 0);
+  if (tab === 'notes') { rnMount($('#vSideBody'), V.entry && BYKEY.get(V.entry.k), 'side'); return; }
   if (tab === 'info') { showInfo(); return; }
   if (!V.doc) { $('#vSideBody').innerHTML = `<p class="v-side-note">Opening\u2026</p>`; return; }
   if (tab === 'pages') showThumbs();
@@ -5489,7 +5503,6 @@ function showInfo() {
     (gs && !e.ib && BYKEY.get(e.k) ? `<button type="button" class="btn" data-iedit title="Edit this publication\u2019s details">${ICON.pencil}<span>Edit</span></button>` : '') + `</div>`;
   if (e.kw && e.kw.length) h += `<div class="vi-kw">${e.kw.map(k => `<span>${esc(k)}</span>`).join('')}</div>`;
   if (f.abstract) h += `<details class="vi-sec" open><summary>Abstract</summary><p>${esc(f.abstract)}</p></details>`;
-  if (f.annote) h += `<details class="vi-sec" open><summary>Notes</summary><p>${esc(f.annote)}</p></details>`;
   const skip = new Set(['abstract', 'annote', 'keywords', 'date-added', 'date-modified', 'read', 'rating']);
   const keys = Object.keys(f).filter(k => !skip.has(k) && f[k]).sort((a, b) => {
     const ia = FIELD_ORDER.indexOf(a), ib = FIELD_ORDER.indexOf(b);
@@ -5509,8 +5522,14 @@ $('#vSideBtn').addEventListener('click', () => toggleSide());
   const grip = $('#vSideGrip'), viewer = $('#viewer'), SIDE_W = 200;
   const clamp = w => Math.round(Math.max(160, Math.min(w, Math.max(160, Math.min(480, window.innerWidth * 0.5)))));
   const set = w => { viewer.style.setProperty('--side-w', clamp(w) + 'px'); return clamp(w); };
-  const done = w => { store.set('sideW', w); refit(); placePalette(); railSoon(); thumbsResized(); };
-  set(store.get('sideW', SIDE_W));
+  // (Notes keep a width of their own: wider, to write in.)
+  const key = () => SIDE.tab === 'notes' ? 'notesSideW' : 'sideW', usual = () => SIDE.tab === 'notes' ? 380 : SIDE_W;
+  const done = w => { store.set(key(), w); refit(); placePalette(); railSoon(); thumbsResized(); };
+  set(store.get(key(), usual()));
+  SIDE.width = () => {
+    const was = viewer.style.getPropertyValue('--side-w'), now = set(store.get(key(), usual())) + 'px';
+    if (was !== now && sideOpen() && !sidePhone()) { refit(); placePalette(); railSoon(); }
+  };
   let drag = null, frame = 0;
   grip.addEventListener('pointerdown', ev => {
     if (ev.button > 0) return;
@@ -5539,12 +5558,12 @@ $('#vSideBtn').addEventListener('click', () => toggleSide());
   grip.addEventListener('pointercancel', end);
   // Not a scroll, or a text selection, on the iPad.
   grip.addEventListener('touchstart', ev => ev.preventDefault(), { passive: false });
-  grip.addEventListener('dblclick', () => done(set(SIDE_W)));
+  grip.addEventListener('dblclick', () => done(set(usual())));
   let lastTap = 0;
   grip.addEventListener('pointerup', ev => {
     if (ev.pointerType === 'mouse') return;
     const now = Date.now();
-    if (now - lastTap < 320) { lastTap = 0; done(set(SIDE_W)); } else lastTap = now;
+    if (now - lastTap < 320) { lastTap = 0; done(set(usual())); } else lastTap = now;
   });
   grip.addEventListener('keydown', ev => {
     const step = ev.shiftKey ? 48 : 16;
@@ -5554,7 +5573,7 @@ $('#vSideBtn').addEventListener('click', () => toggleSide());
     done(set($('#vSide').offsetWidth + d));
   });
   // A narrower window can't keep a wide sidebar.
-  window.addEventListener('resize', () => set(store.get('sideW', SIDE_W)));
+  window.addEventListener('resize', () => set(store.get(key(), usual())));
 })();
 $('#vSide').addEventListener('click', ev => {
   const t = ev.target.closest('[data-vtab]');
@@ -5830,7 +5849,7 @@ async function showMarks() {
   const shown = SIDE.colour ? SIDE.marks.filter(m => (markColour(m) || {}).key === SIDE.colour) : SIDE.marks;
   const worded = shown.filter(m => m.text || m.note).length;
   let h = unsaved + chips + (worded ? `<div class="v-marks-acts"><button type="button" class="btn" data-marks-copy title="Every highlight and note, by page, with the reference">${ICON.copy}<span>Copy summary</span></button>` + AI_BTN +
-    (gs ? `<button type="button" class="btn" data-marks-notes title="Added to the publication\u2019s Notes">${ICON.pencil}<span>Add to notes</span></button>` : '') + `</div>` : '') + `<div class="v-marks">`, last = 0;
+    (gs ? `<button type="button" class="btn" data-marks-notes title="Added to the publication\u2019s Notes">${ICON.pencil}<span>All to notes</span></button>` : '') + `</div>` : '') + `<div class="v-marks">`, last = 0;
   // (A mark of words, as a highlight or underline: Copy and Quote at its
   // top right.)
   SIDE.shown = shown;
@@ -5974,9 +5993,14 @@ $('#vSideBody').addEventListener('click', async ev => {
 $('#vSideBody').addEventListener('click', ev => {
   if (ev.target.closest('[data-marks-copy]')) { const s = marksSummary(true); copy(s.text, 'Copied ' + s.n + ' highlight' + (s.n === 1 ? '' : 's') + ' and notes, with the reference', s.html); return; }
   if (ev.target.closest('[data-marks-notes]') && V.entry) {
-    const e = BYKEY.get(V.entry.k) || V.entry, s = marksSummary(false), was = rawOf(e, 'annote').trim();
-    const head = 'Highlights and notes (' + new Date().toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' }) + '):\n';
-    quickSet(e, { annote: (was ? was + '\n\n' : '') + head + s.text }, 'Added ' + s.n + ' highlight' + (s.n === 1 ? '' : 's') + ' and notes to the Notes');
+    // (Your notes open below the paper: what's in them kept first, and
+    // shown again with these added.)
+    const k = V.entry.k;
+    rnFlush().then(() => {
+      const e = BYKEY.get(k) || V.entry, s = marksSummary(false), was = rawOf(e, 'annote').trim();
+      const head = 'Highlights and notes (' + new Date().toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' }) + '):\n';
+      return quickSet(e, { annote: (was ? was + '\n\n' : '') + head + s.text }, 'Added ' + s.n + ' highlight' + (s.n === 1 ? '' : 's') + ' and notes to the Notes');
+    }).then(() => { const e = BYKEY.get(k); if (rnFor(e)) { RN.ed = null; rnMount(RN.host, e, RN.where); } });
   }
 });
 
@@ -6448,15 +6472,16 @@ function goSpot(b) {
   if (Math.abs(V.viewer.currentScale - b.scale) < 0.001) $('#vScroll').scrollTo(b.left, b.top);
   else V.viewer.currentPageNumber = b.page;
 }
-// On a desktop or iPad, a link inside the paper offers two ways to see
-// where it goes: go there, or show it in a panel along the bottom, leaving
-// your place as it is. (The link's own click handler hands PDF.js the
+// A link inside the paper offers two ways to see where it goes: go there,
+// or show it in a panel along the bottom, leaving your place as it is (in
+// a narrow window too). On a phone, too small for the panel, it goes
+// there, with Back. (The link's own click handler hands PDF.js the
 // destination, which goToDestination then passes to linkChoice.)
 const LINKTAP = { at: null };
 $('#vPages').addEventListener('click', ev => {
   const a = ev.target.closest('.annotationLayer a');
   if (!a || !V.doc || !(a.getAttribute('href') || '').startsWith('#')) return;
-  if (phoneMQ.matches) { pushBack(); return; }
+  if (handheld()) { pushBack(); return; }
   LINKTAP.at = { x: ev.clientX, y: ev.clientY };
   setTimeout(() => { LINKTAP.at = null; }, 0);
 }, true);
@@ -6521,6 +6546,7 @@ function peekForget() {
   PEEK.link.setDocument(null);
 }
 async function showPeek(dest, where) {
+  rnBottomOff();
   const my = ++PEEK.token;
   PEEK.dest = dest;
   const panel = $('#vPeek'), body = $('#vPeekBody');
@@ -6555,8 +6581,9 @@ function closePeek() {
   PEEK.token++;
   $('#vSplitBtn').setAttribute('aria-pressed', 'false');
   if (panel.hidden) return;
+  if (panel.classList.contains('notes') && RN.where === 'bottom') { rnFlush(); RN.ed = null; }
   panel.classList.add('leaving');
-  setTimeout(() => { panel.hidden = true; panel.classList.remove('leaving'); showBack(); }, 220);
+  setTimeout(() => { panel.hidden = true; panel.classList.remove('leaving'); rnBottomOff(); showBack(); }, 220);
 }
 $('#vPeekX').addEventListener('click', closePeek);
 // (A tap of the Apple Pencil on the panel's buttons, acted on as it
@@ -6663,10 +6690,12 @@ $('#vPeekGo').addEventListener('click', () => {
 });
 $('#vSplitBtn').addEventListener('click', () => {
   if (!V.doc) return;
-  if (!$('#vPeek').hidden) { closePeek(); return; }
+  if (!$('#vPeek').hidden && !$('#vPeek').classList.contains('notes')) { closePeek(); return; }
   closeLinkMenu();
   showPeek(null, { page: V.viewer.currentPageNumber, top: null });
 });
+// Your notes, beside the paper or below it (see RN in notes.js).
+$('#vNotesBtn').addEventListener('click', () => toggleReaderNotes());
 document.addEventListener('keydown', ev => {
   if (ev.key !== 'Escape') return;
   if ($('#linkMenu')) { closeLinkMenu(); ev.stopImmediatePropagation(); ev.preventDefault(); }

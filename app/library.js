@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-02.12';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-03.01';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -11,6 +11,10 @@ const app = $('#app'), listEl = $('#list'), rowsEl = $('#rows'), detailEl = $('#
 const phoneMQ = matchMedia('(max-width: 699px)');
 const tabletMQ = matchMedia('(max-width: 1099px)');
 const coarseMQ = matchMedia('(pointer: coarse)');
+// A phone (or a slim column on an iPad): a touch screen under 500 points
+// on its short side. Too small for panels beside or below the paper: links
+// go straight there, notes fill the screen.
+const handheld = () => coarseMQ.matches && Math.min(innerWidth, innerHeight) < 500;
 
 const ICON = {
   history: '<svg class="i" viewBox="0 0 24 24"><path d="M3.8 12a8.2 8.2 0 1 0 2.4-5.8"/><path d="M3.5 3.8v4.4h4.4"/><path d="M12 8v4.2l2.8 1.8"/></svg>',

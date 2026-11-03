@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/notes.js'] = '2026-11-02.12';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/notes.js'] = '2026-11-03.01';
 /* ------------------------------------------------------------ notes */
 // The details pane shows Details or Notes (a switch at its top, or Alt-N;
 // the choice kept). Notes has your notes, in a box you type in, formatted
@@ -25,7 +25,56 @@ function mdInline(s) {
     .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (m, t, u) => `<a href="${u}" target="_blank" rel="noopener">${t}</a>`)
     .replace(/\*\*(?=\S)([\s\S]*?\S)\*\*/g, '<b>$1</b>')
     .replace(/(^|[^*\w])\*(?=\S)([^*]*?\S)\*(?![*\w])/g, '$1<i>$2</i>')
-    .replace(/(^|[^\w])_(?=\S)([^_]*?\S)_(?!\w)/g, '$1<i>$2</i>');
+    .replace(/(^|[^\w])_(?=\S)([^_]*?\S)_(?!\w)/g, '$1<i>$2</i>')
+    .replace(PG_TAG, (m, pre, tag, pg) => `${pre}<span class="pl" data-pg="${pg}">${tag}</span>`);
+}
+// A page in your notes, "p. 331" (or "pp. 331-2", or a roman one): shown
+// as a tag, which goes to that page of the paper. (Still plain text in the
+// .bib.)
+const PG_TAG = /(^|[\s(\[\u201c])(pp?\.\s?(\d+|[ivxlcdm]+)(?:\s?[\u2013-]\s?(?:\d+|[ivxlcdm]+))?)(?=[\s).,;:\]\u201d]|$)/gi;
+// The tags made in what's been typed (outside those there, and links).
+function nvTagPages(el) {
+  const sel = getSelection(), live = sel.rangeCount && el.contains(sel.anchorNode) ? nvOffset(el, sel.getRangeAt(0)) : -1;
+  const kept = RN.ed === el && RN.range && el.contains(RN.range.startContainer) ? nvOffset(el, RN.range) : -1;
+  const walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, { acceptNode: n => n.parentNode.closest('.pl, a') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
+  const nodes = [];
+  for (let n = walk.nextNode(); n; n = walk.nextNode()) { PG_TAG.lastIndex = 0; if (PG_TAG.test(n.data)) nodes.push(n); }
+  nodes.forEach(n => {
+    const frag = document.createDocumentFragment();
+    let at = 0, m;
+    PG_TAG.lastIndex = 0;
+    while ((m = PG_TAG.exec(n.data))) {
+      const start = m.index + m[1].length;
+      frag.append(n.data.slice(at, start));
+      const t = document.createElement('span');
+      t.className = 'pl';
+      t.dataset.pg = m[3];
+      t.textContent = m[2];
+      frag.append(t);
+      at = start + m[2].length;
+    }
+    frag.append(n.data.slice(at));
+    n.replaceWith(frag);
+  });
+  if (!nodes.length) return;
+  if (live >= 0) { sel.removeAllRanges(); sel.addRange(nvAtOffset(el, live)); }
+  if (kept >= 0) RN.range = nvAtOffset(el, kept);
+}
+// A place in the editor as a count of the letters before it, and back.
+function nvOffset(el, range) {
+  const r = document.createRange();
+  r.selectNodeContents(el);
+  r.setEnd(range.startContainer, range.startOffset);
+  return r.toString().length;
+}
+function nvAtOffset(el, n) {
+  const walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT), r = document.createRange();
+  for (let t = walk.nextNode(); t; t = walk.nextNode()) {
+    if (n <= t.data.length) { r.setStart(t, n); r.collapse(true); return r; }
+    n -= t.data.length;
+  }
+  r.selectNodeContents(el); r.collapse(false);
+  return r;
 }
 function mdToHtml(md) {
   const lines = String(md || '').replace(/\r\n?/g, '\n').split('\n'), out = [];
@@ -50,7 +99,7 @@ function mdToHtml(md) {
 // What the editor holds, as Markdown again.
 function htmlToMd(root) {
   const mark = (s, m) => { const x = /^(\s*)([\s\S]*?)(\s*)$/.exec(s); return x[2] ? x[1] + m + x[2] + m + x[3] : s; };
-  const inl = n => [...n.childNodes].map(c => {
+  const inlList = list => list.map(c => {
     if (c.nodeType === 3) return c.data.replace(/\u00a0/g, ' ');
     if (c.nodeType !== 1) return '';
     const t = c.nodeName, inner = inl(c), st = c.style || {};
@@ -61,11 +110,18 @@ function htmlToMd(root) {
     if (/^(DIV|P|H\d|LI|UL|OL|BLOCKQUOTE)$/.test(t)) return '\n' + inner + '\n';
     return inner;
   }).join('');
+  const inl = n => inlList([...n.childNodes]);
   const tidy = s => s.replace(/[ \t]+\n/g, '\n').replace(/\n{2,}/g, '\n').trim();
   const blocks = [];
-  const walk = parent => [...parent.childNodes].forEach(n => {
-    if (n.nodeType === 3) { if (n.data.trim()) blocks.push(tidy(n.data)); return; }
+  // (Words and inline marks side by side, outside a paragraph, as a
+  // quotation's "(p. 331)" with its tag: one block, not one each.)
+  const BLOCK = /^(H\d|UL|OL|BLOCKQUOTE|DIV|P)$/;
+  let run = [];
+  const flush = () => { const s = tidy(inlList(run)); if (s) blocks.push(s); run = []; };
+  const walk = parent => { [...parent.childNodes].forEach(n => {
+    if (n.nodeType === 3 || (n.nodeType === 1 && !BLOCK.test(n.nodeName))) { run.push(n); return; }
     if (n.nodeType !== 1) return;
+    flush();
     const t = n.nodeName;
     if (/^H\d$/.test(t)) { const s = tidy(inl(n)); if (s) blocks.push((t === 'H1' || t === 'H2' || t === 'H3' ? '# ' : '## ') + s.replace(/\n/g, ' ')); }
     else if (t === 'UL' || t === 'OL') {
@@ -75,8 +131,8 @@ function htmlToMd(root) {
     }
     else if (t === 'BLOCKQUOTE') { const s = htmlToMd(n); if (s) blocks.push(s.split('\n').map(l => '> ' + l).join('\n')); }
     else if ((t === 'DIV' || t === 'P') && n.querySelector('ul,ol,blockquote,h1,h2,h3,h4,p,div')) walk(n);
-    else if (t !== 'BR') { const s = tidy(inl(n)); if (s) blocks.push(s); }
-  });
+    else { const s = tidy(inl(n)); if (s) blocks.push(s); }
+  }); flush(); };
   walk(root);
   return blocks.join('\n\n').trim();
 }
@@ -209,6 +265,20 @@ function nvLink(el) {
   input.addEventListener('keydown', ev => { if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); done(false); } });
 }
 
+// A quotation of its own, at the caret: on a new line if the caret's line
+// has words, and a plain line after it, to go on writing.
+function nvQuote(ed, q) {
+  const line = nvBlock(ed);
+  if (line && line.textContent.trim()) nvExec('insertParagraph');
+  nvExec('formatBlock', '<blockquote>');
+  nvExec('insertText', q);
+  nvExec('insertParagraph');
+  nvExec('outdent');
+  nvExec('formatBlock', '<p>');
+  nvTagPages(ed);
+}
+const nvMarkQuote = (r, m) => (m.text ? '\u201c' + m.text + '\u201d ' : '') + '(p. ' + nvPage(r, m.page) + ')' + (m.note ? ' \u2014 ' + m.note : '');
+
 /* ---- saving */
 // One save at a time, each from the publication as it is after the last.
 // Unbalanced braces ({ }) would break the .bib, so aren't saved.
@@ -293,6 +363,19 @@ function nvOpenAt(e, page) {
   POS[fl.id] = { page, at: Date.now(), dev: DEVICE };
   store.set('positions', POS);
   openPaper(e, fl);
+}
+
+// The reader, open at a page as printed (a page tag in your notes).
+function nvOpenAtLabel(e, label) {
+  const fl = readablePdfs(e)[0];
+  if (!fl) return;
+  openPaper(e, fl);
+  const t0 = Date.now();
+  const wait = () => {
+    if (V.doc && V.file && V.file.id === fl.id && V.viewer && V.viewer.pagesCount) { rnGo(label); return; }
+    if (Date.now() - t0 < 15000) setTimeout(wait, 150);
+  };
+  setTimeout(wait, 150);
 }
 
 /* ---- the Notes view, in the details pane */
@@ -393,6 +476,9 @@ detailEl.addEventListener('click', ev => {
   const col = ev.target.closest('[data-nv-col]');
   if (col) { NOTES.colour = col.dataset.nvCol || null; nvShowMarks(e); return; }
   const r = readablePdfs(e)[0] && NOTES.marks.get(readablePdfs(e)[0].id);
+  const tag = ev.target.closest('[data-nv-box] .pl[data-pg]');
+  if (tag && !gs) { nvOpenAtLabel(e, tag.dataset.pg); return; }
+  if (tag && (ev.metaKey || ev.ctrlKey || ev.detail === 0)) { nvOpenAtLabel(e, tag.dataset.pg); return; }
   const go = ev.target.closest('[data-nv-open]');
   if (go) { nvOpenAt(e, +go.dataset.nvOpen); return; }
   const cp = ev.target.closest('[data-nv-copy]');
@@ -405,7 +491,7 @@ detailEl.addEventListener('click', ev => {
 function openNotesPop(e) {
   if (!gs || NOTES.pop) return;
   // (What the box in the details had, unsaved, comes too.)
-  const box = detailEl.querySelector('[data-nv-box]');
+  const box = rnFor(e) ? RN.ed : detailEl.querySelector('[data-nv-box]');
   const md = box ? htmlToMd(box) : rawOf(e, 'annote');
   const year = (/\d{4}/.exec(e.f.year || '') || [''])[0], who = (e.a && e.a[0] && e.a[0][0]) || (e.e && e.e[0] && e.e[0][0]) || '';
   const b = (cmd, title, icon) => `<button type="button" data-np="${cmd}" title="${esc(title)}" aria-label="${esc(title)}">${icon}</button>`;
@@ -448,6 +534,8 @@ function openNotesPop(e) {
     wrap.remove();
     NOTES.pop = null;
     if (state.selKey === e.k) renderDetail();
+    // (The reader's notes, as the large editor left them.)
+    if (rnFor(e)) { RN.ed = null; rnMount(RN.host, BYKEY.get(e.k) || e, RN.where); }
   };
   const onKey = ev => { if (ev.key === 'Escape' && !wrap.querySelector('.np-cite:not([hidden])') && !document.querySelector('.nv-linkbox')) { ev.preventDefault(); ev.stopPropagation(); close(); } };
   document.addEventListener('keydown', onKey, true);
@@ -477,14 +565,7 @@ function openNotesPop(e) {
       back();
       // (A quotation of its own: on a new line if the caret's line has
       // words, and a plain line after it, to go on writing.)
-      const q = (m.text ? '\u201c' + m.text + '\u201d ' : '') + '(p. ' + nvPage(NOTES.popMarks, m.page) + ')' + (m.note ? ' \u2014 ' + m.note : '');
-      const line = nvBlock(ed);
-      if (line && line.textContent.trim()) nvExec('insertParagraph');
-      nvExec('formatBlock', '<blockquote>');
-      nvExec('insertText', q);
-      nvExec('insertParagraph');
-      nvExec('outdent');
-      nvExec('formatBlock', '<p>');
+      nvQuote(ed, nvMarkQuote(NOTES.popMarks, m));
       ed.dispatchEvent(new Event('input'));
       return;
     }
@@ -517,4 +598,246 @@ function openNotesPop(e) {
     NOTES.popMarks = r;
     side.innerHTML = r && r.marks.length ? nvMarksHTML(r, true) : '<p class="nv-none">No highlights or notes in the PDF yet.</p>';
   }, err => { if (side.isConnected) side.innerHTML = `<p class="nv-none">Couldn\u2019t read them: ${esc(errText(err))}</p>`; });
+}
+
+/* ---- in the reader: beside the paper, or below it */
+// Your notes while you read: the sidebar's Notes tab (made wider while
+// it's open; drag its edge, and that width is kept for Notes), or, where
+// that would leave the page too narrow (an iPad held upright, a phone, a
+// narrow window), the bottom half, in the split screen's place. The same
+// notes and editor as the details pane's, saved as you type. Add to notes
+// (beside a passage you select) puts it in as a quotation with its page,
+// and highlights it; a page tag goes to that page of the paper.
+const RN = { e: null, ed: null, host: null, where: null, timer: 0, range: null, from: null };
+const rnFor = e => !!(RN.ed && RN.ed.isConnected && RN.e && e && RN.e.k === e.k);
+const rnShown = () => !!(RN.ed && RN.ed.isConnected && !$('#viewer').hidden && (RN.where === 'bottom' ? !$('#vPeek').hidden : sideOpen() && SIDE.tab === 'notes'));
+// (The page would be under 480px beside the notes: below it instead. On a
+// phone, the sidebar's Notes tab, which fills the screen there.)
+function rnWhere() {
+  if (handheld()) return 'side';
+  const w = $('#viewer').clientWidth || innerWidth;
+  const side = Math.max(320, Math.min(store.get('notesSideW', 380), w * 0.5));
+  return sidePhone() || w - side < 480 ? 'bottom' : 'side';
+}
+function rnHTML(e) {
+  const b = (k, title, icon) => `<button type="button" data-rn="${k}" title="${esc(title)}" aria-label="${esc(title)}">${icon}</button>`;
+  const I = d => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
+  return `<div class="rn">` + (gs ? `<div class="rn-tools">` +
+    b('h', 'Heading', '<b>H</b>') + b('bold', 'Bold (⌘B)', '<b>B</b>') + b('italic', 'Italic (⌘I)', '<i>I</i>') + '<span class="rn-sep"></span>' +
+    b('ul', 'Bulleted list', I('<path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/>')) +
+    b('quote', 'Quotation', I('<path d="M5 17c2.5-.4 4-2.2 4-5V7H5v5h3"/><path d="M14 17c2.5-.4 4-2.2 4-5V7h-4v5h3"/>')) +
+    b('link', 'Link (⌘K)', I('<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>')) +
+    (handheld() ? '' : b('pop', 'Notes, large, with Cite (' + keyHint('notesPop') + ')', POP_ICON)) +
+    `<span class="rn-state" aria-live="polite">Saved</span>` +
+    (handheld() ? `<button type="button" class="rn-done" data-rn="done">Done</button>` : '') + `</div>` : '') +
+    `<div class="rn-edit notes-rich" role="textbox" aria-multiline="true" aria-label="Your notes" data-placeholder="${gs ? 'Write your notes… (select a passage in the paper, then Add to notes, to quote it)' : 'No notes.'}"></div>` +
+    `<div class="rn-marks" hidden></div>` +
+    `<div class="rn-foot"><span>In the .bib’s Notes field</span>` + (gs ? `<button type="button" class="linkish" data-rn-marks aria-expanded="false">Highlights</button>` : '') + `</div></div>`;
+}
+function rnFlush() {
+  clearTimeout(RN.timer);
+  if (!RN.ed || !RN.e || !gs) return Promise.resolve(true);
+  const ed = RN.ed, k = RN.e.k, st = RN.host && RN.host.querySelector('.rn-state');
+  return notesSave(k, htmlToMd(ed), true).then(ok => { if (st && st.isConnected && RN.ed === ed) st.textContent = ok ? 'Saved' : 'Not saved'; return ok; });
+}
+function rnMount(host, e, where) {
+  if (RN.ed && RN.ed !== host.querySelector('.rn-edit')) rnFlush();
+  Object.assign(RN, { e, host, where, ed: null, range: null });
+  if (!e) { host.innerHTML = `<p class="v-side-note">This paper has no entry in the library, so no notes.</p>`; return; }
+  host.innerHTML = rnHTML(e);
+  const ed = host.querySelector('.rn-edit'), st = host.querySelector('.rn-state');
+  RN.ed = ed;
+  noteEditor(ed, rawOf(e, 'annote'), () => {
+    if (st) st.textContent = 'Edited';
+    clearTimeout(RN.timer);
+    RN.timer = setTimeout(() => { if (st) st.textContent = 'Saving…'; rnFlush(); }, 1500);
+  });
+  nvTagPages(ed);
+  ed.addEventListener('blur', () => { if (RN.ed === ed) { nvTagPages(ed); rnFlush(); } });
+  // (Where the caret was, for the buttons and Add to notes, which take the focus.)
+  ['input', 'keyup', 'mouseup', 'touchend', 'focus'].forEach(t => ed.addEventListener(t, rnKeep));
+  // Alt-N closes them again, from inside too (the editor keeps its keys).
+  ed.addEventListener('keydown', ev => { if (keyIs(ev, 'notesView')) { ev.preventDefault(); ev.stopPropagation(); toggleReaderNotes(); } }, true);
+}
+function rnKeep() { const s = getSelection(); if (RN.ed && s.rangeCount && RN.ed.contains(s.anchorNode)) RN.range = s.getRangeAt(0).cloneRange(); }
+document.addEventListener('selectionchange', () => { if (RN.ed && document.activeElement === RN.ed) rnKeep(); });
+function rnBack() {
+  const ed = RN.ed;
+  ed.focus();
+  const s = getSelection(); s.removeAllRanges();
+  if (RN.range && ed.contains(RN.range.startContainer)) s.addRange(RN.range);
+  else { const r = document.createRange(); r.selectNodeContents(ed); r.collapse(false); s.addRange(r); }
+}
+// The buttons, the page tags, the highlights to insert.
+function rnClick(ev) {
+  if (!RN.ed || !RN.host || !RN.host.contains(ev.target)) return;
+  const ed = RN.ed, t = ev.target.closest('[data-rn]');
+  if (t) {
+    const k = t.dataset.rn;
+    if (k === 'pop') { const e = BYKEY.get(RN.e.k); if (e) openNotesPop(e); return; }
+    if (k === 'done') { closeReaderNotes(); return; }
+    rnBack();
+    if (k === 'h') nvToggleBlock(ed, 'h3');
+    else if (k === 'quote') nvToggleBlock(ed, 'blockquote');
+    else if (k === 'ul') nvExec('insertUnorderedList');
+    else if (k === 'link') nvLink(ed);
+    else nvExec(k);
+    ed.dispatchEvent(new Event('input'));
+    return;
+  }
+  const tag = ev.target.closest('.rn-edit .pl[data-pg]');
+  if (tag) { rnGo(tag.dataset.pg); return; }
+  if (ev.target.closest('[data-rn-marks]')) { rnMarks(); return; }
+  const ins = ev.target.closest('[data-np-ins]');
+  if (ins && RN.marks) {
+    const m = RN.marks.marks[+ins.dataset.npIns];
+    if (!m) return;
+    rnBack();
+    nvQuote(ed, nvMarkQuote(RN.marks, m));
+    ed.dispatchEvent(new Event('input'));
+  }
+}
+document.addEventListener('click', rnClick);
+// (The buttons keep the caret where it was.)
+document.addEventListener('mousedown', ev => { if (RN.host && RN.host.contains(ev.target) && ev.target.closest('[data-rn], [data-np-ins], [data-rn-marks]')) ev.preventDefault(); });
+// The paper's highlights and notes (as it is now, in the reader), to insert.
+async function rnMarks() {
+  const box = RN.host.querySelector('.rn-marks'), btn = RN.host.querySelector('[data-rn-marks]');
+  if (!box) return;
+  const open = box.hidden;
+  box.hidden = !open;
+  btn.setAttribute('aria-expanded', String(open));
+  if (!open || !V.doc) return;
+  box.innerHTML = '<p class="nv-none">Reading the highlights…</p>';
+  const doc = V.doc;
+  try {
+    const marks = ((await collectMarks(doc, null)) || []).filter(m => m.text || m.note);
+    let labels = null;
+    try { labels = await doc.getPageLabels(); } catch (err) { labels = null; }
+    if (!box.isConnected) return;
+    RN.marks = { marks, labels };
+    box.innerHTML = marks.length ? nvMarksHTML(RN.marks, true) : '<p class="nv-none">No highlights or notes in the PDF yet (saved ones: those just made come once it’s saved).</p>';
+  } catch (err) { if (box.isConnected) box.innerHTML = `<p class="nv-none">Couldn’t read them: ${esc(errText(err))}</p>`; }
+}
+// Open (beside the paper or below it), or close.
+function openReaderNotes() {
+  if ($('#viewer').hidden || !V.entry) return false;
+  if (rnShown()) return true;
+  const where = rnWhere();
+  if (where === 'side') {
+    RN.from = { open: sideOpen(), tab: SIDE.tab };
+    if (!sideOpen()) toggleSide(true);
+    showSideTab('notes');
+  } else rnBottom();
+  rnPressed();
+  return true;
+}
+function closeReaderNotes() {
+  if (!rnShown()) return;
+  if (RN.where === 'bottom') { closePeek(); return; }
+  const f = RN.from;
+  RN.from = null;
+  if (f && !f.open) toggleSide(false);
+  else showSideTab(f && f.tab && f.tab !== 'notes' ? f.tab : 'pages');
+  rnPressed();
+}
+function toggleReaderNotes() { if (rnShown()) closeReaderNotes(); else { openReaderNotes(); if (RN.ed) rnBack(); } }
+function rnPressed() { const b = $('#vNotesBtn'); if (b) b.setAttribute('aria-pressed', String(rnShown())); }
+// Below the paper: the split screen's panel, showing the notes instead.
+function rnBottom() {
+  const panel = $('#vPeek');
+  PEEK.token++;
+  PEEK.dest = null;
+  panel.classList.add('notes');
+  panel.setAttribute('aria-label', 'Your notes');
+  $('#vPeekTitle').textContent = 'Notes';
+  $('#vPeekNotes').hidden = false;
+  $('#vSplitBtn').setAttribute('aria-pressed', 'false');
+  if (panel.hidden) {
+    peekHeight(store.get('peekH', 1 / 3) < 0.4 ? 0.45 : store.get('peekH', 1 / 3));
+    panel.hidden = false; panel.classList.add('entering'); void panel.offsetWidth; panel.classList.remove('entering');
+  }
+  rnMount($('#vPeekNotes'), V.entry && (BYKEY.get(V.entry.k) || null), 'bottom');
+  showBack();
+}
+// (The panel goes back to being the split screen: notes kept first.)
+function rnBottomOff() {
+  const panel = $('#vPeek');
+  if (!panel.classList.contains('notes')) return;
+  if (RN.where === 'bottom') rnFlush();
+  panel.classList.remove('notes');
+  panel.setAttribute('aria-label', 'Link destination');
+  $('#vPeekNotes').hidden = true;
+  $('#vPeekNotes').replaceChildren();
+  if (RN.where === 'bottom') RN.ed = null;
+  setTimeout(rnPressed, 0);
+}
+// Add to notes: the passage selected, as a quotation with its page (the
+// one in the Quote bar), at the caret in your notes (opened if need be);
+// and highlighted in the paper, so the two go together. On a phone, where
+// the notes would cover the paper, at the end of them, unopened: you read
+// on.
+function rnAddQuote() {
+  const s = QUOTE.sel;
+  if (!s || !V.entry || !gs || !BYKEY.get(V.entry.k)) return;
+  const pg = String(QUOTE.el.querySelector('input').value || '').trim().replace(/-+/g, '–');
+  const q = '“' + s.text.replace(/[.,;:]+$/, '') + '”' + (pg ? ' (p. ' + pg + ')' : '');
+  rnHighlight(s.range);
+  hideQuote();
+  if (handheld() && !rnShown()) {
+    // (After any save still going, so two in a row both stay.)
+    const k = V.entry.k;
+    NOTES.saving.then(() => {
+      const was = rawOf(BYKEY.get(k), 'annote').trim();
+      return notesSave(k, (was ? was + '\n\n' : '') + '> ' + q, true);
+    }).then(ok => { if (ok) toast('Added to your notes' + (pg ? ' (p. ' + pg + ')' : ''), 2200); });
+    return;
+  }
+  openReaderNotes();
+  if (!RN.ed) return;
+  rnBack();
+  nvQuote(RN.ed, q);
+  RN.ed.dispatchEvent(new Event('input'));
+  rnKeep();
+}
+function rnHighlight(range) {
+  const ui = V.ui, T = V.lib && V.lib.AnnotationEditorType;
+  if (!ui || !T || !V.viewer || typeof ui.highlightSelection !== 'function') return;
+  const run = () => {
+    try {
+      const sel = getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      V.newHighlight = true;
+      ui.highlightSelection('main_toolbar');
+    } catch (err) { /* the quotation's still added */ }
+    // (Back to reading.)
+    setTimeout(() => { if (V.tool === 'read' && V.viewer && V.doc) { try { V.viewer.annotationEditorMode = { mode: T.NONE }; } catch (err) { /* later */ } } }, 300);
+  };
+  // PDF.js highlights a selection only in its highlighting mode (and its
+  // own way there is its full viewer's, not this one's): so, that mode
+  // first, and back after.
+  if (V.viewer.annotationEditorMode !== T.HIGHLIGHT) {
+    V.bus.on('annotationeditormodechanged', () => setTimeout(run, 0), { once: true });
+    try { V.viewer.annotationEditorMode = { mode: T.HIGHLIGHT }; } catch (err) { /* not ready */ }
+  } else run();
+}
+// A page tag: to that page of the paper (as printed: the journal's page
+// numbers, as the Quote bar works them out), with Back to where you were.
+async function rnGo(label) {
+  if (!V.doc || !V.viewer) return;
+  const n = await rnPageOf(String(label));
+  if (!n) { toast('Page ' + label + ' isn’t in this PDF.', 2500); return; }
+  pushBack();
+  V.viewer.currentPageNumber = n;
+  const pv = V.viewer.getPageView(n - 1);
+  if (pv && pv.div) { pv.div.classList.remove('rn-flash'); void pv.div.offsetWidth; pv.div.classList.add('rn-flash'); setTimeout(() => pv.div.classList.remove('rn-flash'), 1700); }
+}
+async function rnPageOf(label) {
+  const doc = V.doc, N = doc.numPages, want = label.toLowerCase();
+  if (V.pageLabels === undefined) V.pageLabels = await doc.getPageLabels().catch(() => null);
+  const L = V.pageLabels;
+  if (L) { const i = L.findIndex(l => String(l).toLowerCase() === want); if (i >= 0 && L.some((l, j) => l !== String(j + 1))) return i + 1; }
+  for (let n = 1; n <= N; n++) { const p = await printedPage(n); if (p && String(p.page).toLowerCase() === want) return n; }
+  return /^\d+$/.test(label) && +label >= 1 && +label <= N ? +label : 0;
 }

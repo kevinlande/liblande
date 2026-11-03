@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-02.12';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-03.01';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -2425,8 +2425,8 @@ const KEY_ACTS = [
   { id: 'copyBib', scope: 'lib', def: 'Alt+KeyB', label: 'Copy BibTeX' },
   { id: 'copyKey', scope: 'lib', def: 'Alt+KeyK', label: 'Copy cite key' },
   { id: 'edit', scope: 'lib', def: 'Alt+KeyE', label: 'Edit the publication' },
-  { id: 'notesView', scope: 'lib', def: 'Alt+KeyN', label: 'Details or Notes, in the details pane' },
-  { id: 'notesPop', scope: 'lib', def: 'Alt+Shift+KeyN', label: 'Notes, large (pop out)' },
+  { id: 'notesView', scope: 'both', def: 'Alt+KeyN', label: 'Notes: in the details pane, or beside the paper' },
+  { id: 'notesPop', scope: 'both', def: 'Alt+Shift+KeyN', label: 'Notes, large (pop out)' },
   { id: 'quote', scope: 'pdf', def: 'Alt+KeyC', label: 'Copy the selected passage as a quotation, with its citation' },
   { id: 'closeTab', scope: 'pdf', def: 'Alt+KeyW', label: 'Close the paper’s tab' },
   { id: 'done', scope: 'pdf', def: 'Alt+KeyD', label: 'Done with the paper (marked read, and off your reading list)' },
@@ -2527,6 +2527,8 @@ function runPdfKey(id) {
   const tog = t => { if (gs) setTool(V.tool === t ? 'read' : t); };
   if (id === 'quote') showQuote().then(sel => { if (sel) quoteCopy(); else toast('Select a passage to quote first', 1800); });
   else if (id === 'closeTab') { if (PTABS.active >= 0) closePaperTab(PTABS.active); }
+  else if (id === 'notesView') toggleReaderNotes();
+  else if (id === 'notesPop') { const e = V.entry && BYKEY.get(V.entry.k); if (e && gs) openNotesPop(e); }
   else if (id === 'done') readerDone();
   else if (id === 'markup') { if (gs) setTool(V.tool === 'highlight' ? 'read' : 'markup'); }
   else if (id === 'lines') { if (gs) setTool(LINE_TOOLS.has(V.tool) ? 'read' : 'lines'); }

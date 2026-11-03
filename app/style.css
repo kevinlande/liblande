@@ -2469,3 +2469,37 @@ a.ms-ib { text-decoration: none; }
   .np-edit { padding: 16px 18px 30px; }
   .np-foot span:first-child { display: none; }
 }
+
+/* Notes in the reader (RN in notes.js): the sidebar's Notes tab, or the
+   split screen's panel below the page. The editor fills what's left. */
+.rn { display: flex; flex-direction: column; min-height: 100%; }
+.v-side-body:has(> .rn) { display: flex; flex-direction: column; overflow: hidden; }
+.v-side-body > .rn { flex: 1; min-height: 0; }
+.rn-tools { flex: none; display: flex; align-items: center; flex-wrap: wrap; gap: 1px; padding: 4px 8px; border-bottom: 1px solid var(--line); background: var(--panel); }
+.rn-tools > button { min-width: 30px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border: 0; background: none; border-radius: var(--r-s); color: var(--text); font: 600 13.5px var(--ui); cursor: pointer; }
+.rn-tools > button:hover { background: var(--side-hover); }
+.rn-tools > button i { font-family: var(--serif); }
+.rn-tools .i { width: 16px; height: 16px; }
+.rn-sep { width: 1px; height: 16px; background: var(--line); margin: 0 4px; }
+.rn-state { margin-left: auto; padding-left: 8px; font: 500 11.5px var(--ui); color: var(--faint); }
+.rn-tools > .rn-done { margin-left: 8px; padding: 0 12px; font: 600 14px var(--ui); color: var(--accent); }
+.rn-edit { position: relative; flex: 1 1 auto; min-height: 80px; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding: 12px 14px 24px; outline: none; font-size: 14.5px; }
+.rn-marks { flex: 0 1 auto; max-height: 40%; overflow-y: auto; padding: 4px 14px 8px; border-top: 1px solid var(--line); font-size: 13px; }
+.rn-marks .nv-mk { font: 13.5px/1.45 var(--serif); }
+.rn-foot { flex: none; display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-top: 1px solid var(--line); font: 12px var(--ui); color: var(--faint); }
+.rn-foot .linkish { margin-left: auto; }
+/* A page in your notes, "p. 331": a tag (it goes to the page). */
+.notes-rich .pl { color: var(--accent); background: var(--accent-soft); border-radius: 999px; padding: 0 .45em; font: 500 .82em var(--ui); white-space: nowrap; cursor: pointer; }
+.nv-box .pl { cursor: text; }
+/* The page a tag went to, for a moment. */
+#vPages .page.rn-flash { box-shadow: 0 0 0 3px var(--accent); transition: box-shadow 1.4s ease-out; }
+/* Below the page: the panel's notes, instead of the second view. */
+.v-peek-notes { position: absolute; top: 52px; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; background: var(--panel); }
+.v-peek-notes[hidden] { display: none; }
+.v-peek-notes > .rn { flex: 1; min-height: 0; }
+.v-peek.notes .v-peek-body, .v-peek.notes #vPeekGo { display: none; }
+/* The Quote bar's Add to notes. */
+.quote-note { display: inline-flex; align-items: center; gap: 6px; border: 0; border-left: 1px solid var(--line); border-radius: 0 7px 7px 0; background: none; color: inherit; font: inherit; padding: 6px 10px; cursor: pointer; }
+.quote-note:hover { background: var(--side-hover); }
+.quote-note .i { width: 16px; height: 16px; color: var(--accent); }
+.quote-note[hidden] { display: none; }

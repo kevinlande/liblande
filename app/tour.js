@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-11-02.12';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-11-03.01';
 /* -------------------------------------------------------------- features */
 // What LibLande does, by area: each feature, what it's for, where to find
 // it, and its icon (see featIcon). Shown from the sidebar's foot (Features), with a box to find
@@ -54,6 +54,7 @@ const FEATURES = [
     ['Adding from the web', 'A paper added from its own page with one click: the page\u2019s DOI or citation read, and LibLande opened at Add, filled in from Crossref, with Find PDF ready. Make the button in Safari with Describe Extension (from a description LibLande gives you), or use the bookmark. A PDF dropped on Add with no DOI in its text is looked up by the title and author it gives.', 'Settings \u203a Adding from the web', 'ICON:link'],
     ['Glass', 'Any theme as glass: the library\u2019s toolbar (the list, or on a phone a publication, scrolling up under it), the sidebar where it slides out over the list, the reader\u2019s bars, the markup toolbar and menus translucent, what\u2019s under them showing softly through, in the theme\u2019s own colours; or flat. Kept with your account.', 'Settings \u203a Appearance \u203a Glass', 'ICON:copy'],
     ['Page tones', 'The pages light, sepia (warm paper), dark, or dark sepia; and a Warmth slider that cuts blue light with any of them. The PDF isn\u2019t changed. A tap on the moon switches between your last two.', 'The moon in the reader\u2019s toolbar: rest the pointer on it (on an iPad or iPhone, hold it or tap its \u25be)', '#vDarkBtn'],
+    ['Notes beside the paper', 'Write your notes while you read: in the sidebar\u2019s Notes tab, below the page on an iPad held upright, or the whole screen on a phone; the same notes as the details pane\u2019s. Select a passage and Add to notes to quote it with its page (and highlight it; on a phone, added without opening your notes); a page in your notes, like p. 331, goes to that page.', 'The note button in the reader\u2019s toolbar, or \u2325N', '#vNotesBtn'],
     ['Split screen', 'A second view of the paper below, to scroll on its own (to the references, say).', 'The split box in the reader\u2019s toolbar', '#vSplitBtn'],
     ['Links inside the paper', 'Go to a reference or figure, or look at it in a panel without losing your place; Back to page n brings you back.', 'Tap a link', '#vBackGo'],
     ['Where you left off', 'Each paper opens where you were, on this device or another.', '', 'ICON:history'],
