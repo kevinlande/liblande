@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-02.11';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-02.12';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -489,6 +489,10 @@ function ensureViewer(lib, VL) {
   // When nothing is being drawn, draw the next few pages ahead too, so
   // they're ready before they scroll into view.
   bus.on('pagerendered', e => { clearTimeout(V.aheadTimer); V.aheadTimer = setTimeout(drawAhead, 150); refreshPins(e.pageNumber); ribbonFor(e.pageNumber); });
+  // (And the blurry copies around where you are: see SOFT.)
+  bus.on('pagerendered', () => softSoon());
+  bus.on('pagechanging', () => softSoon());
+  bus.on('pagesloaded', () => softSoon(400));
   bus.on('annotationlayerrendered', e => { sectionLines(e.pageNumber); decorateLines(); });
   bus.on('annotationeditoruimanager', e => { V.ui = e.uiManager; watchChanges(V.ui); });
   // A jump to a page (a link, the outline, a bookmark) lands below the bars
@@ -525,17 +529,92 @@ function drawAhead() {
   const cur = v.currentPageNumber - 1, sc = $('#vScroll');
   const d = sc.scrollTop < (drawAhead.top || 0) - 4 ? -1 : 1;
   drawAhead.top = sc.scrollTop;
-  // Zoomed in well past the screen's width on a touch screen, just the
-  // next page (each is big to draw and to keep in memory).
-  const pv0 = view(cur);
-  const big = coarseMQ.matches && pv0 && pv0.width > sc.clientWidth * 1.4;
-  for (const i of big ? [cur + d] : [cur + d, cur + 2 * d, cur + 3 * d, cur - d]) {
+  // As many as fit a budget of memory for drawn pages (about 256 MB on a
+  // computer, 128 MB on a phone or iPad, whose Safari is strict about it;
+  // half on a device that says it has little): each page's drawing is its
+  // size on screen times the screen's sharpness, four bytes a dot. One to
+  // five ahead, and one behind if there's room for three: within the ten
+  // drawn pages PDF.js keeps, so it lets none on screen go. (Zoomed in far,
+  // pages are big, and so just the next one or two.)
+  const pv0 = view(cur), dpr = window.devicePixelRatio || 1;
+  const bytes = pv0 ? Math.min(pv0.width * pv0.height * dpr * dpr, v.maxCanvasPixels || 2 ** 24) * 4 : 16 * 2 ** 20;
+  const budget = (coarseMQ.matches ? 128 : 256) * 2 ** 20 / (navigator.deviceMemory && navigator.deviceMemory < 4 ? 2 : 1);
+  const many = Math.max(1, Math.min(5, Math.floor(budget / bytes)));
+  const order = [];
+  for (let k = 1; k <= many; k++) { order.push(cur + k * d); if (k === 2 && many >= 3) order.push(cur - d); }
+  for (const i of order) {
     const pv = i >= 0 && i < n ? view(i) : null;
     if (pv && (pv.renderingState === 0 || pv.renderingState === 2)) { v.renderingQueue.renderView(pv); return; }
   }
 }
 // (Also once scrolling stops, in case nothing was drawn meanwhile.)
 $('#vScroll').addEventListener('scroll', () => { clearTimeout(V.aheadTimer); V.aheadTimer = setTimeout(drawAhead, 250); }, { passive: true });
+
+// Blurry copies: a small picture of each page near where you are (about
+// 400 dots wide, kept as a JPEG of some 40 KB), shown under the page until
+// its sharp drawing is there. Scrolling fast, pages go by soft instead of
+// blank. Drawn one at a time, nearest first, only while no page is being
+// drawn sharply; let go of once you're far away. (PDF.js keeps what it
+// read of a page, so drawing it sharply later is quicker too.)
+const SOFT = { doc: null, pics: new Map(), busy: false, timer: 0 };
+function softSoon(ms) { clearTimeout(SOFT.timer); SOFT.timer = setTimeout(softNext, ms == null ? 150 : ms); }
+function softShow(i, url) {
+  const pv = V.viewer && V.viewer.getPageView(i);
+  if (!pv || !pv.div) return;
+  pv.div.classList.toggle('ll-soft', !!url);
+  if (url) pv.div.style.setProperty('--ll-soft', 'url("' + url + '")'); else pv.div.style.removeProperty('--ll-soft');
+}
+function softDrop(i) {
+  const s = SOFT.pics.get(i);
+  if (!s) return;
+  URL.revokeObjectURL(s.url);
+  SOFT.pics.delete(i);
+  softShow(i, null);
+}
+async function softNext() {
+  const v = V.viewer, doc = V.doc;
+  if (!v || !doc || SOFT.busy || !v.pagesCount) return;
+  if (SOFT.doc !== doc) {
+    for (const s of SOFT.pics.values()) URL.revokeObjectURL(s.url);
+    SOFT.pics.clear();
+    SOFT.doc = doc;
+  }
+  const n = v.pagesCount, cur = v.currentPageNumber - 1, near = coarseMQ.matches ? 15 : 20;
+  const turn = i => { const pv = v.getPageView(i); return pv ? (pv.rotation + pv.pdfPageRotate) % 360 : 0; };
+  for (const [i, s] of [...SOFT.pics]) if (Math.abs(i - cur) > near + 3 || s.turn !== turn(i)) softDrop(i);
+  if (document.hidden) return;
+  for (let i = 0; i < n; i++) {
+    const pv = v.getPageView(i);
+    if (pv && pv.renderingState === 1) { softSoon(300); return; }
+  }
+  let next = -1;
+  for (let k = 0; k <= near && next < 0; k++) {
+    for (const i of k ? [cur + k, cur - k] : [cur]) if (i >= 0 && i < n && !SOFT.pics.has(i)) { next = i; break; }
+  }
+  if (next < 0) return;
+  SOFT.busy = true;
+  let c;
+  try {
+    const page = await doc.getPage(next + 1), r = turn(next);
+    const one = page.getViewport({ scale: 1, rotation: r });
+    const vp = page.getViewport({ scale: Math.min(1.5, 400 / one.width), rotation: r });
+    c = document.createElement('canvas');
+    c.width = Math.ceil(vp.width); c.height = Math.ceil(vp.height);
+    await page.render({ canvas: c, canvasContext: c.getContext('2d'), viewport: vp, background: 'white' }).promise;
+    const blob = await new Promise(res => c.toBlob(res, 'image/jpeg', 0.7));
+    if (blob && SOFT.doc === doc && V.doc === doc) {
+      const url = URL.createObjectURL(blob);
+      SOFT.pics.set(next, { url, turn: r });
+      softShow(next, url);
+    }
+  } catch (err) {
+    if (SOFT.doc === doc) SOFT.pics.set(next, { url: '', turn: turn(next) });
+  } finally {
+    if (c) c.width = c.height = 0;
+    SOFT.busy = false;
+  }
+  if (V.doc === doc) softSoon(30);
+}
 
 async function openReader(entry, file, pos) {
   const my = ++V.token;
@@ -775,6 +854,8 @@ function unloadDoc() {
   if (V.doc) {
     const doc = V.doc;
     V.doc = null;
+    for (const k of [...SOFT.pics.keys()]) softDrop(k);
+    SOFT.doc = null;
     V.viewer.setDocument(null);
     V.link.setDocument(null);
     closeLinkMenu(); PEEK.token++; $('#vPeek').hidden = true; peekForget();
@@ -960,6 +1041,14 @@ function showViewer() {
   refit();
   allRibbons();
 }
+// (Put in another order by dragging: see tabDrag. The front tab stays in
+// front.)
+tabDrag($('#vTabs'), '.v-tab', (from, to) => {
+  const front = PTABS.list[PTABS.active], [t] = PTABS.list.splice(from, 1);
+  PTABS.list.splice(to, 0, t);
+  PTABS.active = PTABS.list.indexOf(front);
+  renderPaperTabs();
+});
 $('#vTabs').addEventListener('click', ev => {
   const x = ev.target.closest('[data-ptab-x]');
   if (x) { closePaperTab(+x.dataset.ptabX); return; }

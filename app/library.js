@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-02.11';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-02.12';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -1739,6 +1739,104 @@ $('#tabs').addEventListener('click', ev => {
 $('#tabs').addEventListener('auxclick', ev => {
   const t = ev.target.closest('[data-tab]');
   if (ev.button === 1 && t && tabCloseable(t.dataset.tab)) { ev.preventDefault(); closeTab(t.dataset.tab); }
+});
+// Tabs put in another order by dragging (the library's lists here, the
+// reader's papers too): a tab picked up follows the pointer, and the
+// others shift aside to make room; let go, and it's put there. With a
+// mouse it's picked up as soon as it moves sideways; by touch, held a
+// moment first, so a swipe still scrolls the strip. Near an end of the
+// strip, the strip scrolls. moved(from, to) puts it in its new place.
+function tabDrag(box, sel, moved) {
+  let d = null, dropped = 0;
+  const tabs = () => [...box.querySelectorAll(sel)];
+  const center = r => r.left + r.width / 2;
+  const place = () => {
+    if (!d.el.isConnected) { end(false); return; }
+    const scrolled = box.scrollLeft - d.scroll0, r = d.rects[d.from];
+    // (Kept within the strip: from the first tab's left to the last's right.)
+    const lo = d.rects[0].left - r.left, hi = d.rects[d.rects.length - 1].right - r.right;
+    const dx = Math.max(lo, Math.min(hi, d.x - d.x0 + scrolled));
+    d.el.style.transform = `translateX(${dx}px)`;
+    // (Past another tab's middle with its leading edge: in that one's place.)
+    d.to = d.from + d.rects.filter((q, i) => i > d.from && r.right + dx > center(q)).length - d.rects.filter((q, i) => i < d.from && r.left + dx < center(q)).length;
+    const step = r.width + d.gap;
+    tabs().forEach((t, i) => {
+      if (i === d.from) return;
+      const shift = d.from < d.to && i > d.from && i <= d.to ? -step : d.to < d.from && i >= d.to && i < d.from ? step : 0;
+      t.style.transform = shift ? `translateX(${shift}px)` : '';
+    });
+  };
+  const roll = () => {
+    if (!d || !d.on) return;
+    const b = box.getBoundingClientRect(), v = d.x < b.left + 32 ? -8 : d.x > b.right - 32 ? 8 : 0;
+    if (v) { box.scrollLeft += v; place(); }
+    if (d) d.raf = requestAnimationFrame(roll);
+  };
+  const start = () => {
+    if (!d || !d.el.isConnected) return;
+    const all = tabs();
+    d.on = true;
+    d.rects = all.map(t => t.getBoundingClientRect());
+    d.gap = all.length > 1 ? d.rects[1].left - d.rects[0].right : 0;
+    d.scroll0 = box.scrollLeft;
+    d.to = d.from;
+    d.el.classList.add('tab-held');
+    box.classList.add('tab-dragging');
+    all.forEach(t => { if (t !== d.el) t.style.transition = 'transform .15s'; });
+    place();
+    d.raf = requestAnimationFrame(roll);
+  };
+  const end = drop => {
+    if (!d) return;
+    clearTimeout(d.hold); cancelAnimationFrame(d.raf);
+    const { from, to, on } = d;
+    d = null;
+    tabs().forEach(t => { t.style.transform = ''; t.style.transition = ''; t.classList.remove('tab-held'); });
+    box.classList.remove('tab-dragging');
+    window.removeEventListener('pointermove', move);
+    window.removeEventListener('pointerup', up);
+    window.removeEventListener('pointercancel', cancel);
+    if (on) dropped = Date.now();
+    if (on && drop && to !== from) moved(from, to);
+  };
+  const move = ev => {
+    if (!d || ev.pointerId !== d.id) return;
+    d.x = ev.clientX;
+    if (!d.on) {
+      const ax = Math.abs(ev.clientX - d.x0), ay = Math.abs(ev.clientY - d.y0);
+      if (ax < 6 && ay < 6) return;
+      // (By touch, moved before the hold: a swipe. With a mouse, more down
+      // than sideways: not a drag of the tab.)
+      if (d.touch || ay > ax) { end(false); return; }
+      start();
+    }
+    if (d && d.on) { ev.preventDefault(); place(); }
+  };
+  const up = ev => { if (d && ev.pointerId === d.id) end(true); };
+  const cancel = ev => { if (d && ev.pointerId === d.id) end(false); };
+  box.addEventListener('pointerdown', ev => {
+    dropped = 0;
+    const el = ev.target.closest(sel);
+    if (d || !el || ev.button !== 0 || ev.target.closest('[data-close], [data-ptab-x]')) return;
+    const all = tabs();
+    if (all.length < 2) return;
+    d = { el, id: ev.pointerId, from: all.indexOf(el), x0: ev.clientX, y0: ev.clientY, x: ev.clientX, touch: ev.pointerType !== 'mouse' };
+    if (d.touch) d.hold = setTimeout(start, 350);
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', cancel);
+  });
+  // (While a tab is held by touch, the strip doesn't scroll instead.)
+  box.addEventListener('touchmove', ev => { if (d && d.on) ev.preventDefault(); }, { passive: false });
+  box.addEventListener('contextmenu', ev => { if (d) ev.preventDefault(); });
+  // (Letting go isn't a click on the tab.)
+  box.addEventListener('click', ev => { if (Date.now() - dropped < 400) { ev.preventDefault(); ev.stopImmediatePropagation(); } }, true);
+}
+tabDrag($('#tabScroll'), '.tab', (from, to) => {
+  const [id] = TABS.splice(from, 1);
+  TABS.splice(to, 0, id);
+  store.set('tabs', TABS);
+  renderTabs();
 });
 function setGroup(id) {
   state.group = id; store.set('group', id);

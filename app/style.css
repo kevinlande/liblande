@@ -843,6 +843,12 @@ body:has(#sheet:not([hidden])) .pick-bar { visibility: hidden; }
 .tb-tabs #recentBtn { flex: none; height: 28px; padding: 0 6px; margin-left: 2px; }
 .tab-scroll { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 2px; overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
 .tab-scroll::-webkit-scrollbar { display: none; }
+/* A tab being dragged to another place (tabDrag): lifted, over the others. */
+.tab-scroll .tab, .v-tabs .v-tab { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.tab-dragging { cursor: grabbing; }
+.tab-dragging .tab, .tab-dragging .v-tab, .tab-dragging .v-tab-go { cursor: grabbing; }
+.tab.tab-held, .v-tab.tab-held { position: relative; z-index: 3; background: var(--raise); color: var(--text); box-shadow: 0 4px 14px rgba(0,0,0,.2), 0 0 0 1px var(--line); }
+.tab.tab-held[aria-selected="true"], .v-tab.tab-held[aria-selected="true"] { background: linear-gradient(var(--accent-soft), var(--accent-soft)), var(--raise); }
 /* Lists out of sight at an end of the strip: a button over that end with
    how many (as the open papers' tabs have); a tap lists them. */
 .tab-scroll-wrap { position: relative; flex: 1 1 auto; min-width: 0; display: flex; align-items: center; }
@@ -1528,6 +1534,15 @@ body.is-offline .fileicon:not(.saved), body.is-offline .pdf:not(.saved) { opacit
   -webkit-backdrop-filter: invert(1) hue-rotate(180deg) brightness(.92); backdrop-filter: invert(1) hue-rotate(180deg) brightness(.92);
 }
 .viewer.dark-pages #vPages .page, .viewer.dark-pages #vPeekPages .page { background: #111; }
+/* A page's blurry copy (see SOFT in reader.js), under its sharp drawing
+   until that's there; turned as the drawing is in dark pages and tints. */
+#vPages .page.ll-soft::before { content: ""; position: absolute; inset: 0; background: var(--ll-soft) center / 100% 100% no-repeat; filter: blur(.6px); }
+#vPages .page.ll-soft.loading::after { display: none; }
+.viewer.dark-pages #vPages .page.ll-soft::before { filter: invert(1) hue-rotate(180deg) blur(.6px); }
+.viewer.dark-pages.tone-darksepia #vPages .page.ll-soft::before { filter: invert(1) hue-rotate(180deg) contrast(.86) sepia(.7) brightness(.9) blur(.6px); }
+.viewer.tinted:not(.dark-pages) #vPages .page.ll-soft::before { filter: url(#llTint) blur(.6px); }
+.viewer.tinted.dark-pages #vPages .page.ll-soft::before { filter: invert(1) hue-rotate(180deg) url(#llTint) blur(.6px); }
+.viewer.tinted.dark-pages.tone-darksepia #vPages .page.ll-soft::before { filter: invert(1) hue-rotate(180deg) contrast(.86) sepia(.7) brightness(.9) url(#llTint) blur(.6px); }
 /* Dark sepia: the negative page in browns. Sepia and warmth: the page's
    picture tinted by a colour filter (#llTint: each colour multiplied, so
    white becomes the tint and black stays black). (Not a layer over the
