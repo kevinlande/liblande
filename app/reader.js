@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-03.03';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-04.01';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -486,10 +486,12 @@ function ensureViewer(lib, VL) {
   bus.on('annotationeditorstateschanged', onEditingStates);
   bus.on('editingstateschanged', onEditingStates);
   bus.on('annotationeditormodechanged', () => { applyMarkParams(); refreshAllPins(); });
-  // When nothing is being drawn, draw the next few pages ahead too, so
-  // they're ready before they scroll into view.
-  bus.on('pagerendered', e => { clearTimeout(V.aheadTimer); V.aheadTimer = setTimeout(drawAhead, 150); refreshPins(e.pageNumber); ribbonFor(e.pageNumber); });
-  // (And the blurry copies around where you are: see SOFT.)
+  // (No more pages drawn ahead than PDF.js's own next one: drawing more
+  // ahead slowed Safari to seconds a page after each jump, as to a find
+  // result, against a tenth of a second without. The blurry copies cover
+  // the pages further on; see SOFT.)
+  bus.on('pagerendered', e => { refreshPins(e.pageNumber); ribbonFor(e.pageNumber); });
+  // (The blurry copies around where you are.)
   bus.on('pagerendered', () => softSoon());
   bus.on('pagechanging', () => softSoon());
   bus.on('pagesloaded', () => softSoon(400));
@@ -515,41 +517,12 @@ function ensureViewer(lib, VL) {
   Object.assign(V, { lib, viewer, bus, link, VL });
 }
 
-function drawAhead() {
+// Every page PDF.js counts as on screen drawn (or none to draw).
+function screenDrawn() {
   const v = V.viewer;
-  if (!v || !V.doc || !v.renderingQueue || $('#vPages').classList.contains('zooming')) return;
-  const n = v.pagesCount, view = i => v.getPageView(i);
-  // Not while a page is being drawn. (A page drawn ahead is paused when
-  // one on screen needs drawing first, and PDF.js doesn't come back to it
-  // once it's off screen: it's picked up again below.)
-  for (let i = 0; i < n; i++) {
-    if (view(i) && view(i).renderingState === 1) return;
-  }
-  // Ahead the way you're reading: down the paper, or back up it.
-  const cur = v.currentPageNumber - 1, sc = $('#vScroll');
-  const d = sc.scrollTop < (drawAhead.top || 0) - 4 ? -1 : 1;
-  drawAhead.top = sc.scrollTop;
-  // As many as fit a budget of memory for drawn pages (about 256 MB on a
-  // computer, 128 MB on a phone or iPad, whose Safari is strict about it;
-  // half on a device that says it has little): each page's drawing is its
-  // size on screen times the screen's sharpness, four bytes a dot. One to
-  // five ahead, and one behind if there's room for three: within the ten
-  // drawn pages PDF.js keeps, so it lets none on screen go. (Zoomed in far,
-  // pages are big, and so just the next one or two.)
-  const pv0 = view(cur), dpr = window.devicePixelRatio || 1;
-  const bytes = pv0 ? Math.min(pv0.width * pv0.height * dpr * dpr, v.maxCanvasPixels || 2 ** 24) * 4 : 16 * 2 ** 20;
-  const budget = (coarseMQ.matches ? 128 : 256) * 2 ** 20 / (navigator.deviceMemory && navigator.deviceMemory < 4 ? 2 : 1);
-  const many = Math.max(1, Math.min(5, Math.floor(budget / bytes)));
-  const order = [];
-  for (let k = 1; k <= many; k++) { order.push(cur + k * d); if (k === 2 && many >= 3) order.push(cur - d); }
-  for (const i of order) {
-    const pv = i >= 0 && i < n ? view(i) : null;
-    if (pv && (pv.renderingState === 0 || pv.renderingState === 2)) { v.renderingQueue.renderView(pv); return; }
-  }
+  if (!v || !v._getVisiblePages) return true;
+  return v._getVisiblePages().views.every(x => !x.view || x.view.renderingState === 3);
 }
-// (Also once scrolling stops, in case nothing was drawn meanwhile.)
-$('#vScroll').addEventListener('scroll', () => { clearTimeout(V.aheadTimer); V.aheadTimer = setTimeout(drawAhead, 250); }, { passive: true });
-
 // Blurry copies: a small picture of each page near where you are (about
 // 400 dots wide, kept as a JPEG of some 40 KB), shown under the page until
 // its sharp drawing is there. Scrolling fast, pages go by soft instead of
@@ -585,6 +558,8 @@ async function softNext() {
   const turn = i => { const pv = v.getPageView(i); return pv ? (pv.rotation + pv.pdfPageRotate) % 360 : 0; };
   for (const [i, s] of [...SOFT.pics]) if (Math.abs(i - cur) > near + 3 || s.turn !== turn(i)) softDrop(i);
   if (document.hidden) return;
+  // (Not until the pages on screen are drawn, either.)
+  if (!screenDrawn()) { softSoon(300); return; }
   for (let i = 0; i < n; i++) {
     const pv = v.getPageView(i);
     if (pv && pv.renderingState === 1) { softSoon(300); return; }
@@ -1425,6 +1400,10 @@ async function saveMarkup(force, auto, now) {
         };
         drop();
       }
+      // Nothing left unsaved: the clock is cleared. (Putting the marks
+      // back on the pages after the upload counts as changes to PDF.js,
+      // which started it again.)
+      if (doc === V.doc && !(V.dirty || V.bmDirty || V.drawing)) { clearTimeout(AUTO.timer); AUTO.first = AUTO.last = 0; }
       sideChanged();
       saveUI('saved');
       return true;

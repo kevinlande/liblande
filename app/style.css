@@ -1747,7 +1747,11 @@ a.ms-ib { text-decoration: none; }
   .v-scroll::-webkit-scrollbar-thumb { border-radius: 999px; background: rgba(27, 35, 33, .38); border: 2px solid transparent; background-clip: padding-box; }
   @supports not selector(::-webkit-scrollbar) { .v-scroll { scrollbar-width: none; } }
 }
-.v-scroll .pdfViewer.zooming { will-change: transform; }
+/* (The pages kept to one layer of their own, always, not only while
+   pinched: without, Safari slowed as pages were drawn, to seconds for a
+   page after a jump (as to a find result) and a few frames a second
+   scrolling; with it, a tenth of a second, and smooth.) */
+.v-scroll .pdfViewer { will-change: transform; }
 .v-scroll .pdfViewer.tap-zoom { transition: transform .28s cubic-bezier(.2, .8, .2, 1); will-change: transform; }
 @media (prefers-reduced-motion: reduce) { .v-scroll .pdfViewer.tap-zoom { transition: none; } }
 .v-scroll .pdfViewer { padding: calc(var(--top-h, 48px) + 8px) 0 90px; transform-origin: 0 0; }
