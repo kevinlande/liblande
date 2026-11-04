@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-03.02';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-03.03';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -1032,7 +1032,7 @@ $('#addBtn').addEventListener('click', () => {
 // chosen), each opening Add with that under way. (On a phone, + can be
 // in the toolbar's More menu: held there, the same; see addHold.)
 const AB = { t: 0, long: false, x: 0, y: 0 };
-function closeAddMenu() { const m = $('#addMenu'); if (m) m.remove(); $('#addMore').setAttribute('aria-expanded', 'false'); }
+function closeAddMenu() { AH.hov = false; const m = $('#addMenu'); if (m) m.remove(); $('#addMore').setAttribute('aria-expanded', 'false'); }
 function openAddMenu(btn) {
   closeAddMenu();
   btn = btn || $('#addBtn');
@@ -1104,26 +1104,30 @@ addHold($('#addBtn'));
 // on + from the keyboard. On a touch screen (an iPad or iPhone), a \u25be
 // beside + as well as holding it, as the open papers' button has.
 const AH = { t: 0, hide: 0 };
-$('#addBtn').addEventListener('pointerenter', ev => {
+// (Resting on + or its \u25be, the same.)
+[$('#addBtn'), $('#addMore')].forEach(b => b.addEventListener('pointerenter', ev => {
   if (ev.pointerType !== 'mouse') return;
   clearTimeout(AH.hide);
-  if (!$('#addMenu')) { clearTimeout(AH.t); AH.t = setTimeout(() => openAddMenu(), 350); }
-});
-$('#addBtn').addEventListener('pointerleave', ev => {
+  if (!$('#addMenu')) { clearTimeout(AH.t); AH.t = setTimeout(() => { openAddMenu(); AH.hov = true; }, 350); }
+}));
+[$('#addBtn'), $('#addMore')].forEach(b => b.addEventListener('pointerleave', ev => {
   if (ev.pointerType !== 'mouse') return;
   clearTimeout(AH.t);
   AH.hide = setTimeout(closeAddMenu, 250);
-});
+}));
 // (A click on + opens Add, so the menu resting on it brought goes; not the
 // click that can follow a hold, which showed the menu.)
 $('#addBtn').addEventListener('click', () => { clearTimeout(AH.t); if (!AB.long) closeAddMenu(); }, true);
 $('#addBtn').addEventListener('keydown', ev => { if (ev.key === 'ArrowDown') { ev.preventDefault(); openAddMenu(); const first = $('#addMenu [data-add]'); if (first) first.focus(); } });
 $('#addMore').addEventListener('click', ev => {
+  clearTimeout(AH.t);
+  // (Shown by resting the pointer here: a click keeps it, not shuts it.)
+  if ($('#addMenu') && AH.hov) { AH.hov = false; return; }
   if ($('#addMenu')) { closeAddMenu(); return; }
   openAddMenu();
   if (ev.detail === 0) { const first = $('#addMenu [data-add]'); if (first) first.focus(); }
 });
-function addMoreShown() { $('#addMore').hidden = $('#addBtn').hidden || !coarseMQ.matches; }
+function addMoreShown() { $('#addMore').hidden = $('#addBtn').hidden; }
 new MutationObserver(addMoreShown).observe($('#addBtn'), { attributes: true, attributeFilter: ['hidden'] });
 coarseMQ.addEventListener('change', addMoreShown);
 addMoreShown();

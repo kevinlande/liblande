@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/notes.js'] = '2026-11-03.02';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/notes.js'] = '2026-11-03.03';
 /* ------------------------------------------------------------ notes */
 // The details pane shows Details or Notes (a switch at its top, or Alt-N;
 // the choice kept). Notes has your notes, in a box you type in, formatted
@@ -17,6 +17,9 @@ const NOTES = { view: store.get('detailView', 'details'), h: store.get('notesH',
   colour: null, saving: Promise.resolve(), pop: null };
 // (A sticky note: Notes' own, not the pencil, which is Edit's.)
 const NOTE_ICON = '<svg class="i" viewBox="0 0 24 24"><path d="M5 4h14v11l-5 5H5z"/><path d="M14 20v-5h5"/><path d="M8.5 9h7M8.5 12.5h4"/></svg>';
+// Undo and Redo, in the notes' toolbars (as the markup toolbar's).
+const UNDO_ICON = '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>';
+const REDO_ICON = '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg>';
 const POP_ICON = '<svg class="i" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-8 8M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>';
 
 /* ---- Markdown, the little of it notes need */
@@ -279,6 +282,11 @@ function nvQuote(ed, q) {
 }
 const nvMarkQuote = (r, m) => (m.text ? '\u201c' + m.text + '\u201d ' : '') + '(p. ' + nvPage(r, m.page) + ')' + (m.note ? ' \u2014 ' + m.note : '');
 
+// Your notes as you wrote them: the .bib has each & as \& (or BibDesk's
+// \{&}), as LaTeX needs, and saving writes it so again (see texSafe in
+// pages/edits.js); shown and edited, it's &.
+const notesOf = e => rawOf(e, 'annote').replace(/\\\{&\}|\\&/g, '&');
+
 /* ---- saving */
 // One save at a time, each from the publication as it is after the last.
 // Unbalanced braces ({ }) would break the .bib, so aren't saved.
@@ -286,7 +294,7 @@ function notesSave(key, md, quiet) {
   md = String(md || '').trim();
   NOTES.saving = NOTES.saving.then(async () => {
     const e = BYKEY.get(key);
-    if (!e || md === rawOf(e, 'annote').trim()) return true;
+    if (!e || md === notesOf(e).trim()) return true;
     if (!balanced(md)) { toast('Your notes have unbalanced braces { }, so they weren\u2019t saved. Take one out, or add its pair.', 6000); return false; }
     try {
       const done = await writeEdit(e, { annote: md }, [], []);
@@ -414,7 +422,7 @@ function notesViewHTML(e) {
 function notesMount(e) {
   const box = detailEl.querySelector('[data-nv-box]');
   if (!box) return;
-  noteEditor(box, rawOf(e, 'annote'));
+  noteEditor(box, notesOf(e));
   box.addEventListener('blur', ev => {
     // (Not when it's popping out: that editor takes over.)
     if (ev.relatedTarget && ev.relatedTarget.closest && ev.relatedTarget.closest('[data-nv-pop]')) return;
@@ -492,7 +500,7 @@ function openNotesPop(e) {
   if (!gs || NOTES.pop) return;
   // (What the box in the details had, unsaved, comes too.)
   const box = rnFor(e) ? RN.ed : detailEl.querySelector('[data-nv-box]');
-  const md = box ? htmlToMd(box) : rawOf(e, 'annote');
+  const md = box ? htmlToMd(box) : notesOf(e);
   const year = (/\d{4}/.exec(e.f.year || '') || [''])[0], who = (e.a && e.a[0] && e.a[0][0]) || (e.e && e.e[0] && e.e[0][0]) || '';
   const b = (cmd, title, icon) => `<button type="button" data-np="${cmd}" title="${esc(title)}" aria-label="${esc(title)}">${icon}</button>`;
   const I = d => `<svg class="i" viewBox="0 0 24 24">${d}</svg>`;
@@ -502,6 +510,7 @@ function openNotesPop(e) {
     `<div class="np-head"><h2>${esc(e.f.title || e.k)}<small>${esc([who.replace(/[{}]/g, ''), year].filter(Boolean).join(' ') + ' \u00b7 ' + e.k)}</small></h2>` +
     `<span class="np-state" aria-live="polite">Saved</span><button type="button" class="btn primary" data-np-close>Done</button></div>` +
     `<div class="np-tools">` +
+    b('undo', 'Undo (\u2318Z)', UNDO_ICON) + b('redo', 'Redo (\u21e7\u2318Z)', REDO_ICON) + '<span class="np-sep"></span>' +
     b('h', 'Heading', '<b>H</b>') + b('bold', 'Bold (\u2318B)', '<b>B</b>') + b('italic', 'Italic (\u2318I)', '<i>I</i>') + '<span class="np-sep"></span>' +
     b('ul', 'Bulleted list', I('<path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/>')) +
     b('ol', 'Numbered list', I('<path d="M10 6h10M10 12h10M10 18h10M4 5h1.5v4M4 9h3M4 14.5c0-1 2.5-1.5 2.5 0S4 17 4 18h3"/>')) +
@@ -633,19 +642,23 @@ function rnHTML(e, where) {
   const b = (k, title, icon) => `<button type="button" data-rn="${k}" title="${esc(title)}" aria-label="${esc(title)}">${icon}</button>`;
   const I = d => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
   return `<div class="rn">` + (gs ? `<div class="rn-tools">` +
+    b('undo', 'Undo (\u2318Z)', UNDO_ICON) + b('redo', 'Redo (\u21e7\u2318Z)', REDO_ICON) + '<span class="rn-sep"></span>' +
     b('h', 'Heading', '<b>H</b>') + b('bold', 'Bold (\u2318B)', '<b>B</b>') + b('italic', 'Italic (\u2318I)', '<i>I</i>') + '<span class="rn-sep"></span>' +
     b('ul', 'Bulleted list', I('<path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/>')) +
     b('quote', 'Quotation', I('<path d="M5 17c2.5-.4 4-2.2 4-5V7H5v5h3"/><path d="M14 17c2.5-.4 4-2.2 4-5V7h-4v5h3"/>')) +
     b('link', 'Link (\u2318K)', I('<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>')) +
     // (At the right, after Saved: where the notes go, not how they look.)
-    `<span class="rn-state" aria-live="polite">Saved</span>` +
+    `<span class="rn-state" aria-live="polite" data-ok>Saved</span>` +
     (handheld() ? '' : b('move', RN_MOVE[where === 'bottom' ? 'side' : 'bottom'][0], RN_MOVE[where === 'bottom' ? 'side' : 'bottom'][1]) +
       b('pop', 'Notes, large, with Cite (' + keyHint('notesPop') + ')', POP_ICON)) +
     (handheld() ? `<button type="button" class="rn-done" data-rn="done">Done</button>` : '') + `</div>` : '') +
     `<div class="rn-edit notes-rich" role="textbox" aria-multiline="true" aria-label="Your notes" data-placeholder="${gs ? 'Write your notes\u2026 (select a passage in the paper, then Add to notes, to quote it)' : 'No notes.'}"></div>` +
     `<div class="rn-marks" hidden></div>` +
-    `<div class="rn-foot"><span>In the .bib\u2019s Notes field</span>` + (gs ? `<button type="button" class="linkish" data-rn-marks aria-expanded="false">Highlights</button>` : '') + `</div></div>`;
+    (gs ? `<div class="rn-foot"><button type="button" class="linkish" data-rn-marks aria-expanded="false">Highlights</button></div>` : '') + `</div>`;
 }
+// (Saved: left out of a narrow toolbar, where there's no room; anything
+// else, said.)
+function rnState(st, text) { st.textContent = text; st.toggleAttribute('data-ok', text === 'Saved'); }
 function rnFlush() {
   clearTimeout(RN.timer);
   if (!RN.ed || !RN.e || !gs) return Promise.resolve(true);
@@ -653,7 +666,7 @@ function rnFlush() {
   const last = RN.last = { k, md };
   return notesSave(k, md, true).then(ok => {
     if (ok && RN.last === last) RN.last = null;
-    if (st && st.isConnected && RN.ed === ed) st.textContent = ok ? 'Saved' : 'Not saved';
+    if (st && st.isConnected && RN.ed === ed) rnState(st, ok ? 'Saved' : 'Not saved');
     return ok;
   });
 }
@@ -666,11 +679,11 @@ function rnMount(host, e, where) {
   RN.ed = ed;
   // (Just moved, or another tab and back: what was written, though its
   // save may not be done yet.)
-  const md = RN.last && RN.last.k === e.k ? RN.last.md : rawOf(e, 'annote');
+  const md = RN.last && RN.last.k === e.k ? RN.last.md : notesOf(e);
   noteEditor(ed, md, () => {
-    if (st) st.textContent = 'Edited';
+    if (st) rnState(st, 'Edited');
     clearTimeout(RN.timer);
-    RN.timer = setTimeout(() => { if (st) st.textContent = 'Saving\u2026'; rnFlush(); }, 1500);
+    RN.timer = setTimeout(() => { if (st) rnState(st, 'Saving\u2026'); rnFlush(); }, 1500);
   });
   nvTagPages(ed);
   ed.addEventListener('blur', () => { if (RN.ed === ed) { nvTagPages(ed); rnFlush(); } });
@@ -824,12 +837,16 @@ function rnAddPassage(text, pg) {
     // (After any save still going, so two in a row both stay.)
     const k = V.entry.k;
     NOTES.saving.then(() => {
-      const was = rawOf(BYKEY.get(k), 'annote').trim();
+      const was = notesOf(BYKEY.get(k)).trim();
       return notesSave(k, (was ? was + '\n\n' : '') + '> ' + q, true);
     }).then(ok => { if (ok) toast('Added to your notes' + (pg ? ' (p. ' + pg + ')' : ''), 2200); });
     return;
   }
-  openReaderNotes();
+  // (Not open: on an iPad held upright, below the page, whatever the notes
+  // button opens; elsewhere where the notes button opens them.)
+  if (!rnShown()) {
+    if (coarseMQ.matches && innerHeight > innerWidth) { rnBottom(); rnPressed(); } else openReaderNotes();
+  }
   if (!RN.ed) return;
   rnBack();
   nvQuote(RN.ed, q);

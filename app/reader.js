@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-03.02';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-03.03';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -579,7 +579,9 @@ async function softNext() {
     SOFT.pics.clear();
     SOFT.doc = doc;
   }
-  const n = v.pagesCount, cur = v.currentPageNumber - 1, near = coarseMQ.matches ? 15 : 20;
+  // (A scan's pages are pictures, slow to read and big once read: just
+  // the few nearest.)
+  const n = v.pagesCount, cur = v.currentPageNumber - 1, near = V.scan ? 4 : coarseMQ.matches ? 12 : 15;
   const turn = i => { const pv = v.getPageView(i); return pv ? (pv.rotation + pv.pdfPageRotate) % 360 : 0; };
   for (const [i, s] of [...SOFT.pics]) if (Math.abs(i - cur) > near + 3 || s.turn !== turn(i)) softDrop(i);
   if (document.hidden) return;
@@ -601,6 +603,12 @@ async function softNext() {
     c = document.createElement('canvas');
     c.width = Math.ceil(vp.width); c.height = Math.ceil(vp.height);
     await page.render({ canvas: c, canvasContext: c.getContext('2d'), viewport: vp, background: 'white' }).promise;
+    // What PDF.js read to draw it (its pictures, decoded, among them) let
+    // go of, unless the page is drawn, or being drawn, on screen: as PDF.js
+    // does for pages it no longer shows. Kept, each page with a copy held
+    // all of it, and memory ran out.
+    const pv = v.getPageView(next);
+    if (!pv || pv.renderingState === 0) page.cleanup();
     const blob = await new Promise(res => c.toBlob(res, 'image/jpeg', 0.7));
     if (blob && SOFT.doc === doc && V.doc === doc) {
       const url = URL.createObjectURL(blob);
@@ -1068,7 +1076,7 @@ $('#readerBtn').addEventListener('click', () => {
 // one picked is gone to. The list stays while the pointer is over
 // it, and goes once it leaves both, or on a tap elsewhere or Esc.
 const RB = { t: 0, hide: 0, long: false, x: 0, y: 0 };
-function closeOpenMenu() { clearTimeout(RB.hide); const m = $('#openMenu'); if (m) m.remove(); $('#readerMore').setAttribute('aria-expanded', 'false'); }
+function closeOpenMenu() { RB.hov = false; clearTimeout(RB.hide); const m = $('#openMenu'); if (m) m.remove(); $('#readerMore').setAttribute('aria-expanded', 'false'); }
 function openPapersMenu(focus) {
   closeOpenMenu();
   const btn = $('#readerBtn');
@@ -1112,7 +1120,9 @@ function openPapersMenu(focus) {
 }
 // (The \u25be only on a touch screen: with a mouse or trackpad, resting
 // the pointer on the button lists them.)
-function readerMoreShown() { $('#readerMore').hidden = $('#readerBtn').hidden || !coarseMQ.matches; }
+// (On every screen: hovering isn't the only way to the list. See the little
+// arrows in style.css.)
+function readerMoreShown() { $('#readerMore').hidden = $('#readerBtn').hidden; }
 coarseMQ.addEventListener('change', readerMoreShown);
 // Closed from the list (the reader not opened for it): the one loaded is
 // saved first, as when its tab is closed; the list then drawn again, or
@@ -1147,20 +1157,24 @@ function opThumbs(m) {
   });
 }
 $('#readerMore').addEventListener('click', ev => {
+  clearTimeout(RB.t);
+  // (Shown by resting the pointer here: a click keeps it, not shuts it.)
+  if ($('#openMenu') && RB.hov) { RB.hov = false; return; }
   if ($('#openMenu')) { closeOpenMenu(); return; }
   // (From the keyboard, into the list.)
   openPapersMenu(ev.detail === 0);
 });
-$('#readerBtn').addEventListener('pointerenter', ev => {
+// (Resting on the button or its \u25be, the same.)
+[$('#readerBtn'), $('#readerMore')].forEach(b => b.addEventListener('pointerenter', ev => {
   if (ev.pointerType !== 'mouse') return;
   clearTimeout(RB.hide);
-  if (!$('#openMenu')) { clearTimeout(RB.t); RB.t = setTimeout(() => openPapersMenu(), 350); }
-});
-$('#readerBtn').addEventListener('pointerleave', ev => {
+  if (!$('#openMenu')) { clearTimeout(RB.t); RB.t = setTimeout(() => { openPapersMenu(); RB.hov = true; }, 350); }
+}));
+[$('#readerBtn'), $('#readerMore')].forEach(b => b.addEventListener('pointerleave', ev => {
   if (ev.pointerType !== 'mouse') return;
   clearTimeout(RB.t);
   RB.hide = setTimeout(closeOpenMenu, 250);
-});
+}));
 $('#readerBtn').addEventListener('pointerdown', ev => {
   if (ev.pointerType === 'mouse') return;
   RB.long = false;
@@ -3938,8 +3952,12 @@ function markQuoteButtons(tb) {
     row.insertBefore(b, del && del.parentElement === row ? del : null);
     return b;
   };
-  make('ll-mq-quote', 'Quote: copy the words as a quotation, with the citation', QUOTE_SVG).addEventListener('click', ev => { ev.stopPropagation(); markQuote(div.id, 'copy'); });
-  if (gs && V.entry && BYKEY.get(V.entry.k)) make('ll-mq-note', 'Add to notes, as a quotation with its page', NOTE_SVG).addEventListener('click', ev => { ev.stopPropagation(); markQuote(div.id, 'notes'); });
+  // (Its words read now: Safari copies only at once, on the tap itself,
+  // not after waiting for the page's text.)
+  const words = { w: null };
+  markWords(div.id).then(w => { words.w = w; }, () => {});
+  make('ll-mq-quote', 'Quote: copy the words as a quotation, with the citation', QUOTE_SVG).addEventListener('click', ev => { ev.stopPropagation(); markQuote(div.id, 'copy', words.w); });
+  if (gs && V.entry && BYKEY.get(V.entry.k)) make('ll-mq-note', 'Add to notes, as a quotation with its page', NOTE_SVG).addEventListener('click', ev => { ev.stopPropagation(); markQuote(div.id, 'notes', words.w); });
 }
 // A highlight's words (from the page's text under it) and its page as printed.
 async function markWords(id) {
@@ -3963,8 +3981,8 @@ async function markWords(id) {
   if (!text) return null;
   return { text, page: (await printedPage(n)).page };
 }
-async function markQuote(id, how) {
-  const w = await markWords(id);
+async function markQuote(id, how, ready) {
+  const w = ready || await markWords(id);
   if (!w) { toast('Couldn\u2019t read the words under this highlight.', 3000); return; }
   if (how === 'copy') {
     const { block, text } = quoteWith(w.text, w.page);
@@ -4728,7 +4746,7 @@ $('#vDarkBtn').addEventListener('click', () => {
   closeTone();
   setTone(TONE.prev && TONE.prev !== TONE.now ? TONE.prev : isDarkTone(TONE.now) ? 'light' : 'dark');
 });
-function closeTone() { clearTimeout(TONE.hide); const p = $('#vTone'); if (p) p.remove(); $('#vToneMore').setAttribute('aria-expanded', 'false'); }
+function closeTone() { TONE.hov = false; clearTimeout(TONE.hide); const p = $('#vTone'); if (p) p.remove(); $('#vToneMore').setAttribute('aria-expanded', 'false'); }
 function openTone() {
   closeTone();
   const p = document.createElement('div');
@@ -4749,16 +4767,17 @@ function openTone() {
   p.addEventListener('pointerenter', () => clearTimeout(TONE.hide));
   p.addEventListener('pointerleave', ev => { if (ev.pointerType === 'mouse') TONE.hide = setTimeout(closeTone, 300); });
 }
-$('#vDarkBtn').addEventListener('pointerenter', ev => {
+// (Resting on the moon or its \u25be, the same.)
+[$('#vDarkBtn'), $('#vToneMore')].forEach(b => b.addEventListener('pointerenter', ev => {
   if (ev.pointerType !== 'mouse') return;
   clearTimeout(TONE.hide);
-  if (!$('#vTone')) { clearTimeout(TONE.t); TONE.t = setTimeout(openTone, 350); }
-});
-$('#vDarkBtn').addEventListener('pointerleave', ev => {
+  if (!$('#vTone')) { clearTimeout(TONE.t); TONE.t = setTimeout(() => { openTone(); TONE.hov = true; }, 350); }
+}));
+[$('#vDarkBtn'), $('#vToneMore')].forEach(b => b.addEventListener('pointerleave', ev => {
   if (ev.pointerType !== 'mouse') return;
   clearTimeout(TONE.t);
   TONE.hide = setTimeout(closeTone, 300);
-});
+}));
 $('#vDarkBtn').addEventListener('pointerdown', ev => {
   if (ev.pointerType === 'mouse') return;
   TONE.long = false;
@@ -4767,8 +4786,13 @@ $('#vDarkBtn').addEventListener('pointerdown', ev => {
 });
 ['pointerup', 'pointercancel', 'pointermove'].forEach(n => $('#vDarkBtn').addEventListener(n, ev => { if (ev.pointerType !== 'mouse' && (n !== 'pointermove' || !TONE.long)) clearTimeout(TONE.t); }));
 $('#vDarkBtn').addEventListener('contextmenu', ev => { if (TONE.long || $('#vTone')) ev.preventDefault(); });
-$('#vToneMore').addEventListener('click', () => { if ($('#vTone')) closeTone(); else openTone(); });
-function toneMoreShown() { $('#vToneMore').hidden = !coarseMQ.matches; }
+// (Shown by resting the pointer here: a click keeps it, not shuts it.)
+$('#vToneMore').addEventListener('click', () => {
+  clearTimeout(TONE.t);
+  if ($('#vTone') && TONE.hov) { TONE.hov = false; return; }
+  if ($('#vTone')) closeTone(); else openTone();
+});
+function toneMoreShown() { $('#vToneMore').hidden = false; }
 coarseMQ.addEventListener('change', toneMoreShown);
 toneMoreShown();
 document.addEventListener('pointerdown', ev => { if ($('#vTone') && !ev.target.closest('#vTone, #vDarkBtn, #vToneMore')) closeTone(); }, true);
@@ -5495,6 +5519,8 @@ function resetSide() {
 }
 function toggleSide(open) {
   if (open == null) open = !sideOpen();
+  // (Its header under the bars: they come down, and stay while it's open.)
+  if (open && typeof barsHidden === 'function') barsHidden(false);
   if (!open && SIDE.tab === 'notes' && RN.where === 'side') { rnFlush(); RN.ed = null; setTimeout(rnPressed, 0); }
   $('#vSide').hidden = !open;
   const was = $('#viewer').classList.contains('side-open');
@@ -6078,7 +6104,7 @@ $('#vSideBody').addEventListener('click', ev => {
     // shown again with these added.)
     const k = V.entry.k;
     rnFlush().then(() => {
-      const e = BYKEY.get(k) || V.entry, s = marksSummary(false), was = rawOf(e, 'annote').trim();
+      const e = BYKEY.get(k) || V.entry, s = marksSummary(false), was = notesOf(e).trim();
       const head = 'Highlights and notes (' + new Date().toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' }) + '):\n';
       return quickSet(e, { annote: (was ? was + '\n\n' : '') + head + s.text }, 'Added ' + s.n + ' highlight' + (s.n === 1 ? '' : 's') + ' and notes to the Notes');
     }).then(() => { const e = BYKEY.get(k); if (rnFor(e)) { RN.ed = null; rnMount(RN.host, e, RN.where); } });
@@ -7010,6 +7036,19 @@ function barsHidden(on) {
   const t0 = performance.now(), each = () => { drawRail(); if (performance.now() - t0 < 340) requestAnimationFrame(each); };
   requestAnimationFrame(each);
 }
+// The on-screen keyboard (an iPad's, typing your notes): Safari leaves the
+// page as tall as the screen and slides it up to show the caret, taking
+// the bars and the sidebar's header off the top. So the reader is made to
+// fit what's left above the keyboard, where it's been slid to.
+function kbFit() {
+  const vv = window.visualViewport, v = $('#viewer');
+  if (!vv || v.hidden) { v.classList.remove('kb-up'); return; }
+  const up = innerHeight - vv.height > 120;
+  v.classList.toggle('kb-up', up);
+  v.style.setProperty('--vv-top', (up ? vv.offsetTop : 0) + 'px');
+  v.style.setProperty('--vv-h', vv.height + 'px');
+}
+if (window.visualViewport) { visualViewport.addEventListener('resize', kbFit); visualViewport.addEventListener('scroll', kbFit); }
 const keepBars = () => !TOUCH_UI.matches || !$('#vFind').hidden || sideOpen() || !$('#vComment').hidden || !$('#vpPanel').hidden || $('#vShare').open || $('#vRLMenu').open || V.selected;
 // (Scrolling leaves them as they are: only a tap hides or shows them.)
 // The link within the paper nearest a point, if one is within reach (px).

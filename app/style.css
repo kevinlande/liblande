@@ -1339,6 +1339,9 @@ details.d-sec[open] summary { margin-bottom: 8px; }
 
 .scrim { display: none; }
 .viewer { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; background: var(--paper-bg); }
+/* With the iPad's keyboard up: the reader fits the part of the screen
+   above it (see kbFit), its bars still at the top, not panned off. */
+.viewer.kb-up { bottom: auto; top: var(--vv-top, 0px); height: var(--vv-h, 100%); }
 .v-bar {
   display: flex; align-items: center; gap: 6px; padding: 6px 8px;
   padding-top: calc(6px + env(safe-area-inset-top, 0px));
@@ -1707,6 +1710,12 @@ a.ms-ib { text-decoration: none; }
 .tb-add-pair { display: inline-flex; align-items: center; }
 .toolbar .tb-btn.tb-add-more { width: 18px; min-width: 18px; padding: 0; margin-left: -4px; color: var(--muted); }
 .toolbar .tb-btn.tb-add-more .i { width: 14px; height: 14px; }
+/* The little arrow beside Page tone, Add and Open papers (each opens its menu, as
+   hovering does): with a mouse, narrower still, tucked against its button. */
+@media (pointer: fine) {
+  .v-tools .tb-btn.v-tone-more, .toolbar .tb-btn.tb-reader-more, .toolbar .tb-btn.tb-add-more { width: 13px; min-width: 13px; margin-left: -6px; }
+  .v-tools .tb-btn.v-tone-more .i, .toolbar .tb-btn.tb-reader-more .i, .toolbar .tb-btn.tb-add-more .i { width: 12px; height: 12px; }
+}
 .tb-add-pair:has(#addBtn[hidden]) { display: none; }
 .menu-list .op-row { display: flex; align-items: center; gap: 2px; }
 .menu-list .op-row > button:first-child { flex: 1; min-width: 0; }
@@ -2483,7 +2492,16 @@ a.ms-ib { text-decoration: none; }
 
 /* Notes in the reader (RN in notes.js): the sidebar's Notes tab, or the
    split screen's panel below the page. The editor fills what's left. */
-.rn { display: flex; flex-direction: column; min-height: 100%; }
+.rn { display: flex; flex-direction: column; min-height: 100%; container: rn / inline-size; }
+/* A narrow sidebar: the toolbar's buttons closer, and Saved left out (one
+   that isn't saved yet is still said), so it keeps to one row. */
+@container rn (max-width: 420px) {
+  .rn-tools { padding-inline: 4px; }
+  .rn-tools > button { min-width: 26px; }
+  .rn-sep { margin: 0 2px; }
+  .rn-state[data-ok] { display: none; }
+  .rn-state[data-ok] + button { margin-left: auto; }
+}
 .v-side-body:has(> .rn) { display: flex; flex-direction: column; overflow: hidden; }
 .v-side-body > .rn { flex: 1; min-height: 0; }
 .rn-tools { flex: none; display: flex; align-items: center; flex-wrap: wrap; gap: 1px; padding: 4px 8px; border-bottom: 1px solid var(--line); background: var(--panel); }
