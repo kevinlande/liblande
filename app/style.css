@@ -1552,19 +1552,22 @@ body.is-offline .fileicon:not(.saved), body.is-offline .pdf:not(.saved) { opacit
 #vPages .page.ll-soft.loading::after { display: none; }
 .viewer.dark-pages #vPages .page.ll-soft::before { filter: invert(1) hue-rotate(180deg) blur(.6px); }
 .viewer.dark-pages.tone-darksepia #vPages .page.ll-soft::before { filter: invert(1) hue-rotate(180deg) contrast(.86) sepia(.7) brightness(.9) blur(.6px); }
-.viewer.tinted:not(.dark-pages) #vPages .page.ll-soft::before { filter: url(#llTint) blur(.6px); }
-.viewer.tinted.dark-pages #vPages .page.ll-soft::before { filter: invert(1) hue-rotate(180deg) url(#llTint) blur(.6px); }
-.viewer.tinted.dark-pages.tone-darksepia #vPages .page.ll-soft::before { filter: invert(1) hue-rotate(180deg) contrast(.86) sepia(.7) brightness(.9) url(#llTint) blur(.6px); }
+/* (Kept within the page: in Safari, the blend and the blur together put a
+   pink line down its edge.) */
+.viewer.tinted:not(.dark-pages) #vPages .page.ll-soft::before { background-color: var(--page-tint); background-blend-mode: multiply; clip-path: inset(0); }
 /* Dark sepia: the negative page in browns. Sepia and warmth: the page's
-   picture tinted by a colour filter (#llTint: each colour multiplied, so
-   white becomes the tint and black stays black). (Not a layer over the
-   page blended by multiply: Safari then didn't draw the panel below the
-   pages, for a link's destination or split screen, at all.) */
+   picture tinted by a layer over it blended by multiply (each colour
+   multiplied, so white becomes the tint and black stays black). (Not by
+   an SVG colour filter, #llTint, as before: Safari drew it slowly, a
+   frame of up to half a second each time a page came up, and the pages
+   flickered as they scrolled. And, with the pages now on a layer of their
+   own, the blend no longer keeps Safari from drawing the panel below.)
+   A page with only its blurry copy has the copy itself tinted (on a dark
+   page, only once the page has a layer for its drawing). */
 .viewer.dark-pages.tone-darksepia #vPages .canvasWrapper > canvas, .viewer.dark-pages.tone-darksepia #vPeekPages .canvasWrapper > canvas { filter: invert(1) hue-rotate(180deg) contrast(.86) sepia(.7) brightness(.9); }
 .viewer.dark-pages.tone-darksepia #vPages .page, .viewer.dark-pages.tone-darksepia #vPeekPages .page { background: #17120c; }
-.viewer.tinted:not(.dark-pages) #vPages .canvasWrapper > canvas, .viewer.tinted:not(.dark-pages) #vPeekPages .canvasWrapper > canvas { filter: url(#llTint); }
-.viewer.tinted.dark-pages #vPages .canvasWrapper > canvas, .viewer.tinted.dark-pages #vPeekPages .canvasWrapper > canvas { filter: invert(1) hue-rotate(180deg) url(#llTint); }
-.viewer.tinted.dark-pages.tone-darksepia #vPages .canvasWrapper > canvas, .viewer.tinted.dark-pages.tone-darksepia #vPeekPages .canvasWrapper > canvas { filter: invert(1) hue-rotate(180deg) contrast(.86) sepia(.7) brightness(.9) url(#llTint); }
+#vPeekPages { isolation: isolate; }
+.viewer.tinted :is(#vPages, #vPeekPages) .canvasWrapper::after { content: ""; position: absolute; inset: 0; background: var(--page-tint); mix-blend-mode: multiply; pointer-events: none; }
 /* The moon's choices: the tones, and how warm. */
 .v-tone-pair { display: inline-flex; align-items: center; }
 .v-tools .tb-btn.v-tone-more { width: 18px; min-width: 18px; padding: 0; margin-left: -4px; color: var(--muted); }

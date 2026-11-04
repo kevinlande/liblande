@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-04.01';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-04.02';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -4686,24 +4686,11 @@ function applyTone() {
   v.classList.toggle('tone-sepia', t === 'sepia');
   v.classList.toggle('tone-darksepia', t === 'darksepia');
   // (One tint multiplied over each page: sepia's paper, and the warmth's
-  // amber, mixed.)
+  // amber, mixed. See .tinted in the styles.)
   const base = t === 'sepia' ? [244, 230, 200] : [255, 255, 255], amber = [255, 168, 88], w = TONE.warm / 100 * 0.55;
   const tint = base.map((c, i) => Math.round(c * (1 - w) + amber[i] * w));
   v.classList.toggle('tinted', t === 'sepia' || TONE.warm > 0);
   v.style.setProperty('--page-tint', 'rgb(' + tint.join(',') + ')');
-  // (The filter itself: each of red, green and blue multiplied by the
-  // tint's; see #llTint in the styles.)
-  let f = document.getElementById('llTintSvg');
-  if (!f) {
-    f = document.createElementNS('http:\/\/www.w3.org/2000/svg', 'svg');
-    f.id = 'llTintSvg';
-    f.setAttribute('width', '0'); f.setAttribute('height', '0'); f.setAttribute('aria-hidden', 'true');
-    f.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden';
-    f.innerHTML = '<filter id="llTint" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values=""/></filter>';
-    document.body.appendChild(f);
-  }
-  const [r, g, b] = tint.map(c => (c / 255).toFixed(4));
-  f.querySelector('feColorMatrix').setAttribute('values', `${r} 0 0 0 0  0 ${g} 0 0 0  0 0 ${b} 0 0  0 0 0 1 0`);
   $('#vDarkBtn').setAttribute('aria-pressed', String(t !== 'light'));
   $('#vDarkBtn').dataset.tone = t;
   const box = $('#darkPagesBox');
