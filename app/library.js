@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-09.03';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-09.04';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -166,7 +166,7 @@ $('#themeSeg').addEventListener('click', ev => {
     location.reload();
     return;
   }
-  if (window.google && google.script && google.script.run) google.script.run.withFailureHandler(() => {}).savePrefs({ theme: b.dataset.themeSet });
+  sendPrefs({ theme: b.dataset.themeSet });
 });
 
 /* ------------------------------------------------------------ data prep */
@@ -385,7 +385,7 @@ function savePositions() {
   const keep = Object.entries(POS).sort((a, b) => b[1].at - a[1].at).slice(0, 150);
   Object.keys(POS).forEach(k => { if (!keep.some(x => x[0] === k)) delete POS[k]; });
   store.set('positions', POS);
-  if (gs && SYNC.position) google.script.run.withFailureHandler(() => {}).savePrefs({ positions: POS });
+  if (gs && SYNC.position) sendPrefs({ positions: POS });
   if (ENTRIES.length) renderRLBar();
 }
 document.addEventListener('visibilitychange', () => { if (document.hidden && notePosition.t) savePositions(); });
@@ -554,7 +554,7 @@ function saveProgress() {
   const keep = Object.entries(PROGRESS).sort((a, b) => b[1].at - a[1].at).slice(0, 300);
   Object.keys(PROGRESS).forEach(k => { if (!keep.some(x => x[0] === k)) delete PROGRESS[k]; });
   store.set('progress', PROGRESS);
-  if (gs && SYNC.progress) google.script.run.withFailureHandler(() => {}).savePrefs({ progress: PROGRESS });
+  if (gs && SYNC.progress) sendPrefs({ progress: PROGRESS });
   if (ENTRIES.length) paint();
 }
 // From another device: the further read, unless one was reset (pressing
@@ -1092,7 +1092,7 @@ function notDupsMerge(prefs) {
 function notDuplicates(e) {
   (DUPS.get(e.k) || []).forEach(x => NOT_DUPS.add(pairOf(e.k, x.k)));
   store.set('notDups', [...NOT_DUPS]);
-  if (window.google && google.script && google.script.run) google.script.run.withFailureHandler(() => {}).savePrefs({ notDups: [...NOT_DUPS] });
+  sendPrefs({ notDups: [...NOT_DUPS] });
   findDups();
   renderGroups();
   refresh(false);
@@ -1323,7 +1323,7 @@ function noteLibCount(bibId, n) {
   LIB_COUNTS[bibId] = { n, at: Date.now() };
   store.set('libCounts', LIB_COUNTS);
   clearTimeout(libCountsTimer);
-  libCountsTimer = setTimeout(() => { if (gs) google.script.run.withFailureHandler(() => {}).savePrefs({ libCounts: LIB_COUNTS }); }, 3000);
+  libCountsTimer = setTimeout(() => { if (gs) sendPrefs({ libCounts: LIB_COUNTS }); }, 3000);
 }
 function libCountsMerge(prefs) {
   Object.entries((prefs && prefs.libCounts) || {}).forEach(([k, v]) => { if (v && (!LIB_COUNTS[k] || LIB_COUNTS[k].at < v.at)) LIB_COUNTS[k] = v; });
@@ -1543,7 +1543,7 @@ let sideDragged = false;
         SIDE_ORDER[d.sec.dataset.sec] = items().map(sideId);
         SIDE_ORDER.at = Date.now();
         store.set('sideOrder', SIDE_ORDER);
-        if (gs) google.script.run.withFailureHandler(() => {}).savePrefs({ sideOrder: SIDE_ORDER });
+        if (gs) sendPrefs({ sideOrder: SIDE_ORDER });
         if (d.sec.querySelector(':scope > .lib-sub')) applySideOrder(g);
       } else applySideOrder(g);
       // (The click that ends a drag doesn't open the item.)
@@ -2855,8 +2855,8 @@ function recentSave() {
   store.set('recentClosed', RECENT.closed);
   clearTimeout(RECENT.saveT);
   RECENT.saveT = setTimeout(() => {
-    if (!gs || !window.google || !google.script || !google.script.run) return;
-    if (SYNC.recent) google.script.run.withFailureHandler(() => {}).savePrefs({ recentSeen: RECENT.seen.slice(0, 100), recentClosed: RECENT.closed.slice(0, 20) });
+    if (!gs) return;
+    if (SYNC.recent) sendPrefs({ recentSeen: RECENT.seen.slice(0, 100), recentClosed: RECENT.closed.slice(0, 20) });
   }, 4000);
 }
 const nowSec = () => Math.round(Date.now() / 1000);

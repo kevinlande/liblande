@@ -17,11 +17,11 @@
   window.LIBLANDE_PAGES = true;
   // (Which version each part of the app is from: index.html checks they
   // match. build.py fills it in.)
-  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-11-09.03';
+  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-11-09.04';
   const CLIENT_ID = '789682218462-98mjugngb46ttd01ucp9dcj71ufspjgn.apps.googleusercontent.com';
   // Google Drive (your .bib, papers and LibLande folder): all it needs.
   const SCOPE = 'https://www.googleapis.com/auth/drive';
-  const API = 'https://www.googleapis.com/drive/v3/';
+  const API = 'https://www.googleapis.com/drive/v3/', UPLOAD = 'https://www.googleapis.com/upload/drive/v3/';
   const FOLDER = 'application/vnd.google-apps.folder';
   // As in Code.gs.
   const DATA_FOLDER = 'LibLande', LIBRARY_FILE = 'library.json.gz',
@@ -119,7 +119,8 @@
     if (barEl && !barEl.hidden) bar(waiters.length ? OFFLINE_BAR : null);
   });
   window.addEventListener('online', () => {
-    if (barEl && !barEl.hidden && barEl.textContent === OFFLINE_BAR) bar(waiters.length || !valid() ? (email ? 'Tap anywhere to reconnect to Google Drive' : 'Sign in with Google to open your library') : null);
+    if (waiters.length && !valid()) bar(email ? 'Tap anywhere to reconnect to Google Drive' : 'Sign in with Google to open your library');
+    else if (barEl && !barEl.hidden && barEl.textContent === OFFLINE_BAR) bar(!valid() ? (email ? 'Tap anywhere to reconnect to Google Drive' : 'Sign in with Google to open your library') : null);
   });
 
   // The bar: what's needed, at the top of the screen.
@@ -145,6 +146,12 @@
   // under way when LibLande goes to the background can be left with none,
   // ever, and changes to the .bib wait their turn behind it.)
   const STALL = 45 * 1000, STALL_SENDING = 5 * 60 * 1000, STALL_READING = 5 * 60 * 1000;
+  const DRIVE_WAITS = [500, 2000, 5000];
+  async function passing(r) {
+    if (r.status === 429 || r.status >= 500) return true;
+    if (r.status !== 403) return false;
+    try { return /rateLimitExceeded|userRateLimitExceeded/.test(JSON.stringify((await r.clone().json()).error)); } catch (e) { return false; }
+  }
   async function drive(path, opts = {}, base = API) {
     const go = async t => {
       const stop = window.AbortController ? new AbortController() : null;
@@ -164,8 +171,18 @@
         throw err;
       }
     };
-    let r = await go(await getToken());
-    if (r.status === 401) r = await go(await getToken(true));
+    // (Drive's passing troubles, 429, a 5xx, or a 403 for asking too fast:
+    // a request that changes nothing is asked again, up to three times,
+    // after a moment. One that changes something isn't, as whether it was
+    // made can't be told.)
+    const again = !opts.method || opts.method === 'GET';
+    let r;
+    for (let tries = 0; ; tries++) {
+      r = await go(await getToken());
+      if (r.status === 401) r = await go(await getToken(true));
+      if (r.ok || !again || tries >= 3 || !(await passing(r))) break;
+      await new Promise(done => setTimeout(done, DRIVE_WAITS[tries]));
+    }
     if (!r.ok) {
       let msg = '';
       try { msg = (await r.json()).error.message; } catch (e) { /* none */ }
@@ -196,26 +213,10 @@
     const raw = await (await drive('files/' + encodeURIComponent(f.id) + '?alt=media')).text();
     try { return JSON.parse(raw); } catch (e) { return null; }
   }
-  // LibLande's folder in My Drive (the one with the library in it).
-  let dataId = store.get('dataFolder', null);
-  async function dataFolder() {
-    if (dataId) {
-      try {
-        const f = await (await drive('files/' + encodeURIComponent(dataId) + '?fields=id,trashed')).json();
-        if (!f.trashed) return dataId;
-      } catch (e) { /* gone: look again */ }
-    }
-    const folders = await list('name = ' + q(DATA_FOLDER) + " and 'root' in parents and mimeType = '" + FOLDER + "' and trashed = false");
-    for (const f of folders) {
-      if (await fileIn(f.id, LIBRARY_FILE)) { dataId = f.id; store.set('dataFolder', dataId); return dataId; }
-    }
-    return null;
-  }
-  const bytesToB64 = bytes => {
-    let s = '';
-    for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
-    return btoa(s);
-  };
+  // LibLande's folder in My Drive: as the builder finds it (the same one
+  // for preferences and PDF backups here as for .bib backups and the
+  // inbox there).
+  const dataFolder = () => builder.dataFolder();
   const day = () => {
     const d = new Date();
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
@@ -232,7 +233,7 @@
       // few seconds: answered as soon as it's done.)
       const running = buildRun;
       // (Changes kept from a time offline go to Drive first.)
-      if (outbox.length && navigator.onLine) { try { await flushOutbox(); } catch (e) { /* tried */ } }
+      if (freshOutbox().length && navigator.onLine) { try { await flushOutbox(); } catch (e) { /* tried */ } }
       const w = await builder.look({ daily: true });
       if (!w.configured) return { configured: false };
       const started = startBuild(w);
@@ -360,10 +361,13 @@
       return { id: lib.id, stamp: Date.parse(lib.modifiedTime), token: await getToken() };
     },
     getToken() { return getToken(); },
+    // The library, when the page's own download of it failed: through
+    // drive() here, which waits and asks again. (Handed over as it is: Apps
+    // Script had to send it as base64 text.)
     async getLibrary() {
       const info = await SERVER.getLibraryInfo();
-      const bytes = new Uint8Array(await (await drive('files/' + encodeURIComponent(info.id) + '?alt=media')).arrayBuffer());
-      return { stamp: info.stamp, library: bytesToB64(bytes) };
+      const gz = new Uint8Array(await (await drive('files/' + encodeURIComponent(info.id) + '?alt=media')).arrayBuffer());
+      return { stamp: info.stamp, gz };
     },
     // Your preferences (theme, tools, recently viewed...), in
     // LibLande/prefs.json, so they follow you across devices.
@@ -424,22 +428,31 @@
   // page shows them (index.html's overlayOffline reads
   // window.liblandeOutbox), and asks with the answers given here: what the
   // reading list comes to with them.
+  // (Kept in this browser's storage, shared by every LibLande tab, and
+  // read from it afresh before each use: two tabs open don't each keep a
+  // copy of their own and write over the other's.)
   let outbox = store.get('outbox', []);
-  window.liblandeOutbox = () => outbox.slice();
+  const freshOutbox = () => (outbox = store.get('outbox', []));
+  window.addEventListener('storage', ev => {
+    if (ev.key !== 'liblande.pages.outbox') return;
+    freshOutbox();
+    window.dispatchEvent(new CustomEvent('liblande-waiting', { detail: { waiting: outbox.length } }));
+  });
+  window.liblandeOutbox = () => freshOutbox().slice();
   const isOffline = e => !navigator.onLine || !!(e && e.offline);
   function keepForLater(name, args) {
-    outbox.push({ name, args, at: Date.now() });
+    freshOutbox().push({ name, args, at: Date.now(), id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8) });
     store.set('outbox', outbox);
     window.dispatchEvent(new CustomEvent('liblande-waiting', { detail: { waiting: outbox.length } }));
   }
   // (Made in Drive first: anything kept from before, so the order holds.)
   function later(name, offline) {
     return async (...args) => {
-      if (navigator.onLine && outbox.length) { try { await flushOutbox(); } catch (e) { /* tried */ } }
+      if (navigator.onLine && freshOutbox().length) { try { await flushOutbox(); } catch (e) { /* tried */ } }
       // (The answer first: a change that can't be kept offline says so,
       // and isn't kept.)
       const keep = () => { const res = offline(...args); keepForLater(name, args); return res; };
-      if (!navigator.onLine || outbox.length) return keep();
+      if (!navigator.onLine || freshOutbox().length) return keep();
       try {
         const res = await edits[name](...args);
         offlineLists.update(res);
@@ -486,14 +499,16 @@
   // the second is checked against what the first made it. One that can't
   // be made (the publication was changed elsewhere meanwhile, say) is left
   // out, with why. The page hears how it went (the event liblande-outbox).
+  // (One tab at a time, with the browser's lock where it has one, so two
+  // tabs don't both make the same change.)
   let flushing = null;
   function flushOutbox() {
     if (flushing) return flushing;
-    if (!outbox.length || !navigator.onLine) return Promise.resolve();
-    flushing = (async () => {
+    if (!freshOutbox().length || !navigator.onLine) return Promise.resolve();
+    const work = async () => {
       let saved = 0;
       const failed = [], hashes = {};
-      while (outbox.length) {
+      while (freshOutbox().length) {
         const item = outbox[0], req = item.args[0];
         if (req && typeof req === 'object' && req.key && hashes[req.key] && req.expectHash === hashes[req.key].from) req.expectHash = hashes[req.key].to;
         try {
@@ -505,18 +520,23 @@
           if (isOffline(e)) break;
           failed.push({ name: item.name, key: req && req.key || (typeof req === 'string' ? req : ''), reason: e.message });
         }
-        outbox.shift();
-        store.set('outbox', outbox);
+        // (Taken off as itself: the list as it is now, which another tab
+        // may have added to meanwhile.)
+        const same = x => (item.id ? x.id === item.id : x.at === item.at && x.name === item.name);
+        store.set('outbox', freshOutbox().filter(x => !same(x)));
+        outbox = store.get('outbox', []);
       }
       if (saved || failed.length) window.dispatchEvent(new CustomEvent('liblande-outbox', { detail: { saved, failed, waiting: outbox.length } }));
-    })().finally(() => { flushing = null; });
+    };
+    const locked = navigator.locks && navigator.locks.request ? navigator.locks.request('liblande-outbox', work) : work();
+    flushing = Promise.resolve(locked).finally(() => { flushing = null; });
     return flushing;
   }
   window.addEventListener('online', () => setTimeout(() => { flushOutbox().catch(() => {}); }, 1500));
   // (Safari often doesn't say it's back online, as when LibLande comes
   // back to the screen with a connection already: so also then, and every
   // half minute while changes wait, with the page on screen.)
-  const flushSoon = () => { if (outbox.length && navigator.onLine && !document.hidden) flushOutbox().catch(() => {}); };
+  const flushSoon = () => { if (freshOutbox().length && navigator.onLine && !document.hidden) flushOutbox().catch(() => {}); };
   document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(flushSoon, 1500); });
   setInterval(flushSoon, 30 * 1000);
 
@@ -532,23 +552,56 @@
     // (Not readable just now: none this time, and asked again next time,
     // rather than the old ones in settings.json taken for them.)
     let saved;
-    try { saved = await builder.readJson(await dataFolder(), PREFS_FILE); } catch (e) { console.warn('Preferences:', e.message); return Object.assign({}, prefsWaiting); }
+    try { saved = await readPrefs(); } catch (e) { console.warn('Preferences:', e.message); return Object.assign({}, prefsWaiting); }
     prefsMemo = saved || (settings && settings.prefs) || {};
     return Object.assign({}, prefsMemo, prefsWaiting);
   }
   // (Kept paper by paper when saved: see savePrefs. The numbers are how
   // many papers are kept, as the page keeps.)
   const BY_PAPER = { positions: 150, progress: 300 };
+  // prefs.json read and written by its ID once known (2 requests, not 5).
+  let prefsId = null;
+  async function readPrefs() {
+    if (prefsId) {
+      try { return JSON.parse(await (await drive('files/' + encodeURIComponent(prefsId) + '?alt=media')).text()); } catch (e) {
+        if (e.offline) throw e;
+        prefsId = null;
+      }
+    }
+    const folder = await dataFolder();
+    const f = folder && await builder.named(folder, PREFS_FILE, 'id');
+    if (!f) return null;
+    prefsId = f.id;
+    return builder.readJson(folder, PREFS_FILE);
+  }
+  async function writePrefs(value) {
+    if (prefsId) {
+      try {
+        await drive('files/' + encodeURIComponent(prefsId) + '?uploadType=media&fields=id', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(value) }, UPLOAD);
+        return;
+      } catch (e) { if (e.offline) throw e; prefsId = null; }
+    }
+    const made = await builder.writeFile(await dataFolder(), PREFS_FILE, JSON.stringify(value), 'application/json');
+    prefsId = made && made.id;
+  }
+  // Changes gathered for a moment and saved as one: every caller in the
+  // batch hears when it's done.
+  let prefsBatch = null;
   function savePrefs(changes) {
     Object.assign(prefsWaiting, changes || {});
     clearTimeout(prefsTimer);
-    return new Promise(resolve => {
-      prefsTimer = setTimeout(async () => {
+    if (!prefsBatch) { let done; prefsBatch = { promise: new Promise(r => { done = r; }) }; prefsBatch.done = done; }
+    const batch = prefsBatch;
+    const resolve = v => batch.done(v);
+    prefsTimer = setTimeout(async () => {
+      // (Changes asked for from now on are the next batch's, heard when
+      // that one is saved.)
+      if (prefsBatch === batch) prefsBatch = null;
+      {
         const these = prefsWaiting;
         prefsWaiting = {};
         try {
-          const folder = await dataFolder();
-          const was = (await builder.readJson(folder, PREFS_FILE)) || prefsMemo || {};
+          const was = (await readPrefs()) || prefsMemo || {};
           const now = Object.assign({}, was, these);
           // (Places in papers and reading progress: paper by paper, the
           // later of this device's and what another device saved, so one
@@ -564,15 +617,16 @@
             });
             now[k] = Object.fromEntries(Object.entries(all).sort((x, y) => ((y[1] && y[1].at) || 0) - ((x[1] && x[1].at) || 0)).slice(0, most));
           });
-          await builder.writeFile(folder, PREFS_FILE, JSON.stringify(now), 'application/json');
+          await writePrefs(now);
           prefsMemo = now;
         } catch (e) {
           prefsWaiting = Object.assign(these, prefsWaiting);
           console.warn('Preferences:', e.message);
         }
         resolve(Object.assign({}, prefsMemo, prefsWaiting));
-      }, 1500);
-    });
+      }
+    }, 1500);
+    return batch.promise;
   }
   const names = {};
   async function folderName(id) {
@@ -765,9 +819,7 @@
     if (!window.google.script) window.google.script = scriptApi;
     makeClient();
   });
-  // Back online with something waiting for Google: ask for the tap now.
-  window.addEventListener('online', () => { if (waiters.length && !valid()) bar('Tap anywhere to reconnect to Google Drive'); });
-  window.addEventListener('offline', () => bar(null));
+  // (Going offline and back: see the listeners near the top.)
 
   /* ------------------------------------------------------------ offline */
   // sw.js keeps the app, PDF.js and recently opened papers on this device,

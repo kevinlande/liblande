@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-11-09.03';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-11-09.04';
 // On GitHub Pages, every part of the app must be from the same version: a
 // part kept from an older one (the offline copy, served when the network
 // was slow) lacks what this page needs. Then the kept copies go, and the
@@ -238,6 +238,17 @@ const callServer = (name, ...args) => new Promise((resolve, reject) => {
   }
   runner[name](...args);
 });
+// Your preferences saved with your account (prefs.json, through the
+// server): nothing comes of a failure, as the next save carries them too.
+// done() once saved. (A function, so it can be used from any part, even
+// one run before this.)
+function sendPrefs(changes, done) {
+  const run = window.google && google.script && google.script.run;
+  if (!run) return;
+  let r = run.withFailureHandler(() => {});
+  if (done) r = r.withSuccessHandler(done);
+  r.savePrefs(changes);
+}
 const errText = err => ((err && err.message) || String(err)).replace(/^(Exception|Error): /, '');
 let status = null, statusReq = null, STYLE_WAS = null;
 let showSetup = () => {};
@@ -251,8 +262,8 @@ function renderLibOthers(st) {
   }).join('');
 }
 
-// Builds run in the background on Google's side (a big library takes a
-// minute or more). Poll until the build finishes, reporting progress.
+// A build runs on this device (pages/server.js and builder.js), in the
+// background; ask after it until it's done, reporting progress.
 async function waitForBuild(progress) {
   const start = Date.now();
   while (status && status.configured && status.building) {
@@ -283,7 +294,8 @@ function gunzipJSON(bytes) {
 const b64ToBytes = b64 => Uint8Array.from(atob(b64), c => c.charCodeAt(0));
 
 // Download library.json.gz from Google Drive. If that fails, the server is
-// asked for it as base64 (getLibrary).
+// asked for it (getLibrary), which tries again more patiently. (The test
+// page's stand-in sends it as base64.)
 async function download() {
   // The status (from getStatus) says where the library is, with a token;
   // only without them (or if the token has run out) is the server asked.
@@ -308,7 +320,7 @@ async function download() {
     console.warn('Direct Drive download failed; trying again another way.', e);
     stage('Downloading the library again');
     const r = await callServer('getLibrary');
-    return { stamp: r.stamp, gz: b64ToBytes(r.library) };
+    return { stamp: r.stamp, gz: r.gz || b64ToBytes(r.library) };
   }
 }
 
@@ -394,7 +406,7 @@ if (RELOADING) {
     const saved = status.prefs && status.prefs.theme, toSave = store.get('themeToSave', null);
     if (toSave) {
       // (Chosen just before the page opened again: saved with your account now.)
-      google.script.run.withSuccessHandler(() => store.set('themeToSave', null)).withFailureHandler(() => {}).savePrefs({ theme: toSave });
+      sendPrefs({ theme: toSave }, () => store.set('themeToSave', null));
     } else if (saved && saved !== store.get('theme', 'auto')) { store.set('theme', saved); applyTheme(saved); }
     const look = status.prefs && status.prefs.style;
     if (look && look !== store.get('style', 'liblande') && $('#setup').hidden) { store.set('style', look); applyStyle(look); }
@@ -730,7 +742,7 @@ if (RELOADING) {
   $('#glassBox').addEventListener('change', ev => {
     store.set('glass', ev.target.checked);
     applyGlass(ev.target.checked);
-    if (window.google && google.script && google.script.run) google.script.run.withFailureHandler(() => {}).savePrefs({ glass: ev.target.checked });
+    sendPrefs({ glass: ev.target.checked });
   });
   $('#coversBox').addEventListener('change', ev => { store.set('coversOn', ev.target.checked); sweepCovers(); renderDetail(); });
   $('#setup').querySelectorAll('[data-sync]').forEach(b => b.addEventListener('change', () => {
@@ -869,7 +881,7 @@ if (RELOADING) {
       const look = document.documentElement.getAttribute('data-style') || 'liblande';
       if (look !== store.get('style', 'liblande')) {
         store.set('style', look);
-        if (window.google && google.script && google.script.run) google.script.run.withFailureHandler(() => {}).savePrefs({ style: look });
+        sendPrefs({ style: look });
       }
       STYLE_WAS = null;
       setupMsg('', 'status');

@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/newpapers.js'] = '2026-11-09.03';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/newpapers.js'] = '2026-11-09.04';
 /* ------------------------------------------------------------ new papers */
 // Found with OpenAlex (citations, authors, journals) and Semantic Scholar
 // (papers like your examples), asked from this page: no key, and no email
@@ -46,7 +46,7 @@ function npPick(cfg, k) {
 }
 function npSave(synced) {
   store.set('npCfg', NP.cfg); store.set('npGone', NP.gone);
-  if (synced && gs && SYNC.alerts !== false) google.script.run.withFailureHandler(() => {}).savePrefs({ npCfg: NP.cfg, npGone: NP.gone });
+  if (synced && gs && SYNC.alerts !== false) sendPrefs({ npCfg: NP.cfg, npGone: NP.gone });
 }
 function npMerge(prefs) {
   if (!prefs || SYNC.alerts === false) return;

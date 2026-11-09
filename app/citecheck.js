@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/citecheck.js'] = '2026-11-09.03';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/citecheck.js'] = '2026-11-09.04';
 /* ------------------------------------------------------------ manuscript check */
 // A manuscript's citations checked: a Google Doc, or a Word file from Google
 // Drive or this device, read (never changed). Each APA author-date citation
@@ -313,9 +313,7 @@ async function msFromDrive(link) {
 }
 const MS_API = 'https:\/\/www.googleapis.com/drive/v3/files/';
 async function msGet(url, opts = {}) {
-  const go = async token => fetch(url, Object.assign({}, opts, { headers: Object.assign({ Authorization: 'Bearer ' + token }, opts.headers || {}) }));
-  let r = await go(await driveToken());
-  if (r.status === 401) r = await go(await driveToken(true));
+  const r = await googleFetch(url, opts);
   if (r.status === 404) throw new Error('Google Drive can’t find that file (or it isn’t shared with your account).');
   if (!r.ok) throw new Error('Google Drive didn’t send the file (error ' + r.status + ').');
   return r;
@@ -343,7 +341,7 @@ const msDoc = x => x.id || 'file:' + x.name;
 function msSave() {
   store.set('msRecent', MS.recent);
   store.set('msHidden', MS.hidden);
-  if (gs && SYNC.cite) google.script.run.withFailureHandler(() => {}).savePrefs({ msRecent: MS.recent, msHidden: MS.hidden });
+  if (gs && SYNC.cite) sendPrefs({ msRecent: MS.recent, msHidden: MS.hidden });
 }
 function msMerge(prefs) {
   if (!prefs || !SYNC.cite) return;
@@ -600,9 +598,7 @@ $('#sheetBody').addEventListener('click', ev => {
 // has what it was before. (Word files: reported only.)
 const DOCS_API = 'https:\/\/docs.googleapis.com/v1/documents/';
 async function docsCall(path, opts = {}) {
-  const go = async token => fetch(DOCS_API + path, Object.assign({}, opts, { headers: Object.assign({ Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, opts.headers || {}) }));
-  let r = await go(await driveToken());
-  if (r.status === 401) r = await go(await driveToken(true));
+  const r = await googleFetch(DOCS_API + path, Object.assign({}, opts, { headers: Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {}) }));
   if (r.ok) return r.json();
   let msg = '';
   try { msg = ((await r.json()).error || {}).message || ''; } catch (e) { /* none */ }

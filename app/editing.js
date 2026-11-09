@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-09.03';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-09.04';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -1446,7 +1446,7 @@ const SMART = store.get('smart', { at: 0, list: [] });
 function smartSave() {
   SMART.at = Date.now();
   store.set('smart', SMART);
-  if (gs && SYNC.smart) google.script.run.withFailureHandler(() => {}).savePrefs({ smart: SMART });
+  if (gs && SYNC.smart) sendPrefs({ smart: SMART });
   renderGroups();
 }
 function smartMerge(prefs) {
@@ -1701,7 +1701,7 @@ async function renameCore(e, newKey) {
     store.set('recentSeen', RECENT.seen);
     const pairs = [...NOT_DUPS].map(p => p.split('|').map(k => (k === old ? newKey : k))).map(([a, b]) => pairOf(a, b));
     NOT_DUPS.clear(); pairs.forEach(p => NOT_DUPS.add(p)); store.set('notDups', [...NOT_DUPS]);
-    google.script.run.withFailureHandler(() => {}).savePrefs(SYNC.recent ? { recentSeen: RECENT.seen.slice(0, 100), notDups: [...NOT_DUPS] } : { notDups: [...NOT_DUPS] });
+    sendPrefs(SYNC.recent ? { recentSeen: RECENT.seen.slice(0, 100), notDups: [...NOT_DUPS] } : { notDups: [...NOT_DUPS] });
     if (res.reading) setReading(res.reading);
     if (state.selKey === old) state.selKey = newKey;
     if (res.queued) e.offline = true;
@@ -2467,7 +2467,7 @@ function keysSave() {
   KEYS.at = Date.now();
   store.set('keys', KEYS.mine);
   store.set('keysAt', KEYS.at);
-  if (gs && SYNC.keys) google.script.run.withFailureHandler(() => {}).savePrefs({ keys: KEYS.mine, keysAt: KEYS.at });
+  if (gs && SYNC.keys) sendPrefs({ keys: KEYS.mine, keysAt: KEYS.at });
 }
 function keysMerge(prefs) {
   if (SYNC.keys && prefs && prefs.keysAt > KEYS.at) { KEYS.mine = prefs.keys || {}; KEYS.at = prefs.keysAt; store.set('keys', KEYS.mine); store.set('keysAt', KEYS.at); }

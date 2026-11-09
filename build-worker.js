@@ -12,7 +12,13 @@ self.onmessage = async ev => {
   const d = ev.data;
   if (d.call) {
     try {
-      self.postMessage({ id: d.id, result: self.liblandeEditCore[d.call](...d.args) });
+      // (The .bib's text, sent once: a later call on the same text, or on
+      // what the last call made of it, says so instead of sending it again.)
+      if (d.same) d.args[0] = self.lastText;
+      else if (typeof d.args[0] === 'string') self.lastText = d.args[0];
+      const result = self.liblandeEditCore[d.call](...d.args);
+      if (result && typeof result.text === 'string') self.lastText = result.text;
+      self.postMessage({ id: d.id, result });
     } catch (e) {
       self.postMessage({ id: d.id, error: (e && e.message) || String(e) });
     }

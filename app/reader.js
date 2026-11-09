@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-09.03';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-09.04';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -221,15 +221,21 @@ async function fetchAheadNow() {
 }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) fetchAheadSoon(); });
 window.addEventListener('online', () => fetchAheadSoon(5000));
+// A request to Google (Drive, Docs) with this device's token, made again
+// with a fresh one if it had run out (401); given up after ms with no
+// answer, if given (see fetchWithin; not for a download read as it comes).
+async function googleFetch(url, opts = {}, ms) {
+  const go = async t => {
+    const o = Object.assign({}, opts, { headers: Object.assign({}, opts.headers, { Authorization: 'Bearer ' + t }) });
+    return ms ? fetchWithin(url, o, ms) : fetch(url, o);
+  };
+  let r = await go(await driveToken());
+  if (r.status === 401) r = await go(await driveToken(true));
+  return r;
+}
 async function driveToken(fresh) {
   if (!fresh && tokenCache && Date.now() - tokenCache.at < 30 * 60 * 1000) return tokenCache.token;
-  let token;
-  try {
-    token = await callServer('getToken');
-  } catch (err) {
-    // An older Code.gs has no getToken; the library download's token works too.
-    token = (await callServer('getLibraryInfo')).token;
-  }
+  const token = await callServer('getToken');
   tokenCache = { token, at: Date.now() };
   return tokenCache.token;
 }
@@ -283,8 +289,7 @@ function trimRecentPdfs() {
 async function getPdfBytes(file, onProgress) {
   if (recentPdfs.has(file.id)) return recentPdfs.get(file.id);
   const url = 'https:\/\/www.googleapis.com/drive/v3/files/' + encodeURIComponent(file.id) + '?alt=media';
-  let r = await fetch(url, { headers: { Authorization: 'Bearer ' + await driveToken() } });
-  if (r.status === 401) r = await fetch(url, { headers: { Authorization: 'Bearer ' + await driveToken(true) } });
+  const r = await googleFetch(url);
   if (!r.ok) {
     throw new Error(r.status === 404
       ? 'Google Drive can\u2019t find this file any more. It may have been moved or deleted.'
@@ -412,7 +417,7 @@ async function fetchWithin(url, opts, ms) {
 }
 async function pdfMd5(file) {
   const url = 'https:\/\/www.googleapis.com/drive/v3/files/' + encodeURIComponent(file.id) + '?fields=md5Checksum';
-  const r = await fetchWithin(url, { headers: { Authorization: 'Bearer ' + await driveToken() } }, 45 * 1000);
+  const r = await googleFetch(url, {}, 45 * 1000);
   if (!r.ok) return null;
   return (await r.json()).md5Checksum || null;
 }
@@ -1530,19 +1535,17 @@ async function uploadMarked(file, bytes, pages) {
   // (A big file on a slow connection takes a while: at least 5 minutes,
   // more at about 40 KB a second.)
   const within = Math.max(5 * 60 * 1000, bytes.byteLength / 40);
-  const up = token => fetchWithin('https:\/\/www.googleapis.com/upload/drive/v3/files/' + encodeURIComponent(file.id) + '?uploadType=media&fields=md5Checksum',
-    { method: 'PATCH', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/pdf' }, body: bytes }, within);
   let r;
   try {
-    r = await up(await driveToken());
-    if (r.status === 401) r = await up(await driveToken(true));
+    r = await googleFetch('https:\/\/www.googleapis.com/upload/drive/v3/files/' + encodeURIComponent(file.id) + '?uploadType=media&fields=md5Checksum',
+      { method: 'PATCH', headers: { 'Content-Type': 'application/pdf' }, body: bytes }, within);
   } catch (err) {
     // (Given up on, the upload may still have arrived: if Drive's file is
     // now exactly this size, it did, and its checksum is the new one;
     // otherwise the next save would take it for a change made elsewhere.)
     if (err.noAnswer) {
-      const now = await fetchWithin('https:\/\/www.googleapis.com/drive/v3/files/' + encodeURIComponent(file.id) + '?fields=md5Checksum,size',
-        { headers: { Authorization: 'Bearer ' + await driveToken() } }, 45 * 1000).then(x => (x.ok ? x.json() : null)).catch(() => null);
+      const now = await googleFetch('https:\/\/www.googleapis.com/drive/v3/files/' + encodeURIComponent(file.id) + '?fields=md5Checksum,size', {}, 45 * 1000)
+        .then(x => (x.ok ? x.json() : null)).catch(() => null);
       if (now && now.md5Checksum && Number(now.size) === bytes.byteLength) return now.md5Checksum;
     }
     throw err;
@@ -2266,10 +2269,10 @@ let toolPrefsTimer = 0;
 function saveToolPrefs() {
   clearTimeout(toolPrefsTimer);
   toolPrefsTimer = setTimeout(() => {
-    if (!gs || !window.google || !google.script || !google.script.run) return;
+    if (!gs) return;
     const tools = {};
     TOOL_PREFS.forEach(k => { tools[k] = MARK[k]; });
-    google.script.run.withFailureHandler(() => {}).savePrefs({ tools });
+    sendPrefs({ tools });
   }, 1500);
 }
 function applyToolPrefs(tools) {
@@ -2323,8 +2326,8 @@ function showPalette() {
 const deviceKind = () => /iPhone|iPod/.test(navigator.userAgent) ? 'iphone'
   : /iPad/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ? 'ipad' : 'desktop';
 function savePalettePlace() {
-  if (!gs || !window.google || !google.script || !google.script.run) return;
-  google.script.run.withFailureHandler(() => {}).savePrefs({ ['palette.' + deviceKind()]: { pos: store.get('palettePos', null), snap: store.get('paletteSnap', 'bottom'), pencil: !!store.get('pencil', false) } });
+  if (!gs) return;
+  sendPrefs({ ['palette.' + deviceKind()]: { pos: store.get('palettePos', null), snap: store.get('paletteSnap', 'bottom'), pencil: !!store.get('pencil', false) } });
 }
 // Dragged near the left or right edge of the pages (beside the sidebar,
 // if it's open; on a screen at least 600px wide), the palette snaps there

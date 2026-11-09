@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/chapters.js'] = '2026-11-09.03';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/chapters.js'] = '2026-11-09.04';
 /* ------------------------------------------------------------ link chapters */
 // A chapter is linked to its book by its crossref field (see findChapters).
 // Chapters added before that are linked here, after you've looked:
@@ -42,7 +42,7 @@ function lcNoMerge(prefs) {
 }
 function lcNoSave() {
   store.set('lcNo', [...LC_NO]);
-  if (window.google && google.script && google.script.run) google.script.run.withFailureHandler(() => {}).savePrefs({ lcNo: [...LC_NO] });
+  sendPrefs({ lcNo: [...LC_NO] });
 }
 const lcPairId = x => 'c:' + x.c.k + '>' + x.b.k;
 const lcGroupId = g => 'g:' + lcNorm(g.fields.title);

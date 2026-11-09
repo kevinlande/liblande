@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/findpdf.js'] = '2026-11-09.03';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/findpdf.js'] = '2026-11-09.04';
 /* ------------------------------------------------------------ find a PDF */
 // For a publication: its free copy, found through OpenAlex (which carries
 // Unpaywall's open-access data, and needs no email), or the article
@@ -19,7 +19,7 @@ function proxiesSave() {
   PROXIES.at = Date.now();
   store.set('proxies', PROXIES);
   clearTimeout(proxiesSave.t);
-  proxiesSave.t = setTimeout(() => { if (gs) google.script.run.withFailureHandler(() => {}).savePrefs({ proxies: PROXIES }); }, 1500);
+  proxiesSave.t = setTimeout(() => { if (gs) sendPrefs({ proxies: PROXIES }); }, 1500);
 }
 function proxiesMerge(prefs) {
   const x = prefs && prefs.proxies;

@@ -19,7 +19,7 @@
  */
 (function (root) {
   'use strict';
-  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).builder = '2026-11-09.03';
+  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).builder = '2026-11-09.04';
   const FOLDER = 'application/vnd.google-apps.folder';
   const DATA_FOLDER = 'LibLande', LIBRARY_FILE = 'library.json.gz', INDEX_FILE = 'file-index.json',
     SETTINGS_FILE = 'settings.json', INBOX_FOLDER = 'Inbox', INBOX_FILE = 'LibLande inbox.bib';
@@ -77,7 +77,17 @@
     const meta = (id, fields) => get('files/' + encodeURIComponent(id) + '?fields=' + encodeURIComponent(fields));
     const named = async (parentId, name, fields, folder) => (await listAll('name = ' + q(name) + ' and ' + q(parentId) +
       ' in parents and trashed = false' + (folder ? " and mimeType = '" + FOLDER + "'" : ''), fields || 'id,name,modifiedTime', 'modifiedTime desc'))[0] || null;
-    const text = async id => (await io.drive('files/' + encodeURIComponent(id) + '?alt=media')).text();
+    // (A file that isn't UTF-8 is read as well as it can be, and noted:
+    // edits refuse to write it back, which would garble its accented
+    // letters. A \ufffd written in the file itself is fine.)
+    const notUtf8 = new Set();
+    const text = async id => {
+      const buf = await (await io.drive('files/' + encodeURIComponent(id) + '?alt=media')).arrayBuffer();
+      try { const t = new TextDecoder('utf-8', { fatal: true }).decode(buf); notUtf8.delete(id); return t; } catch (e) {
+        notUtf8.add(id);
+        return new TextDecoder('utf-8').decode(buf);
+      }
+    };
     // The last text of each file read or written here, by modified time:
     // a build after an edit made here needn't download the .bib again.
     const kept = {};
@@ -125,12 +135,14 @@
       return (await io.drive(path, { method: old ? 'PATCH' : 'POST', headers: { 'Content-Type': blob.type }, body: blob }, UPLOAD)).json();
     }
 
+    async function writeIndex(folder, index) {
+      const body = JSON.stringify(index), w = await writeFile(folder, INDEX_FILE, body, 'application/json');
+      if (w && w.id && w.modifiedTime) remember(w.id, w.modifiedTime, body);
+    }
+
     /* -------------------------------------------- settings */
-    // Which .bib and papers folder: LibLande/settings.json, made from Apps
-    // Script's settings the first time (and again when they change there).
-    // Which .bib and papers folder, and how edits are saved:
-    // LibLande/settings.json (first made from Apps Script's settings).
-    // fresh: read the file again.
+    // Which .bib and papers folder (and the libraries you've used):
+    // LibLande/settings.json. fresh: read the file again.
     let known = null;
     async function readSettings() {
       const folder = await dataFolder();
@@ -145,7 +157,7 @@
     // Change settings.json: fn(settings) changes it in place, on a fresh
     // copy of the file (or a new one).
     async function updateSettings(fn) {
-      const s = (await readSettings()) || { bibId: '', papersId: '', directEdits: false, pendingGroups: [], readingGroup: '', prefs: {} };
+      const s = (await readSettings()) || { bibId: '', papersId: '', readingGroup: '', prefs: {} };
       fn(s);
       await writeFile(await dataFolder(true), SETTINGS_FILE, JSON.stringify(s, null, 1), 'application/json');
       known = s;
@@ -318,11 +330,13 @@
 
       // The papers folder's index: the saved one, unless it's for another
       // folder, or a day old, or a full build was asked for.
-      const indexFile = await named(folder, INDEX_FILE, 'id');
+      // (Kept from the last time it was read or written, while unchanged:
+      // not downloaded for every build.)
+      const indexFile = await named(folder, INDEX_FILE, 'id,modifiedTime');
       let index = null;
       if (indexFile && !o.force) {
         try {
-          const saved = JSON.parse(await text(indexFile.id));
+          const saved = JSON.parse(await textAt(indexFile.id, indexFile.modifiedTime));
           if (saved.papersId === papersId && saved.prefix === prefix && saved.files && saved.folders) index = saved;
         } catch (e) { /* list it again */ }
       }
@@ -331,14 +345,14 @@
       if (fullListing) {
         const tree = await listTree(papersId, prefix);
         index = { papersId, prefix, files: tree.files, folders: tree.folders, hash: indexHash(tree.files) };
-        await writeFile(folder, INDEX_FILE, JSON.stringify(index), 'application/json');
+        await writeIndex(folder, index);
         lastFull = String(Date.now());
       }
       if (!fullListing && Object.keys(filed.files).length) {
         Object.assign(index.files, filed.files);
         Object.assign(index.folders, filed.folders);
         index.hash = indexHash(index.files);
-        await writeFile(folder, INDEX_FILE, JSON.stringify(index), 'application/json');
+        await writeIndex(folder, index);
       }
       filed.files = {}; filed.folders = {};
       mark(fullListing ? 'listed papers folder' : 'read saved index');
@@ -369,7 +383,7 @@
           const found = await resolveMissing(out.data, index);
           if (found.looked) {
             index.hash = indexHash(index.files);
-            await writeFile(folder, INDEX_FILE, JSON.stringify(index), 'application/json');
+            await writeIndex(folder, index);
             props.signature = fingerprint_(bibStamp + ':' + inboxStamp + ':' + papersId + ':' + index.hash + ':' + inboxHash);
             mark('looked up ' + found.looked + ' new file' + (found.looked === 1 ? '' : 's') + ' (' + found.found + ' found)');
           }
@@ -396,7 +410,7 @@
       try { return JSON.parse(raw); } catch (e) { return null; }
     }
 
-    return { look, build, settings, updateSettings, dataFolder, named, meta, text, textAt, remember, noteFile, readJson, writeFile, listAll };
+    return { look, build, settings, updateSettings, dataFolder, named, meta, text, textAt, remember, noteFile, readJson, writeFile, listAll, notUtf8: id => notUtf8.has(id) };
   }
 
   root.makeLiblandeBuilder = makeBuilder;

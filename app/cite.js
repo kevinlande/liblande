@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/cite.js'] = '2026-11-09.03';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/cite.js'] = '2026-11-09.04';
 /* ------------------------------------------------------------ citation styles */
 // Your citation style, chosen in Settings > Citing, kept with your account:
 // APA by default, which LibLande formats itself (apaCitation, apaInText:
@@ -242,7 +242,7 @@ function citeChoose(id, title) {
     store.set('citeRecent', CITE.recent);
     citeLoad(id).catch(err => toast('Couldn\u2019t download ' + (title || id) + ': ' + errText(err), 6000));
   }
-  if (window.google && google.script && google.script.run) google.script.run.withFailureHandler(() => {}).savePrefs({ citeStyle: id, citeRecent: CITE.recent });
+  sendPrefs({ citeStyle: id, citeRecent: CITE.recent });
   // (What shows citations again, in the new style.)
   if (typeof renderDetail === 'function' && state.selKey) renderDetail();
   if (V.entry && SIDE.tab === 'info' && sideOpen()) showInfo();

@@ -19,7 +19,7 @@
  */
 (function (root) {
   'use strict';
-  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).edits = '2026-11-09.03';
+  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).edits = '2026-11-09.04';
   const FOLDER = 'application/vnd.google-apps.folder';
   const UPLOAD = 'https://www.googleapis.com/upload/drive/v3/';
   const READING_FILE = 'reading-list.json',
@@ -80,9 +80,7 @@
         throw new Error(fileName + ' has changed since LibLande last read it (perhaps it was saved in BibDesk). ' + CHANGED);
       }
       const before = parseBib_(text);
-      if (req.expectHash && hashOf(text, req.key) !== req.expectHash) {
-        throw new Error('This publication has been changed since LibLande last read it (perhaps in BibDesk). ' + CHANGED);
-      }
+      const clash = !!req.expectHash && hashOf(text, req.key) !== req.expectHash;
       const changingGroups = !!req.groups && ((req.groups.add || []).length + (req.groups.remove || []).length > 0);
       if (changingGroups && req.expectGroupsHash && groupsHashOf(before) !== req.expectGroupsHash) {
         throw new Error('Your static groups have been changed since LibLande last read them (perhaps in BibDesk). ' + CHANGED);
@@ -91,6 +89,13 @@
       if (Object.keys(set).length || changingGroups) set['date-modified'] = req.modified;
       let edited = Object.keys(set).length ? editEntry_(text, req.key, set) : text;
       if (req.groups) edited = editGroups_(edited, req.key, req.groups.add || [], req.groups.remove || []);
+      // Changed since it was read: a clash, unless the change is already
+      // there exactly (to its date-modified), as when this edit reached
+      // Drive before but its answer was lost, and it's made again.
+      if (clash) {
+        if (edited === text && Object.keys(set).length) return { text: null, hash: hashOf(text, req.key), already: true };
+        throw new Error('This publication has been changed since LibLande last read it (perhaps in BibDesk). ' + CHANGED);
+      }
       if (edited === text) return { text: null };
       // Checked before writing: same entries, and exactly the requested changes.
       const after = parseBib_(edited);
@@ -339,7 +344,9 @@
     // isn't downloaded again.)
     async function read(id) {
       const m = await meta(id, 'id,name,modifiedTime,mimeType,size,parents');
-      return { m, text: await B.textAt(id, m.modifiedTime) };
+      const text = await B.textAt(id, m.modifiedTime);
+      if (B.notUtf8 && B.notUtf8(id)) throw new Error(m.name + ' isn\u2019t saved as UTF-8 (Unicode), so LibLande didn\u2019t change it: its accented letters would have been garbled. In BibDesk, save it with the encoding Unicode (UTF-8) (File \u203a Save As\u2026), then try again.');
+      return { m, text };
     }
     // A copy in LibLande/Backups named with the time. Throws if the copy
     // fails, so nothing is written without a backup. Returns the folder,
@@ -413,7 +420,7 @@
       }
       throw new Error(BUSY);
     }
-    // The same for LibLande's own JSON files (pending edits, the reading
+    // The same for LibLande's own JSON files (the reading
     // list): change(value) changes it in place, or returns false to leave it.
     async function changeJson(name, blank, change) {
       const folder = await B.dataFolder();
@@ -485,7 +492,7 @@
 
     // The text work (reading the .bib, editing, checking): in the worker
     // (build-worker.js), so the page doesn't freeze, or here without one.
-    let worker = null, seq = 0;
+    let worker = null, seq = 0, lastSent = null;
     const WORKER_WAIT = 60 * 1000;
     const calls = {};
     function run(name, ...args) {
@@ -497,11 +504,17 @@
               const c = calls[ev.data.id];
               if (!c) return;
               delete calls[ev.data.id];
-              if (ev.data.error) c.reject(new Error(ev.data.error)); else c.resolve(ev.data.result);
+              if (ev.data.error) { lastSent = null; c.reject(new Error(ev.data.error)); return; }
+              const res = ev.data.result;
+              // (What the worker keeps now, if no other call has gone to it
+              // since: see build-worker.js.)
+              if (res && typeof res.text === 'string' && !Object.keys(calls).length) lastSent = res.text;
+              else if (Object.keys(calls).length) lastSent = null;
+              c.resolve(res);
             };
             worker.onerror = ev => {
               Object.keys(calls).forEach(k => { calls[k].reject(new Error(ev.message || 'LibLande couldn’t read the .bib file.')); delete calls[k]; });
-              worker = null;
+              worker = null; lastSent = null;
             };
           }
           const id = ++seq, w = worker;
@@ -511,11 +524,14 @@
             const timer = setTimeout(() => {
               if (!calls[id]) return;
               delete calls[id];
-              if (worker === w) { try { w.terminate(); } catch (e) { /* gone */ } worker = null; }
+              if (worker === w) { try { w.terminate(); } catch (e) { /* gone */ } worker = null; lastSent = null; }
               Promise.resolve().then(() => core[name](...args)).then(resolve, reject);
             }, WORKER_WAIT);
             calls[id] = { resolve: v => { clearTimeout(timer); resolve(v); }, reject: e => { clearTimeout(timer); reject(e); } };
-            w.postMessage({ id, call: name, args });
+            // (The text the worker has already: not sent again.)
+            const same = typeof args[0] === 'string' && args[0] === lastSent;
+            if (!same && typeof args[0] === 'string') lastSent = args[0];
+            w.postMessage(same ? { id, call: name, args: [null].concat(args.slice(1)), same: true } : { id, call: name, args });
           });
         } catch (e) { /* no worker: here */ }
       }
@@ -547,7 +563,7 @@
       const id = req.where === 'inbox' ? await inboxFile(false) : await mainBibId();
       if (!id) throw new Error('LibLande couldn’t find the file to edit.');
       const out = await changeFile(id, async (text, m) => run('saveEntry', text, req, m.name, req.where !== 'inbox' ? Date.parse(m.modifiedTime) : null), req.backupName);
-      if (!out.text) return { stamp: Date.parse(out.m.modifiedTime), unchanged: true };
+      if (!out.text) return { stamp: Date.parse(out.m.modifiedTime), unchanged: true, hash: out.hash, already: !!out.already };
       return { stamp: out.stamp, hash: out.hash, groupsHash: out.groupsHash };
     });
 
@@ -609,8 +625,7 @@
     /* -------------------------------------------- the reading list */
     // Several reading-list changes at once (as Code.gs's readingOps):
     // papers added or taken off also go into, or out of, the BibDesk group
-    // "★ Reading List", in the .bib with direct saving on, otherwise
-    // as pending edits.
+    // "★ Reading List", in the .bib.
     F.readingOps = req => serial(async () => {
       let add = [], remove = [];
       const now = Date.now();
