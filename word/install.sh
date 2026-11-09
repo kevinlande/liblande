@@ -54,6 +54,11 @@ fi
 rm -f "$WEF/liblande-word-test.xml"
 mv -f "$tmp" "$WEF/$NAME"
 chmod 644 "$WEF/$NAME"
+# Word keeps add-ins it has seen in a cache, and can go on showing an old
+# one: cleared (Microsoft's advice), once Word isn't running.
+CACHE="$HOME/Library/Containers/com.microsoft.Word/Data/Library/Application Support/Microsoft/Office/16.0/Wef"
+clear_cache() { [ -d "$CACHE" ] && rm -rf "$CACHE"/* 2>/dev/null; }
+pgrep -xq "Microsoft Word" || clear_cache
 say "LibLande for Word is installed."
 say "(In Word: the LibLande button on the Home tab, or Home › Add-ins.)"
 
@@ -63,10 +68,10 @@ if pgrep -xq "Microsoft Word"; then
   if [ "$ans" = "y" ] || [ "$ans" = "Y" ]; then
     osascript -e 'tell application "Microsoft Word" to quit' >/dev/null 2>&1
     for i in $(seq 1 60); do pgrep -xq "Microsoft Word" || break; sleep 0.5; done
-    if pgrep -xq "Microsoft Word"; then say "Word is still open (waiting on a document?). Restart it yourself when ready."
-    else open -a "Microsoft Word"; say "Word restarted."; fi
+    if pgrep -xq "Microsoft Word"; then say "Word is still open (waiting on a document?). Quit it, then run this again."
+    else clear_cache; open -a "Microsoft Word"; say "Word restarted."; fi
   else
-    say "Restart Word when you're ready, and the add-in will be there."
+    say "Quit Word when you're ready, then run this again, so the add-in shows up."
   fi
 else
   say "Open Word, and it will be there."

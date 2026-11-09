@@ -2,15 +2,15 @@
 <!-- LibLande for Word: cite from your LibLande library while you write.
      Copied into Word's add-ins folder on the Mac
      (~/Library/Containers/com.microsoft.Word/Data/Documents/wef), it adds a
-     LibLande button to the Home tab. (Its Id is the test add-in's, so it
-     takes that one's place.) -->
+     LibLande button to the Home tab. (Its own Id: sharing the test
+     add-in's, Word kept showing that one from its cache.) -->
 <OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
            xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
            xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
            xsi:type="TaskPaneApp">
-  <Id>3b88e350-f89b-4dac-b7cb-bb64b2e2d46a</Id>
-  <Version>1.1.0.0</Version>
+  <Id>55318a69-6af9-44a2-a8a3-cc069fedbeef</Id>
+  <Version>1.2.0.0</Version>
   <ProviderName>Kevin Lande</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="LibLande"/>
