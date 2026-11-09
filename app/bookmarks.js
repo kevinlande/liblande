@@ -1,8 +1,8 @@
 ﻿// LibLande: bookmarked pages, and writing bookmarks into the PDF.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
+// index.html: library, apa, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/bookmarks.js'] = '2026-11-09.05';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/bookmarks.js'] = '2026-11-09.06';
 /* ---- bookmarked pages */
 // Tap a page's top right corner twice to bookmark it (or press B for the
 // current page). Bookmarks are saved into the PDF with your markup, as ordinary PDF

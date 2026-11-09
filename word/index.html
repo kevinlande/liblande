@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LibLande</title>
+<style>
+  :root { --bg:#fff; --panel:#f6f8f7; --text:#1b2321; --muted:#56635f; --faint:#66726e; --line:#d5ddd9; --row:#eef2f0; --accent:#1f6b5c; --accent-ink:#fff; --soft:#dcebe6; --warn:#8a4b00; --warn-soft:#fbefdc; --field:#fff; --focus:#2a7de1; color-scheme: light; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#1f2322; --panel:#262b2a; --text:#e2e8e5; --muted:#a9b5b1; --faint:#95a29e; --line:#3a4341; --row:#2c3331; --accent:#5fb39e; --accent-ink:#0f1a17; --soft:#24433b; --warn:#f0b866; --warn-soft:#3b2e1a; --field:#191d1c; --focus:#6aa8ff; color-scheme: dark; }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 13px/1.4 -apple-system, system-ui, sans-serif; display: flex; flex-direction: column; overflow: hidden; }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+  [hidden] { display: none !important; }
+  .ph { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); background: var(--panel); position: relative; flex: none; }
+  .ph b { font-size: 14px; }
+  .pill { margin-left: auto; font-size: 11px; padding: 1px 7px; border-radius: 9px; background: var(--warn-soft); color: var(--warn); }
+  .acct { margin-left: auto; width: 26px; height: 26px; border-radius: 50%; border: none; background: var(--soft); color: var(--accent); font-weight: 600; font-size: 12px; cursor: pointer; }
+  .pill:not([hidden]) + .acct { margin-left: 6px; }
+  .menu { position: absolute; right: 10px; top: 42px; min-width: 210px; background: var(--bg); border: 1px solid var(--line); border-radius: 9px; box-shadow: 0 8px 24px #0004; padding: 6px 0; z-index: 5; }
+  .menu button { display: block; width: 100%; text-align: left; background: none; border: none; padding: 6px 12px; cursor: pointer; }
+  .menu button:hover { background: var(--row); }
+  .menu .who { color: var(--muted); font-size: 12px; border-bottom: 1px solid var(--line); padding: 2px 12px 8px; margin-bottom: 4px; }
+  .tabs { display: flex; gap: 4px; padding: 8px 12px 0; border-bottom: 1px solid var(--line); flex: none; }
+  .tabs button { background: none; border: none; padding: 6px 10px; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; }
+  .tabs button[aria-selected="true"] { color: var(--accent); font-weight: 600; border-bottom-color: var(--accent); }
+  .view { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .scroll { flex: 1; overflow-y: auto; min-height: 0; }
+  .body { padding: 12px; }
+  .search { display: flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--field); border-radius: 8px; padding: 0 9px; }
+  .search:focus-within { border-color: var(--focus); box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 30%, transparent); }
+  .search svg { width: 15px; height: 15px; stroke: var(--muted); fill: none; stroke-width: 2; flex: none; }
+  .search input { flex: 1; border: none; background: none; padding: 7px 0; font: inherit; color: var(--text); outline: none; min-width: 0; }
+  .res { margin: 8px -12px 0; }
+  .sub { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--faint); padding: 6px 12px 2px; }
+  .it { display: flex; gap: 9px; padding: 8px 12px; border-bottom: 1px solid var(--row); cursor: pointer; }
+  .it:hover { background: color-mix(in srgb, var(--soft) 45%, transparent); }
+  .it[aria-checked="true"] { background: var(--soft); }
+  .it.kb { box-shadow: inset 3px 0 0 var(--focus); }
+  .box { width: 16px; height: 16px; border: 1.5px solid var(--faint); border-radius: 4px; flex: none; margin-top: 2px; display: grid; place-items: center; color: var(--accent-ink); font-size: 11px; }
+  .it[aria-checked="true"] .box { background: var(--accent); border-color: var(--accent); }
+  .it .tx { flex: 1; min-width: 0; }
+  .t { font-weight: 600; }
+  .m { color: var(--muted); font-size: 12px; }
+  .cited { align-self: flex-start; margin-top: 2px; font-size: 11px; line-height: 16px; color: var(--accent); background: var(--bg); border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); border-radius: 9px; padding: 0 7px; white-space: nowrap; flex: none; }
+  .empty { text-align: center; color: var(--muted); padding: 22px 8px; }
+  .empty .btn { margin-top: 10px; }
+  .foot { border-top: 1px solid var(--line); background: var(--panel); padding: 10px 12px 12px; flex: none; max-height: 60%; overflow-y: auto; }
+  .lbl { display: flex; align-items: center; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--faint); margin: 0 0 6px; }
+  .lbl button { margin-left: auto; text-transform: none; letter-spacing: 0; font-size: 12px; color: var(--accent); background: none; border: none; cursor: pointer; padding: 0 2px; }
+  .chosen { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+  .ch { display: flex; align-items: center; gap: 6px; background: var(--field); border: 1px solid var(--line); border-radius: 7px; padding: 3px 4px 3px 2px; }
+  .ch.drag { box-shadow: 0 6px 16px #0004; border-color: var(--accent); position: relative; z-index: 2; cursor: grabbing; }
+  .ch.drag .grip { cursor: grabbing; }
+  .grip { color: var(--faint); cursor: grab; width: 16px; text-align: center; letter-spacing: -2px; font-size: 12px; user-select: none; touch-action: none; }
+  .ch .n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ch input, .pre input { font: inherit; font-size: 12px; border: 1px solid var(--line); background: var(--field); color: var(--text); border-radius: 5px; padding: 2px 5px; }
+  .ch input { width: 82px; }
+  .x { width: 24px; height: 24px; border: none; background: none; color: var(--muted); border-radius: 5px; cursor: pointer; flex: none; }
+  .x:hover { background: var(--row); }
+  .opts { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+  .seg button { padding: 4px 7px; font-size: 12px; background: var(--field); border: none; cursor: pointer; }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button[aria-checked="true"] { background: var(--accent); color: var(--accent-ink); }
+  .pre { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); }
+  .pre input { width: 74px; }
+  .prev { background: var(--field); border: 1px dashed var(--line); border-radius: 7px; padding: 7px 9px; font: 14px Garamond, "EB Garamond", Georgia, serif; margin-bottom: 8px; overflow-wrap: anywhere; }
+  .note { font-size: 12px; color: var(--muted); margin: 0 0 8px; }
+  .btns { display: flex; gap: 8px; }
+  .btn { border: 1px solid var(--line); background: var(--field); border-radius: 8px; padding: 7px 12px; font-weight: 500; cursor: pointer; }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .btn.grow { flex: 1; }
+  .btn:disabled { opacity: .55; cursor: default; }
+  .btn kbd { font: 11px -apple-system, system-ui; opacity: .75; margin-left: 6px; }
+  .card { border: 1px solid var(--line); border-radius: 9px; padding: 10px 12px; margin-bottom: 10px; }
+  .card h4 { margin: 0 0 6px; font-size: 13px; }
+  .line { display: flex; align-items: center; gap: 8px; color: var(--muted); margin-bottom: 8px; flex-wrap: wrap; }
+  .line b { color: var(--text); font-weight: 500; }
+  .line select { margin-left: auto; font: inherit; color: var(--text); background: var(--field); border: 1px solid var(--line); border-radius: 6px; padding: 2px 4px; }
+  .link-row { display: flex; gap: 8px; padding: 6px 0; border-top: 1px solid var(--row); font-size: 12px; align-items: center; }
+  .link-row .w { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tag { font-size: 11px; padding: 1px 6px; border-radius: 9px; background: var(--soft); color: var(--accent); white-space: nowrap; }
+  .tag.w { background: var(--warn-soft); color: var(--warn); }
+  .err { background: var(--warn-soft); color: var(--warn); border-radius: 8px; padding: 8px 10px; margin: 0 0 8px; }
+</style>
+
+<header class="ph">
+  <b>LibLande</b>
+  <span class="pill" id="offline" hidden>Offline</span>
+  <button class="acct" id="acct" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Account" hidden>?</button>
+  <div class="menu" id="menu" role="menu" hidden>
+    <div class="who" id="menuWho"></div>
+    <button type="button" role="menuitem" id="mReload">Reload library</button>
+    <button type="button" role="menuitem" id="mOpen">Open LibLande</button>
+    <button type="button" role="menuitem" id="mOut">Sign out</button>
+  </div>
+</header>
+
+<div class="view" id="vSignin" hidden>
+  <div class="body"><div class="empty">Sign in to Google to use your library.<br><button class="btn primary" id="signin" type="button">Sign in</button><div class="note" id="signinNote" style="margin-top:10px"></div></div></div>
+</div>
+
+<div class="view" id="vMain" hidden>
+  <div class="tabs" role="tablist">
+    <button type="button" role="tab" id="tCite" aria-selected="true" aria-controls="pCite">Cite</button>
+    <button type="button" role="tab" id="tRefs" aria-selected="false" aria-controls="pRefs">References</button>
+  </div>
+  <div class="view" id="pCite" role="tabpanel">
+    <div class="scroll">
+      <div class="body">
+        <label class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg><input id="q" type="search" placeholder="Search your library" autocomplete="off" autocorrect="off" spellcheck="false" aria-label="Search your library" aria-controls="res"></label>
+        <div class="res" id="res" role="listbox" aria-multiselectable="true"></div>
+      </div>
+    </div>
+    <div class="foot" id="foot" hidden>
+      <div class="err" id="citeErr" hidden></div>
+      <div class="lbl"><span>This citation</span><button type="button" id="az" hidden>A&#x2013;Z</button></div>
+      <div class="chosen" id="chosen"></div>
+      <div class="opts">
+        <span class="seg" role="radiogroup" aria-label="Form" id="forms">
+          <button type="button" role="radio" data-form="paren" aria-checked="true"></button><button type="button" role="radio" data-form="narr" aria-checked="false"></button><button type="button" role="radio" data-form="year" aria-checked="false"></button>
+        </span>
+        <label class="pre" id="preWrap">before <input id="pre" list="preList" placeholder="see"></label>
+        <datalist id="preList"><option value="see"><option value="e.g."><option value="see also"><option value="cf."><option value="but see"></datalist>
+      </div>
+      <div class="prev" id="prev" aria-live="polite"></div>
+      <p class="note" id="prevNote" hidden></p>
+      <div class="btns"><button class="btn primary grow" id="insert" type="button">Insert<kbd>&#x2318;&#x21a9;</kbd></button></div>
+    </div>
+  </div>
+  <div class="view" id="pRefs" role="tabpanel" hidden>
+    <div class="scroll"><div class="body">
+      <div class="err" id="refsErr" hidden></div>
+      <div class="card">
+        <h4>References</h4>
+        <div class="line"><b id="refCount"></b><select id="style" aria-label="Style"><option>APA 7th</option></select></div>
+        <div class="btns"><button class="btn grow" id="refsBtn" type="button">Insert References here</button></div>
+      </div>
+      <div class="card" id="zCard" hidden>
+        <h4>Zotero citations</h4>
+        <div class="line"><b id="zCount"></b></div>
+        <div id="zRows"></div>
+      </div>
+    </div></div>
+  </div>
+</div>
+
+<div class="view" id="vLoading">
+  <div class="body"><div class="empty" id="loadingText">Loading&#x2026;</div></div>
+</div>
+
+<script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+<script>
+// What app/apa.js uses from the rest of LibLande, here on its own.
+var ENTRIES = [];
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const safeUrl = u => /^https?:[/][/]/i.test(u) ? u : null;
+const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[‐-―]/g, '-');
+const cmpStr = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+</script>
+<script src="../app/apa.js"></script>
+<script src="engine.js"></script>
+<script src="panel.js"></script>

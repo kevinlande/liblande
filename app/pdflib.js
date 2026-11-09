@@ -1,8 +1,8 @@
 ﻿// LibLande: pdf-lib: loading it, clean copies without marks, and rebuilding a damaged PDF.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
+// index.html: library, apa, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/pdflib.js'] = '2026-11-09.05';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/pdflib.js'] = '2026-11-09.06';
 // Clean copies: the same PDF with markup annotations (highlights, pen
 // marks, notes, shapes) removed, using pdf-lib. Links and form fields stay.
 // Marks that an app has flattened into the page itself can't be removed.

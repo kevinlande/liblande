@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- LibLande for Word: cite from your LibLande library while you write.
+     Copied into Word's add-ins folder on the Mac
+     (~/Library/Containers/com.microsoft.Word/Data/Documents/wef), it adds a
+     LibLande button to the Home tab. (Its Id is the test add-in's, so it
+     takes that one's place.) -->
+<OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+           xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
+           xsi:type="TaskPaneApp">
+  <Id>3b88e350-f89b-4dac-b7cb-bb64b2e2d46a</Id>
+  <Version>1.1.0.0</Version>
+  <ProviderName>Kevin Lande</ProviderName>
+  <DefaultLocale>en-US</DefaultLocale>
+  <DisplayName DefaultValue="LibLande"/>
+  <Description DefaultValue="Cite from your LibLande library while you write."/>
+  <IconUrl DefaultValue="https://kevinlande.github.io/liblande/icon.png"/>
+  <HighResolutionIconUrl DefaultValue="https://kevinlande.github.io/liblande/icon.png"/>
+  <SupportUrl DefaultValue="https://kevinlande.github.io/liblande/"/>
+  <AppDomains>
+    <AppDomain>https://accounts.google.com</AppDomain>
+    <AppDomain>https://kevinlande.github.io</AppDomain>
+  </AppDomains>
+  <Hosts>
+    <Host Name="Document"/>
+  </Hosts>
+  <DefaultSettings>
+    <SourceLocation DefaultValue="https://kevinlande.github.io/liblande/word/index.html"/>
+  </DefaultSettings>
+  <Permissions>ReadWriteDocument</Permissions>
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
+    <Hosts>
+      <Host xsi:type="Document">
+        <DesktopFormFactor>
+          <FunctionFile resid="Panel.Url"/>
+          <ExtensionPoint xsi:type="PrimaryCommandSurface">
+            <OfficeTab id="TabHome">
+              <Group id="LibLande.Group">
+                <Label resid="Group.Label"/>
+                <Icon>
+                  <bt:Image size="16" resid="Icon.16"/>
+                  <bt:Image size="32" resid="Icon.32"/>
+                  <bt:Image size="80" resid="Icon.80"/>
+                </Icon>
+                <Control xsi:type="Button" id="LibLande.Open">
+                  <Label resid="Button.Label"/>
+                  <Supertip>
+                    <Title resid="Button.Label"/>
+                    <Description resid="Button.Tip"/>
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Icon.16"/>
+                    <bt:Image size="32" resid="Icon.32"/>
+                    <bt:Image size="80" resid="Icon.80"/>
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>LibLande.Panel</TaskpaneId>
+                    <SourceLocation resid="Panel.Url"/>
+                  </Action>
+                </Control>
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
+        </DesktopFormFactor>
+      </Host>
+    </Hosts>
+    <Resources>
+      <bt:Images>
+        <bt:Image id="Icon.16" DefaultValue="https://kevinlande.github.io/liblande/icon.png"/>
+        <bt:Image id="Icon.32" DefaultValue="https://kevinlande.github.io/liblande/icon.png"/>
+        <bt:Image id="Icon.80" DefaultValue="https://kevinlande.github.io/liblande/icon.png"/>
+      </bt:Images>
+      <bt:Urls>
+        <bt:Url id="Panel.Url" DefaultValue="https://kevinlande.github.io/liblande/word/index.html"/>
+      </bt:Urls>
+      <bt:ShortStrings>
+        <bt:String id="Group.Label" DefaultValue="LibLande"/>
+        <bt:String id="Button.Label" DefaultValue="LibLande"/>
+      </bt:ShortStrings>
+      <bt:LongStrings>
+        <bt:String id="Button.Tip" DefaultValue="Cite from your LibLande library."/>
+      </bt:LongStrings>
+    </Resources>
+  </VersionOverrides>
+</OfficeApp>

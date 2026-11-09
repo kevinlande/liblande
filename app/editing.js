@@ -1,8 +1,8 @@
 ﻿// LibLande: adding and editing, BibTeX pasted in, selecting several, updates, cite keys, versions, export, the keyboard.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
+// index.html: library, apa, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-09.05';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-09.06';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -1271,12 +1271,6 @@ state.picking = false;
 state.picked = new Set();
 state.anchor = null;
 const pickedEntries = () => Array.from(state.picked).map(k => BYKEY.get(k)).filter(Boolean);
-// APA order: by first author (or title), then year. Each key is worked out
-// once, not in every comparison.
-const apaOrder = list => list
-  .map(e => [norm((e.a && e.a[0] ? e.a[0][0] + ' ' + e.a[0][1] : e.e && e.e[0] ? e.e[0][0] + ' ' + e.e[0][1] : e.f.title || '') + ' ' + (e.f.year || '')), e])
-  .sort((a, b) => cmpStr(a[0], b[0]))
-  .map(x => x[1]);
 
 function setPicking(on, seedKey) {
   state.picking = on;
@@ -2304,15 +2298,6 @@ function copyTargets() {
   if (state.picking && state.picked.size) return pickedEntries();
   const e = state.selKey && BYKEY.get(state.selKey);
   return e ? [e] : [];
-}
-// APA's form for citing several works at once: (A, 2012; B, 2026), in
-// reference-list order.
-function apaInTextMany(list) {
-  const cites = apaOrder(list).map(apaInText);
-  return {
-    text: '(' + cites.map(c => c.text.slice(1, -1)).join('; ') + ')',
-    html: '(' + cites.map(c => c.html.slice(1, -1)).join('; ') + ')',
-  };
 }
 function copyAs(kind) {
   const list = copyTargets(), n = list.length;
