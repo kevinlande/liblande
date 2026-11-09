@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-09.01';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-09.02';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -393,9 +393,26 @@ function vStatus(msg, isError, actions) {
   }
 }
 
+// fetch, given up after ms with no answer, its (small) reply read within
+// the same time (an iPad can leave a request under way when LibLande goes
+// to the background with none, ever, and every later save would wait
+// behind it). Given up, it fails as a lost connection does, so a save
+// keeps the changes on this device; err.noAnswer says so.
+async function fetchWithin(url, opts, ms) {
+  if (!window.AbortController) return fetch(url, opts);
+  const stop = new AbortController(), timer = setTimeout(() => stop.abort(), ms);
+  try {
+    const r = await fetch(url, Object.assign({}, opts, { signal: stop.signal }));
+    const body = await r.arrayBuffer();
+    return new Response(body, { status: r.status, statusText: r.statusText, headers: r.headers });
+  } catch (err) {
+    if (stop.signal.aborted) { const e = new Error('Google Drive can\u2019t be reached just now (no answer).'); e.noAnswer = true; throw e; }
+    throw err;
+  } finally { clearTimeout(timer); }
+}
 async function pdfMd5(file) {
   const url = 'https:\/\/www.googleapis.com/drive/v3/files/' + encodeURIComponent(file.id) + '?fields=md5Checksum';
-  const r = await fetch(url, { headers: { Authorization: 'Bearer ' + await driveToken() } });
+  const r = await fetchWithin(url, { headers: { Authorization: 'Bearer ' + await driveToken() } }, 45 * 1000);
   if (!r.ok) return null;
   return (await r.json()).md5Checksum || null;
 }
@@ -1361,13 +1378,7 @@ async function saveMarkup(force, auto, now) {
       }
       const saved = await doc.saveDocument();
       const bytes = await realLines(withBm ? await withBookmarks(saved, bmSnap) : saved);
-      const up = token => fetch('https:\/\/www.googleapis.com/upload/drive/v3/files/' + encodeURIComponent(file.id) + '?uploadType=media&fields=md5Checksum',
-        { method: 'PATCH', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/pdf' }, body: bytes });
-      let r = await up(await driveToken());
-      if (r.status === 401) r = await up(await driveToken(true));
-      if (!r.ok) throw new Error('Google Drive didn\u2019t accept the changes (error ' + r.status + ').');
-      const res = await r.json().catch(() => ({}));
-      V.md5 = res.md5Checksum || null;
+      V.md5 = await uploadMarked(file, bytes, doc.numPages);
       V.bytes = bytes;
       recentPdfs.delete(file.id); recentPdfs.set(file.id, bytes); trimRecentPdfs();
       if (V.md5) recentMd5.set(file.id, V.md5); else recentMd5.delete(file.id);
@@ -1508,20 +1519,53 @@ async function uploadKept(back) {
   else if (others) toast('Marks made offline couldn\u2019t be saved to Google Drive yet. They\u2019re kept on this device; opening the paper saves them.', 6000);
 }
 window.addEventListener('online', () => setTimeout(() => uploadKept(true), 1500));
-async function uploadMarked(file, bytes) {
-  const up = token => fetch('https:\/\/www.googleapis.com/upload/drive/v3/files/' + encodeURIComponent(file.id) + '?uploadType=media&fields=md5Checksum',
-    { method: 'PATCH', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/pdf' }, body: bytes });
-  let r = await up(await driveToken());
-  if (r.status === 401) r = await up(await driveToken(true));
+// Upload a changed PDF in place of the one on Drive, once it's checked:
+// a whole PDF (it starts and ends as one should), and with pages pages
+// when that's given. One that isn't is never sent.
+async function uploadMarked(file, bytes, pages) {
+  await checkPdf(bytes, pages);
+  // (A big file on a slow connection takes a while: at least 5 minutes,
+  // more at about 40 KB a second.)
+  const within = Math.max(5 * 60 * 1000, bytes.byteLength / 40);
+  const up = token => fetchWithin('https:\/\/www.googleapis.com/upload/drive/v3/files/' + encodeURIComponent(file.id) + '?uploadType=media&fields=md5Checksum',
+    { method: 'PATCH', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/pdf' }, body: bytes }, within);
+  let r;
+  try {
+    r = await up(await driveToken());
+    if (r.status === 401) r = await up(await driveToken(true));
+  } catch (err) {
+    // (Given up on, the upload may still have arrived: if Drive's file is
+    // now exactly this size, it did, and its checksum is the new one;
+    // otherwise the next save would take it for a change made elsewhere.)
+    if (err.noAnswer) {
+      const now = await fetchWithin('https:\/\/www.googleapis.com/drive/v3/files/' + encodeURIComponent(file.id) + '?fields=md5Checksum,size',
+        { headers: { Authorization: 'Bearer ' + await driveToken() } }, 45 * 1000).then(x => (x.ok ? x.json() : null)).catch(() => null);
+      if (now && now.md5Checksum && Number(now.size) === bytes.byteLength) return now.md5Checksum;
+    }
+    throw err;
+  }
   if (!r.ok) throw new Error('Google Drive didn\u2019t accept the changes (error ' + r.status + ').');
   return (await r.json().catch(() => ({}))).md5Checksum || null;
+}
+async function checkPdf(bytes, pages) {
+  if (bytes && !(bytes instanceof Uint8Array)) bytes = new Uint8Array(bytes.buffer || bytes);
+  const bad = 'the saved copy of the PDF didn\u2019t come out whole, so it wasn\u2019t sent to Google Drive (the copy there is unchanged)';
+  const n = bytes && bytes.byteLength;
+  if (!n || n < 64) throw new Error(bad);
+  const latin = (a, b) => new TextDecoder('latin1').decode(bytes.subarray(a, b));
+  if (latin(0, Math.min(n, 1024)).indexOf('%PDF-') < 0 || latin(Math.max(0, n - 2048), n).indexOf('%%EOF') < 0) throw new Error(bad);
+  if (!pages) return;
+  let doc = null, count = 0;
+  try { doc = await openPdf(V.lib, { data: bytes.slice(0) }).promise; count = doc.numPages; } catch (err) { count = 0; } finally { if (doc) await closePdf(doc).catch(() => {}); }
+  if (count !== pages) throw new Error(bad + ' (it had ' + count + ' page' + (count === 1 ? '' : 's') + ', not ' + pages + ')');
 }
 // The open paper changed as a whole (pages turned, or OCR's text added):
 // any marks not yet saved are saved first, edit(bytes) makes the new PDF
 // from the one on Drive, which is uploaded (if it's still the one on
 // Drive), and the paper is opened again where you are (or, if it's open
 // behind the library, when you go back to it).
-// (opts.page: the page to open it at, as when pages were added.)
+// (opts.page: the page to open it at, as when pages were added;
+// opts.samePages: the edit keeps the page count, which is checked.)
 async function rewritePdf(file, edit, opts = {}) {
   const showing = () => V.file && V.file.id === file.id && V.doc;
   if (!showing()) throw new Error('the paper isn\u2019t open.');
@@ -1530,11 +1574,11 @@ async function rewritePdf(file, edit, opts = {}) {
     if (r !== true) throw new Error('your marks couldn\u2019t be saved first' + (r === 'kept' ? ' (you\u2019re offline)' : '') + '.');
   }
   if (!showing()) throw new Error('the paper was closed.');
-  const md5 = V.md5, out = await edit(V.bytes);
+  const md5 = V.md5, pages = opts.samePages ? V.doc.numPages : 0, out = await edit(V.bytes);
   const now = await pdfMd5(file).catch(() => null);
   if (md5 && now && now !== md5) throw new Error('the PDF changed on Google Drive meanwhile.');
   await callServer('backupPdf', file.id);
-  const newMd5 = await uploadMarked(file, out);
+  const newMd5 = await uploadMarked(file, out, pages);
   recentPdfs.delete(file.id); recentPdfs.set(file.id, out); trimRecentPdfs();
   if (newMd5) recentMd5.set(file.id, newMd5); else recentMd5.delete(file.id);
   THUMBS.delete(file.id);
@@ -1617,7 +1661,7 @@ async function saveRotation() {
         if (page) page.setRotation(degrees(((page.getRotation().angle + k) % 360 + 360) % 360));
       }
       return doc.save();
-    });
+    }, { samePages: true });
   } catch (err) {
     toast('Couldn\u2019t turn the page' + (want.size === 1 ? '' : 's') + ': ' + errText(err), 6000);
     // (Back as it is on Drive.)
@@ -1654,7 +1698,7 @@ async function combineMarks() {
     const md5 = await pdfMd5(file).catch(() => null);
     recentPdfs.delete(file.id);
     const newer = await getPdfBytes(file);
-    const tmp = await openPdf(V.lib, { data: newer.slice(0) }).promise;
+    const tmp = await openPdf(V.lib, { data: newer.slice(0) }).promise, tmpPages = tmp.numPages;
     let out = newer;
     try {
       // (PDF.js writes only entries named as its marks are.)
@@ -1670,7 +1714,7 @@ async function combineMarks() {
     out = await realLines(out);
     const now = await pdfMd5(file).catch(() => null);
     if (md5 && now && now !== md5) throw new Error('The PDF changed on Google Drive again meanwhile.');
-    const newMd5 = await uploadMarked(file, out);
+    const newMd5 = await uploadMarked(file, out, tmpPages);
     // Drive has both sets: this paper is shown from it (once the copy kept
     // on this device is gone, or it would be offered again).
     await forgetKept(file.id).catch(() => {});

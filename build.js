@@ -558,78 +558,6 @@ function bibEntryText_(type, key, fields) {
   return '@' + type + '{' + key + ',\n' + names.map(n => '\t' + n + ' = {' + fields[n] + '}').join(',\n') + '}\n';
 }
 
-/* ------------------------------------------------------------ pending edits */
-
-// Merge a new pending edit into the list: one edit per entry, later field
-// values win, and adding then removing a group (or the reverse) cancels out.
-// The entry's fingerprint from the first edit is kept, since the file itself
-// hasn't changed in between.
-function mergeEdit_(list, next) {
-  const old = list.find(x => x.key === next.key);
-  if (!old) { list.push(next); return list; }
-  Object.assign(old.set, next.set);
-  const add = new Set(old.groups.add), remove = new Set(old.groups.remove);
-  next.groups.add.forEach(g => { if (remove.has(g)) remove.delete(g); else add.add(g); });
-  next.groups.remove.forEach(g => { if (add.has(g)) add.delete(g); else remove.add(g); });
-  old.groups = { add: Array.from(add), remove: Array.from(remove) };
-  old.modified = next.modified;
-  if (!old.expectGroupsHash) old.expectGroupsHash = next.expectGroupsHash;
-  delete old.conflict;
-  return list;
-}
-
-// Apply pending edits to the text of a .bib file. An edit whose entry (or,
-// for group changes, the group list) was changed since the edit was made is
-// skipped, not forced. Returns {edited, applied, skipped}; throws if the
-// result doesn't check out, so nothing gets written.
-// groupsHash: the group list's fingerprint to check edits against, when
-// groups were just added to `text` (edits were made before those).
-function applyEdits_(text, edits, groupsHash) {
-  const before = parseBib_(text);
-  const groupsNow = groupsHash || fingerprint_(groupsComment_(before[1]));
-  let edited = text;
-  const applied = [], skipped = [];
-  edits.forEach(ed => {
-    try {
-      const loc = locateEntry_(edited, ed.key);
-      if (ed.expectHash && fingerprint_(edited.slice(loc.start, loc.end)) !== ed.expectHash) {
-        throw new Error('It was changed (perhaps in BibDesk) after this edit was made.');
-      }
-      const changingGroups = ed.groups.add.length + ed.groups.remove.length > 0;
-      if (changingGroups && ed.expectGroupsHash && groupsNow !== ed.expectGroupsHash) {
-        throw new Error('The static groups were changed (perhaps in BibDesk) after this edit was made.');
-      }
-      // No date for reading-list changes: BibDesk doesn't date group membership.
-      let next = editEntry_(edited, ed.key, Object.assign({}, ed.set, ed.modified ? { 'date-modified': ed.modified } : {}));
-      if (changingGroups) next = editGroups_(next, ed.key, ed.groups.add, ed.groups.remove);
-      edited = next;
-      applied.push(ed);
-    } catch (err) {
-      skipped.push({ key: ed.key, reason: String((err && err.message) || err) });
-    }
-  });
-  if (applied.length) {
-    const after = parseBib_(edited);
-    if (after[0].length !== before[0].length) throw new Error('Applying the edits would have changed the number of entries, so nothing was saved.');
-    const fields = new Map(after[0].map(x => [x[1], x[2]]));
-    const groups = staticGroups_(after[1]);
-    applied.forEach(ed => {
-      const f = fields.get(ed.key) || {};
-      Object.keys(ed.set).forEach(n => {
-        const want = ed.set[n] == null ? '' : String(ed.set[n]);
-        if ((f[n] === undefined ? '' : f[n]) !== want) throw new Error('The ' + n + ' field of ' + ed.key + ' didn\u2019t come out as expected, so nothing was saved.');
-      });
-      ed.groups.add.concat(ed.groups.remove).forEach(name => {
-        const g = groups.find(x => x.name === name);
-        if (!g || (g.keys.indexOf(ed.key) >= 0) !== (ed.groups.add.indexOf(name) >= 0)) {
-          throw new Error('The group \u201c' + name + '\u201d didn\u2019t come out as expected, so nothing was saved.');
-        }
-      });
-    });
-  }
-  return { edited: edited, applied: applied, skipped: skipped };
-}
-
 /* ------------------------------------------------------------ filing PDFs */
 
 // The folder and file name BibDesk's AutoFile gives a PDF with the format
@@ -777,4 +705,4 @@ function checkRename_(before, after, oldKey, newKey) {
   return b;
 }
 
-;if (self.document) (self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {}).build = '2026-11-09.01';
+;if (self.document) (self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {}).build = '2026-11-09.02';

@@ -19,7 +19,7 @@
  */
 (function (root) {
   'use strict';
-  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).builder = '2026-11-09.01';
+  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).builder = '2026-11-09.02';
   const FOLDER = 'application/vnd.google-apps.folder';
   const DATA_FOLDER = 'LibLande', LIBRARY_FILE = 'library.json.gz', INDEX_FILE = 'file-index.json',
     SETTINGS_FILE = 'settings.json', INBOX_FOLDER = 'Inbox', INBOX_FILE = 'LibLande inbox.bib';
@@ -247,16 +247,27 @@
 
     /* -------------------------------------------- parsing */
     let worker = null;
+    const PARSE_WAIT = 2 * 60 * 1000;
     function parse(job) {
       if (typeof Worker === 'function' && root.LIBLANDE_BUILD_WORKER !== false) {
         try {
           if (!worker) worker = new Worker('build-worker.js');
+          const w = worker;
           return new Promise((resolve, reject) => {
-            const done = ev => { worker.removeEventListener('message', done); worker.removeEventListener('error', fail); ev.data.error ? reject(new Error(ev.data.error)) : resolve(ev.data.result); };
-            const fail = ev => { worker.removeEventListener('message', done); worker.removeEventListener('error', fail); worker = null; reject(new Error(ev.message || 'The library couldn\u2019t be read.')); };
-            worker.addEventListener('message', done);
-            worker.addEventListener('error', fail);
-            worker.postMessage({ job });
+            const off = () => { clearTimeout(timer); w.removeEventListener('message', done); w.removeEventListener('error', fail); };
+            const done = ev => { off(); ev.data.error ? reject(new Error(ev.data.error)) : resolve(ev.data.result); };
+            const fail = ev => { off(); if (worker === w) worker = null; reject(new Error(ev.message || 'The library couldn\u2019t be read.')); };
+            // (A worker that never answers, as one can when an iPad puts
+            // LibLande to sleep: given up, and the work done here instead,
+            // or every later build would wait for it.)
+            const timer = setTimeout(() => {
+              off();
+              if (worker === w) { try { w.terminate(); } catch (e) { /* gone */ } worker = null; }
+              Promise.resolve().then(() => assemble(job)).then(resolve, reject);
+            }, PARSE_WAIT);
+            w.addEventListener('message', done);
+            w.addEventListener('error', fail);
+            w.postMessage({ job });
           });
         } catch (e) { /* no worker: parse here */ }
       }

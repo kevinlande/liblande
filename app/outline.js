@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/outline.js'] = '2026-11-09.01';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/outline.js'] = '2026-11-09.02';
 /* -------------------------------------------------------- outline editor */
 // In the sidebar's Outline tab: Edit the outline (the PDF's own, or the one
 // made from its printed Contents), or Make one afresh: from the Contents
@@ -496,7 +496,7 @@ async function oleSave() {
   const bar = $('#vSideBody .v-ole-bar [data-ole="save"]');
   if (bar) { bar.disabled = true; bar.textContent = 'Saving\u2026'; }
   try {
-    await rewritePdf(file, bytes => writeOutline(bytes, items));
+    await rewritePdf(file, bytes => writeOutline(bytes, items), { samePages: true });
     OLE.on = false; OLE.items = []; OLE.sel = -1;
     toast(items.length ? 'Outline saved into the PDF.' : 'Outline removed from the PDF.', 3000);
     if (V.file && V.file.id === file.id) {

@@ -19,7 +19,7 @@
  */
 (function (root) {
   'use strict';
-  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).edits = '2026-11-09.01';
+  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).edits = '2026-11-09.02';
   const FOLDER = 'application/vnd.google-apps.folder';
   const UPLOAD = 'https://www.googleapis.com/upload/drive/v3/';
   const READING_FILE = 'reading-list.json',
@@ -319,17 +319,25 @@
       const m = await meta(id, 'id,name,modifiedTime,mimeType,size,parents');
       return { m, text: await B.textAt(id, m.modifiedTime) };
     }
-    // A copy in LibLande/Backups named with the time; the newest
-    // KEEP_BACKUPS copies of each file are kept. Throws if the copy fails,
-    // so nothing is written without a backup.
+    // A copy in LibLande/Backups named with the time. Throws if the copy
+    // fails, so nothing is written without a backup. Returns the folder,
+    // for pruneBackups once the change is written.
     async function backup(m, when) {
       const folder = await subFolder(await B.dataFolder(), BACKUP_FOLDER, true);
       const base = m.name.replace(/\.bib$/i, '');
       const copy = await json('files/' + encodeURIComponent(m.id) + '/copy?fields=id,size', { method: 'POST',
         headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: base + ' ' + (when || fileTime()) + '.bib', parents: [folder.id] }) });
       if (!copy || String(copy.size) !== String(m.size)) throw new Error('LibLande couldn’t make a backup copy, so it didn’t save.');
+      return folder;
+    }
+    // The newest KEEP_BACKUPS copies of the file are kept. (Only its own:
+    // "Test Library 2026-..." is a copy of Test Library, "Test Library 2
+    // 2026-..." isn't.)
+    async function pruneBackups(m, folder) {
+      const base = m.name.replace(/\.bib$/i, '');
+      const own = f => f.name.indexOf(base + ' ') === 0 && /^\d{4}-\d\d-\d\d /.test(f.name.slice(base.length + 1));
       const old = (await B.listAll(q(folder.id) + ' in parents and name contains ' + q(base) + ' and trashed = false', 'id,name', 'createdTime desc'))
-        .filter(f => f.name.indexOf(base + ' ') === 0).slice(KEEP_BACKUPS);
+        .filter(own).slice(KEEP_BACKUPS);
       for (const f of old) await patch(f.id, { trashed: true });
     }
     async function writeText(m, text) {
@@ -351,19 +359,30 @@
         step('Making the changes');
         const out = await change(text, m);
         if (!out || out.text == null || out.text === text) return Object.assign({ m }, out || {});
-        step('Checking it wasn\u2019t changed meanwhile');
-        const now = await meta(id, 'modifiedTime');
-        if (now.modifiedTime !== m.modifiedTime) { if (out.undo) await out.undo(); continue; }
+        // (The backup first, then the check right before writing, so a
+        // change made meanwhile, as by BibDesk, has as little time as can
+        // be to slip in between and be overwritten.)
+        let folder;
         try {
           step('Making a backup copy');
-          await backup(m, when);
-          step('Saving to Google Drive');
-          const saved = await writeText(m, out.text);
-          return Object.assign(out, { m, saved, stamp: Date.parse(saved.modifiedTime) });
+          folder = await backup(m, when);
         } catch (e) {
           if (out.undo) await out.undo();
           throw e;
         }
+        step('Checking it wasn\u2019t changed meanwhile');
+        const now = await meta(id, 'modifiedTime');
+        if (now.modifiedTime !== m.modifiedTime) { if (out.undo) await out.undo(); continue; }
+        let saved;
+        try {
+          step('Saving to Google Drive');
+          saved = await writeText(m, out.text);
+        } catch (e) {
+          if (out.undo) await out.undo();
+          throw e;
+        }
+        await pruneBackups(m, folder).catch(e => console.warn('Pruning backups:', e.message));
+        return Object.assign(out, { m, saved, stamp: Date.parse(saved.modifiedTime) });
       }
       throw new Error(BUSY);
     }

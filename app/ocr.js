@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/ocr.js'] = '2026-11-09.01';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/ocr.js'] = '2026-11-09.02';
 /* ------------------------------------------------------------------ OCR */
 // A scan's pages are pictures, with no text to search, select or mark.
 // Make searchable reads each page without text with Tesseract (in this
@@ -304,7 +304,7 @@ async function ocrLayer(bytes, found) {
 // made meanwhile saved first), uploaded, and the paper opened again with it
 // if it's open (rewritePdf); if it's been closed, into the one on Drive.
 async function ocrSave(file, found) {
-  if (V.file && V.file.id === file.id && V.doc) { await rewritePdf(file, bytes => ocrLayer(bytes, found)); return; }
+  if (V.file && V.file.id === file.id && V.doc) { await rewritePdf(file, bytes => ocrLayer(bytes, found), { samePages: true }); return; }
   // (Its marks were saved on leaving it, unless offline.)
   const kept = await JOURNAL.load(file.id).catch(() => null);
   if (kept && kept.bytes) throw new Error('it has marks kept on this device that haven\u2019t reached Google Drive yet. Open it while online, then try again.');
