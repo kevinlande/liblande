@@ -10,6 +10,8 @@
 (function (root) {
   const NAMES = e => (e.a && e.a.length ? e.a : (e.e || []));
   const nameKey = e => NAMES(e).map(n => norm(n[0] + ' ' + (n[1] || ''))).join('|');
+  // (Surnames only, as a citation reads: what letters and order go by.)
+  const surKey = e => NAMES(e).map(n => norm(n[0])).join('|');
   const baseYear = e => (origYear(e) ? origYear(e) + '/' : '') + (((e.f.year || '').trim()) || 'n.d.');
 
   // Pages as APA writes them: "7" -> "p. 7", "20-24" -> "pp. 20–24";
@@ -28,14 +30,16 @@
     return /^(e\.g\.|i\.e\.)$/i.test(pre) ? pre + ', ' : pre + ' ';
   }
 
-  // Year letters (2011a, 2011b) for works with the same authors and year,
-  // in the order of their titles; and the authors' short form for each
+  // Year letters (2011a, 2011b) for works with the same authors' surnames
+  // and year, in the order of their titles; and the authors' short form for each
   // work, with more names where two "et al." forms would read the same.
   function plan(entries) {
     const groups = new Map();
     entries.forEach(e => {
       if (!NAMES(e).length) return;
-      const g = nameKey(e) + '#' + baseYear(e);
+      // (By surnames, as the citations read: "Green, E. J." and "Green, E."
+      // in two entries are one author to a reader.)
+      const g = surKey(e) + '#' + baseYear(e);
       if (!groups.has(g)) groups.set(g, []);
       groups.get(g).push(e);
     });
@@ -99,9 +103,13 @@
 
   // APA's order for the works in one citation: by authors, then year.
   function order(items, byKey) {
-    const key = it => { const e = byKey.get(it.k); return e ? nameKey(e) + ' ' + baseYear(e) + ' ' + norm(e.f.title || '') : it.k; };
+    const key = it => { const e = byKey.get(it.k); return e ? (surKey(e) || norm(e.f.title || '')) + ' ' + baseYear(e) + ' ' + norm(e.f.title || '') : it.k; };
     return items.slice().sort((a, b) => cmpStr(key(a), key(b)));
   }
+
+  // A work's place in the References list: by surnames, then year (with its
+  // letter), then initials and title.
+  const refKey = (e, P) => (surKey(e) || norm(e.f.title || '')) + ' ' + yearOf(e, P) + ' ' + nameKey(e) + ' ' + norm(e.f.title || '');
 
   // One citation's text, given the plan.
   function citeText(c, byKey, P) {
@@ -135,7 +143,7 @@
     const texts = {};
     Object.keys(cites).forEach(id => { texts[id] = citeText(cites[id], byKey, P); });
     const refs = entries.slice()
-      .sort((a, b) => cmpStr(nameKey(a) + ' ' + yearOf(a, P) + ' ' + norm(a.f.title || ''), nameKey(b) + ' ' + yearOf(b, P) + ' ' + norm(b.f.title || '')))
+      .sort((a, b) => cmpStr(refKey(a, P), refKey(b, P)))
       .map(e => {
         const y = yearOf(e, P);
         const shown = y === baseYear(e) ? e : Object.assign({}, e, { f: Object.assign({}, e.f, { year: y.replace(/^\d{4}\//, '') }) });
