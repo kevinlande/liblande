@@ -450,10 +450,12 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 }
 /* Settings: a list of rows (a switch or a tick box, each with a line of
    explanation), then the library's files. */
-.set-list { display: grid; gap: 18px; margin-top: 4px; }
+.set-list { display: grid; gap: 30px; margin-top: 4px; }
 /* Settings in sections: Appearance, what's shared, the library. */
 .set-sec { display: grid; }
-.set-sec > h3 { margin: 0; padding-bottom: 6px; border-bottom: 1px solid var(--line); font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
+/* (A section's heading above its items' names: larger, and in the text's
+   own colour.) */
+.set-sec > h3 { margin: 0; padding-bottom: 8px; border-bottom: 1px solid var(--line); font-size: 17px; font-weight: 700; color: var(--text); }
 .set-sec > :last-child { border-bottom: 0; }
 .set-sec > .set-group { border-top: 0; padding-top: 10px; }
 .set-sec .set-group > .hint { margin: 0 0 4px; font-size: 13px; }
@@ -472,7 +474,7 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .tp-mini b::after { content: ""; display: block; height: 9px; width: 34%; border-radius: 3px; background: var(--tp-accent); }
 .set-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--line); }
 .set-text { display: grid; gap: 3px; min-width: 0; }
-.setup-card .set-text label, .set-name { margin: 0; font-weight: 600; font-size: 14.5px; }
+.setup-card .set-text label, .set-name { margin: 0; font-weight: 600; font-size: 14px; }
 .set-text .hint { font-size: 13px; }
 .switch { position: relative; flex: none; width: 48px; height: 28px; }
 /* (The whole switch the checkbox, on or off: the later rule for the
