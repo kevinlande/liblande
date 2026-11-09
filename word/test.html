@@ -113,7 +113,9 @@
   $('b3').addEventListener('click', () => {
     say(3, null, 'Opening Word’s sign-in window…');
     try {
-      Office.context.ui.displayDialogAsync(location.origin + location.pathname.replace(/test\.html$/, 'signin.html'), { height: 70, width: 40 }, res => {
+      // (Outside /liblande/, which the LibLande app on a Mac claims as its
+      // own: Google's answer would go there, not back to Word's window.)
+      Office.context.ui.displayDialogAsync('https://kevinlande.github.io/liblande-word/signin.html', { height: 70, width: 40 }, res => {
         if (res.status !== Office.AsyncResultStatus.Succeeded) { say(3, false, 'The window didn’t open: ' + errText(res.error)); return; }
         const dialog = res.value;
         dialog.addEventHandler(Office.EventType.DialogMessageReceived, ev => {
