@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-11-09.06';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-11-09.07';
 // On GitHub Pages, every part of the app must be from the same version: a
 // part kept from an older one (the offline copy, served when the network
 // was slow) lacks what this page needs. Then the kept copies go, and the
@@ -744,6 +744,9 @@ if (RELOADING) {
     applyGlass(ev.target.checked);
     sendPrefs({ glass: ev.target.checked });
   });
+  // LibLande in Word: its installer, on a Mac (not an iPad or iPhone).
+  $('#wordSec').hidden = !/Mac/.test(navigator.platform) || navigator.maxTouchPoints > 1;
+  $('#wordCopy').addEventListener('click', () => copy($('#wordCmd').textContent, 'Copied: paste it in Terminal'));
   $('#coversBox').addEventListener('change', ev => { store.set('coversOn', ev.target.checked); sweepCovers(); renderDetail(); });
   $('#setup').querySelectorAll('[data-sync]').forEach(b => b.addEventListener('change', () => {
     SYNC[b.dataset.sync] = b.checked;

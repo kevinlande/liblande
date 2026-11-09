@@ -2547,3 +2547,7 @@ a.ms-ib { text-decoration: none; }
 .quote-note:hover { background: var(--side-hover); }
 .quote-note .i { width: 16px; height: 16px; color: var(--accent); }
 .quote-note[hidden] { display: none; }
+
+/* Settings › Word: the install command, with Copy. */
+.word-cmd { display: flex; gap: 8px; align-items: center; margin: 6px 0; }
+.word-cmd code { flex: 1; min-width: 0; overflow-wrap: anywhere; word-break: break-all; font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; }
