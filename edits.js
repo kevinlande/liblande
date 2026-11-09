@@ -19,15 +19,37 @@
  */
 (function (root) {
   'use strict';
-  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).edits = '2026-11-09.02';
+  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).edits = '2026-11-09.03';
   const FOLDER = 'application/vnd.google-apps.folder';
   const UPLOAD = 'https://www.googleapis.com/upload/drive/v3/';
   const READING_FILE = 'reading-list.json',
-    INBOX_FOLDER = 'Inbox', INBOX_FILE = 'LibLande inbox.bib', BACKUP_FOLDER = 'Backups', KEEP_BACKUPS = 50;
+    INBOX_FOLDER = 'Inbox', INBOX_FILE = 'LibLande inbox.bib', BACKUP_FOLDER = 'Backups';
   const READING_GROUP = '★ Reading List';
   const BUSY = 'LibLande is updating your library right now. Try again in a minute.';
   const q = s => "'" + String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
   const pad = n => String(n).padStart(2, '0');
+  // The time in a backup copy's name ("Library 2026-10-21 175041.bib"),
+  // or null for a file that isn't a copy of this one.
+  const backupTime = (name, base) => {
+    const x = name.indexOf(base + ' ') === 0 && /^(\d{4})-(\d\d)-(\d\d) (\d\d)(\d\d)(\d\d)\.bib$/i.exec(name.slice(base.length + 1));
+    return x ? new Date(+x[1], x[2] - 1, +x[3], +x[4], +x[5], +x[6]).getTime() : null;
+  };
+  // Of copies made at these times (newest first), the indexes of those to
+  // let go (see pruneBackups).
+  const KEEP_RECENT = 10, KEEP_DAYS = 14, KEEP_WEEKS = 12, DAY = 24 * 60 * 60 * 1000;
+  const backupsToTrash = (times, now) => {
+    const seen = new Set(), out = [];
+    times.forEach((t, i) => {
+      if (i < KEEP_RECENT) return;
+      const age = Math.max(0, now - t) / DAY;
+      let slot = null;
+      if (age < KEEP_DAYS + 1) slot = 'd' + new Date(t).toDateString();
+      else if (age < KEEP_DAYS + 1 + KEEP_WEEKS * 7) slot = 'w' + Math.floor((age - KEEP_DAYS - 1) / 7);
+      if (slot && !seen.has(slot)) { seen.add(slot); return; }
+      out.push(i);
+    });
+    return out;
+  };
   const fileTime = () => { const d = new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + pad(d.getMinutes()) + pad(d.getSeconds()); };
   const bytesToB64 = bytes => { let s = ''; for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i] & 0xff); return btoa(s); };
 
@@ -330,15 +352,18 @@
       if (!copy || String(copy.size) !== String(m.size)) throw new Error('LibLande couldn’t make a backup copy, so it didn’t save.');
       return folder;
     }
-    // The newest KEEP_BACKUPS copies of the file are kept. (Only its own:
-    // "Test Library 2026-..." is a copy of Test Library, "Test Library 2
-    // 2026-..." isn't.)
-    async function pruneBackups(m, folder) {
+    // Which copies of the file are kept: the newest KEEP_RECENT, then the
+    // newest of each day for KEEP_DAYS days, then of each week for
+    // KEEP_WEEKS weeks (at most about 36 copies, reaching back some three
+    // months); the rest go to Drive's trash. Ages are from the time in each
+    // copy's name. (Only its own copies: "Test Library 2026-..." is a copy
+    // of Test Library, "Test Library 2 2026-..." isn't.)
+    async function pruneBackups(m, folder, now) {
       const base = m.name.replace(/\.bib$/i, '');
-      const own = f => f.name.indexOf(base + ' ') === 0 && /^\d{4}-\d\d-\d\d /.test(f.name.slice(base.length + 1));
-      const old = (await B.listAll(q(folder.id) + ' in parents and name contains ' + q(base) + ' and trashed = false', 'id,name', 'createdTime desc'))
-        .filter(own).slice(KEEP_BACKUPS);
-      for (const f of old) await patch(f.id, { trashed: true });
+      const all = (await B.listAll(q(folder.id) + ' in parents and name contains ' + q(base) + ' and trashed = false', 'id,name', 'createdTime desc'))
+        .map(f => ({ f, when: backupTime(f.name, base) })).filter(x => x.when != null).sort((a, b) => b.when - a.when);
+      const old = backupsToTrash(all.map(x => x.when), now || Date.now());
+      for (const i of old) await patch(all[i].f.id, { trashed: true });
     }
     async function writeText(m, text) {
       const saved = await json('files/' + encodeURIComponent(m.id) + '?uploadType=media&fields=id,modifiedTime,size', { method: 'PATCH',
@@ -381,7 +406,9 @@
           if (out.undo) await out.undo();
           throw e;
         }
-        await pruneBackups(m, folder).catch(e => console.warn('Pruning backups:', e.message));
+        // (Not waited for: the save is done, and the first pruning under
+        // the new rule can move many copies to the trash.)
+        pruneBackups(m, folder).catch(e => console.warn('Pruning backups:', e.message));
         return Object.assign(out, { m, saved, stamp: Date.parse(saved.modifiedTime) });
       }
       throw new Error(BUSY);
@@ -770,6 +797,8 @@
     });
 
 
+    // (For the tests.)
+    F.backupsToTrash = backupsToTrash;
     return F;
   }
 

@@ -1,4 +1,4 @@
-/*
+﻿/*
  * LibLande on GitHub Pages: its server, in the browser.
  *
  * The page (index.html) talks to its server through google.script.run, as
@@ -17,7 +17,7 @@
   window.LIBLANDE_PAGES = true;
   // (Which version each part of the app is from: index.html checks they
   // match. build.py fills it in.)
-  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-11-09.02';
+  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-11-09.03';
   const CLIENT_ID = '789682218462-98mjugngb46ttd01ucp9dcj71ufspjgn.apps.googleusercontent.com';
   // Google Drive (your .bib, papers and LibLande folder): all it needs.
   const SCOPE = 'https://www.googleapis.com/auth/drive';
@@ -273,7 +273,10 @@
     },
     // Refresh: a look at the .bib and the inbox, and a build here if
     // either changed (the page waits for it, asking getStatus).
-    refreshNow() { return SERVER.getStatus(); },
+    // (Your preferences read again, as another device may have changed
+    // them.)
+    refreshNow() { prefsMemo = null; return SERVER.getStatus(); },
+    async getPrefs() { prefsMemo = null; return loadPrefs(null); },
     // New settings, from the links pasted in Settings (as Code.gs's
     // saveSettings): the .bib and, if given, the papers folder, checked and
     // kept in settings.json. A library built from other ones goes to the
@@ -533,6 +536,9 @@
     prefsMemo = saved || (settings && settings.prefs) || {};
     return Object.assign({}, prefsMemo, prefsWaiting);
   }
+  // (Kept paper by paper when saved: see savePrefs. The numbers are how
+  // many papers are kept, as the page keeps.)
+  const BY_PAPER = { positions: 150, progress: 300 };
   function savePrefs(changes) {
     Object.assign(prefsWaiting, changes || {});
     clearTimeout(prefsTimer);
@@ -542,7 +548,22 @@
         prefsWaiting = {};
         try {
           const folder = await dataFolder();
-          const now = Object.assign((await builder.readJson(folder, PREFS_FILE)) || prefsMemo || {}, these);
+          const was = (await builder.readJson(folder, PREFS_FILE)) || prefsMemo || {};
+          const now = Object.assign({}, was, these);
+          // (Places in papers and reading progress: paper by paper, the
+          // later of this device's and what another device saved, so one
+          // device doesn't undo another's.)
+          // (The page can say how two of one kind are made one, as the
+          // pages read on both devices: window.LIBLANDE_MERGE.)
+          Object.entries(BY_PAPER).forEach(([k, most]) => {
+            if (!these[k] || !was[k] || typeof was[k] !== 'object') return;
+            const all = Object.assign({}, was[k]), both = window.LIBLANDE_MERGE && window.LIBLANDE_MERGE[k];
+            Object.entries(these[k]).forEach(([id, v]) => {
+              if (both) { try { all[id] = both(v, all[id]); return; } catch (e) { /* as below */ } }
+              if (!all[id] || ((v && v.at) || 0) >= ((all[id] && all[id].at) || 0)) all[id] = v;
+            });
+            now[k] = Object.fromEntries(Object.entries(all).sort((x, y) => ((y[1] && y[1].at) || 0) - ((x[1] && x[1].at) || 0)).slice(0, most));
+          });
           await builder.writeFile(folder, PREFS_FILE, JSON.stringify(now), 'application/json');
           prefsMemo = now;
         } catch (e) {

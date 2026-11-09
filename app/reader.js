@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-09.02';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-09.03';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -473,6 +473,7 @@ function ensureViewer(lib, VL) {
     RAIL.lastPage = e.pageNumber;
     noteProgress(e.pageNumber, viewer.pagesCount);
     notePosition(e.pageNumber);
+    if (AWAY && ++AWAY.turns >= 3) { AWAY = null; showBack(); }
   });
   bus.on('pagerendered', e => { if (SPLIT.n === e.pageNumber) splitLine(); });
   bus.on('pagesloaded', e => {
@@ -721,17 +722,19 @@ async function openReader(entry, file, pos) {
     V.viewer.setDocument(doc);
     V.link.setDocument(doc);
     if (before) closePdf(before);
-    // (Where you left it on another device: there, once its pages are laid
-    // out, after this device's own place for it.)
+    // (Where you left it on another device, more lately: offered, once its
+    // pages are laid out at this device's own place for it.)
     const far = elsewhere(file.id);
     if (far) {
       const once = () => {
         V.bus.off('pagesinit', once);
         setTimeout(() => {
           if (V.doc !== doc) return;
-          V.viewer.currentPageNumber = Math.min(far.page, doc.numPages);
-          toast('Opened at page ' + far.page + ', where you left off on another device', 3500);
-        }, 80);
+          const page = Math.min(far.page, doc.numPages);
+          if (page === V.viewer.currentPageNumber) return;
+          AWAY = { page, name: far.name, turns: 0 };
+          showBack();
+        }, 400);
       };
       V.bus.on('pagesinit', once);
     }
@@ -1856,13 +1859,18 @@ function watchChanges(ui) {
 }
 // Changes are uploaded to Drive on their own two minutes after the last
 // one, and never more than five minutes after the first one not yet
-// uploaded (and at once when you switch to another app or tab, or leave
+// uploaded (for a big PDF, five and fifteen: see AUTO_BIG) (and at once when you switch to another app or tab, or leave
 // the paper), but not while you're in the middle of a stroke, the comment
 // box or typing. Only changes count: reading and scrolling don't put it off. (Each upload rebuilds the whole PDF and sends it, which costs
 // battery; meanwhile they're kept on this device, see JOURNAL.) If the PDF changed
 // elsewhere, LibLande asks first and waits.
 const AUTO = { timer: 0, down: false, paused: false, failed: false, backedUp: '', first: 0, last: 0 };
 const AUTO_QUIET = 2 * 60 * 1000, AUTO_MOST = 5 * 60 * 1000;
+// A big PDF (a scanned book, say) is sent whole each time, which is slow
+// and heavy on a phone's data: five minutes after the last change, and at
+// most fifteen after the first, instead. (Kept on this device meanwhile;
+// leaving the paper or the app still saves at once.)
+const AUTO_BIG = 10 * 1024 * 1024, AUTO_BIG_QUIET = 5 * 60 * 1000, AUTO_BIG_MOST = 15 * 60 * 1000;
 // A change made (a mark, an undo, a comment, a bookmark).
 function autoChanged() {
   const t = Date.now();
@@ -1878,7 +1886,8 @@ function autoSaveSoon(wait) {
   if (!gs || !V.doc || AUTO.paused || !(V.dirty || V.bmDirty || V.drawing)) return;
   if (wait == null && !AUTO.first) return;
   const t = Date.now();
-  if (wait == null) wait = Math.max(0, Math.min(AUTO.last + AUTO_QUIET, AUTO.first + AUTO_MOST) - t);
+  const big = V.bytes && V.bytes.byteLength > AUTO_BIG;
+  if (wait == null) wait = Math.max(0, Math.min(AUTO.last + (big ? AUTO_BIG_QUIET : AUTO_QUIET), AUTO.first + (big ? AUTO_BIG_MOST : AUTO_MOST)) - t);
   AUTO.due = t + wait;
   AUTO.timer = setTimeout(() => autoSave(false), wait);
 }
@@ -6610,6 +6619,10 @@ function spot() {
 // Remember a place to come back to (now, or one given), before a jump.
 // After going back, the button offers a return to where you'd jumped to.
 let FWD = null;
+// The place in this paper on another device, offered by the same pill
+// ({page, name, turns}): gone with its \u00d7, once taken, or after three
+// pages turned.
+let AWAY = null;
 function pushBack(from) {
   BACK.push(from || spot());
   if (BACK.length > 20) BACK.shift();
@@ -6857,10 +6870,11 @@ document.addEventListener('keydown', ev => {
 function showBack() {
   const el = $('#vBack');
   const last = BACK[BACK.length - 1];
-  el.hidden = !(last || FWD) || $('#viewer').hidden;
+  el.hidden = !(last || FWD || AWAY) || $('#viewer').hidden;
   if (el.hidden) return;
   el.classList.toggle('fwd', !last);
-  el.querySelector('span').textContent = last ? 'Back to page ' + last.page : 'Return to page ' + FWD.page;
+  el.querySelector('span').textContent = last ? 'Back to page ' + last.page : FWD ? 'Return to page ' + FWD.page
+    : 'Go to page ' + AWAY.page + ', where you were on your ' + (AWAY.name || 'other device');
   // Stay clear of the markup toolbar and its button.
   el.style.bottom = '';
   const r = el.getBoundingClientRect();
@@ -7242,7 +7256,7 @@ function doubleTapZoom(x, y, before) {
     settle(w > 60 && k !== 2 ? (left - pr.left) / pr.width : null, gap);
   }, before);
 }
-function clearBack() { BACK.length = 0; FWD = null; $('#vBack').hidden = true; }
+function clearBack() { BACK.length = 0; FWD = null; AWAY = null; $('#vBack').hidden = true; }
 $('#vBackGo').addEventListener('click', () => {
   if (!V.doc) return;
   if (BACK.length) {
@@ -7254,6 +7268,11 @@ $('#vBackGo').addEventListener('click', () => {
     const here = spot(), f = FWD;
     FWD = null;
     goSpot(f);
+    BACK.push(here);
+  } else if (AWAY) {
+    const here = spot(), page = AWAY.page;
+    AWAY = null;
+    V.viewer.currentPageNumber = page;
     BACK.push(here);
   }
   showBack();

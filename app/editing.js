@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-09.02';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-09.03';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -639,8 +639,19 @@ async function uploadPdf(file, name, info) {
   return r.json();
 }
 
-// After a save: rebuild (right away when it can), then load the result.
-async function afterWrite() {
+// After a save: the library rebuilt from the .bib (for your other devices,
+// and the next time LibLande opens), once the edits pause. Each change is
+// already shown here, and a rebuild reads the whole .bib, so one rebuild
+// for a run of edits, not one each. (Sooner if you leave LibLande or tap
+// Refresh; if it never happens, the next start or refresh builds.)
+const REBUILD = { timer: 0, wait: 45 * 1000 };
+function afterWrite() {
+  clearTimeout(REBUILD.timer);
+  REBUILD.timer = setTimeout(rebuildNow, REBUILD.wait);
+}
+async function rebuildNow() {
+  clearTimeout(REBUILD.timer);
+  REBUILD.timer = 0;
   try {
     status = await callServer('refreshNow');
     setReading(status.reading);
@@ -650,6 +661,7 @@ async function afterWrite() {
     /* The next refresh picks the change up. */
   }
 }
+document.addEventListener('visibilitychange', () => { if (document.hidden && REBUILD.timer) rebuildNow(); });
 
 function applyLocal(e, set, add, remove) {
   setFields(e, set);
@@ -1135,17 +1147,6 @@ document.addEventListener('pointerdown', ev => { if ($('#addMenu') && !ev.target
 document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && $('#addMenu')) { ev.stopPropagation(); closeAddMenu(); } }, true);
 window.addEventListener('resize', closeAddMenu);
 
-// Rebuild and load the library without messages (nothing visible changes).
-async function quietRefresh() {
-  try {
-    status = await callServer('refreshNow');
-    setReading(status.reading);
-    if (status.building) await waitForBuild();
-    if (status.stamp !== loadedStamp) await update(true);
-  } catch (err) {
-    /* The next refresh or 10-minute check picks it up. */
-  }
-}
 
 
 function setFields(e, set) {

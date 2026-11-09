@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-09.02';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-09.03';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -362,15 +362,25 @@ const SYNC = Object.assign({ progress: true, position: true, cite: true, smart: 
 // Where you are in each paper ({file id: {page, at, dev}}), for opening it
 // there on another device; dev tells this device's from the others'.
 const POS = store.get('positions', {});
+// (What kind of device this is, for "where you were on your Mac".)
+const DEVICE_NAME = /iPad/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1) ? 'iPad'
+  : /iPhone/.test(navigator.userAgent) ? 'iPhone' : /Android/.test(navigator.userAgent) ? 'phone' : /Macintosh/.test(navigator.userAgent) ? 'Mac'
+  : /Windows/.test(navigator.userAgent) ? 'PC' : '';
 const DEVICE = store.get('deviceId', null) || (() => { const d = Math.random().toString(36).slice(2, 10); store.set('deviceId', d); return d; })();
+// Kept on this device as you go, and sent to your other devices only on
+// closing the paper or going back to the library (each send costs several
+// requests to Drive), or switching to another app; notePosition.t says
+// one is waiting.
 function notePosition(page) {
   if (!V.file || !page) return;
-  POS[V.file.id] = { page, at: Date.now(), dev: DEVICE };
-  clearTimeout(notePosition.t);
-  notePosition.t = setTimeout(savePositions, 8000);
+  // (Another paper now: the last one was left, so its place goes.)
+  if (notePosition.t && notePosition.file && notePosition.file !== V.file.id) savePositions();
+  notePosition.file = V.file.id;
+  POS[V.file.id] = { page, at: Date.now(), dev: DEVICE, name: DEVICE_NAME };
+  store.set('positions', POS);
+  notePosition.t = 1;
 }
 function savePositions() {
-  clearTimeout(notePosition.t);
   notePosition.t = 0;
   const keep = Object.entries(POS).sort((a, b) => b[1].at - a[1].at).slice(0, 150);
   Object.keys(POS).forEach(k => { if (!keep.some(x => x[0] === k)) delete POS[k]; });
@@ -378,14 +388,14 @@ function savePositions() {
   if (gs && SYNC.position) google.script.run.withFailureHandler(() => {}).savePrefs({ positions: POS });
   if (ENTRIES.length) renderRLBar();
 }
+document.addEventListener('visibilitychange', () => { if (document.hidden && notePosition.t) savePositions(); });
 function positionsMerge(prefs) {
   if (!SYNC.position) return;
   Object.entries((prefs && prefs.positions) || {}).forEach(([k, v]) => { if (!POS[k] || POS[k].at < v.at) POS[k] = v; });
   store.set('positions', POS);
 }
-document.addEventListener('visibilitychange', () => { if (document.hidden && notePosition.t) savePositions(); });
-// The page to open a paper at, if the latest place in it was on another
-// device.
+// The latest place in a paper, if it was on another device (offered on
+// opening it: see AWAY in reader.js).
 const elsewhere = fileId => { const x = SYNC.position && POS[fileId]; return x && x.dev !== DEVICE && x.page > 1 ? x : null; };
 // A paper ends where its references start: reaching that page is 100%
 // (the pages before it count towards it), so a paper read through doesn't
@@ -413,7 +423,11 @@ function noteProgress(page, total) {
   dwellFlush();
   const e = V.entry;
   if (!e || !total) return;
-  if (DWELL.key !== e.k) { DWELL.key = e.k; DWELL.acc = new Map(); DWELL.need = new Map(); }
+  if (DWELL.key !== e.k) {
+    // (Another paper now: the last one's progress goes.)
+    if (noteProgress.t) { noteProgress.t = 0; saveProgress(); }
+    DWELL.key = e.k; DWELL.acc = new Map(); DWELL.need = new Map();
+  }
   DWELL.page = page; DWELL.total = total; DWELL.t0 = Date.now();
   dwellNeed(page);
   clearInterval(DWELL.timer);
@@ -457,17 +471,21 @@ function countPage(e, page) {
   x.p = progressOf(x);
   PROGRESS[e.k] = x;
   if (x.p >= 100 && !(old && old.p >= 100)) syncReaderRL();
-  clearTimeout(noteProgress.t);
-  noteProgress.t = setTimeout(() => { noteProgress.t = 0; saveProgress(); }, 4000);
+  // (Kept here now; sent on going back to the library, to another paper or
+  // to another app.)
+  store.set('progress', PROGRESS);
+  noteProgress.t = 1;
 }
-document.addEventListener('visibilitychange', () => { if (DWELL.timer) dwellFlush(); });
-// (Back to the library with progress not yet saved: saved now, so the
-// list shows it.)
+document.addEventListener('visibilitychange', () => {
+  if (DWELL.timer) dwellFlush();
+  if (document.hidden && noteProgress.t) { noteProgress.t = 0; saveProgress(); }
+});
+// (Back to the library with progress or a place not yet sent: sent now,
+// and the list shows it.)
 new MutationObserver(() => {
-  if (!$('#viewer').hidden || !noteProgress.t) return;
-  clearTimeout(noteProgress.t);
-  noteProgress.t = 0;
-  saveProgress();
+  if (!$('#viewer').hidden) return;
+  if (noteProgress.t) { noteProgress.t = 0; saveProgress(); }
+  if (notePosition.t) savePositions();
 }).observe($('#viewer'), { attributes: true, attributeFilter: ['hidden'] });
 // The page a paper's reference list starts on (0: none found): from the
 // PDF's outline, or else a line on its own reading References,
@@ -544,19 +562,42 @@ function saveProgress() {
 // a device that hasn't heard of it.
 function progressMerge(prefs) {
   if (!SYNC.progress) return;
-  Object.entries((prefs && prefs.progress) || {}).forEach(([k, v]) => {
-    const mine = PROGRESS[k];
-    if (!mine) { PROGRESS[k] = v; return; }
-    if (mine.reset || v.reset) { if ((v.at || 0) > (mine.at || 0)) PROGRESS[k] = v; return; }
-    // (Both counting pages: the pages read on either.)
-    if (mine.pages != null && v.pages != null) {
-      const x = Object.assign({}, mine, { pages: rangesOf(new Set([...pagesOf(mine.pages), ...pagesOf(v.pages)])), n: Math.max(mine.n || 0, v.n || 0), base: Math.max(mine.base || 0, v.base || 0), at: Math.max(mine.at || 0, v.at || 0) });
-      x.p = progressOf(x);
-      PROGRESS[k] = x;
-    } else if (mine.p < v.p) PROGRESS[k] = v;
-  });
+  Object.entries((prefs && prefs.progress) || {}).forEach(([k, v]) => { PROGRESS[k] = progressBoth(PROGRESS[k], v); });
   store.set('progress', PROGRESS);
 }
+// One paper's progress from two devices, as one.
+function progressBoth(mine, v) {
+  if (!mine) return v;
+  if (!v) return mine;
+  if (mine.reset || v.reset) return (v.at || 0) > (mine.at || 0) ? v : mine;
+  // (Both counting pages: the pages read on either.)
+  if (mine.pages != null && v.pages != null) {
+    const x = Object.assign({}, mine, { pages: rangesOf(new Set([...pagesOf(mine.pages), ...pagesOf(v.pages)])), n: Math.max(mine.n || 0, v.n || 0), base: Math.max(mine.base || 0, v.base || 0), at: Math.max(mine.at || 0, v.at || 0) });
+    x.p = progressOf(x);
+    return x;
+  }
+  return mine.p < v.p ? v : mine;
+}
+// (The same, when your preferences are saved to Drive, so what another
+// device saved meanwhile is added to, not replaced: see savePrefs in
+// server.js.)
+window.LIBLANDE_MERGE = { progress: progressBoth };
+// Your other devices' progress and places in papers, read in again on
+// coming back to LibLande after a minute or more away (and on Refresh:
+// see start.js), so the reading list and Where you left off agree.
+function pullPrefs(prefs) {
+  if (!prefs) return;
+  progressMerge(prefs);
+  positionsMerge(prefs);
+  if (ENTRIES.length) { paint(); renderRLBar(); }
+}
+const AWAY_SINCE = { at: 0 };
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { AWAY_SINCE.at = Date.now(); return; }
+  if (!gs || !AWAY_SINCE.at || Date.now() - AWAY_SINCE.at < 60 * 1000) return;
+  AWAY_SINCE.at = 0;
+  callServer('getPrefs').then(pullPrefs).catch(() => {});
+});
 const progressText = e => { const x = PROGRESS[e.k]; return !x || !x.p ? '' : x.p >= 100 ? 'read through' : x.p + '% read'; };
 // The badge: pressed, the count starts again (with Undo).
 const progressTag = e => progressText(e) ? `<button type="button" class="rl-prog" data-prog-reset="${esc(e.k)}" style="--p:${PROGRESS[e.k].p}%" title="How far you\u2019ve read: press to start the count again">${progressText(e)}</button>` : '';
