@@ -19,7 +19,7 @@
  */
 (function (root) {
   'use strict';
-  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).builder = '2026-11-09.04';
+  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).builder = '2026-11-09.05';
   const FOLDER = 'application/vnd.google-apps.folder';
   const DATA_FOLDER = 'LibLande', LIBRARY_FILE = 'library.json.gz', INDEX_FILE = 'file-index.json',
     SETTINGS_FILE = 'settings.json', INBOX_FOLDER = 'Inbox', INBOX_FILE = 'LibLande inbox.bib';
@@ -108,9 +108,22 @@
 
     // LibLande's folder in My Drive: the one holding the library (made,
     // with create, when there's none).
-    let dataId = null;
+    // (Remembered, and checked again after ten minutes: one moved to the
+    // trash, or deleted, while LibLande is open is looked for again.)
+    let dataId = null, dataChecked = 0;
     async function dataFolder(create) {
-      if (dataId) return dataId;
+      if (dataId && Date.now() - dataChecked < 10 * 60 * 1000) return dataId;
+      if (dataId) {
+        try {
+          const f = await get('files/' + encodeURIComponent(dataId) + '?fields=id,trashed');
+          if (f && f.id && !f.trashed) { dataChecked = Date.now(); return dataId; }
+        } catch (e) {
+          // (Offline: as it was. Gone: looked for again.)
+          if (e.offline) return dataId;
+        }
+        dataId = null;
+      }
+      dataChecked = Date.now();
       const folders = await listAll('name = ' + q(DATA_FOLDER) + " and 'root' in parents and mimeType = '" + FOLDER + "' and trashed = false", 'id');
       for (const f of folders) {
         if (await named(f.id, LIBRARY_FILE, 'id') || await named(f.id, SETTINGS_FILE, 'id')) return (dataId = f.id);
