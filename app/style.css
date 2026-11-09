@@ -1347,6 +1347,9 @@ details.d-sec[open] summary { margin-bottom: 8px; }
   padding-top: calc(6px + env(safe-area-inset-top, 0px));
   padding-left: calc(8px + env(safe-area-inset-left, 0px)); padding-right: calc(8px + env(safe-area-inset-right, 0px));
   background: var(--panel); border-bottom: 1px solid var(--line);
+  /* (Above the tabs under it, so its menus (Share, Add) drop down over
+     them: its glass blur makes it a layer of its own.) */
+  position: relative; z-index: 2;
 }
 /* Open papers, as tabs under the viewer's bar. */
 .v-tabs { flex: none; display: flex; align-items: center; gap: 2px; overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch;
@@ -1755,6 +1758,11 @@ a.ms-ib { text-decoration: none; }
    page after a jump (as to a find result) and a few frames a second
    scrolling; with it, a tenth of a second, and smooth.) */
 .v-scroll .pdfViewer { will-change: transform; }
+/* (And as wide as its widest page: on its own layer, it is what PDF.js
+   takes the pages to be within, and, zoomed in wider than the screen, it
+   took it for what scrolls and scrolled that: a link or outline entry then
+   didn't move the page at all.) */
+#vPages { width: max-content; min-width: 100%; }
 .v-scroll .pdfViewer.tap-zoom { transition: transform .28s cubic-bezier(.2, .8, .2, 1); will-change: transform; }
 @media (prefers-reduced-motion: reduce) { .v-scroll .pdfViewer.tap-zoom { transition: none; } }
 .v-scroll .pdfViewer { padding: calc(var(--top-h, 48px) + 8px) 0 90px; transform-origin: 0 0; }

@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, reader, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-04.02';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-09.01';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -6165,12 +6165,28 @@ const TOC_NUMBERED = /^(\d{1,2}(?:\.\d{1,2}){0,3})\.?\s+\S/;
 // (A line starting "Chapter", "Part", "Appendix"... is a heading if it's
 // short: a long one is an entry's title running over two lines.)
 const tocHeading = t => (/^(chapter|part|book|section|appendix|appendices)\b/i.test(t) && t.split(/\s+/).length <= 6) || ((l => l.length >= 4 && l.replace(/[^A-Z]/g, '').length / l.length > 0.7)(t.replace(/[^A-Za-z]/g, '')));
+// OCR's specks and misreadings tidied in a title: a stray mark or letter
+// read from the margin before it ("f Introduction", ") Notes"), and a
+// section's roman numeral read as look-alikes ("Section]", "Section Il").
+const TOC_SPECK = /^(?:[^\w\s"'\u201c\u2018(\u00a7]+|[a-z])\s+(?=[A-Z0-9"\u201c\u2018\u00a7])/;
+const tocClean = t => t
+  .replace(TOC_SPECK, '')
+  .replace(/\b(section|chapter|part|book|lecture|essay)\s*([IVXl1|\]\[!]{1,6})(?=[\s.:]|$)/gi, (m, w, n) => /^\d+$/.test(n) ? m : w + ' ' + n.replace(/[l1|\]\[!]/g, 'I'))
+  .trim();
+// A page number OCR read partly as letters ("a7" for 47): figures, if
+// every letter is one often read for a figure, and there's a figure in it.
+const TOC_DIGIT = { a: '4', A: '4', s: '5', S: '5', o: '0', O: '0', b: '6', B: '8', g: '9', q: '9', z: '2', Z: '2', l: '1', I: '1', t: '7', T: '7' };
+const tocDigits = text => {
+  const m = /^(.*\S)\s+([0-9A-Za-z]{2,4})$/.exec(text);
+  if (!m || !/\d/.test(m[2]) || /^\d+$/.test(m[2]) || ![...m[2]].every(c => /\d/.test(c) || TOC_DIGIT[c])) return null;
+  return { text: m[1] + ' ' + [...m[2]].map(c => TOC_DIGIT[c] || c).join(''), was: m[2] };
+};
 // (at: the Contents start on that page, said so, rather than found.)
 async function printedContents(doc, fileId, at) {
   if (at) fileId = null;
-  // (v4: read again since two columns, page labels with gaps and parts
-  // were read.)
-  const ck = 'v4:' + (fileId || '') + ':' + doc.numPages;
+  // (v5: read again since OCR's misreadings were tidied, and printed
+  // pages ahead of the PDF's counted.)
+  const ck = 'v5:' + (fileId || '') + ':' + doc.numPages;
   if (fileId && TOC_CACHE[ck]) return TOC_CACHE[ck];
   const N = doc.numPages, lines = {};
   const read = async n => (lines[n] = lines[n] || await pageLines(doc, n));
@@ -6199,17 +6215,31 @@ async function printedContents(doc, fileId, at) {
   const raw = [];
   for (let n = from; n <= to; n++) {
     // (Not the heading, page numbers, or running heads such as "viii CONTENTS".)
-    const ls = (await read(n)).filter(l => !TOC_HEAD.test(l.text.replace(/^(\d{1,4}|[ivxlc]{1,7})\s+|\s+(\d{1,4}|[ivxlc]{1,7})$/gi, '').replace(/\s+/g, '')) && !/^\d{1,4}$|^[ivxlc]{1,6}$/i.test(l.text) && !repeated(l));
+    const ls = (await read(n)).filter(l => !TOC_HEAD.test(l.text.replace(/^(\d{1,4}|[ivxlc]{1,7})\s+|\s+(\d{1,4}|[ivxlc]{1,7})$/gi, '').replace(/\s+/g, '')) && !/^\d{1,4}$|^[ivxlc]{1,6}$/i.test(l.text) && !repeated(l)
+      // (Nor a speck read as a letter or mark on a line of its own.)
+      && /\w\W*\w/.test(l.text));
     for (let i = 0; i < ls.length; i++) {
-      const l = ls[i], m = TOC_ENTRY.exec(l.text);
-      if (m && !(/^[ivxlcdm]+$/.test(tocNum(m[2])) && /\b(part|chapter|book|volume)$/i.test(m[1]))) { raw.push({ title: m[1].replace(/[\s.\u00b7\u2026_]+$/, ''), num: tocNum(m[2]), x: l.x, rx: l.rx, col: l.col }); continue; }
-      if (tocHeading(l.text)) { raw.push({ title: l.text, num: null, x: l.x, rx: l.rx, col: l.col, head: true }); continue; }
+      const l = ls[i], fix = !TOC_ENTRY.test(l.text) && tocDigits(l.text), m = TOC_ENTRY.exec(fix ? fix.text : l.text);
+      if (m && !(/^[ivxlcdm]+$/.test(tocNum(m[2])) && /\b(part|chapter|book|volume)$/i.test(m[1]))) { raw.push({ title: tocClean(m[1].replace(/[\s.\u00b7\u2026_]+$/, '')), num: tocNum(m[2]), x: l.x, rx: l.rx, col: l.col, was: fix ? fix.was : null, line: l.text, speck: TOC_SPECK.test(l.text) }); continue; }
+      if (tocHeading(l.text)) { raw.push({ title: tocClean(l.text), num: null, x: l.x, rx: l.rx, col: l.col, head: true, speck: TOC_SPECK.test(l.text) }); continue; }
       // (A title over two lines, its page number on the second.)
       const next = ls[i + 1], nm = next && TOC_ENTRY.exec(next.text);
-      if (nm && !tocHeading(next.text)) { raw.push({ title: l.text + ' ' + nm[1].replace(/[\s.\u00b7\u2026_]+$/, ''), num: tocNum(nm[2]), x: l.x, rx: l.rx, col: l.col }); i++; }
+      if (nm && !tocHeading(next.text)) { raw.push({ title: tocClean(l.text) + ' ' + nm[1].replace(/[\s.\u00b7\u2026_]+$/, ''), num: tocNum(nm[2]), x: l.x, rx: l.rx, col: l.col }); i++; }
     }
   }
+  // (A number made from letters kept only if it falls between the entries
+  // around it; else the line is as it was, a heading or a title.)
+  raw.forEach((r, i) => {
+    if (!r.was) return;
+    const prev = raw.slice(0, i).reverse().find(x => x.num && /^\d+$/.test(x.num) && !x.was), next = raw.slice(i + 1).find(x => x.num && /^\d+$/.test(x.num) && !x.was);
+    if ((prev && +r.num < +prev.num) || (next && +r.num > +next.num)) { r.num = null; r.title = tocClean(r.line); r.head = tocHeading(r.line); }
+  });
   if (raw.filter(r => r.num).length < 3) return null;
+  // (A line that started with a speck in the margin starts, in fact, where
+  // most lines without one do: its indent isn't the speck's.)
+  const commonest = list => { const k = new Map(); list.forEach(v => { const b = Math.round(v / 4) * 4; k.set(b, (k.get(b) || 0) + 1); }); const best = [...k].sort((a, b) => b[1] - a[1])[0]; return best ? best[0] : null; };
+  const clean = raw.filter(r => !r.speck), cx = commonest(clean.map(r => r.x)), crx = commonest(clean.map(r => r.rx || 0));
+  if (clean.length && cx != null) raw.forEach(r => { if (r.speck) { r.x = cx; r.rx = crx; } });
   // (A page number set apart, "The Algorithmic Level 7 2" for 72: joined
   // when that fits between the entries around it.)
   raw.forEach((r, i) => {
@@ -6308,7 +6338,9 @@ async function pageMapper(doc, raw, tocStart, tocEnd, read) {
       for (const l of ends) {
         const m = roman ? /^([ivxlc]{1,7})$/.exec(l.text) : /^(\d{1,4})$/.exec(l.text) || /^(\d{1,4})\s+\S|\S\s+(\d{1,4})$/.exec(l.text);
         const v = m && (roman ? romanValue(m[1]) : +(m[1] || m[2]));
-        if (v && v <= n) { const off = n - v; votes.set(off, (votes.get(off) || 0) + 1); }
+        // (The printed number may be ahead of the PDF's: a scan starting
+        // part way into a book.)
+        if (v && (roman ? v <= n : v <= n + 40)) { const off = n - v; votes.set(off, (votes.get(off) || 0) + 1); }
       }
     }
     const best = [...votes].sort((a, b) => b[1] - a[1])[0];
