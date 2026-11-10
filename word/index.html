@@ -181,6 +181,23 @@
   .hlt .q { flex: 1; min-width: 0; font: 13.5px/1.4 Garamond, "EB Garamond", Georgia, serif; overflow-wrap: anywhere; }
   .hlt .q .note2 { display: block; font: 12px/1.4 -apple-system, system-ui, sans-serif; color: var(--muted); margin-top: 3px; }
   .hlt .qb { align-self: flex-start; font-size: 11.5px; border: 1px solid var(--line); border-radius: 6px; padding: 1px 7px; background: var(--field); color: var(--accent); white-space: nowrap; cursor: pointer; }
+  .selcard { border: 2px solid var(--accent); border-radius: 12px; background: color-mix(in srgb, var(--accent) 6%, var(--bg)); margin: 0 0 10px; overflow: hidden; max-height: 55vh; overflow-y: auto; }
+  .selcard .sb { background: var(--accent); color: var(--accent-ink); padding: 4px 6px 8px 12px; position: sticky; top: 0; }
+  .selcard .sb .ic { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 5px; border: none; background: none; color: inherit; cursor: pointer; font-size: 13px; }
+  .selcard .sb .ic:hover { background: rgba(0,0,0,.15); }
+  .sbd { padding: 6px 12px 12px; }
+  .sbd .note { margin: 4px 0; }
+  .lbl2 { font-size: 11px; color: var(--faint); text-transform: uppercase; letter-spacing: .04em; margin: 8px 0 2px; }
+  .cand { display: flex; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--row); align-items: flex-start; }
+  .cand .tx { flex: 1; min-width: 0; }
+  .cand .lk { border: 1px solid var(--accent); color: var(--accent); background: var(--field); border-radius: 6px; padding: 2px 9px; font-size: 12px; white-space: nowrap; cursor: pointer; }
+  .cand .lk.p { background: var(--accent); color: var(--accent-ink); }
+  .sbd .alt { display: flex; gap: 8px; margin-top: 8px; }
+  .sbd .alt button { flex: 1; border: 1px solid var(--line); border-radius: 8px; padding: 6px; font-size: 12px; background: var(--field); cursor: pointer; }
+  .sbd .alt button.go { color: var(--accent); border-color: var(--accent); }
+  .sbd .alt button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 500; }
+  .sbd .alt button:disabled { opacity: .5; cursor: default; }
+  .sbd .search { margin-top: 6px; }
   .err.ok { background: var(--soft); color: var(--accent); }
   .err { background: var(--warn-soft); color: var(--warn); border-radius: 8px; padding: 8px 10px; margin: 0 0 8px; }
 </style>
@@ -210,6 +227,10 @@
   </div>
   <div class="view" id="pCite" role="tabpanel">
     <div class="top">
+      <div class="selcard" id="selCard" hidden>
+        <div class="sb"><div class="gtop"><span class="gk" id="selLabel"></span><button class="ic" type="button" id="selX" aria-label="Close" title="Close">&#x2715;</button></div><div class="gc" id="selText"></div></div>
+        <div class="sbd" id="selBody"></div>
+      </div>
       <label class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg><input id="q" type="search" placeholder="Search your library" autocomplete="off" autocorrect="off" spellcheck="false" aria-label="Search your library" aria-controls="res"></label>
       <div class="lists" id="listsBox">
         <div class="subtabs" role="tablist" aria-label="List" id="lists"><button type="button" role="tab" data-list="doc" aria-selected="false">In this document<i id="nDoc"></i></button><button type="button" role="tab" data-list="lib" aria-selected="true">Library<i id="nLib"></i></button></div>
@@ -300,8 +321,8 @@ const safeUrl = u => /^https?:[/][/]/i.test(u) ? u : null;
 const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[‐-―]/g, '-');
 const cmpStr = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 </script>
-<script src="../app/apa.js?v=2026-11-10.03"></script>
-<script src="../app/csl.js?v=2026-11-10.03"></script>
-<script src="../app/marks.js?v=2026-11-10.03"></script>
-<script src="engine.js?v=2026-11-10.03"></script>
-<script src="panel.js?v=2026-11-10.03"></script>
+<script src="../app/apa.js?v=2026-11-10.04"></script>
+<script src="../app/csl.js?v=2026-11-10.04"></script>
+<script src="../app/marks.js?v=2026-11-10.04"></script>
+<script src="engine.js?v=2026-11-10.04"></script>
+<script src="panel.js?v=2026-11-10.04"></script>

@@ -315,8 +315,8 @@
     await ctx.sync();
   }
 
-  async function insertCitation() {
-    const c = currentCite();
+  async function insertCitation(given) {
+    const c = given || currentCite();
     if (!c.items.length) return;
     hideErr('citeErr');
     const id = newId();
@@ -357,6 +357,7 @@
   // works stay in the settings). The cursor leaving it leaves it here too,
   // unless something was changed.
   function enterEdit(id) {
+    hideSelCard();
     const c = S.cites[id];
     const its = c.own ? c.items : LLWord.order(c.items, S.byKey);
     S.editing = id;
@@ -382,27 +383,186 @@
   function onSelection() {
     clearTimeout(selTimer);
     selTimer = setTimeout(async () => {
-      let tag = '';
+      let tag = '', where = null;
       try {
         await Word.run(async ctx => {
-          const cc = ctx.document.getSelection().parentContentControlOrNullObject;
+          const sel = ctx.document.getSelection();
+          const cc = sel.parentContentControlOrNullObject;
           cc.load('tag');
           await ctx.sync();
           tag = cc.isNullObject ? '' : cc.tag || '';
+          if (tag) return;
+          // (Where the selection is in its paragraph, for a citation typed
+          // there: the paragraph's text, and how much of it comes before.
+          // Not to be had for every selection, as one over a picture.)
+          try {
+            sel.load('text');
+            const para = sel.paragraphs.getFirst();
+            para.load('text');
+            const before = para.getRange('Start').expandTo(sel.getRange('Start'));
+            before.load('text');
+            await ctx.sync();
+            where = { text: sel.text || '', para: para.text || '', at: (before.text || '').length };
+          } catch (e) { where = null; }
         });
       } catch (e) { return; }
       const id = /^LL:/.test(tag) && tag !== 'LL:refs' ? tag.slice(3) : '';
       if (!id || !S.cites[id]) {
         S.skipEdit = null;
         if (S.editing && !S.dirty) leaveEdit();
+        if (!tag && where) noticeSelection(where); else hideSelCard();
         return;
       }
+      hideSelCard();
       // (Not the one just inserted or updated, with the cursor after it;
       // and not over a new citation being made, or changes not yet saved.)
       if (id === S.editing || id === S.skipEdit) return;
       if (S.editing ? S.dirty : S.chosen.length) return;
       enterEdit(id);
     }, 200);
+  }
+  /* ---- a citation typed by hand, selected (or the cursor in it): linked */
+  // The Cite tab shows it at the top with the works it could be (engine.js
+  // findTyped and matchTyped, as Link citations does); Link makes it a
+  // LibLande citation. Not in the library: Add to LibLande. Text that isn't
+  // a citation: searched for, to cite a work in its place.
+  const SEL = { card: null };
+  function noticeSelection(w) {
+    if (S.editing || S.chosen.length || !S.entries.length) { hideSelCard(); return; }
+    const end = w.at + w.text.length;
+    // (The cursor inside it, not just before or after it, as it is after
+    // one just linked; or a selection within it, or of all of it.)
+    const typed = LLWord.findTyped(w.para).find(t => w.text ? t.at <= w.at && end <= t.at + t.text.length : t.at < w.at && w.at < t.at + t.text.length);
+    if (typed) {
+      // (The same one as shown already: left as it is, choices and all.)
+      if (SEL.card && SEL.card.kind === 'typed' && SEL.card.t.text === typed.text && SEL.card.para === w.para) return;
+      const items = [];
+      typed.parts.forEach(pt => LLWord.matchTyped(pt, S.entries).forEach((m, yi) => items.push({
+        label: pt.years.length > 1 ? pt.names.join(' & ') + ', ' + pt.years[yi].y + pt.years[yi].letter : pt.text.replace(/^[^A-Z\u00c0-\u024f]*?(?=\p{Lu})/u, ''),
+        pt, yi, cands: m.cands.slice(0, 6), k: m.pick ? m.pick.k : null, finding: false,
+      })));
+      SEL.card = { kind: 'typed', t: typed, para: w.para, items };
+    } else if (w.text.trim().length >= 3 && w.text.trim().length <= 200 && !/\r|\n/.test(w.text.trim())) {
+      const text = w.text.trim();
+      if (SEL.card && SEL.card.kind === 'text' && SEL.card.text === text) return;
+      SEL.card = { kind: 'text', text, hits: matches(text).slice(0, 5) };
+    } else { hideSelCard(); return; }
+    paintSelCard();
+  }
+  function hideSelCard() {
+    if (!SEL.card) return;
+    SEL.card = null;
+    $('selCard').hidden = true;
+  }
+  const workRow = (e, i, j, pressed, btn) => '<div class="cand"><div class="tx"><div class="t">' + esc(e.f.title || e.k) + '</div><div class="m">' + esc(metaOf(e)) + '</div></div>' +
+    '<button type="button" class="lk' + (pressed ? ' p' : '') + '" data-i="' + i + '" data-k="' + esc(e.k) + '" aria-pressed="' + !!pressed + '">' + btn + '</button></div>';
+  function paintSelCard() {
+    const c = SEL.card;
+    if (!c) return;
+    let label, shown, body = '';
+    if (c.kind === 'typed') {
+      const n = c.t.parts.length;
+      label = n > 1 ? 'Selected \u00b7 ' + n + ' citations' : 'Selected citation';
+      shown = c.t.text;
+      const many = c.items.length > 1;
+      c.items.forEach((it, i) => {
+        if (many) body += '<div class="lbl2">' + esc(it.label) + '</div>';
+        if (!it.cands.length) body += '<p class="note">Not in your library.</p>';
+        else if (!many && it.cands.length > 1) body += '<div class="lbl2">' + it.cands.length + ' works could be this one</div>';
+        // (One work: its Link links it; several: the one chosen is marked,
+        // and the button at the foot links them all.)
+        body += it.cands.map(e => workRow(e, i, 0, it.k === e.k, many ? (it.k === e.k ? 'Chosen' : 'Choose') : 'Link')).join('');
+        body += it.finding ? '<label class="search"><input type="search" data-find="' + i + '" placeholder="Another work\u2026" autocomplete="off" spellcheck="false"></label><div data-found="' + i + '"></div>'
+          : '<div class="alt"><button type="button" data-search="' + i + '">' + (it.cands.length ? 'Search for another\u2026' : 'Search\u2026') + '</button>' +
+            (it.cands.length ? '' : '<button type="button" class="go" data-addlib="' + i + '">Add to LibLande\u2026</button>') + '</div>';
+      });
+      if (many) {
+        const ready = c.items.every(it => it.k);
+        body += '<div class="alt"><button type="button" class="primary" data-linkall' + (ready ? '' : ' disabled') + '>' + (c.items.length === 2 ? 'Link both' : 'Link all ' + c.items.length) + '</button></div>';
+      }
+    } else {
+      label = 'Selected text';
+      shown = '\u201c' + c.text + '\u201d';
+      body = '<p class="note">' + (c.hits.length ? 'Not a citation. Searched for in your library:' : 'Not a citation, and nothing in your library matches it.') + '</p>' +
+        c.hits.map(e => workRow(e, -1, 0, false, 'Cite here')).join('') +
+        '<div class="alt"><button type="button" class="go" data-addtext>Add to LibLande\u2026</button></div>';
+    }
+    $('selLabel').textContent = label;
+    $('selText').textContent = shown;
+    $('selBody').innerHTML = body;
+    $('selCard').hidden = false;
+  }
+  // The typed citation made LibLande's: found again in its paragraph (the
+  // cursor's), the one at the same place, and put in a citation of these
+  // works.
+  async function linkSelected() {
+    const c = SEL.card;
+    if (!c || c.kind !== 'typed' || !c.items.every(it => it.k)) return;
+    const items = c.items.map(it => {
+      const x = { k: it.k, page: it.yi === it.pt.years.length - 1 ? it.pt.page : '' };
+      if (it.yi === 0 && it.pt.pre) x.pre = it.pt.pre;
+      return x;
+    });
+    const id = newId();
+    try {
+      await Word.run(async ctx => {
+        const para = ctx.document.getSelection().paragraphs.getFirst();
+        para.load('text');
+        const found = para.search(c.t.text, { matchCase: true });
+        found.load('items');
+        await ctx.sync();
+        if (para.text !== c.para) throw new Error('the paragraph changed; select the citation again.');
+        // (Which of the paragraph's copies of it: the one at that place.)
+        let nth = 0;
+        for (let at = c.para.indexOf(c.t.text); at >= 0 && at < c.t.at; at = c.para.indexOf(c.t.text, at + 1)) nth++;
+        const r = found.items[nth];
+        if (!r) throw new Error('it isn\u2019t where it was; select it again.');
+        const inside = r.parentContentControlOrNullObject;
+        inside.load('tag');
+        await ctx.sync();
+        if (!inside.isNullObject && /^LL:/.test(inside.tag || '')) throw new Error('it\u2019s already a LibLande citation.');
+        const cc = r.insertContentControl();
+        cc.tag = 'LL:' + id; cc.title = 'LibLande'; cc.appearance = 'BoundingBox';
+        await ctx.sync();
+        cc.getRange('After').select();
+        await ctx.sync();
+      });
+    } catch (e) { showSelErr('Couldn\u2019t link it: ' + wordError(e)); return; }
+    S.cites[id] = { items, form: c.t.form, own: true };
+    if (S.present) S.present.push(id);
+    S.skipEdit = id;
+    hideSelCard();
+    await saveSettings();
+    try { await refreshDocument(); } catch (e) { /* Refresh will */ }
+    search();
+  }
+  function showSelErr(msg) { const p = document.createElement('div'); p.className = 'err'; p.textContent = msg; $('selBody').prepend(p); }
+  function onSelCardClick(ev) {
+    const c = SEL.card;
+    if (!c) return;
+    const b = ev.target.closest('button');
+    if (!b) return;
+    if (b.id === 'selX') { hideSelCard(); return; }
+    if (b.hasAttribute('data-linkall')) { linkSelected(); return; }
+    if (b.hasAttribute('data-addtext')) { addInLibLande(c.text); return; }
+    if (b.dataset.addlib != null) { const it = c.items[+b.dataset.addlib]; addInLibLande(it.pt.names.join(' ') + ' ' + it.pt.years[it.yi].y); return; }
+    if (b.dataset.search != null) { c.items[+b.dataset.search].finding = true; paintSelCard(); const f = document.querySelector('[data-find="' + b.dataset.search + '"]'); if (f) f.focus(); return; }
+    if (b.classList.contains('lk')) {
+      const k = b.dataset.k;
+      if (c.kind === 'text') { insertCitation({ items: [{ k, page: '' }], form: 'paren', own: false }).then(hideSelCard); return; }
+      const it = c.items[+b.dataset.i];
+      if (!it.cands.some(e => e.k === k) && S.byKey.get(k)) it.cands.push(S.byKey.get(k));
+      it.k = k;
+      it.finding = false;
+      if (c.items.length === 1) linkSelected(); else paintSelCard();
+    }
+  }
+  function onSelCardInput(ev) {
+    const i = ev.target.dataset.find;
+    if (i == null) return;
+    const hits = ev.target.value.trim() ? matches(ev.target.value).slice(0, 6) : [];
+    const multi = SEL.card.items.length > 1;
+    document.querySelector('[data-found="' + i + '"]').innerHTML = hits.map(e => workRow(e, +i, 0, false, multi ? 'Choose' : 'Link')).join('');
   }
   async function updateCitation() {
     const id = S.editing, c = currentCite();
@@ -1541,6 +1701,8 @@
     }, true);
     $('foot').addEventListener('pointerdown', () => $('pCite').classList.remove('browsing'));
     $('lists').addEventListener('click', onListsClick);
+    $('selCard').addEventListener('click', onSelCardClick);
+    $('selCard').addEventListener('input', onSelCardInput);
     $('nLists').addEventListener('click', onListsClick);
     $('gq').addEventListener('input', paintGroupMenu);
     $('gList').addEventListener('click', ev => { const g = ev.target.closest('[data-g]'); if (g) addGroupTab(g.dataset.g); });
@@ -1734,5 +1896,5 @@
     });
   } else start();
   // (For testing in a browser.)
-  window.LLPanel = { S, useLibrary, search, toggle, paintChosen, view, zoteroCite, zoteroMatcher, swapFields, enterEdit, leaveEdit, currentCite, renderAll, styleEngine, LINK, paintLink, paintRefs, unwrapControls, openNotes, readMarks, paintLists, addGroupTab, listKeys };
+  window.LLPanel = { S, useLibrary, search, toggle, paintChosen, view, zoteroCite, zoteroMatcher, swapFields, enterEdit, leaveEdit, currentCite, renderAll, styleEngine, LINK, paintLink, paintRefs, unwrapControls, openNotes, readMarks, paintLists, addGroupTab, listKeys, noticeSelection };
 })();
