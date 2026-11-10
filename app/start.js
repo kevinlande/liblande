@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-11-10.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-11-10.05';
 // On GitHub Pages, every part of the app must be from the same version: a
 // part kept from an older one (the offline copy, served when the network
 // was slow) lacks what this page needs. Then the kept copies go, and the
@@ -97,6 +97,20 @@ function copy(text, msg, html) {
     }
   } catch { fallback(); }
 }
+
+/* ------------------------------------------------------------ settings' tabs */
+// Settings in tabs: Appearance, Sync, Library, Citing, Extensions (Word,
+// adding from the web); the one open last opened again.
+function setSettingsTab(t) {
+  if (!document.querySelector('#setupEdit .set-sec[data-stab="' + t + '"]')) t = 'look';
+  store.set('setTab', t);
+  document.querySelectorAll('#setTabs [data-stab]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.stab === t)));
+  document.querySelectorAll('#setupEdit .set-sec').forEach(s => s.classList.toggle('off-tab', s.dataset.stab !== t));
+  $('#setup').scrollTop = 0;
+  const card = $('#setupForm');
+  if (card) card.scrollTop = 0;
+}
+$('#setTabs').addEventListener('click', ev => { const b = ev.target.closest('[data-stab]'); if (b) setSettingsTab(b.dataset.stab); });
 
 /* ------------------------------------------------------------ navigation */
 function go(view) {
@@ -709,7 +723,6 @@ if (RELOADING) {
       // The theme previews as you choose; Save keeps it, Cancel puts it back.
       STYLE_WAS = store.get('style', 'liblande');
       renderThemePicks();
-      $('#darkPagesBox').checked = !!store.get('darkPages', false);
       $('#glassBox').checked = !!glassNow();
       $('#coversBox').checked = coversOn();
       renderProxies();
@@ -727,6 +740,7 @@ if (RELOADING) {
     }
     if (!configured) $('#linkFields').after($('#setLibs'));
     setupMsg(st && st.problem, 'error');
+    if (configured) setSettingsTab(store.get('setTab', 'look'));
     $('#setup').scrollTop = 0;
     if (!configured) $('#bibLink').focus();
   };
@@ -736,8 +750,6 @@ if (RELOADING) {
     if (STYLE_WAS != null) { applyStyle(STYLE_WAS); STYLE_WAS = null; }
     $('#setup').hidden = true;
   };
-  // (These take effect at once, on this device.)
-  $('#darkPagesBox').addEventListener('change', ev => setDarkPages(ev.target.checked));
   // (Glass: as soon as it's switched, and on your other devices too.)
   $('#glassBox').addEventListener('change', ev => {
     store.set('glass', ev.target.checked);
@@ -823,6 +835,7 @@ if (RELOADING) {
     $('#settingsBtn').click();
     for (let i = 0; i < 150 && ($('#setup').hidden || $('#setupEdit').hidden); i++) await new Promise(r => setTimeout(r, 100));
     if ($('#setup').hidden) return;
+    setSettingsTab('library');
     $('#newLibRow').hidden = false;
     $('#newLibRow').scrollIntoView({ block: 'center' });
     $('#newLibName').focus();

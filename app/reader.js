@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-10.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-10.05';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -4081,8 +4081,6 @@ function applyTone() {
   v.style.setProperty('--page-tint', 'rgb(' + tint.join(',') + ')');
   $('#vDarkBtn').setAttribute('aria-pressed', String(t !== 'light'));
   $('#vDarkBtn').dataset.tone = t;
-  const box = $('#darkPagesBox');
-  if (box) box.checked = isDarkTone(t);
   const p = $('#vTone');
   if (p) p.querySelectorAll('[data-tone]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tone === t)));
 }
@@ -4092,8 +4090,6 @@ function setTone(t) {
   store.set('pageTone', t); store.set('pageTonePrev', TONE.prev); store.set('darkPages', isDarkTone(t));
   applyTone();
 }
-// (Settings' "Dark pages" switch: dark, or back to light.)
-function setDarkPages(on) { setTone(on ? (TONE.now === 'sepia' ? 'darksepia' : isDarkTone(TONE.now) ? TONE.now : 'dark') : (TONE.now === 'darksepia' ? 'sepia' : 'light')); }
 applyTone();
 $('#vDarkBtn').addEventListener('click', () => {
   if (TONE.long) { TONE.long = false; return; }
