@@ -38,7 +38,7 @@
     return gisReady || (gisReady = new Promise((ok, no) => {
       const s = document.createElement('script');
       s.src = 'https://accounts.google.com/gsi/client';
-      s.onload = ok; s.onerror = () => { gisReady = null; no(new Error('Google’s sign-in didn’t load. Are you online?')); };
+      s.onload = ok; s.onerror = () => { gisReady = null; no(new Error('Google\u2019s sign-in didn\u2019t load. Are you online?')); };
       document.head.appendChild(s);
     }));
   }
@@ -48,12 +48,12 @@
       const client = google.accounts.oauth2.initTokenClient({
         client_id: CLIENT_ID, scope: SCOPE,
         callback: t => {
-          if (!t || !t.access_token) { no(new Error('Google didn’t sign you in.')); return; }
+          if (!t || !t.access_token) { no(new Error('Google didn\u2019t sign you in.')); return; }
           token = { value: t.access_token, exp: Date.now() + (Number(t.expires_in) || 3600) * 1000 - 60000 };
           store.set('token', token);
           ok(token);
         },
-        error_callback: e => no(new Error(e && e.type === 'popup_closed' ? 'Sign-in was closed.' : 'Sign-in didn’t finish.')),
+        error_callback: e => no(new Error(e && e.type === 'popup_closed' ? 'Sign-in was closed.' : 'Sign-in didn\u2019t finish.')),
       });
       client.requestAccessToken({ prompt: prompt == null ? (store.get('email', null) ? '' : 'select_account') : prompt, login_hint: store.get('email', undefined) });
     });
@@ -74,7 +74,7 @@
       const lib = ((await (await drive('files?q=' + encodeURIComponent("name = 'library.json.gz' and " + q(f.id) + ' in parents and trashed = false') + '&fields=files(id,modifiedTime)')).json()).files || [])[0];
       if (lib) return lib;
     }
-    throw new Error('No LibLande library in your Google Drive (My Drive › LibLande).');
+    throw new Error('No LibLande library in your Google Drive (My Drive \u203a LibLande).');
   }
   const gunzip = async buf => JSON.parse(await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).text());
   async function fetchLibrary(force) {
@@ -211,7 +211,7 @@
         cc.getRange('After').select();
         await ctx.sync();
       });
-    } catch (e) { showErr('citeErr', 'Couldn’t insert it: ' + wordError(e)); return; }
+    } catch (e) { showErr('citeErr', 'Couldn\u2019t insert it: ' + wordError(e)); return; }
     S.cites[id] = c;
     if (S.present) S.present.push(id);
     await saveSettings();
@@ -219,11 +219,11 @@
     $('q').value = '';
     search();
     $('q').focus();
-    try { await refreshDocument(); } catch (e) { showErr('citeErr', 'The other citations couldn’t be updated: ' + wordError(e)); }
+    try { await refreshDocument(); } catch (e) { showErr('citeErr', 'The other citations couldn\u2019t be updated: ' + wordError(e)); }
   }
   function wordError(e) {
     const m = (e && (e.message || e.code)) || String(e);
-    if (/protect|read.?only|locked/i.test(m)) return 'this document can’t be changed (it’s protected or read-only).';
+    if (/protect|read.?only|locked/i.test(m)) return 'this document can\u2019t be changed (it\u2019s protected or read-only).';
     if (/compat|InvalidArgument|NotAllowed|GeneralException/i.test(m)) return m + ' (If this is an older .doc file, save it as .docx.)';
     return m;
   }
@@ -252,44 +252,142 @@
       });
       S.hasRefs = true;
       paintRefs();
-    } catch (e) { showErr('refsErr', 'Couldn’t put the list there: ' + wordError(e)); }
+    } catch (e) { showErr('refsErr', 'Couldn\u2019t put the list there: ' + wordError(e)); }
   }
 
-  /* ---- Zotero's citations, read (converting them comes later) */
-  async function readZotero() {
-    if (!S.inWord) return;
-    let found = [];
-    try {
-      await Word.run(async ctx => {
-        const fields = ctx.document.body.fields;
-        fields.load('items/code');
-        await ctx.sync();
-        found = fields.items.map(f => f.code || '').filter(c => /ZOTERO_ITEM/.test(c));
-      });
-    } catch (e) {
-      $('zCard').hidden = false;
-      $('zCount').textContent = 'Zotero’s citations couldn’t be read here: ' + wordError(e);
-      $('zRows').innerHTML = '';
-      return;
-    }
-    if (!found.length) { $('zCard').hidden = true; return; }
-    const items = [];
-    found.forEach(code => {
-      const j = code.indexOf('{');
-      try { (JSON.parse(code.slice(j)).citationItems || []).forEach(it => items.push(it.itemData || {})); } catch (e) { /* not readable */ }
-    });
+  /* ---- Zotero's citations: read, matched to the library, converted */
+  // A Zotero citation (its field's code: "ADDIN ZOTERO_ITEM CSL_CITATION
+  // {json}") as a LibLande one: its works (by DOI, or title and year), pages
+  // (Zotero's locator, with its label), the first work's prefix ("see"), and
+  // the year alone where Zotero suppressed the author. null if any of its
+  // works isn't in the library.
+  const LABELS = { page: '', chapter: 'chap. ', paragraph: 'para. ', section: 'sec. ', note: 'n. ', line: 'line ', figure: 'fig. ', volume: 'vol. ' };
+  function zoteroMatcher() {
     const doi = new Map(), title = new Map();
     S.entries.forEach(e => {
       if (e.f.doi) doi.set(String(e.f.doi).toLowerCase().replace(/^https?:\/\/(dx\.)?doi\.org\//, ''), e);
       title.set(norm(e.f.title || '').replace(/[^a-z0-9]/g, '') + '#' + (e.f.year || ''), e);
     });
     const yearOf = d => d.issued && d.issued['date-parts'] && d.issued['date-parts'][0] ? String(d.issued['date-parts'][0][0]) : '';
-    const match = d => (d.DOI && doi.get(String(d.DOI).toLowerCase())) || title.get(norm(d.title || '').replace(/[^a-z0-9]/g, '') + '#' + yearOf(d)) || null;
-    const missing = items.filter(d => !match(d));
+    const match = d => (d.DOI && doi.get(String(d.DOI).toLowerCase().replace(/^https?:\/\/(dx\.)?doi\.org\//, ''))) || title.get(norm(d.title || '').replace(/[^a-z0-9]/g, '') + '#' + yearOf(d)) || null;
+    return { match, yearOf };
+  }
+  function zoteroCite(code, M) {
+    let data;
+    try { data = JSON.parse(code.slice(code.indexOf('{'))); } catch (e) { return { items: [], cite: null }; }
+    const its = data.citationItems || [];
+    const items = its.map(it => ({ it, e: M.match(it.itemData || {}) }));
+    if (!items.length || items.some(x => !x.e)) return { items, cite: null };
+    const page = it => it.locator ? (LABELS[it.label || 'page'] != null ? LABELS[it.label || 'page'] : (it.label || '') + ' ') + it.locator : '';
+    return {
+      items,
+      cite: {
+        items: items.map(x => ({ k: x.e.k, page: page(x.it).trim() })),
+        form: its.some(it => it['suppress-author']) ? 'year' : 'paren',
+        pre: String(its[0].prefix || '').replace(/[,\s]+$/, '').trim(),
+        own: false,
+      },
+    };
+  }
+  async function readZotero() {
+    if (!S.inWord) return;
+    let codes = [];
+    try {
+      await Word.run(async ctx => {
+        const fields = ctx.document.body.fields;
+        fields.load('items/code');
+        await ctx.sync();
+        codes = fields.items.map(f => f.code || '');
+      });
+    } catch (e) {
+      $('zCard').hidden = false;
+      $('zCount').textContent = 'Zotero\u2019s citations couldn\u2019t be read here: ' + wordError(e);
+      $('zRows').innerHTML = ''; $('zConvert').hidden = true;
+      return;
+    }
+    const cites = codes.filter(c => /ZOTERO_ITEM/.test(c));
+    if (!cites.length) { $('zCard').hidden = true; return; }
+    const M = zoteroMatcher();
+    const all = cites.map(c => zoteroCite(c, M));
+    const works = all.flatMap(z => z.items), missing = works.filter(x => !x.e).map(x => x.it.itemData || {});
+    const ready = all.filter(z => z.cite).length;
     $('zCard').hidden = false;
-    $('zCount').textContent = found.length + ' citation' + (found.length === 1 ? '' : 's') + ' · ' + (items.length - missing.length) + ' of ' + items.length + ' works in your library';
+    $('zCount').textContent = cites.length + ' citation' + (cites.length === 1 ? '' : 's') + ' \u00b7 ' + (works.length - missing.length) + ' of ' + works.length + ' works in your library';
     $('zRows').innerHTML = missing.slice(0, 8).map(d => '<div class="link-row"><span class="tag w">not found</span><span class="w">' +
-      esc(((d.author && d.author[0] && d.author[0].family) || '') + ' (' + (yearOf(d) || 'n.d.') + ') ' + (d.title || '')) + '</span></div>').join('');
+      esc(((d.author && d.author[0] && d.author[0].family) || '') + ' (' + (M.yearOf(d) || 'n.d.') + ') ' + (d.title || '')) + '</span></div>').join('') +
+      (missing.length ? '<p class="note" style="margin:6px 0 0">Citations with a work not in your library stay as Zotero\u2019s.</p>' : '');
+    $('zConvert').hidden = !ready;
+    $('zConvert').textContent = 'Convert ' + ready + ' to LibLande';
+  }
+
+  // Each Zotero citation that can be made LibLande's: its field selected
+  // and replaced by the citation, as a LibLande content control; Zotero's
+  // bibliography replaced by the References list. (The first is checked
+  // before the rest: if its field is still there, Word replaced only its
+  // text, and nothing more is done.)
+  async function convertZotero() {
+    hideErr('refsErr');
+    const b = $('zConvert');
+    b.disabled = true;
+    const M = zoteroMatcher();
+    let done = 0, kept = 0, bibl = false;
+    try {
+      await Word.run(async ctx => {
+        const fields = ctx.document.body.fields;
+        fields.load('items/code');
+        await ctx.sync();
+        // (From the end back, so what's replaced doesn't move what's still to
+        // come; and Zotero's bibliography kept if any citation stays Zotero's,
+        // as LibLande's list wouldn't have its works.)
+        const zf = fields.items.filter(f => /ZOTERO_(ITEM|BIBL)/.test(f.code || '')).reverse();
+        const keepBib = zf.some(f => /ZOTERO_ITEM/.test(f.code) && !zoteroCite(f.code, M).cite);
+        const count = async () => { const f = ctx.document.body.fields; f.load('items/code'); await ctx.sync(); return f.items.filter(x => /ZOTERO_(ITEM|BIBL)/.test(x.code || '')).length; };
+        const before = zf.length;
+        let checked = false;
+        for (const f of zf) {
+          const isBib = /ZOTERO_BIBL/.test(f.code);
+          const z = isBib ? null : zoteroCite(f.code, M);
+          if (!isBib && !z.cite) { kept++; continue; }
+          if (isBib && keepBib) continue;
+          f.select();
+          await ctx.sync();
+          const sel = ctx.document.getSelection();
+          if (isBib) {
+            const para = sel.insertParagraph('', 'Before');
+            sel.insertText('', 'Replace');
+            const cc = para.getRange('Whole').insertContentControl();
+            cc.tag = 'LL:refs'; cc.title = 'LibLande References'; cc.appearance = 'BoundingBox';
+            await ctx.sync();
+            bibl = true;
+          } else {
+            const id = newId();
+            const r = sel.insertText(LLWord.render(Object.assign({}, presentCites(), { [id]: z.cite }), S.byKey).texts[id], 'Replace');
+            const cc = r.insertContentControl();
+            cc.tag = 'LL:' + id; cc.title = 'LibLande'; cc.appearance = 'BoundingBox';
+            S.cites[id] = z.cite;
+            if (S.present) S.present.push(id);
+            await ctx.sync();
+          }
+          // (The first: was the field itself replaced?)
+          if (!checked) {
+            checked = true;
+            if ((await count()) >= before) throw new Error('Word changed the citation\u2019s text but kept Zotero\u2019s field, so nothing more was converted. (Undo with \u2318Z.)');
+          }
+          if (!isBib) done++;
+        }
+      });
+    } catch (e) {
+      await saveSettings();
+      showErr('refsErr', (done ? 'Converted ' + done + ', then stopped: ' : 'Couldn\u2019t convert them: ') + wordError(e));
+      b.disabled = false;
+      return;
+    }
+    await saveSettings();
+    b.disabled = false;
+    try { await refreshDocument(true); } catch (e) { /* Refresh will */ }
+    readZotero();
+    showErr('refsErr', 'Converted ' + done + ' citation' + (done === 1 ? '' : 's') + (bibl ? ' and the bibliography' : '') + (kept ? '; ' + kept + ' left as Zotero\u2019s' : '') + '.');
+    $('refsErr').classList.add('ok');
   }
 
   /* ---- search */
@@ -317,7 +415,7 @@
     const ns = (e.a && e.a.length ? e.a : e.e) || [];
     const ini = n => n[0] + (n[1] ? ', ' + n[1].split(/\s+/).map(w => w[0] ? w[0].toUpperCase() + '.' : '').join(' ') : '');
     const who = ns.length === 0 ? '' : ns.length === 1 ? ini(ns[0]) : ns.length === 2 ? ini(ns[0]) + ' & ' + ini(ns[1]) : ini(ns[0]) + ' et al.';
-    return [who + (e.a && e.a.length ? '' : ns.length ? ' (Ed' + (ns.length > 1 ? 's' : '') + '.)' : ''), e.f.year || 'n.d.', e.f.journal || e.f.booktitle || e.f.publisher || ''].filter(Boolean).join(' · ');
+    return [who + (e.a && e.a.length ? '' : ns.length ? ' (Ed' + (ns.length > 1 ? 's' : '') + '.)' : ''), e.f.year || 'n.d.', e.f.journal || e.f.booktitle || e.f.publisher || ''].filter(Boolean).join(' \u00b7 ');
   }
   function paintResults() {
     const counts = LLWord.counts(presentCites());
@@ -325,14 +423,14 @@
     const text = $('q').value.trim();
     let html = S.heading ? '<div class="sub">' + esc(S.heading) + '</div>' : '';
     if (!S.results.length) {
-      html += text ? '<div class="empty">No matches.<br><button class="btn" type="button" id="addLib">Add to LibLande…</button></div>' : '';
+      html += text ? '<div class="empty">No matches.<br><button class="btn" type="button" id="addLib">Add to LibLande\u2026</button></div>' : '';
     }
     html += S.results.map((e, i) => {
       const n = counts.get(e.k) || 0;
       return '<div class="it' + (i === S.marker ? ' kb' : '') + '" role="option" aria-selected="' + picked.has(e.k) + '" aria-checked="' + picked.has(e.k) + '" data-k="' + esc(e.k) + '" id="r' + i + '">' +
-        '<span class="box" aria-hidden="true">' + (picked.has(e.k) ? '✓' : '') + '</span>' +
+        '<span class="box" aria-hidden="true">' + (picked.has(e.k) ? '\u2713' : '') + '</span>' +
         '<div class="tx"><div class="t">' + esc(e.f.title || e.k) + '</div><div class="m">' + esc(metaOf(e)) + '</div></div>' +
-        (n ? '<span class="cited">cited ' + n + '×</span>' : '') + '</div>';
+        (n ? '<span class="cited">cited ' + n + '\u00d7</span>' : '') + '</div>';
     }).join('');
     $('res').innerHTML = html;
     const kb = $('r' + S.marker);
@@ -357,10 +455,10 @@
     if (!S.chosen.length) return;
     $('az').hidden = !S.own || S.chosen.length < 2;
     $('chosen').innerHTML = S.chosen.map((c, i) =>
-      '<div class="ch" data-i="' + i + '">' + (S.chosen.length > 1 ? '<span class="grip" aria-label="Drag to reorder" title="Drag to reorder">⋮⋮</span>' : '') +
+      '<div class="ch" data-i="' + i + '">' + (S.chosen.length > 1 ? '<span class="grip" aria-label="Drag to reorder" title="Drag to reorder">\u22ee\u22ee</span>' : '') +
       '<span class="n">' + esc(label(c)) + '</span>' +
       '<input data-i="' + i + '" value="' + esc(c.page) + '" placeholder="page" aria-label="Page for ' + esc(label(c)) + '">' +
-      '<button class="x" type="button" data-i="' + i + '" aria-label="Remove ' + esc(label(c)) + '">✕</button></div>').join('');
+      '<button class="x" type="button" data-i="' + i + '" aria-label="Remove ' + esc(label(c)) + '">\u2715</button></div>').join('');
     const y = (() => { const e = S.byKey.get(S.chosen[0].k); return e ? (e.f.year || 'n.d.') : '2011'; })();
     const names = { paren: '(Author, ' + y + ')', narr: 'Author (' + y + ')', year: '(' + y + ')' };
     document.querySelectorAll('#forms button').forEach(b => { b.textContent = names[b.dataset.form]; b.setAttribute('aria-checked', String(b.dataset.form === S.form)); });
@@ -427,13 +525,13 @@
   function paintRefs() {
     const cites = presentCites(), n = Object.keys(cites).length;
     const works = new Set(Object.values(cites).flatMap(c => c.items.map(it => it.k))).size;
-    $('refCount').textContent = n + ' citation' + (n === 1 ? '' : 's') + ' · ' + works + ' work' + (works === 1 ? '' : 's');
+    $('refCount').textContent = n + ' citation' + (n === 1 ? '' : 's') + ' \u00b7 ' + works + ' work' + (works === 1 ? '' : 's');
     $('refsBtn').textContent = S.hasRefs ? 'Go to list' : 'Insert References here';
   }
 
   /* ---- errors, the header, views */
   function showErr(id, msg) { $(id).textContent = msg; $(id).hidden = false; if (id === 'citeErr') $('foot').hidden = false; }
-  function hideErr(id) { $(id).hidden = true; }
+  function hideErr(id) { $(id).hidden = true; $(id).classList.remove('ok'); }
   function view(name) { ['vSignin', 'vMain', 'vLoading'].forEach(v => { $(v).hidden = v !== name; }); }
   function paintAccount() {
     const email = store.get('email', '');
@@ -448,7 +546,7 @@
   async function reload(force) {
     try {
       if (!tokenOk()) await signIn();
-      $('loadingText').textContent = 'Loading library…';
+      $('loadingText').textContent = 'Loading library\u2026';
       if (!S.entries.length) view('vLoading');
       await fetchLibrary(force);
       whoAmI();
@@ -512,6 +610,7 @@
     $('tCite').addEventListener('click', () => tab('cite'));
     $('tRefs').addEventListener('click', () => tab('refs'));
     $('refsBtn').addEventListener('click', insertOrGoToRefs);
+    $('zConvert').addEventListener('click', convertZotero);
     $('signin').addEventListener('click', () => reload(false));
     $('acct').addEventListener('click', ev => {
       ev.stopPropagation();
@@ -578,5 +677,5 @@
     });
   } else start();
   // (For testing in a browser.)
-  window.LLPanel = { S, useLibrary, search, toggle, paintChosen, view };
+  window.LLPanel = { S, useLibrary, search, toggle, paintChosen, view, zoteroCite, zoteroMatcher };
 })();

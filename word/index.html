@@ -13,7 +13,8 @@
   button { font: inherit; color: inherit; }
   :focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
   [hidden] { display: none !important; }
-  .ph { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); background: var(--panel); position: relative; flex: none; }
+  /* (Room at the right for the "i" Word puts over a panel's top corner.) */
+  .ph { display: flex; align-items: center; gap: 8px; padding: 10px 44px 10px 12px; border-bottom: 1px solid var(--line); background: var(--panel); position: relative; flex: none; }
   .ph b { font-size: 14px; }
   .logo { border-radius: 5px; flex: none; }
   .hbtn { margin-left: auto; width: 28px; height: 28px; border: none; background: none; border-radius: 7px; cursor: pointer; display: grid; place-items: center; color: var(--muted); }
@@ -89,6 +90,7 @@
   .link-row .w { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .tag { font-size: 11px; padding: 1px 6px; border-radius: 9px; background: var(--soft); color: var(--accent); white-space: nowrap; }
   .tag.w { background: var(--warn-soft); color: var(--warn); }
+  .err.ok { background: var(--soft); color: var(--accent); }
   .err { background: var(--warn-soft); color: var(--warn); border-radius: 8px; padding: 8px 10px; margin: 0 0 8px; }
 </style>
 
@@ -149,6 +151,7 @@
         <h4>Zotero citations</h4>
         <div class="line"><b id="zCount"></b></div>
         <div id="zRows"></div>
+        <div class="btns" style="margin-top:8px"><button class="btn primary grow" id="zConvert" type="button" hidden>Convert to LibLande</button></div>
       </div>
     </div></div>
   </div>
@@ -167,6 +170,6 @@ const safeUrl = u => /^https?:[/][/]/i.test(u) ? u : null;
 const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[‐-―]/g, '-');
 const cmpStr = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 </script>
-<script src="../app/apa.js?v=2026-11-09.12"></script>
-<script src="engine.js?v=2026-11-09.12"></script>
-<script src="panel.js?v=2026-11-09.12"></script>
+<script src="../app/apa.js?v=2026-11-09.13"></script>
+<script src="engine.js?v=2026-11-09.13"></script>
+<script src="panel.js?v=2026-11-09.13"></script>

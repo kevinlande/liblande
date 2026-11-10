@@ -14,14 +14,14 @@
   const surKey = e => NAMES(e).map(n => norm(n[0])).join('|');
   const baseYear = e => (origYear(e) ? origYear(e) + '/' : '') + (((e.f.year || '').trim()) || 'n.d.');
 
-  // Pages as APA writes them: "7" -> "p. 7", "20-24" -> "pp. 20–24";
-  // "para. 3", "chap. 2", "pp. 4–5" kept as typed.
+  // Pages as APA writes them: "7" -> "p. 7", "20-24" -> "pp. 20-24";
+  // "para. 3", "chap. 2", "pp. 4-5" kept as typed.
   function pageText(p) {
     p = String(p || '').trim();
     if (!p) return '';
-    if (/^\p{L}/u.test(p)) return p.replace(/(\d)\s*-+\s*(\d)/g, '$1–$2');
-    const n = p.replace(/\s*-+\s*/g, '–');
-    return (/[–,]/.test(n) ? 'pp. ' : 'p. ') + n;
+    if (/^\p{L}/u.test(p)) return p.replace(/(\d)\s*-+\s*(\d)/g, '$1\u2013$2');
+    const n = p.replace(/\s*-+\s*/g, '\u2013');
+    return (/[\u2013,]/.test(n) ? 'pp. ' : 'p. ') + n;
   }
   // What goes before, with APA's comma after "e.g." and "i.e.".
   function preText(pre) {
