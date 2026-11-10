@@ -68,18 +68,18 @@ try {
 
   <main class="main" id="main">
     <header class="toolbar">
-      <button class="tb-btn tb-side" id="sideToggle" aria-label="Show or hide groups" title="Groups">
+      <button class="tb-btn tb-side" id="sideToggle" aria-label="Groups" title="Groups">
         <svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M9 4v16"/></svg>
       </button>
       <button class="tb-btn tb-back" id="back">
         <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg><span id="backLabel">Groups</span>
       </button>
-      <span class="tb-reader-pair" id="readerPair"><button type="button" class="tb-btn tb-reader" id="readerBtn" hidden title="Back to your open papers" aria-label="Back to your open papers"><svg class="i" viewBox="0 0 24 24"><path d="M2 5h6a4 4 0 0 1 4 4v11a3 3 0 0 0-3-3H2z"/><path d="M22 5h-6a4 4 0 0 0-4 4v11a3 3 0 0 1 3-3h7z"/></svg><span class="ct" id="readerCt"></span></button><button type="button" class="tb-btn tb-reader-more" id="readerMore" hidden title="List your open papers" aria-label="List your open papers" aria-haspopup="menu" aria-expanded="false"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg></button></span>
+      <span class="tb-reader-pair" id="readerPair"><button type="button" class="tb-btn tb-reader" id="readerBtn" hidden title="Back to your open papers" aria-label="Back to your open papers"><svg class="i" viewBox="0 0 24 24"><path d="M2 5h6a4 4 0 0 1 4 4v11a3 3 0 0 0-3-3H2z"/><path d="M22 5h-6a4 4 0 0 0-4 4v11a3 3 0 0 1 3-3h7z"/></svg><span class="tb-reader-lbl">Reader</span><span class="ct" id="readerCt"></span></button><button type="button" class="tb-btn tb-reader-more" id="readerMore" hidden title="List your open papers" aria-label="List your open papers" aria-haspopup="menu" aria-expanded="false"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg></button></span>
       <div class="tb-title tb-tabs" id="tabs" role="tablist" aria-label="Open lists"><button type="button" class="tab pinned" role="tab" data-tab="all" aria-selected="true"><span class="nm">Library</span><span class="ct"></span></button><button type="button" class="tb-btn" id="recentBtn" aria-label="Recently viewed" title="Recently viewed"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.8 12a8.2 8.2 0 1 0 2.4-5.8"/><path d="M3.5 3.8v4.4h4.4"/><path d="M12 8v4.2l2.8 1.8"/></svg></button><div class="tab-scroll-wrap"><div class="tab-scroll" id="tabScroll"></div><button type="button" class="v-tabs-more left" id="tabLeft" aria-label="Lists out of sight to the left" hidden></button><button type="button" class="v-tabs-more right" id="tabRight" aria-label="Lists out of sight to the right" hidden></button></div></div>
       <button type="button" class="tb-btn net-badge" id="netBadge" data-net hidden aria-live="polite"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 18.5h9.8a3.7 3.7 0 0 0 .6-7.35A5.6 5.6 0 0 0 7.2 9.6a4.45 4.45 0 0 0 .3 8.9z"/><path class="net-slash" d="M4 4l16 16"/></svg><span class="net-n"></span></button>
-      <button type="button" class="tb-btn select-btn" id="selectBtn" title="Select several publications to export or copy" aria-label="Select several publications" aria-pressed="false"><svg class="i" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><path d="M5.5 7l1.5 1.5 2.5-3"/><path d="M14 7h7M14 17h7"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/></svg></button>
+      <button type="button" class="tb-btn select-btn" id="selectBtn" title="Select several" aria-label="Select several publications" aria-pressed="false"><svg class="i" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><path d="M5.5 7l1.5 1.5 2.5-3"/><path d="M14 7h7M14 17h7"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/></svg></button>
       <button type="button" class="tb-btn tb-more" id="moreBtn" aria-label="More" title="More" aria-haspopup="menu" aria-expanded="false"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="18" cy="12" r="1.4"/></svg></button>
-      <span class="tb-add-pair"><button type="button" class="tb-btn" id="addBtn" hidden aria-label="Add a publication" title="Add a publication"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button><button type="button" class="tb-btn tb-add-more" id="addMore" hidden aria-label="More ways to add" title="Paste, From a photo, or a chapter of the selected book" aria-haspopup="menu" aria-expanded="false"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg></button></span>
+      <span class="tb-add-pair"><button type="button" class="tb-btn" id="addBtn" hidden aria-label="Add a publication" title="Add a publication"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button><button type="button" class="tb-btn tb-add-more" id="addMore" hidden aria-label="More ways to add" title="More ways to add" aria-haspopup="menu" aria-expanded="false"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg></button></span>
       <button class="tb-btn tb-refresh" id="refreshBtn" hidden aria-label="Check for changes" title="Check Google Drive for changes">
         <svg class="i" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>
       </button>
@@ -93,7 +93,7 @@ try {
           <option value="title">Title</option>
           <option value="kw">Keywords</option>
         </select>
-        <button type="button" class="search-save" id="searchSave" hidden aria-label="Save this search as a group" title="Save this search as a group in the sidebar"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1z"/><path d="M12 7.5v6M9 10.5h6"/></svg></button>
+        <button type="button" class="search-save" id="searchSave" hidden aria-label="Save search as a group" title="Save search as a group"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1z"/><path d="M12 7.5v6M9 10.5h6"/></svg></button>
         <button type="button" class="search-x" id="searchX" aria-label="Close search" title="Close search (Esc)"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </label>
     </header>
@@ -151,29 +151,30 @@ try {
 <div class="viewer" id="viewer" hidden role="dialog" aria-modal="true" aria-labelledby="vTitle">
   <div class="v-top" id="vTop">
   <header class="v-bar">
-    <button type="button" class="tb-btn" id="vSideBtn" aria-pressed="false" aria-label="Pages, annotations, bookmarks and outline" title="Pages, annotations, bookmarks and outline"><svg class="i" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M9.5 4.5v15"/></svg></button>
-    <button type="button" class="tb-btn v-lib" id="vClose" aria-label="Back to the library" title="Back to the library (Esc); the papers stay open"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h3v16H5zM10.5 4h3v16h-3z"/><path d="M16 5.2l2.9-.8 3.1 15.4-2.9.8z"/></svg><span>Library</span></button>
+    <button type="button" class="tb-btn" id="vSideBtn" aria-pressed="false" aria-label="Sidebar" title="Sidebar"><svg class="i" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M9.5 4.5v15"/></svg></button>
+    <span class="v-halves"><span class="v-half-r" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M2 5h6a4 4 0 0 1 4 4v11a3 3 0 0 0-3-3H2z"/><path d="M22 5h-6a4 4 0 0 0-4 4v11a3 3 0 0 1 3-3h7z"/></svg><span class="lbl">Reader</span><span class="ct" id="vReaderCt"></span></span><button type="button" class="tb-btn v-lib" id="vClose" aria-label="Back to the library" title="Library (Esc)"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h3v16H5zM10.5 4h3v16h-3z"/><path d="M16 5.2l2.9-.8 3.1 15.4-2.9.8z"/></svg><span>Library</span></button></span>
     <button type="button" class="tb-btn" id="vRecentBtn" aria-label="Recently closed papers" title="Recently closed papers" aria-haspopup="menu"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 20H5A1.5 1.5 0 0 1 3.5 18.5v-14A1.5 1.5 0 0 1 5 3h5.5L14 6.5V8.5"/><path d="M10.5 3v3.5H14"/><path d="M12.2 15.5a4.8 4.8 0 1 0 1.6-3.6" stroke-width="2"/><path d="M13.6 9v3.1h3.1" stroke-width="2"/></svg></button>
     <div class="v-title-wrap"><div class="v-title" id="vTitle"></div><button type="button" class="tb-btn v-title-x" id="vTitleX" hidden aria-label="Close this paper" title="Close this paper"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <button type="button" class="tb-btn v-newtab" id="vNewTab" aria-label="New tab" title="New tab"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
     <span class="v-page" id="vPage"></span>
     <div class="v-tools">
       <button type="button" class="tb-btn" id="vFindBtn" aria-label="Search in this paper" title="Search in this paper (&#x2318;F)" aria-pressed="false"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg></button>
-      <span class="v-tone-pair"><button type="button" class="tb-btn" id="vDarkBtn" aria-pressed="false" aria-label="Page tone" title="Page tone: click to switch between light and dark; the arrow beside it for the choices"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg></button><button type="button" class="tb-btn v-tone-more" id="vToneMore" hidden aria-label="Page tones" title="Page tones" aria-haspopup="dialog" aria-expanded="false"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg></button></span>
+      <span class="v-tone-pair"><button type="button" class="tb-btn" id="vDarkBtn" aria-pressed="false" aria-label="Page tone" title="Light or dark pages"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg></button><button type="button" class="tb-btn v-tone-more" id="vToneMore" hidden aria-label="Page tones" title="Page tones" aria-haspopup="dialog" aria-expanded="false"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg></button></span>
       <button type="button" class="tb-btn v-notes" id="vNotesBtn" aria-pressed="false" aria-label="Your notes" title="Your notes, beside the paper (&#x2325;N)"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v11l-5 5H5z"/><path d="M14 20v-5h5"/><path d="M8.5 9h7M8.5 12.5h4"/></svg></button>
-      <button type="button" class="tb-btn v-split" id="vSplitBtn" aria-pressed="false" aria-label="Split screen" title="Split screen: a second view of this paper below, to scroll on its own"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4" width="17" height="16" rx="2"/><path d="M3.5 12h17"/><path d="M11 8h2M11 16h2" opacity=".55"/></svg></button>
+      <button type="button" class="tb-btn v-split" id="vSplitBtn" aria-pressed="false" aria-label="Split screen" title="Split screen"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4" width="17" height="16" rx="2"/><path d="M3.5 12h17"/><path d="M11 8h2M11 16h2" opacity=".55"/></svg></button>
       <button type="button" class="tb-btn v-zoomctl" id="vZoomOut" aria-label="Zoom out" title="Zoom out">&#x2212;</button>
-      <button type="button" class="v-zoom" id="vZoomLevel" title="Fit the page to the screen" aria-label="Zoom 100%: tap to fit the page to the screen">100%</button>
+      <button type="button" class="v-zoom" id="vZoomLevel" title="Fit the whole page" aria-label="Zoom 100%, fit the whole page">100%</button>
       <button type="button" class="tb-btn v-zoomctl" id="vZoomIn" aria-label="Zoom in" title="Zoom in">+</button>
       <details class="menu" id="vShare"><summary class="btn" title="Share a copy to another app"><svg class="i" viewBox="0 0 24 24"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg><span class="sr-only">Share</span><svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></summary><div class="menu-list" role="menu"><a role="menuitem" class="mi" id="vDrive" href="#" target="_blank" rel="noopener"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg><span>Open in Google Drive</span></a></div></details>
       <button type="button" class="tb-btn net-badge" id="vNetBadge" data-net hidden aria-live="polite"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 18.5h9.8a3.7 3.7 0 0 0 .6-7.35A5.6 5.6 0 0 0 7.2 9.6a4.45 4.45 0 0 0 .3 8.9z"/><path class="net-slash" d="M4 4l16 16"/><path class="net-up" d="M12 16.2v-5.4M9.6 13l2.4-2.4 2.4 2.4"/><path class="net-ok" d="M9.4 13.6l1.9 1.9 3.4-3.6"/></svg><span class="net-n"></span></button>
       <details class="menu right" id="vRLMenu" hidden><summary class="tb-btn" id="vRL" aria-label="Reading list" title="Reading list"><svg class="i" viewBox="0 0 24 24"><path d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1z"/></svg></summary><div class="menu-list" role="menu" id="vRLList"></div></details>
     </div>
   </header>
-  <div class="v-tabs-wrap"><nav class="v-tabs" id="vTabs" role="tablist" aria-label="Open papers"></nav><button type="button" class="v-tabs-more left" id="vTabsLeft" aria-label="Papers out of sight to the left" hidden></button><button type="button" class="v-tabs-more right" id="vTabsRight" aria-label="Papers out of sight to the right" hidden></button></div>
+  <div class="v-tabs-wrap"><nav class="v-tabs" id="vTabs" role="tablist" aria-label="Open papers"></nav><button type="button" class="v-tabs-more left" id="vTabsLeft" aria-label="More papers left" hidden></button><button type="button" class="v-tabs-more right" id="vTabsRight" aria-label="More papers right" hidden></button></div>
   <div class="v-find" id="vFind" hidden role="search">
     <input type="search" id="vFindInput" placeholder="Search in this paper" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="Search in this paper">
     <span class="v-find-count" id="vFindCount" role="status"></span>
-    <button type="button" class="btn v-find-ocr" id="vFindOcr" hidden title="A scan has no text to search until it's read with OCR">Scan: make searchable</button>
+    <button type="button" class="btn v-find-ocr" id="vFindOcr" hidden title="Read the scan's text (OCR)">Scan: make searchable</button>
     <button type="button" class="tb-btn" id="vFindPrev" aria-label="Previous match" title="Previous (&#x21e7;Return)"><svg class="i" viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg></button>
     <button type="button" class="tb-btn" id="vFindNext" aria-label="Next match" title="Next (Return)"><svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
     <button type="button" class="tb-btn" id="vFindClose" aria-label="Close search" title="Close search (Esc)"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
@@ -185,14 +186,15 @@ try {
   <div class="v-comment" id="vComment" hidden role="dialog" aria-label="Comment" data-mode="view"><div class="v-comment-bar"><span class="v-comment-title">Comment</span><button type="button" id="vCommentEdit" aria-label="Edit comment" title="Edit comment"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg></button><button type="button" class="danger" id="vCommentDelete" aria-label="Delete comment" title="Delete comment"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13M10 11v6M14 11v6"/></svg></button><button type="button" class="danger" id="vCommentRemove" aria-label="Delete highlight" title="Delete highlight"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 20h11"/><path d="M4.7 14.3l8.6-8.6a2 2 0 0 1 2.8 0l3.2 3.2a2 2 0 0 1 0 2.8L12 19H8l-3.3-3.3a1 1 0 0 1 0-1.4z"/><path d="M9.3 9.7l5 5"/></svg></button><button type="button" id="vCommentClose" aria-label="Close" title="Close"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"/></svg></button></div><div class="v-comment-view" id="vCommentView" title="Tap to edit"></div><textarea id="vCommentText" rows="4" placeholder="Add a comment"></textarea><div class="v-comment-acts"><span></span><button type="button" class="btn" id="vCommentCancel">Cancel</button><button type="button" class="btn primary" id="vCommentSave">Save</button></div></div>
   <div class="v-body">
     <div class="v-peek" id="vPeek" hidden role="region" aria-label="Link destination"><div class="v-peek-grip" id="vPeekGrip" role="separator" aria-orientation="horizontal" aria-label="Resize the panel" title="Drag to resize (double-click for a third)" tabindex="0"></div><div class="v-peek-head"><span class="v-peek-title" id="vPeekTitle"></span><button type="button" class="btn" id="vPeekGo"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h14"/><path d="M13 6l6 6-6 6"/></svg><span>Go there</span></button><button type="button" class="tb-btn v-peek-x" id="vPeekX" aria-label="Close" title="Close (Esc)"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div><div class="v-peek-notes" id="vPeekNotes" hidden></div><div class="v-peek-body" id="vPeekBody"><div class="pdfViewer" id="vPeekPages"></div></div></div>
-    <aside class="v-side" id="vSide" hidden aria-label="Pages, annotations, bookmarks and outline"><div class="v-side-grip" id="vSideGrip" role="separator" aria-orientation="vertical" aria-label="Resize the sidebar" title="Drag to resize (double-click for the usual width)" tabindex="0"></div>
+    <aside class="v-side" id="vSide" hidden aria-label="Sidebar"><div class="v-side-grip" id="vSideGrip" role="separator" aria-orientation="vertical" aria-label="Resize the sidebar" title="Drag to resize (double-click for the usual width)" tabindex="0"></div>
       <div class="v-side-tabs" role="tablist"><button type="button" role="tab" data-vtab="pages" aria-label="Pages" title="Pages"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3.5" width="7" height="8" rx="1"/><rect x="13" y="3.5" width="7" height="8" rx="1"/><rect x="4" y="13.5" width="7" height="8" rx="1"/><rect x="13" y="13.5" width="7" height="8" rx="1"/></svg></button><button type="button" role="tab" data-vtab="marks" aria-label="Annotations" title="Annotations"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 4.5l5 5-7.5 7.5H7v-5z"/><path d="M4 20.5h9"/><path d="M11 8l5 5"/></svg></button><button type="button" role="tab" data-vtab="bookmarks" aria-label="Bookmarks" title="Bookmarks"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1z"/></svg></button><button type="button" role="tab" data-vtab="outline" aria-label="Outline" title="Outline"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h2M9 6h11M7 12h2M12 12h8M7 18h2M12 18h8"/></svg></button><button type="button" role="tab" data-vtab="info" aria-label="Citation" title="Citation"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.6v.4"/></svg></button><button type="button" role="tab" data-vtab="notes" aria-label="Notes" title="Your notes (&#x2325;N)"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v11l-5 5H5z"/><path d="M14 20v-5h5"/><path d="M8.5 9h7M8.5 12.5h4"/></svg></button></div>
       <div class="v-side-body" id="vSideBody"></div>
     </aside>
+    <div class="v-start" id="vStart" hidden></div>
     <div class="v-scroll" id="vScroll"><div class="pdfViewer" id="vPages"></div></div>
     <div class="v-rail" id="vRail" hidden aria-hidden="true"><div class="v-grab" id="vThumb"><span class="v-grab-tip" id="vThumbTip"></span></div></div>
     <div class="v-pagepill" id="vPagePill" aria-hidden="true"></div>
-    <div class="v-palette" id="vPalette" hidden role="toolbar" aria-label="Markup tools"><button type="button" class="vp-grip" id="vpGrip" aria-label="Move the toolbar" title="Drag to move"><svg class="i" viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/></svg></button><div class="vp-group vp-tools"><button type="button" data-tool="select" aria-pressed="false" title="Select marks (V)" aria-label="Select marks"><svg class="i" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="1.5" stroke-dasharray="3 2.6"/></svg></button><button type="button" data-tool="markup" id="vpMarkup" class="has-alt" aria-pressed="false" title="Highlight (H)" aria-label="Highlight"><svg class="i" viewBox="0 0 24 24"><path d="M14.5 4.5l5 5-7.5 7.5H7v-5z"/><path d="M4 20.5h9"/><path d="M11 8l5 5"/></svg></button><button type="button" data-tool="lines" id="vpLines" class="has-alt" aria-pressed="false" title="Underline or strike through (U)" aria-label="Underline or strike through"><svg class="i" viewBox="0 0 24 24"><path d="M7 4v6a5 5 0 0 0 10 0V4"/><path d="M5 20h14"/></svg></button><button type="button" data-tool="pen" aria-pressed="false" title="Pen (P)" aria-label="Pen"><svg class="i" viewBox="0 0 24 24"><path d="M4 20l1.2-4.8L15.8 4.6a2 2 0 0 1 2.8 0l.8.8a2 2 0 0 1 0 2.8L8.8 18.8z"/><path d="M13.5 7l3.5 3.5"/></svg></button><button type="button" data-tool="text" aria-pressed="false" title="Text box (T)" aria-label="Text box"><svg class="i" viewBox="0 0 24 24"><path d="M5 6.5V5h14v1.5"/><path d="M12 5v14"/><path d="M9 19h6"/></svg></button><button type="button" data-tool="comment" aria-pressed="false" title="Note: tap the page to pin a note there (N)" aria-label="Note: pin a note to the page"><svg class="i" viewBox="0 0 24 24"><path d="M5 5h14a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 19 17h-7l-4.5 3.5V17H5a1.5 1.5 0 0 1-1.5-1.5v-9A1.5 1.5 0 0 1 5 5z"/></svg></button><button type="button" class="vp-more" id="vpMore" aria-expanded="false" title="More tools" aria-label="More tools"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="18" cy="12" r="1.4"/></svg></button><button type="button" data-tool="eraser" aria-pressed="false" title="Eraser (E)" aria-label="Eraser"><svg class="i" viewBox="0 0 24 24"><path d="M9 20h11"/><path d="M4.7 14.3l8.6-8.6a2 2 0 0 1 2.8 0l3.2 3.2a2 2 0 0 1 0 2.8L12 19H8l-3.3-3.3a1 1 0 0 1 0-1.4z"/><path d="M9.3 9.7l5 5"/></svg></button></div><div class="vp-group vp-stylegrp" id="vpStyleGrp" hidden><button type="button" class="vp-style" id="vpStyle" aria-haspopup="true" aria-expanded="false" title="Colour and size" aria-label="Colour and size"><i></i></button></div><div class="vp-group"><button type="button" id="vpUndo" disabled title="Undo" aria-label="Undo"><svg class="i" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button><button type="button" id="vpRedo" disabled title="Redo" aria-label="Redo"><svg class="i" viewBox="0 0 24 24"><path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg></button><button type="button" id="vpDelete" hidden title="Delete the selected mark" aria-label="Delete the selected mark"><svg class="i" viewBox="0 0 24 24"><path d="M4 7h16M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13"/></svg></button><button type="button" id="vpMin" title="Hide the toolbar" aria-label="Hide the toolbar"><svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button></div></div>
+    <div class="v-palette" id="vPalette" hidden role="toolbar" aria-label="Markup tools"><button type="button" class="vp-grip" id="vpGrip" aria-label="Move the toolbar" title="Drag to move"><svg class="i" viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/></svg></button><div class="vp-group vp-tools"><button type="button" data-tool="select" aria-pressed="false" title="Select marks (V)" aria-label="Select marks"><svg class="i" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="1.5" stroke-dasharray="3 2.6"/></svg></button><button type="button" data-tool="markup" id="vpMarkup" class="has-alt" aria-pressed="false" title="Highlight (H)" aria-label="Highlight"><svg class="i" viewBox="0 0 24 24"><path d="M14.5 4.5l5 5-7.5 7.5H7v-5z"/><path d="M4 20.5h9"/><path d="M11 8l5 5"/></svg></button><button type="button" data-tool="lines" id="vpLines" class="has-alt" aria-pressed="false" title="Underline or strike through (U)" aria-label="Underline or strike through"><svg class="i" viewBox="0 0 24 24"><path d="M7 4v6a5 5 0 0 0 10 0V4"/><path d="M5 20h14"/></svg></button><button type="button" data-tool="pen" aria-pressed="false" title="Pen (P)" aria-label="Pen"><svg class="i" viewBox="0 0 24 24"><path d="M4 20l1.2-4.8L15.8 4.6a2 2 0 0 1 2.8 0l.8.8a2 2 0 0 1 0 2.8L8.8 18.8z"/><path d="M13.5 7l3.5 3.5"/></svg></button><button type="button" data-tool="text" aria-pressed="false" title="Text box (T)" aria-label="Text box"><svg class="i" viewBox="0 0 24 24"><path d="M5 6.5V5h14v1.5"/><path d="M12 5v14"/><path d="M9 19h6"/></svg></button><button type="button" data-tool="comment" aria-pressed="false" title="Sticky note (N)" aria-label="Sticky note"><svg class="i" viewBox="0 0 24 24"><path d="M5 5h14a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 19 17h-7l-4.5 3.5V17H5a1.5 1.5 0 0 1-1.5-1.5v-9A1.5 1.5 0 0 1 5 5z"/></svg></button><button type="button" class="vp-more" id="vpMore" aria-expanded="false" title="More tools" aria-label="More tools"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="18" cy="12" r="1.4"/></svg></button><button type="button" data-tool="eraser" aria-pressed="false" title="Eraser (E)" aria-label="Eraser"><svg class="i" viewBox="0 0 24 24"><path d="M9 20h11"/><path d="M4.7 14.3l8.6-8.6a2 2 0 0 1 2.8 0l3.2 3.2a2 2 0 0 1 0 2.8L12 19H8l-3.3-3.3a1 1 0 0 1 0-1.4z"/><path d="M9.3 9.7l5 5"/></svg></button></div><div class="vp-group vp-stylegrp" id="vpStyleGrp" hidden><button type="button" class="vp-style" id="vpStyle" aria-haspopup="true" aria-expanded="false" title="Colour and size" aria-label="Colour and size"><i></i></button></div><div class="vp-group"><button type="button" id="vpUndo" disabled title="Undo" aria-label="Undo"><svg class="i" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button><button type="button" id="vpRedo" disabled title="Redo" aria-label="Redo"><svg class="i" viewBox="0 0 24 24"><path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg></button><button type="button" id="vpDelete" hidden title="Delete the selected mark" aria-label="Delete the selected mark"><svg class="i" viewBox="0 0 24 24"><path d="M4 7h16M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13"/></svg></button><button type="button" id="vpMin" title="Hide the toolbar" aria-label="Hide the toolbar"><svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button></div></div>
     <div class="vp-panel" id="vpPanel" hidden role="dialog" aria-label="Colour and size"></div>
     <button type="button" class="vp-show" id="vpShow" hidden title="Show the markup tools" aria-label="Show the markup tools"><svg class="i" viewBox="0 0 24 24"><path d="M4 20l1.2-4.8L15.8 4.6a2 2 0 0 1 2.8 0l.8.8a2 2 0 0 1 0 2.8L8.8 18.8z"/><path d="M13.5 7l3.5 3.5"/></svg></button>
     <div class="v-ocr" id="vOcr" hidden role="status"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16"/><path d="M8 9.5h8M8 12h8M8 14.5h5"/></svg><span class="v-ocr-msg"></span><button type="button" class="btn" id="vOcrGo"></button><button type="button" class="v-ocr-x" id="vOcrX" aria-label="Dismiss" title="Don’t offer this for this paper again"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"/></svg></button><i class="v-ocr-fill"></i></div>
@@ -219,18 +221,28 @@ try {
 </div>
 <div class="setup" id="setup" hidden>
   <form class="setup-card" id="setupForm" novalidate>
+    <div class="set-top">
     <div class="sheet-head" id="setHead" hidden><button type="button" class="tb-btn sheet-x" id="setClose" aria-label="Cancel" title="Cancel (Esc)"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button><h2>Settings</h2><button type="submit" class="btn primary sheet-go" id="setSave">Save</button></div>
+      <div class="set-tabs" hidden role="tablist" aria-label="Settings" id="setTabs"><button type="button" role="tab" data-stab="look">Appearance</button><button type="button" role="tab" data-stab="sync">Sync</button><button type="button" role="tab" data-stab="library">Library</button><button type="button" role="tab" data-stab="cite">Citing</button><button type="button" role="tab" data-stab="ext">Extensions</button></div>
+    </div>
     <h2 id="setupTitle">Set up LibLande</h2>
-    <p id="setupIntro">LibLande shows a BibTeX library that&#x2019;s stored in your Google Drive, in the style of BibDesk. It reads your .bib file and the names of your papers, and never changes them.</p>
+    <p id="setupIntro">A BibDesk library in your browser: your .bib and its PDFs, from Google Drive. Changes go back into the .bib.</p>
     <div class="set-list" id="setupEdit" hidden>
-      <div class="set-tabs" role="tablist" aria-label="Settings" id="setTabs"><button type="button" role="tab" data-stab="look">Appearance</button><button type="button" role="tab" data-stab="sync">Sync</button><button type="button" role="tab" data-stab="library">Library</button><button type="button" role="tab" data-stab="cite">Citing</button><button type="button" role="tab" data-stab="ext">Extensions</button></div>
       <section class="set-sec" data-stab="look"><h3 class="tab-named">Appearance</h3>
+      <div class="set-row">
+        <div class="set-text"><span class="set-name">Light or dark</span><span class="hint">Auto follows your device.</span></div>
+        <div class="seg set-mode" id="themeSegSet" role="radiogroup" aria-label="Light or dark">
+          <button type="button" role="radio" data-theme-set="auto">Auto</button>
+          <button type="button" role="radio" data-theme-set="light">Light</button>
+          <button type="button" role="radio" data-theme-set="dark">Dark</button>
+        </div>
+      </div>
       <div class="set-theme">
-        <div class="set-text"><span class="set-name">Theme</span><span class="hint">Colours and type. Light, Dark or Auto is at the foot of the sidebar.</span></div>
+        <div class="set-text"><span class="set-name">Theme</span><span class="hint">Colours and type.</span></div>
         <div class="theme-picks" id="themePicks" role="radiogroup" aria-label="Theme"></div>
       </div>
       <div class="set-row">
-        <div class="set-text"><label for="glassBox">Glass</label><span class="hint">Translucent bars, toolbar and menus, the page showing softly through them, in the theme&#x2019;s own colours. Off: solid (flat).</span></div>
+        <div class="set-text"><label for="glassBox">Glass</label><span class="hint">Translucent bars, menus and panels. Off: solid.</span></div>
         <span class="switch"><input type="checkbox" role="switch" id="glassBox"><span aria-hidden="true"></span></span>
       </div>
       </section>
@@ -242,7 +254,7 @@ try {
         <label class="set-sync"><span>Recently viewed</span><span class="switch"><input type="checkbox" role="switch" data-sync="recent"><span aria-hidden="true"></span></span></label>
         <label class="set-sync"><span>Saved searches</span><span class="switch"><input type="checkbox" role="switch" data-sync="smart"><span aria-hidden="true"></span></span></label>
         <label class="set-sync"><span>Cite Check&#x2019;s manuscripts and dismissed findings</span><span class="switch"><input type="checkbox" role="switch" data-sync="cite"><span aria-hidden="true"></span></span></label>
-        <label class="set-sync"><span>New papers: what you follow, and what you dismiss</span><span class="switch"><input type="checkbox" role="switch" data-sync="alerts"><span aria-hidden="true"></span></span></label>
+        <label class="set-sync"><span>New papers: follows and dismissals</span><span class="switch"><input type="checkbox" role="switch" data-sync="alerts"><span aria-hidden="true"></span></span></label>
         <label class="set-sync"><span>Keyboard shortcuts</span><span class="switch"><input type="checkbox" role="switch" data-sync="keys"><span aria-hidden="true"></span></span></label>
       </div>
       </section>
@@ -253,7 +265,7 @@ try {
         <button type="button" class="linkish" id="changeLinks">Use a different .bib file or folder&#x2026;</button>
       </div>
       <div class="set-row">
-        <div class="set-text"><span class="set-name">Backups</span><span class="hint">In Google Drive, LibLande &#x203a; Backups: a copy of the .bib before each change (the last 10, then one a day for two weeks, then one a week for three months), and in Backups &#x203a; PDFs a copy of each PDF before its first save of the day (kept 60 days). Older copies go to Google Drive&#x2019;s trash.</span></div>
+        <div class="set-text"><span class="set-name">Backups</span><span class="hint">In Drive, LibLande &#x203a; Backups. The .bib: the last 10 changes, then one a day for two weeks, one a week for three months. PDFs: before the first save each day, kept 60 days.</span></div>
       </div>
       <div class="set-row">
         <div class="set-text"><label for="coversBox">Book covers</label><span class="hint">Looked up on Open Library by ISBN, or by title and author, and kept on this device.</span></div>
@@ -262,7 +274,7 @@ try {
       </section>
       <section class="set-sec" id="wordSec" data-stab="ext"><h3>Word</h3>
       <div class="set-group">
-        <p class="hint">LibLande in Word: cite from your library while you write.</p>
+        <p class="hint">Cite from your library in Word.</p>
         <ol class="word-steps">
           <li><a href="word/liblande-word.xml" download="liblande-word.xml">Download the add-in file</a>.</li>
           <li>In Finder, Go &#x203a; Go to Folder&#x2026;, paste this, and drop the file in (make a folder named wef there if there isn&#x2019;t one):
@@ -275,25 +287,25 @@ try {
       </section>
       <section class="set-sec" id="citeSec" data-stab="cite"><h3 class="tab-named">Citing</h3>
       <div class="set-group">
-        <p class="hint">The style for Copy, Quote, the QR code, Export and Cite Check&#x2019;s reference lists: <b id="citeNow">APA 7th edition</b>. BibTeX and your .bib aren&#x2019;t changed.</p>
-        <label class="cite-find"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg><input id="citeFind" type="search" placeholder="Find a style: a journal, publisher or name" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Find a citation style"></label>
+        <p class="hint">Now <b id="citeNow">APA 7th edition</b>. Used by Copy, Quote, the QR code, Export and Cite Check. Your .bib isn&#x2019;t changed.</p>
+        <label class="cite-find"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg><input id="citeFind" type="search" placeholder="Find a style (journal, publisher, name)" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Find a citation style"></label>
         <div class="cite-list" id="citeList" role="radiogroup" aria-label="Citation style"></div>
         <div class="cite-prev" id="citePreview" hidden></div>
       </div>
       </section>
       <section class="set-sec" id="proxySec" data-stab="library"><h3>Library proxies</h3>
       <div class="set-group">
-        <p class="hint">Your library&#x2019;s proxy (as EZproxy): Find a PDF, in a publication&#x2019;s details, then opens the article through it, signed in with your library account. Type its address, as ezproxy.library.yorku.ca, or its whole login link.</p>
+        <p class="hint">Find PDF opens articles through your library&#x2019;s proxy, signed in with your library account. Its address (e.g. ezproxy.library.yorku.ca) or full login link.</p>
         <div id="proxyList"></div>
         <button type="button" class="linkish" id="proxyAdd">Add a library proxy&#x2026;</button>
       </div>
       </section>
       <section class="set-sec" id="webAddSec" data-stab="ext"><h3>Adding from the web</h3>
       <div class="set-group">
-        <p class="hint">Add a paper from its page (a journal&#x2019;s, PhilPapers, JSTOR, arXiv) with one click: it reads the page&#x2019;s DOI or citation and opens it here, in Add, filled in, with Find PDF ready.</p>
-        <p class="hint"><b>Safari</b> (macOS&#xa0;27, iOS and iPadOS&#xa0;27): make the button with Describe Extension, in the address bar&#x2019;s menu. Copy this description, and paste it in.</p>
+        <p class="hint">One click on a paper&#x2019;s page opens Add here, filled in, with Find PDF ready.</p>
+        <p class="hint"><b>Safari</b> (27 and later): copy the description, then paste it into Describe Extension in the address bar&#x2019;s menu.</p>
         <div class="web-add-row"><button type="button" class="btn" id="webExtCopy">Copy the description</button></div>
-        <p class="hint"><b>Or a bookmark</b> (Chrome, or an older Safari): drag this to your bookmarks bar. On an iPhone or iPad, <button type="button" class="linkish" id="webBmCopy">copy it</button>, bookmark any page, then edit that bookmark and paste in place of its address.</p>
+        <p class="hint"><b>Or a bookmark</b> (other browsers): drag this to your bookmarks bar. On an iPhone or iPad, <button type="button" class="linkish" id="webBmCopy">copy it</button>, bookmark any page, then edit that bookmark and paste in place of its address.</p>
         <div class="web-add-row"><a class="btn web-bm" id="webBm" href="#" draggable="true">+ Add to LibLande</a></div>
       </div>
       </section>
@@ -304,14 +316,14 @@ try {
       <p class="hint">In Google Drive, right-click the file (on iPhone or iPad, tap &#x22ef;) and choose Share, then Copy link.</p>
       <label for="papersLink">Link to your papers folder <span class="opt">(optional)</span></label>
       <input id="papersLink" type="text" inputmode="url" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="drive.google.com/drive/folders/&#x2026;">
-      <p class="hint">Leave this empty if your PDFs are in the same folder as the .bib file or in folders inside it, as BibDesk&#x2019;s AutoFile arranges them.</p>
+      <p class="hint">Leave empty if the PDFs are in the .bib&#x2019;s folder or below it (as AutoFile puts them).</p>
     </div>
     <div class="set-libs" id="setLibs">
       <div id="libOthers"></div>
       <button type="button" class="linkish" id="newLibBtn">Start a new, empty library&#x2026;</button>
       <div class="set-newlib" id="newLibRow" hidden>
-        <p class="hint">A folder in your My Drive, with an empty .bib file in it for LibLande (and BibDesk). The library you have now stays as it is, and you can switch back to it here.</p>
-        <div class="set-newlib-go"><input id="newLibName" type="text" autocomplete="off" placeholder="Its name, such as Teaching" aria-label="The new library&#x2019;s name"><button type="button" class="btn primary" id="newLibGo">Create</button></div>
+        <p class="hint">A new folder in My Drive with an empty .bib. Your current library stays; switch back here.</p>
+        <div class="set-newlib-go"><input id="newLibName" type="text" autocomplete="off" placeholder="Name, e.g. Teaching" aria-label="New library name"><button type="button" class="btn primary" id="newLibGo">Create</button></div>
       </div>
     </div>
     <p class="setup-error" id="setupError" role="alert" hidden></p>
@@ -321,7 +333,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-11-10.06</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-11-10.07</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -336,7 +348,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-11-10.06';
+      l.querySelector('small').textContent = 'Version 2026-11-10.07';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -348,7 +360,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-11-10.06): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-11-10.07): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });

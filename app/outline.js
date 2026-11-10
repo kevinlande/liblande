@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/outline.js'] = '2026-11-10.06';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/outline.js'] = '2026-11-10.07';
 /* -------------------------------------------------------- outline editor */
 // In the sidebar's Outline tab: Edit the outline (the PDF's own, or the one
 // made from its printed Contents), or Make one afresh: from the Contents
@@ -458,7 +458,7 @@ async function oleMake(kind) {
       if (doc !== V.doc) return;
       if (!made || !made.items.length) {
         // (Many papers, and some books, have none: the headings instead.)
-        toast('No Contents page was found. Go to it (its first page) and try again, or make the outline from the headings.', 9000,
+        toast('No Contents page found. Go to it and try again, or use the headings.', 9000,
           { label: 'From the headings', run: () => oleMake('heads') });
         OLE.busy = false;
         if (OLE.on) oleRender(); else showOutline();
@@ -471,7 +471,7 @@ async function oleMake(kind) {
       items = await headingOutline(doc, p => { if (p % 10 === 1) body.innerHTML = `<p class="v-side-note">Looking for headings: page ${p} of ${doc.numPages}\u2026</p>`; });
       if (doc !== V.doc) return;
       if (!items.length) {
-        toast('No headings were found: no lines in larger type than the text' + (V.scan ? ' (a scan has no text: make it searchable first)' : '') + '.', 6000);
+        toast(V.scan ? 'No headings: make the scan searchable first.' : 'No headings found.', 6000);
         OLE.busy = false;
         if (OLE.on) oleRender(); else showOutline();
         return;
@@ -490,7 +490,7 @@ async function oleMake(kind) {
 // bookmarks kept, after it), then the paper opened again with it.
 async function oleSave() {
   if (!V.doc || !V.file || OLE.busy) return;
-  if (!gs || !navigator.onLine) { toast('Saving the outline needs an internet connection, to save it to Google Drive.', 3500); return; }
+  if (!gs || !navigator.onLine) { toast('Saving the outline needs a connection.', 3500); return; }
   const items = OLE.items.map(it => Object.assign({}, it, { title: it.title.trim() || 'Untitled' })), file = V.file;
   OLE.busy = true;
   const bar = $('#vSideBody .v-ole-bar [data-ole="save"]');

@@ -205,7 +205,7 @@
 <header class="ph">
   <img class="logo" src="icons/icon-32.png" alt="" width="20" height="20"><b>LibLande</b>
   <span class="pill" id="offline" hidden>Offline</span>
-  <button class="hbtn" id="refresh" type="button" title="Refresh: your library, and this document’s citations and References" aria-label="Refresh"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/></svg></button>
+  <button class="hbtn" id="refresh" type="button" title="Refresh library and citations" aria-label="Refresh"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/></svg></button>
   <button class="acct" id="acct" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Account" hidden>?</button>
   <div class="menu" id="menu" role="menu" hidden>
     <div class="who" id="menuWho"></div>
@@ -285,8 +285,8 @@
       <div class="card" id="plainCard" hidden>
         <h4>Make plain</h4>
         <p class="note">Every citation and the References list as ordinary text.</p>
-        <div class="btns" style="flex-direction:column"><button class="btn grow" id="plainCopy" type="button">Make a plain copy&#x2026;</button><button class="btn grow" id="plainAskBtn" type="button">Convert fields to plain text&#x2026;</button></div>
-        <div class="ask" id="plainAsk" hidden><p>Convert the citations and the References list in this document to plain text?</p><div class="btns"><button class="btn primary grow" id="plainYes" type="button">Convert</button><button class="btn grow" id="plainNo" type="button">Cancel</button></div></div>
+        <div class="btns" style="flex-direction:column"><button class="btn grow" id="plainCopy" type="button">Make a plain copy&#x2026;</button><button class="btn grow" id="plainAskBtn" type="button">Convert to plain text&#x2026;</button></div>
+        <div class="ask" id="plainAsk" hidden><p>Convert all citations and References to plain text?</p><div class="btns"><button class="btn primary grow" id="plainYes" type="button">Convert</button><button class="btn grow" id="plainNo" type="button">Cancel</button></div></div>
       </div>
     </div></div>
   </div>
@@ -321,8 +321,8 @@ const safeUrl = u => /^https?:[/][/]/i.test(u) ? u : null;
 const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[‐-―]/g, '-');
 const cmpStr = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 </script>
-<script src="../app/apa.js?v=2026-11-10.06"></script>
-<script src="../app/csl.js?v=2026-11-10.06"></script>
-<script src="../app/marks.js?v=2026-11-10.06"></script>
-<script src="engine.js?v=2026-11-10.06"></script>
-<script src="panel.js?v=2026-11-10.06"></script>
+<script src="../app/apa.js?v=2026-11-10.07"></script>
+<script src="../app/csl.js?v=2026-11-10.07"></script>
+<script src="../app/marks.js?v=2026-11-10.07"></script>
+<script src="engine.js?v=2026-11-10.07"></script>
+<script src="panel.js?v=2026-11-10.07"></script>

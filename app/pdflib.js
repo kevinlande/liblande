@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/pdflib.js'] = '2026-11-10.06';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/pdflib.js'] = '2026-11-10.07';
 // Clean copies: the same PDF with markup annotations (highlights, pen
 // marks, notes, shapes) removed, using pdf-lib. Links and form fields stay.
 // Marks that an app has flattened into the page itself can't be removed.
@@ -16,7 +16,7 @@ function loadPdfLib() {
       const s = document.createElement('script');
       s.src = PDFLIB;
       s.onload = () => resolve(window.PDFLib);
-      s.onerror = () => reject(new Error('A PDF tool LibLande needs (pdf-lib) couldn\u2019t load. Check your internet connection and try again.'));
+      s.onerror = () => reject(new Error('A PDF tool LibLande needs (pdf-lib) couldn\u2019t load. Check your connection.'));
       document.head.appendChild(s);
     });
     pdfLibReady.catch(() => { pdfLibReady = null; });

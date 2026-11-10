@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/ocr.js'] = '2026-11-10.06';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/ocr.js'] = '2026-11-10.07';
 /* ------------------------------------------------------------------ OCR */
 // A scan's pages are pictures, with no text to search, select or mark.
 // Make searchable reads each page without text with Tesseract (in this
@@ -36,7 +36,7 @@ function loadTesseract() {
       const s = document.createElement('script');
       s.src = TESS + 'tesseract.min.js';
       s.onload = () => resolve(window.Tesseract);
-      s.onerror = () => reject(new Error('The OCR tool (Tesseract) couldn\u2019t load. Check your internet connection and try again.'));
+      s.onerror = () => reject(new Error('The OCR tool (Tesseract) couldn\u2019t load. Check your connection.'));
       document.head.appendChild(s);
     });
     tessReady.catch(() => { tessReady = null; });
@@ -151,8 +151,8 @@ $('#vFindOcr').addEventListener('click', () => { $('#vFindOcr').hidden = true; m
 async function makeSearchable() {
   if (OCR.file) { toast(V.file && OCR.file.id === V.file.id ? 'This paper is being made searchable already.' : 'Another paper is being made searchable: one at a time.', 3500); return; }
   if (!V.doc || !V.file || !V.bytes) return;
-  if (!gs) { toast('Making a paper searchable needs Google Drive, to save it.', 4000); return; }
-  if (!navigator.onLine) { toast('Making a paper searchable needs an internet connection.', 4000); return; }
+  if (!gs) { toast('Sign in to Google Drive to make it searchable.', 4000); return; }
+  if (!navigator.onLine) { toast('Making it searchable needs a connection.', 4000); return; }
   const file = V.file, entry = V.entry;
   Object.assign(OCR, { file, entry, pages: [], at: 0, phase: 'find', load: 0, stop: false, found: new Map() });
   ocrBar();

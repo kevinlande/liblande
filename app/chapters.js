@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/chapters.js'] = '2026-11-10.06';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/chapters.js'] = '2026-11-10.07';
 /* ------------------------------------------------------------ link chapters */
 // A chapter is linked to its book by its crossref field (see findChapters).
 // Chapters added before that are linked here, after you've looked:
@@ -144,7 +144,7 @@ function lcRender() {
   const box = (id, on) => `<input type="checkbox" class="lc-ck" data-lc="${id}"${on ? ' checked' : ''} aria-label="Link">`;
   // (The chapter's own "book title", which it was matched by.)
   const bt = c => `<span class="lc-bt">Book title: <q>${esc(c.f.booktitle || '')}</q></span>`;
-  const no = id => `<button type="button" class="lc-no" data-lc-no="${esc(id)}" title="Dismiss: not this one, and don\u2019t suggest it again" aria-label="Dismiss this suggestion">${ICON.x}</button>`;
+  const no = id => `<button type="button" class="lc-no" data-lc-no="${esc(id)}" title="Not this one" aria-label="Not this one">${ICON.x}</button>`;
   const pair = (x, i, kind) => `<div class="lc-pair-row"><label class="lc-pair">${box(kind + ':' + i, x.on)}<span class="lc-c"><span class="lc-t">${esc(x.c.f.title || x.c.k)}</span><span class="lc-m">${esc(meta(x.c))}</span>${bt(x.c)}</span>` +
     `<span class="lc-arrow" aria-hidden="true">\u2192</span><span class="lc-b"><span class="lc-t">${esc(x.b.f.title || x.b.k)}</span><span class="lc-m">${esc(bookMeta(x.b))}${x.why ? ` \u00b7 <span class="lc-why">${esc(x.why)}</span>` : ''}</span></span></label>${no(x.id)}</div>`;
   const SHOW = 6;
@@ -168,7 +168,7 @@ function lcRender() {
       (g.chapters.length > 4 ? `<button type="button" class="lc-more" data-lc-more="g${i}">${all ? 'Show fewer' : 'Show ' + (g.chapters.length - 4) + ' more'}</button>` : '') + `</div>`;
   };
   const head = (label, n, act) => `<h3 class="lc-h"><span>${label}</span><span class="lc-n">${n}</span>${act || ''}</h3>`;
-  let h = `<p class="lc-lead">Each chapter ticked is linked to its book (its crossref), so it shows under the book in the list, and its book details are brought in line with the book. Nothing is written until you press Link; then it\u2019s one change, with Undo.</p>`;
+  let h = `<p class="lc-lead">Ticked chapters are linked to their book and take its details. Nothing changes until you press Link; Undo reverses it.</p>`;
   if (!r.sure.length && !r.near.length && !r.groups.length) h += `<p class="lc-lead"><b>Nothing to link:</b> every chapter whose book is here is linked to it.</p>`;
   if (r.sure.length) h += `<section class="lc-sec">${head('Book in your library', r.sure.length, `<button type="button" class="lc-all" data-lc-all="sure">${r.sure.every(x => x.on) ? 'Untick all' : 'Tick all'}</button>`)}${list(r.sure, 'sure')}</section>`;
   if (r.near.length) h += `<section class="lc-sec">${head('Possibly their book: check these', r.near.length)}${list(r.near, 'near')}</section>`;
@@ -184,7 +184,7 @@ function lcRender() {
         `<span class="lc-m">${esc(x.c ? '\u2192 ' + (x.b.f.title || x.b.k) : 'A book to add, for ' + x.chapters.length + ' chapters')}</span></span>` +
         `<button type="button" class="lc-back" data-lc-back="${esc(x.id)}">Bring back</button></div>`).join('') + `</div>` : '') + `</section>`;
   }
-  if (r.single) h += `<p class="lc-note">${r.single} chapter${r.single === 1 ? ' is' : 's are'} from books with only that chapter in your library. They\u2019re left as they are; each is linked by itself if you add its book later.</p>`;
+  if (r.single) h += `<p class="lc-note">${r.single} chapter${r.single === 1 ? ' is' : 's are'} from books with only that chapter in your library. Left as they are; adding the book later links them.</p>`;
   const top = $('#sheetBody').scrollTop;
   const body = $('#sheetBody .lc-body');
   if (body) body.innerHTML = h; else $('#sheetBody').insertAdjacentHTML('beforeend', `<div class="lc-body">${h}</div>`);
@@ -251,7 +251,7 @@ async function saveLinkChapters() {
     g.chapters.forEach(c => link(c, g.key, g.fields));
   });
   if (!items.length) { closeSheet(); return; }
-  if (isOffline()) { sheetMsg('Linking chapters needs a connection. Try again when you\u2019re online.', true); return; }
+  if (isOffline()) { sheetMsg('Linking chapters needs a connection.', true); return; }
   sheetBusy(true);
   let step = '';
   const t0 = Date.now(), tell = () => { if (step && sheet === s) sheetMsg(step + '\u2026 (' + Math.round((Date.now() - t0) / 1000) + ' s)'); };

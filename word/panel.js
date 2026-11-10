@@ -617,7 +617,7 @@
   function wordError(e) {
     const m = (e && (e.message || e.code)) || String(e);
     if (/protect|read.?only|locked/i.test(m)) return 'this document can\u2019t be changed (it\u2019s protected or read-only).';
-    if (/compat|InvalidArgument|NotAllowed|GeneralException/i.test(m)) return m + ' (If this is an older .doc file, save it as .docx.)';
+    if (/compat|InvalidArgument|NotAllowed|GeneralException/i.test(m)) return m + ' An older .doc? Save it as .docx.';
     return m;
   }
 
@@ -835,7 +835,7 @@
     } catch (e) {
       await saveSettings();
       const m = (e && (e.message || e.code)) || String(e);
-      showErr('refsErr', (done ? 'Converted ' + done + ', then stopped' : 'Couldn\u2019t convert them') + ' (while ' + step + '): ' + m + (done ? ' Undo with \u2318Z if you like.' : ''));
+      showErr('refsErr', (done ? 'Converted ' + done + ', then stopped' : 'Couldn\u2019t convert them') + ' (while ' + step + '): ' + m + (done ? ' \u2318Z undoes it.' : ''));
       b.disabled = false;
       try { await refreshDocument(true); } catch (x) { /* Refresh will */ }
       readZotero();
@@ -1111,7 +1111,7 @@
       return;
     }
     b.disabled = false;
-    showErr('refsErr', 'The plain copy opened in a new window: save it where you like (\u2318S). This document stays linked.');
+    showErr('refsErr', 'Plain copy opened in a new window; save it with \u2318S. This document stays linked.');
     $('refsErr').classList.add('ok');
   }
 

@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-10.06';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-10.07';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -111,7 +111,7 @@ function formFieldNames(type, present) {
 }
 function fieldInput(n, value, lead) {
   const id = 'fld-' + n;
-  const hint = n === 'author' || n === 'editor' ? ' placeholder="Last, First and Last, First (or a list of full names)"'
+  const hint = n === 'author' || n === 'editor' ? ' placeholder="Last, First and Last, First"'
     : n === 'origdate' ? ' placeholder="Year of original publication" title="Year of original publication (if this is a reprint, new printing or translation)" inputmode="numeric"' : '';
   const input = AREA_FIELDS.has(n) || n === 'title'
     ? `<textarea id="${id}" data-field="${n}" rows="${n === 'abstract' ? 4 : 2}">${esc(value)}</textarea>`
@@ -383,7 +383,7 @@ function openAdd(pdf) {
   sheet = { mode: 'add', pdf: null };
   const h = sheetHead('Add a publication', 'Add to library') +
     `<div class="fld"><label for="doiLookup">From a title, DOI or BibTeX</label><div class="doi-row">` +
-    `<input id="doiLookup" type="text" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="A title (and author), a DOI, ISBN or arXiv ID, or BibTeX" aria-controls="tsList">` +
+    `<input id="doiLookup" type="text" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Title, DOI, ISBN, arXiv ID or BibTeX" aria-controls="tsList">` +
     `<button type="button" class="btn" id="doiGo">Fill in</button>` +
     (navigator.clipboard && navigator.clipboard.readText ? `<button type="button" class="btn" id="bibPaste" title="Fill in from the DOI or BibTeX entry you copied">Paste</button>` : '') +
     // (A photo of the paper or book: see titlesearch.js.)
@@ -495,7 +495,7 @@ function webAddDescription() {
 }
 if ($('#webBm')) {
   $('#webBm').href = webAddBookmark();
-  $('#webBm').addEventListener('click', ev => { ev.preventDefault(); toast('Drag it to your bookmarks bar (it does nothing here).', 4000); });
+  $('#webBm').addEventListener('click', ev => { ev.preventDefault(); toast('Drag it to your bookmarks bar.', 4000); });
   const copy = (text, what) => navigator.clipboard.writeText(text).then(() => toast(what, 6000), () => toast('Couldn’t copy it.', 4000));
   $('#webExtCopy').addEventListener('click', () => copy(webAddDescription(), 'Copied. In Safari, open the address bar’s menu, choose Describe Extension, and paste it in.'));
   $('#webBmCopy').addEventListener('click', () => copy(decodeURIComponent(webAddBookmark()), 'Copied. Bookmark any page, name it “Add to LibLande”, then edit it and paste this in place of its address.'));
@@ -1262,13 +1262,13 @@ function netRender() {
   });
 }
 const saveText = st => st === 'saving' ? 'Saving this paper\u2019s marks to Google Drive\u2026' : st === 'saved' ? 'Saved to Google Drive'
-  : 'This paper\u2019s changes aren\u2019t on Google Drive yet. They save on their own; tap to save them now (\u2318S).';
+  : 'Not on Google Drive yet. Tap to save now (\u2318S).';
 const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many);
 function netText() {
   const parts = [NET.changes && plural(NET.changes, 'change to your library', 'changes to your library'), NET.papers && 'marks on ' + plural(NET.papers, 'paper', 'papers')].filter(Boolean);
   const waiting = parts.length ? parts.join(' and ') + (NET.changes + NET.papers === 1 && !NET.papers ? ' is' : ' are') + ' kept on this device' : '';
-  if (isOffline()) return 'You\u2019re offline. ' + (waiting ? waiting.charAt(0).toUpperCase() + waiting.slice(1) + ', and go to Google Drive when you\u2019re back online.' : 'Changes you make are kept on this device until you\u2019re back online. Papers saved for offline reading open as usual.');
-  return waiting ? waiting.charAt(0).toUpperCase() + waiting.slice(1) + ', waiting to go to Google Drive (they go on their own, soon).' : 'Everything is saved to Google Drive.';
+  if (isOffline()) return 'You\u2019re offline. ' + (waiting ? waiting.charAt(0).toUpperCase() + waiting.slice(1) + ', and go to Google Drive when you\u2019re back online.' : 'Changes are kept here until you\u2019re online.');
+  return waiting ? waiting.charAt(0).toUpperCase() + waiting.slice(1) + ', waiting for Google Drive.' : 'Everything is saved to Google Drive.';
 }
 document.addEventListener('click', ev => {
   const b = ev.target.closest('[data-net]');
@@ -1336,7 +1336,7 @@ function renderPickBar() {
   btn.classList.toggle('on', state.picking);
   btn.setAttribute('aria-pressed', String(state.picking));
   fitToolbar();
-  btn.title = state.picking ? 'Done selecting' : 'Select several publications to export or copy';
+  btn.title = state.picking ? 'Done selecting' : 'Select several';
   const bar = $('#pickBar');
   bar.hidden = !state.picking;
   if (!state.picking) return;
@@ -1391,7 +1391,7 @@ function openBulk() {
     (kws.size ? `<p class="sheet-note">Tap a keyword to take it off all of them.</p><div class="bulk-kws">` +
       [...kws].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([k, c]) =>
         `<button type="button" class="chip bulk-kw" data-kw="${esc(k)}" aria-pressed="false">${esc(k)}<span class="bulk-n">${c === n ? 'all' : c + '/' + n}</span></button>`).join('') + `</div>` : '') +
-    `<input id="bulkKwAdd" type="text" placeholder="Add keywords to all of them, separated by commas" autocomplete="off"></div>` +
+    `<input id="bulkKwAdd" type="text" placeholder="Add keywords to all (comma-separated)" autocomplete="off"></div>` +
     (groups.length ? `<div class="fld"><label>Static groups</label><div class="bulk-groups">` +
       groups.map(g => {
         const c = list.filter(e => g.items.includes(e)).length, was = c === n ? 'all' : c ? 'some' : 'none';
@@ -1491,7 +1491,7 @@ function openSmart(x) {
     `<p class="sheet-note">A saved search is a group in the sidebar that fills itself: whatever matches, now and later.</p>` +
     `<div class="fld"><label for="smartName">Name</label><input id="smartName" type="text" value="${esc(x ? x.name : state.q.trim())}"></div>` +
     `<div class="fld"><label for="smartQ">Search for</label><input id="smartQ" type="text" autocapitalize="off" autocorrect="off" spellcheck="false" value="${esc(x ? x.q : state.q.trim())}"></div>` +
-    `<p class="sheet-note">Words can name a field: <code>author:lee</code> <code>year:2020-2024</code> <code>kw:perception</code> <code>journal:mind</code> <code>type:book</code> <code>has:pdf</code> <code>is:unread</code>; start one with \u2212 to leave it out. Words in quotation marks are found only whole: <code>author:"lande"</code>.</p>`, x ? 'Save' : 'Save search');
+    `<p class="sheet-note">Fields: <code>author:lee</code> <code>year:2020-2024</code> <code>kw:perception</code> <code>journal:mind</code> <code>type:book</code> <code>has:pdf</code> <code>is:unread</code>. <code>\u2212word</code> leaves out; <code>"quotes"</code> match whole words.</p>`, x ? 'Save' : 'Save search');
   $('#smartName').focus();
 }
 function saveSmart() {
@@ -1598,7 +1598,7 @@ async function checkForthcoming() {
   sheet = { mode: 'forth', found };
   const label = n => FIELD_LABELS[n] || n;
   showSheet(`<h2>Updates from Crossref</h2>` +
-    (found.length ? `<p class="sheet-note">Tick the changes to save. Only empty fields are filled in; a different year is offered unticked, since Crossref\u2019s can be the year it appeared online.</p>` +
+    (found.length ? `<p class="sheet-note">Only empty fields are filled. A different year is unticked: Crossref\u2019s may be the online date.</p>` +
       found.map((x, j) => `<div class="fu-item"><div class="fu-title">${esc(x.e.f.title || x.e.k)} <span class="fu-who">${esc(x.e.authorsShort || '')}${x.inIssue ? '' : ' \u00b7 not in an issue yet'}</span></div>` +
         x.changes.map((c, k) => `<label class="check"><input type="checkbox" data-fu="${j}:${k}"${c.on ? ' checked' : ''}> ${esc(label(c.n))}: ${c.from ? `<s>${esc(c.from)}</s> \u2192 ` : ''}${esc(c.to)}</label>`).join('') + `</div>`).join('')
       : `<p class="sheet-note">Crossref has nothing new on any of them yet.</p>`) +
@@ -2208,7 +2208,7 @@ function loadJSZip() {
       const s = document.createElement('script');
       s.src = JSZIP;
       s.onload = () => resolve(window.JSZip);
-      s.onerror = () => reject(new Error('The tool for making .zip files couldn\u2019t load. Check your internet connection and try again.'));
+      s.onerror = () => reject(new Error('The tool for making .zip files couldn\u2019t load. Check your connection.'));
       document.head.appendChild(s);
     });
     jszipReady.catch(() => { jszipReady = null; });
@@ -2288,7 +2288,7 @@ function saveExport() {
     // The share sheet wouldn't take the files one by one (too many, or too
     // large): make one .zip file instead, for another tap on Save.
     sheetBusy(true);
-    sheetMsg('The share sheet couldn\u2019t take the files one by one, so LibLande is making a .zip file instead\u2026');
+    sheetMsg('Making a .zip instead\u2026');
     try {
       s.zipBlob = await makeZip(s.name, s.files);
       sheetMsg(s.name + '.zip is ready. Tap Save again, then choose Save to Files.');
@@ -2363,7 +2363,7 @@ function loadQrLib() {
       const s = document.createElement('script');
       s.src = QRLIB;
       s.onload = () => ok(window.qrcode);
-      s.onerror = () => no(new Error('The QR code maker couldn\u2019t load. Check your internet connection and try again.'));
+      s.onerror = () => no(new Error('The QR code maker couldn\u2019t load. Check your connection.'));
       document.head.appendChild(s);
     });
     qrReady.catch(() => { qrReady = null; });
@@ -2451,8 +2451,8 @@ const KEY_ACTS = [
   { id: 'notesPop', scope: 'both', def: 'Alt+Shift+KeyN', label: 'Notes, large (pop out)' },
   { id: 'quote', scope: 'pdf', def: 'Alt+KeyC', label: 'Copy the selected passage as a quotation, with its citation' },
   { id: 'closeTab', scope: 'pdf', def: 'Alt+KeyW', label: 'Close the paper’s tab' },
-  { id: 'done', scope: 'pdf', def: 'Alt+KeyD', label: 'Done with the paper (marked read, and off your reading list)' },
-  { id: 'share', scope: 'pdf', def: 'Alt+KeyM', label: 'Share the paper as it is, with its citation (as for Mail)' },
+  { id: 'done', scope: 'pdf', def: 'Alt+KeyD', label: 'Done: mark read' },
+  { id: 'share', scope: 'pdf', def: 'Alt+KeyM', label: 'Share with citation' },
   { id: 'shareClean', scope: 'pdf', def: 'Alt+Shift+KeyM', label: 'Share a clean copy (no annotations)' },
   { id: 'download', scope: 'pdf', def: 'Alt+KeyS', label: 'Download (save) the paper as it is' },
   { id: 'downloadClean', scope: 'pdf', def: 'Alt+Shift+KeyS', label: 'Download a clean copy (no annotations)' },
@@ -2461,7 +2461,7 @@ const KEY_ACTS = [
   { id: 'pen', scope: 'pdf', def: 'KeyP', label: 'Pen' },
   { id: 'eraser', scope: 'pdf', def: 'KeyE', label: 'Eraser' },
   { id: 'text', scope: 'pdf', def: 'KeyT', label: 'Text box' },
-  { id: 'comment', scope: 'pdf', def: 'KeyN', label: 'Note: pin a note to the page' },
+  { id: 'comment', scope: 'pdf', def: 'KeyN', label: 'Sticky note' },
   { id: 'select', scope: 'pdf', def: 'KeyV', label: 'Select marks' },
   { id: 'bookmark', scope: 'pdf', def: 'KeyB', label: 'Bookmark the page' },
 ];
@@ -2491,9 +2491,9 @@ function keysMerge(prefs) {
 }
 // The ones that stay as they are.
 const KEYS_FIXED = {
-  lib: [['Return', 'Read the PDF'], ['↑ ↓', 'Previous or next publication'], ['Letters', 'Jump to publications starting with them, in the sorted column'],
+  lib: [['Return', 'Read the PDF'], ['↑ ↓', 'Previous or next publication'], ['Letters', 'Jump in the sorted column'],
     ['/ or ⌘F', 'Search'], ['⌘-click, ⇧-click', 'Select several publications'], ['⌘A', 'Select all shown'], ['Esc', 'Stop selecting, or close a window'], ['?', 'This list']],
-  pdf: [['⌘F', 'Search in the paper'], ['⌘S', 'Save the marks now'], ['+ −', 'Zoom in or out'], ['Esc', 'Put the tool down; with none on, close the paper']],
+  pdf: [['⌘F', 'Search in the paper'], ['⌘S', 'Save the marks now'], ['+ −', 'Zoom in or out'], ['Esc', 'Drop the tool, or close the paper']],
 };
 function openShortcuts() {
   sheet = { mode: 'help' };

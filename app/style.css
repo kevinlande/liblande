@@ -167,9 +167,12 @@
    wide screen, there's nothing under it to show; on a phone it's a page of
    its own.) */
 @media (min-width: 700px) and (max-width: 1099px) {
-  :root[data-glass] .sidebar { background: color-mix(in srgb, var(--side) 60%, transparent);
+  /* (Over a library dimmed only lightly, and itself mostly the sidebar's
+     colour: glass, but not the dimmed list showing grey through it.) */
+  :root[data-glass] .sidebar { background: color-mix(in srgb, var(--side) 80%, transparent);
     -webkit-backdrop-filter: saturate(180%) blur(28px); backdrop-filter: saturate(180%) blur(28px);
     border-right-color: var(--glass-edge); }
+  :root[data-glass] .app.side-open .scrim { background: rgba(0, 0, 0, .12); }
 }
 :root[data-glass] .listwrap > :is(.pick-bar, .rl-list-bar, .colhead) { position: relative; z-index: 2;
   background: color-mix(in srgb, var(--panel) 68%, transparent);
@@ -363,6 +366,9 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .seg button { border: 0; background: none; padding: 4px 6px; font-size: 11.5px; color: var(--muted); text-align: center; min-width: 0; }
 .seg button + button { border-left: 1px solid var(--line); }
 .seg button[aria-checked="true"] { background: var(--accent); color: var(--accent-ink); }
+/* (In Settings: a little larger, its own width.) */
+.seg.set-mode { width: 210px; flex: none; }
+.seg.set-mode button { padding: 6px 8px; font-size: 13px; }
 .setup { position: fixed; inset: 0; z-index: 65; background: var(--bg); overflow-y: auto; padding: calc(24px + env(safe-area-inset-top, 0px)) 16px calc(24px + env(safe-area-inset-bottom, 0px)); display: grid; justify-items: center; align-content: start; }
 .setup-card { width: min(520px, 100%); display: grid; gap: 8px; margin-top: 6vh; }
 .setup-card h2 { margin: 0 0 4px; font: 600 26px/1.2 var(--serif); }
@@ -440,22 +446,44 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 @media (min-width: 700px) {
   .setup.pop:not([hidden]) { background: rgba(0, 0, 0, .32); padding: max(16px, env(safe-area-inset-top, 0px)) 16px 16px; overflow: hidden; align-content: center; }
   .setup.pop .setup-card { width: min(760px, 100%); max-height: calc(100dvh - 32px - env(safe-area-inset-top, 0px)); overflow-y: auto; overscroll-behavior: contain; margin: 0; padding: 0 20px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); box-shadow: 0 18px 60px rgba(0, 0, 0, .3); }
-  .setup.pop .sheet-head { padding-top: 12px; }
+  /* (The title bar across the panel's whole width, to its rounded edges,
+     not a box of its own inside it; in Settings, one with the tabs under
+     it.) */
+  .setup.pop .sheet-head { padding: 12px 20px 8px; margin: 0 -20px 4px; }
+  #setup.pop .set-top { margin: 0 -20px; padding: 0 20px; }
   /* Every other panel (updates, export, applying edits, shortcuts,
      Settings): narrower, its title at the top and its buttons at the
      bottom, both in view while the middle scrolls. */
   .setup.pop:not(.compact) .setup-card { width: min(620px, 100%); padding-top: 18px; }
   .setup.pop:not(.head-mode) .setup-actions { position: sticky; bottom: -16px; margin: 4px -20px -16px; padding: 12px 20px 16px; background: var(--bg); border-top: 1px solid var(--line); }
   .setup.pop.head-mode:not(.compact) .setup-card { padding-top: 0; }
-  /* (Settings: wider, for its tabs.) */
-  #setup.pop .setup-card { width: min(820px, 100%); }
+  /* (Settings: wider, for its tabs, and one height whichever tab is open.) */
+  #setup.pop .setup-card { width: min(820px, 100%); height: min(760px, calc(100dvh - 32px - env(safe-area-inset-top, 0px))); align-content: start; }
+  /* In glass, these panels too: the library showing softly through, less
+     darkened behind them; their title, tabs and buttons, which stay put as
+     the middle scrolls, glass over it. */
+  :root[data-glass] .setup.pop:not([hidden]) { background: rgba(0, 0, 0, .16); }
+  :root[data-glass] .setup.pop .setup-card { background: color-mix(in srgb, var(--bg) 74%, transparent);
+    -webkit-backdrop-filter: saturate(180%) blur(32px); backdrop-filter: saturate(180%) blur(32px);
+    border-color: var(--glass-edge); box-shadow: inset 0 1px 0 var(--glass-rim), inset 0 0 0 .5px var(--glass-rim), 0 18px 60px rgba(0, 0, 0, .3); }
+  :root[data-glass] .setup.pop .sheet-head, :root[data-glass] #setup.pop .set-top, :root[data-glass] .setup.pop:not(.head-mode) .setup-actions {
+    background: color-mix(in srgb, var(--bg) 60%, transparent);
+    -webkit-backdrop-filter: saturate(160%) blur(20px); backdrop-filter: saturate(160%) blur(20px); }
 }
 /* Settings: a list of rows (a switch or a tick box, each with a line of
    explanation), then the library's files. */
 .set-list { display: grid; gap: 30px; margin-top: 4px; }
 /* Settings' tabs: under its title, in view as the tab's page scrolls; on
    a phone, scrolling sideways. */
-.set-tabs { position: sticky; top: 52px; z-index: 2; display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; margin: 0 -20px; padding: 6px 20px 0; background: var(--bg); border-bottom: 1px solid var(--line); }
+/* Settings' title and tabs: one bar at the top, what's under it scrolling
+   beneath it. */
+#setup .set-top { min-width: 0; position: sticky; top: 0; z-index: 3; margin: 0 -16px; padding: 0 16px; background: var(--bg); border-bottom: 1px solid var(--line); }
+#setup .set-top:has(> .sheet-head[hidden]) { position: static; margin: 0; padding: 0; border: 0; background: none; }
+#setup .set-top .sheet-head { position: static; margin: 0; padding-left: 0; padding-right: 0; padding-bottom: 2px; background: none !important; border-bottom: 0; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+.set-tabs { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; margin: 0 -8px; }
+.set-tabs[hidden] { display: none; }
+/* (The card's parts no wider than it: the tabs scroll sideways instead.) */
+#setup .setup-card > * { min-width: 0; }
 .set-tabs button { flex: none; padding: 8px 12px; border: none; border-bottom: 2px solid transparent; background: none; color: var(--muted); font: inherit; font-size: 14px; cursor: pointer; }
 .set-tabs button[aria-selected="true"] { color: var(--accent); font-weight: 600; border-bottom-color: var(--accent); }
 .set-sec.off-tab { display: none; }
@@ -915,6 +943,42 @@ body:has(#sheet:not([hidden])) .pick-bar { visibility: hidden; }
 }
 .toolbar .tb-btn.tb-reader { width: auto; padding: 0 7px; gap: 3px; }
 .tb-reader .ct { font: 600 11.5px var(--ui); font-variant-numeric: tabular-nums; }
+/* On a computer or an iPad, LibLande's two halves as one switch: Reader
+   (with how many papers are open, and its \u25be) | Library, the half you're
+   in filled. In the library, on another list, Library is shaded lightly; in
+   the reader, the same switch at its top left, Library without its count.
+   On a phone, the book alone, and the reader's Library button. */
+.tb-reader-lbl, .v-half-r { display: none; }
+@media (min-width: 700px) {
+  /* (Up against the Library tab: the toolbar's gap taken back.) */
+  .tb-reader-pair { height: 30px; border: 1px solid var(--line); border-right: 0; border-radius: 9px 0 0 9px; margin-right: calc(-1 * var(--tb-gap)); overflow: hidden; }
+  .toolbar .tb-btn.tb-reader { height: 28px; padding: 0 10px 0 10px; gap: 5px; color: var(--muted); border-radius: 0; }
+  .toolbar .tb-btn.tb-reader.none { opacity: .75; }
+  .tb-reader-lbl { display: inline; font: 600 13.5px var(--ui); }
+  .tb-reader .ct, .v-half-r .ct { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--accent); color: var(--accent-ink); font: 600 11px var(--ui); display: inline-grid; place-items: center; font-variant-numeric: tabular-nums; }
+  .tb-reader .ct:empty, .v-half-r .ct:empty { display: none; }
+  /* (No \u25be: the count lists the open papers.) */
+  .toolbar .tb-reader-pair .tb-btn.tb-reader-more { display: none; }
+  .tb-reader .ct { cursor: pointer; transition: transform .1s, box-shadow .1s; }
+  .tb-reader .ct:hover { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
+  #tabs .tab.pinned { height: 30px; border: 1px solid var(--line); border-radius: 0 9px 9px 0; padding: 0 14px 0 12px; margin-right: 6px; }
+  #tabs .tab.pinned[aria-selected="false"] { background: color-mix(in srgb, var(--accent-soft) 50%, transparent); color: var(--text); }
+  /* (The switch sliding between its halves, going to and from the reader:
+     a shape under the two, the halves' own shading set aside meanwhile.) */
+  .toolbar.sliding { position: relative; z-index: 0; }
+  :root[data-glass] .toolbar.sliding { position: absolute; z-index: 30; }
+  .toolbar .sw-slide { position: absolute; z-index: -1; background: var(--accent-soft); border-radius: 8px; pointer-events: none; }
+  .toolbar.sliding #tabs .tab.pinned { background: none; color: var(--text); }
+  #tabs .tab.pinned .ct { display: inline-block; overflow: hidden; white-space: nowrap; vertical-align: bottom; }
+  .v-halves { display: inline-flex; align-items: stretch; height: 30px; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; flex: none; }
+  .v-half-r { display: inline-flex; align-items: center; gap: 5px; padding: 0 12px 0 10px; background: var(--accent-soft); color: var(--text); font: 600 13.5px var(--ui); }
+  /* (The reader's bar laid out as the library's toolbar, so the sidebar
+     button and the switch stay exactly where they are, from one to the
+     other.) */
+  .viewer .v-bar { gap: 8px; padding-top: calc(8px + env(safe-area-inset-top, 0px)); padding-bottom: 8px; padding-left: calc(12px + env(safe-area-inset-left, 0px)); }
+  .v-halves .tb-btn.v-lib { height: auto; border-radius: 0; border-left: 1px solid var(--line); padding: 0 14px 0 12px; gap: 5px; color: var(--muted); }
+  .v-halves .tb-btn.v-lib span { font: 600 13.5px var(--ui); }
+}
 .tb-refresh.busy svg { animation: spin 1s linear infinite; }
 /* Checking for changes: pull the list down; the toolbar button shows only
    with a mouse. */
@@ -1423,6 +1487,38 @@ details.d-sec[open] summary { margin-bottom: 8px; }
 @media (prefers-reduced-motion: reduce) { .v-palette, .vp-show { transition: none; } }
 @media (prefers-reduced-motion: reduce) { .v-top { transition: none; } }
 .v-title-wrap { flex: 1; min-width: 0; display: flex; align-items: center; gap: 2px; }
+/* The start page, with no paper open: three lists of papers to open,
+   the reader's tools put away meanwhile. */
+.viewer.start .v-tools, .viewer.start .v-page, .viewer.start #vPalette, .viewer.start .v-scroll, .viewer.start .v-rail, .viewer.start .v-pagepill, .viewer.start .v-side, .viewer.start #vRecentBtn, .viewer.start #vSideBtn { display: none !important; }
+.viewer.start .v-title { color: var(--muted); }
+.v-newtab { flex: none; }
+.v-start { position: absolute; inset: 0; overflow-y: auto; padding: 28px 28px 40px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 26px; align-content: start; background: var(--bg); }
+.v-start[hidden] { display: none; }
+@media (max-width: 899px) { .v-start { grid-template-columns: minmax(0, 1fr); gap: 20px; padding: 18px; } }
+.vs-col h3 { margin: 0 0 10px; display: flex; align-items: center; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--faint); }
+.vs-col h3 .linkish { margin-left: auto; text-transform: none; letter-spacing: 0; font-size: 12px; }
+.vs-card { width: 100%; display: flex; gap: 10px; text-align: left; padding: 8px; margin-bottom: 8px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--text); cursor: pointer; font: inherit; }
+.vs-card:hover { border-color: var(--accent); }
+.vs-card .op-thumb { flex: none; width: 42px; height: 56px; display: grid; place-items: center; overflow: hidden; border: 1px solid var(--line); border-radius: 3px; background: #fff; color: var(--faint); }
+.vs-card .op-thumb img { width: 100%; height: 100%; object-fit: cover; object-position: top; }
+.vs-tx { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.vs-t { font-weight: 600; font-size: 13px; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.vs-m { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vs-w { color: var(--faint); font-size: 11.5px; display: flex; gap: 6px; align-items: center; }
+.vs-dev, .vs-tag { font-size: 10.5px; padding: 0 6px; border-radius: 8px; font-weight: 600; }
+.vs-dev { background: var(--accent-soft); color: var(--accent); }
+.vs-tag { border: 1px solid var(--line); color: var(--muted); font-weight: 500; }
+.vs-prog { height: 3px; background: var(--line); border-radius: 2px; overflow: hidden; margin-top: 3px; }
+.vs-prog b { display: block; height: 100%; background: var(--accent); }
+.vs-none { color: var(--faint); font-size: 12px; margin: 4px; }
+/* (The paper tabs in the bar, wide enough: in the title's place, with two
+   or more papers open; with one, its title as before.) */
+.viewer.tabs-in-bar .v-tabs-wrap { flex: 1 1 0; min-width: 0; }
+.viewer.tabs-in-bar .v-tabs { padding: 0; background: none; border-bottom: 0; }
+.viewer.tabs-in-bar.multi .v-title-wrap { display: none; }
+.viewer.tabs-in-bar:not(.multi) .v-tabs-wrap { display: none; }
+.viewer.tabs-in-bar .v-tabs-more { bottom: 0; }
+:root[data-glass] .viewer.tabs-in-bar .v-tabs { background: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
 .v-title { flex: 0 1 auto; min-width: 0; font: 600 14.5px/1.3 var(--serif); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .v-title-x { flex: none; width: 28px; height: 28px; opacity: .7; }
 .v-title-x .i { width: 14px; height: 14px; }

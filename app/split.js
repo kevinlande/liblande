@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/split.js'] = '2026-11-10.06';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/split.js'] = '2026-11-10.07';
 /* ---------------------------------------------------------- split pages */
 // From a page's thumbnail (Split), or all the wide pages at once (Split
 // all). A dashed line shows where the page will be cut, at the fold
@@ -68,7 +68,7 @@ const isWide = async (doc, n) => { const v = (await doc.getPage(n)).getViewport(
 // Choosing where to cut: the line on the page, and the bar at the top.
 async function splitStart(n, all) {
   if (!V.doc || !V.file || !V.viewer || SPLIT.busy) return;
-  if (!gs || !navigator.onLine) { toast('Splitting pages needs an internet connection, to save them to Google Drive.', 3500); return; }
+  if (!gs || !navigator.onLine) { toast('Splitting pages needs a connection.', 3500); return; }
   if (OCR.file && OCR.file.id === V.file.id) { toast('Wait until the paper has been made searchable.', 3500); return; }
   const doc = V.doc, my = ++SPLIT.token;
   if (all) {

@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/findpdf.js'] = '2026-11-10.06';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/findpdf.js'] = '2026-11-10.07';
 /* ------------------------------------------------------------ find a PDF */
 // For a publication: its free copy, found through OpenAlex (which carries
 // Unpaywall's open-access data, and needs no email), or the article
@@ -98,7 +98,7 @@ async function findPdf(e, how, after) {
   if (!url || !safeUrl(url)) {
     if (w) w.close();
     const p = PROXIES.list[0];
-    toast('No free copy of it is known.' + (p ? '' : ' A library proxy can open it through your library.'), 6000,
+    toast('No free copy found.', 6000,
       p ? { label: 'Through ' + proxyName(p), run: () => findPdf(e, 'p:0') } : { label: 'Set up a proxy', run: openProxySettings });
     return;
   }
@@ -138,10 +138,10 @@ function renderProxies() {
   const box = $('#proxyList');
   if (!box) return;
   box.innerHTML = PROXIES.list.map((p, i) => `<div class="proxy-row" data-proxy="${i}">` +
-    `<input type="text" class="proxy-name" value="${esc(p.name || '')}" placeholder="Its name, as York University Libraries" aria-label="The proxy\u2019s name" autocomplete="off">` +
-    `<input type="text" class="proxy-addr" value="${esc(p.typed || '')}" placeholder="ezproxy.library.yorku.ca" aria-label="The proxy\u2019s address" inputmode="url" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">` +
+    `<input type="text" class="proxy-name" value="${esc(p.name || '')}" placeholder="Name, e.g. York University Libraries" aria-label="Proxy name" autocomplete="off">` +
+    `<input type="text" class="proxy-addr" value="${esc(p.typed || '')}" placeholder="ezproxy.library.yorku.ca" aria-label="Proxy address" inputmode="url" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">` +
     `<button type="button" class="tb-btn" data-proxy-del aria-label="Remove this proxy" title="Remove">${ICON.x}</button>` +
-    `<span class="hint proxy-eg">${p.prefix ? 'An article opens as ' + esc(proxyLink(p, 'https:\/\/doi.org/10.\u2026')) : 'Type its address, as ezproxy.library.yorku.ca.'}</span></div>`).join('');
+    `<span class="hint proxy-eg">${p.prefix ? 'An article opens as ' + esc(proxyLink(p, 'https:\/\/doi.org/10.\u2026')) : 'Its address, e.g. ezproxy.library.yorku.ca.'}</span></div>`).join('');
 }
 function openProxySettings() {
   const b = $('#settingsBtn');
@@ -168,7 +168,7 @@ $('#proxyList').addEventListener('input', ev => {
   if (!p) return;
   if (ev.target.matches('.proxy-name')) p.name = ev.target.value.trim();
   if (ev.target.matches('.proxy-addr')) { p.typed = ev.target.value.trim(); p.prefix = proxyPrefix(p.typed); }
-  row.querySelector('.proxy-eg').textContent = p.prefix ? 'An article opens as ' + proxyLink(p, 'https:\/\/doi.org/10.\u2026') : 'Type its address, as ezproxy.library.yorku.ca.';
+  row.querySelector('.proxy-eg').textContent = p.prefix ? 'An article opens as ' + proxyLink(p, 'https:\/\/doi.org/10.\u2026') : 'Its address, e.g. ezproxy.library.yorku.ca.';
   proxiesSave();
   renderDetail();
 });

@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/citecheck.js'] = '2026-11-10.06';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/citecheck.js'] = '2026-11-10.07';
 /* ------------------------------------------------------------ manuscript check */
 // A manuscript's citations checked: a Google Doc, or a Word file from Google
 // Drive or this device, read (never changed). Each APA author-date citation
@@ -518,7 +518,7 @@ function showMsReport(rep) {
     `<div class="actions ms-top">` +
       (R.items.length ? `<button type="button" class="btn primary" data-ms-allrefs title="Every work cited, in your citation style (${esc(citeShort())}), in order; references never cited are left out">${ICON.copy}<span>Copy References (${R.items.length})</span></button>` : '') +
       (v.missing.some(w => w.lib) ? `<button type="button" class="btn" data-ms-missing>${ICON.copy}<span>Copy missing (${v.missing.filter(w => w.lib).length})</span></button>` : '') +
-      (rep.kind === 'gdoc' && rep.id && rep.refs && gs && msFixes(rep).length ? `<button type="button" class="btn" data-ms-fix title="Add missing references, bring old ones up to date, take out ones never cited: in the Google Doc itself">${ICON.pencil}<span>Fix in the document\u2026</span></button>` : '') +
+      (rep.kind === 'gdoc' && rep.id && rep.refs && gs && msFixes(rep).length ? `<button type="button" class="btn" data-ms-fix title="Fix the References in the Google Doc">${ICON.pencil}<span>Fix in the document\u2026</span></button>` : '') +
       `<button type="button" class="btn" data-ms-again>${ICON.doc}<span>Check another</span></button></div>` +
     (R.left ? `<p class="ms-note">${ICON.alert}<span>${R.left} cited work${R.left === 1 ? ' is' : 's are'} in neither the References nor your library, so Copy References leaves ${R.left === 1 ? 'it' : 'them'} out.</span></p>` : '') +
     sec('bad', ICON.alert, 'Cited, but missing from the References', missing, true) +
@@ -649,7 +649,7 @@ function openMsFix(rep) {
     (x.kind === 'remove' ? esc(x.r.raw) : citeRef(x.e).html) + (x.kind === 'update' || x.kind === 'restyle' ? `<span class="ms-dim"> (was: ${esc(x.r.raw)})</span>` : '') + `</span></label>`;
   const part = (kind, title) => { const ix = fixes.map((x, i) => [x, i]).filter(([x]) => x.kind === kind); return ix.length ? `<h3 class="msf-h">${title}</h3>` + ix.map(([x, i]) => row(x, i)).join('') : ''; };
   showSheet(`<h2>Fix the References</h2>` +
-    `<p class="sheet-note">In “${esc(rep.name)}” itself, in one go, in your citation style (${esc(citeTitle())}). References LibLande doesn’t recognise are left as they are, and its citations in the text stay as they are. Untick any you’d rather keep as written. To undo, use the document’s version history (File › Version history).</p>` +
+    `<p class="sheet-note">Changes “${esc(rep.name)}” into your style (${esc(citeTitle())}). Unrecognised references and in-text citations are left alone. Untick any to keep as written. To undo, use the document’s version history (File › Version history).</p>` +
     (fixes.length ? part('add', 'Missing from the References') + part('update', 'Out of date') + part('restyle', 'Not in ' + citeShort() + '\u2019s form') + part('remove', 'Never cited')
       : `<p class="ms-dim">Nothing in the References for LibLande to change.</p>`), fixes.length ? 'Make the changes' : 'Close');
 }

@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/keywords.js'] = '2026-11-10.06';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/keywords.js'] = '2026-11-10.07';
 /* ------------------------------------------------------------ suggested keywords */
 // Suggested from your own keywords: those of the publications most like
 // this one (by the words of their titles and abstracts, their authors and
@@ -159,7 +159,7 @@ function kwsDetailRow(e) {
   if (!gs || e.ib || KWS.hide.has(e.k) || !ENTRIES.length) return '';
   const list = kwsSuggest(e.f, e.kw, e.k).filter(x => x.s >= 0.3).slice(0, 4);
   return `<div class="kw-sugs d-kw-sugs" id="kwSugRow"${list.length ? '' : ' hidden'}><span class="kw-sugs-lbl">Suggested</span><span class="kw-sugs-list">${kwsChips(list, 'data-kws-add')}</span>` +
-    `<button type="button" class="kw-sugs-x" data-kws-hide title="No suggestions for this one" aria-label="No suggested keywords for this publication">${ICON.x}</button></div>`;
+    `<button type="button" class="kw-sugs-x" data-kws-hide title="Hide suggestions" aria-label="Hide suggestions">${ICON.x}</button></div>`;
 }
 detailEl.addEventListener('click', ev => {
   const e = BYKEY.get(state.selKey);
@@ -275,7 +275,7 @@ function ktRender() {
   const r = sheet.r, count = k => (KEYWORDS.get(k) || []).length;
   const name = e => esc(String(e.f.title || e.k).replace(/[{}]/g, '').slice(0, 90)) + (e.f.year ? ' (' + esc(e.f.year) + ')' : '');
   const nMissing = [...r.missing.values()].reduce((a, l) => a + l.length, 0);
-  let h = `<h2>Tidy keywords</h2><p class="sheet-note">${KEYWORDS.size.toLocaleString()} keywords on ${ENTRIES.filter(e => e.kw.length).length.toLocaleString()} publications. Nothing changes until you press Apply; the .bib is backed up first.</p>`;
+  let h = `<h2>Tidy keywords</h2><p class="sheet-note">${KEYWORDS.size.toLocaleString()} keywords on ${ENTRIES.filter(e => e.kw.length).length.toLocaleString()} publications. Nothing changes until you press Apply.</p>`;
   const sec = (id, title, n, note, body) => `<details class="kt-sec" id="${id}"${n ? ' open' : ''}><summary><h3>${title} <span class="bulk-n">${n}</span></h3></summary>` +
     (n ? `<p class="sheet-note">${note}</p>${body}` : `<p class="sheet-note">None.</p>`) + `</details>`;
   h += sec('ktGroups', 'Written differently', r.groups.length, 'The same keyword written more than one way: each made the one chosen. Untick a group to leave it.',

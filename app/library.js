@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-10.06';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-10.07';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -152,11 +152,16 @@ $('#themePicks').addEventListener('click', ev => {
   const b = ev.target.closest('[data-style-set]');
   if (b) applyStyle(b.dataset.styleSet);
 });
-$('#themeSeg').addEventListener('click', ev => {
+// Auto, Light or Dark: at the foot of the sidebar, and in Settings ›
+// Appearance (applyTheme marks both). From Settings, the page isn't opened
+// again (see below) until Settings closes.
+let themeReload = false;
+function onThemeSet(ev) {
   const b = ev.target.closest('[data-theme-set]');
   if (!b) return;
   store.set('theme', b.dataset.themeSet);
   applyTheme(b.dataset.themeSet);
+  if (window.LIBLANDE_PAGES && !$('#setup').hidden) { store.set('themeToSave', b.dataset.themeSet); themeReload = true; sendPrefs({ theme: b.dataset.themeSet }); return; }
   // On GitHub Pages, Safari colours the strip behind the status bar only as
   // the page opens: the page opens again at once (unless marks are
   // unsaved), and the theme is saved with your account as it does
@@ -167,7 +172,14 @@ $('#themeSeg').addEventListener('click', ev => {
     return;
   }
   sendPrefs({ theme: b.dataset.themeSet });
-});
+}
+$('#themeSeg').addEventListener('click', onThemeSet);
+$('#themeSegSet').addEventListener('click', onThemeSet);
+new MutationObserver(() => {
+  if (!themeReload || !$('#setup').hidden || V.dirty || V.bmDirty || V.drawing || V.saving) return;
+  themeReload = false;
+  location.reload();
+}).observe($('#setup'), { attributes: true, attributeFilter: ['hidden'] });
 
 /* ------------------------------------------------------------ data prep */
 function lastNames(names) {
@@ -1343,7 +1355,7 @@ function librariesHTML() {
   const row = l => {
     const cur = l.bibId === curId, n = cur && !LIBS.phase ? ENTRIES.length : (LIB_COUNTS[l.bibId] || {}).n;
     return `<button type="button" class="grp lib-row${cur ? ' cur' : ''}${cur && state.group === 'all' ? ' on' : ''}" data-lib="${esc(l.bibId)}" data-papers="${esc(l.papersId || '')}"${cur ? ' data-g="all"' : ''}` +
-      ` title="${cur ? esc(libName(l)) + ': the library open now' : 'Switch to ' + esc(libName(l)) + ' (or drop publications here to copy them to it)'}">` +
+      ` title="${cur ? esc(libName(l)) + ': the library open now' : 'Switch to ' + esc(libName(l))}">` +
       `${ICON.lib}<span class="nm">${esc(libName(l))}</span><span class="ct">${n != null ? n.toLocaleString() : ''}</span></button>`;
   };
   const sub = `<div class="lib-sub${LIBS.phase === 'folding' ? ' folded' : LIBS.phase === 'loading' ? ' lib-wait' : ''}">` +
@@ -1377,7 +1389,7 @@ async function copyToLibrary(keys, lib) {
 function openCopyTo(keys) {
   if (!LIBS.list.length) { toast('You have no other library yet. Make one with + beside Libraries in the sidebar.', 4000); return; }
   sheet = { mode: 'help', copyKeys: keys };
-  showSheet(`<h2>Copy to another library</h2><p class="sheet-note">${keys.length === 1 ? 'The publication' : keys.length + ' publications'}, with ${keys.length === 1 ? 'its PDFs' : 'their PDFs'}, copied to the library you choose. ${keys.length === 1 ? 'It stays' : 'They stay'} here too.</p>` +
+  showSheet(`<h2>Copy to another library</h2><p class="sheet-note">${keys.length === 1 ? 'The publication' : keys.length + ' publications'}, with ${keys.length === 1 ? 'its PDFs' : 'their PDFs'}, copied to the library you choose.</p>` +
     `<div class="copy-libs">${LIBS.list.map(l => `<button type="button" class="set-lib" data-copy-to="${esc(l.bibId)}">${ICON.lib}<span>${esc(libName(l))}</span></button>`).join('')}</div>`, 'Cancel');
   $('#sheetCancel').hidden = true;
 }
@@ -1448,10 +1460,10 @@ function renderGroups() {
     ((n => (n || state.group === 'forth' ? grpBtn('forth', 'Forthcoming', n, ICON.forth) : ''))(ENTRIES.filter(isForthcoming).length)) +
     `</div>`) +
     // (Tools: not lists, so no count.)
-    `<div class="sec${secFold('tools')}" data-sec="tools">${secHead('tools', 'Tools')}<button type="button" class="grp" data-tool="mscheck" aria-label="Cite Check: check a manuscript\u2019s citations"${msToolTitle()}>${ICON.citecheck}<span class="nm">Cite Check</span>${msToolCount()}</button>` +
-      (gs ? `<button type="button" class="grp" data-tool="newpapers" aria-label="New papers" title="New papers that cite yours, by authors you follow, like ones you choose, and in your journals">${ICON.bell}<span class="nm">New papers</span>${npToolCount()}</button>` +
-        `<button type="button" class="grp" data-tool="kwtidy" aria-label="Tidy keywords" title="Keywords written more than one way, used once, or probably missing">${ICON.tag}<span class="nm">Tidy keywords</span></button>` +
-        `<button type="button" class="grp" data-tool="linkch" aria-label="Link chapters to books" title="Chapters linked to their books, and books added for chapters that have none">${ICON.addChapter}<span class="nm">Link chapters</span></button>` : '') + `</div>`;
+    `<div class="sec${secFold('tools')}" data-sec="tools">${secHead('tools', 'Tools')}<button type="button" class="grp" data-tool="mscheck" aria-label="Cite Check"${msToolTitle()}>${ICON.citecheck}<span class="nm">Cite Check</span>${msToolCount()}</button>` +
+      (gs ? `<button type="button" class="grp" data-tool="newpapers" aria-label="New papers" title="New work citing you, or by authors and in journals you follow">${ICON.bell}<span class="nm">New papers</span>${npToolCount()}</button>` +
+        `<button type="button" class="grp" data-tool="kwtidy" aria-label="Tidy keywords" title="Merge, clear out or add keywords">${ICON.tag}<span class="nm">Tidy keywords</span></button>` +
+        `<button type="button" class="grp" data-tool="linkch" aria-label="Link chapters to books" title="Link chapters to their books">${ICON.addChapter}<span class="nm">Link chapters</span></button>` : '') + `</div>`;
   // (Saved searches just above the static groups.)
   if (SMART.list.length) h += `<div class="sec${secFold('q')}" data-sec="q">${secHead('q', 'Saved searches')}` + SMART.list.map(x => grpBtn('q:' + x.name, x.name, groupItems('q:' + x.name).length, ICON.search)).join('') + `</div>`;
   if (GROUPS.some(g => !(gs && g === readingGroup())) || gs) {
@@ -2440,7 +2452,7 @@ function rowHTML(e, i, top, h) {
   // several); without a server (the local tests), or for a file not found in Drive, it
   // links to Google Drive.
   const file = state.picking ? pickBox(e) : n
-    ? `<button type="button" class="fileicon${savedHere(e) ? ' saved' : ''}" data-open-pdf="${i}" title="${n > 1 ? 'Read one of its ' + n + ' PDFs' : 'Read ' + esc(f.n)}${savedHere(e) ? ' (saved on this device: opens offline)' : ''}" aria-label="Read the PDF">${ICON.doc}</button>`
+    ? `<button type="button" class="fileicon${savedHere(e) ? ' saved' : ''}" data-open-pdf="${i}" title="${n > 1 ? 'Read one of its ' + n + ' PDFs' : 'Read ' + esc(f.n)}${savedHere(e) ? ' (offline)' : ''}" aria-label="Read the PDF">${ICON.doc}</button>`
     : f ? `<a class="fileicon" href="${esc(driveUrl(f))}" target="_blank" rel="noopener" title="Open ${esc(f.n)}" aria-label="Open linked file">${ICON.doc}</a>`
     : '';
   const ch = CHAPTER_ROWS.has(i);
@@ -3011,7 +3023,7 @@ function renderDetail() {
     `<button type="button" role="menuitem" class="mi" data-copy="apa-short">${ICON.intext}<span>In-text <small class="mi-style" data-cite-label>${esc(citeShort())}</small></span><kbd>${esc(keyHint('copyShort'))}</kbd></button>` +
     `<button type="button" role="menuitem" class="mi" data-copy="qr">${ICON.qr}<span>QR code\u2026</span></button>` +
     // (A prompt to paste into Claude: see reader.js.)
-    (readable.length ? `<button type="button" role="menuitem" class="mi" data-copy="ai" title="A prompt to paste into Claude: a compact outline of this paper (its question, claim, argument and sections), weighing your highlights and notes (with its text)">${ICON.ai}<span>For AI (summary prompt)</span></button>` : '') +
+    (readable.length ? `<button type="button" role="menuitem" class="mi" data-copy="ai" title="Copy a prompt for Claude: outline this paper with your highlights">${ICON.ai}<span>For AI (summary prompt)</span></button>` : '') +
     // (Another style, for this copy: see cite.js.)
     citeOnceHTML() + `</div></details>`);
   if (gs && !e.ib && LIBS.list.length) more.push(`<button type="button" role="menuitem" data-copy-lib="${esc(e.k)}">${ICON.lib}<span>Copy to another library\u2026</span></button>`);
@@ -3065,7 +3077,7 @@ function renderDetail() {
 
   if (e.ib) {
     notices += `<p class="inbox-note">Added in LibLande and waiting in your inbox. To move it into ${esc(DATA.source)}, open ` +
-      `LibLande \u203a Inbox \u203a LibLande inbox.bib in BibDesk and drag it into your library. Once it\u2019s there, it leaves the inbox.</p>`;
+      `LibLande \u203a Inbox \u203a LibLande inbox.bib in BibDesk and drag it into your library.</p>`;
   }
   const kwAdd = gs ? `<span class="kw-add-wrap"><button type="button" class="chip kw-add" data-kw-add title="Add a keyword">+ Keyword</button></span>` : '';
   let chips = '';

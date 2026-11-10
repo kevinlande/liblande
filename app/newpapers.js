@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/newpapers.js'] = '2026-11-10.06';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/newpapers.js'] = '2026-11-10.07';
 /* ------------------------------------------------------------ new papers */
 // Found with OpenAlex (citations, authors, journals) and Semantic Scholar
 // (papers like your examples), asked from this page: no key, and no email
@@ -167,12 +167,12 @@ async function npToggleAbstract(item, x) {
   if (open) NP_OPEN.add(x.id); else NP_OPEN.delete(x.id);
   btn.setAttribute('aria-expanded', String(open));
   box.hidden = !open;
-  if (!open || NP_ABS.has(x.id)) { if (open) box.textContent = NP_ABS.get(x.id) || 'No abstract is to be had for this one.'; return; }
+  if (!open || NP_ABS.has(x.id)) { if (open) box.textContent = NP_ABS.get(x.id) || 'No abstract.'; return; }
   box.textContent = 'Getting the abstract\u2026';
   box.classList.add('np-abs-wait');
   try {
     const text = await npAbstract(x);
-    box.textContent = text || 'No abstract is to be had for this one.';
+    box.textContent = text || 'No abstract.';
   } catch (err) {
     box.textContent = 'Couldn\u2019t get the abstract: ' + errText(err);
     NP_OPEN.delete(x.id);
@@ -329,10 +329,10 @@ function npRender() {
     `<div class="np-tabs" role="tablist">` + [['top', 'Top 15', Math.min(15, all.length)], ['all', 'All', all.length]].concat(NP_KINDS.map(([k, l]) => [k, l, of(k).length])).map(([k, l, n]) =>
       `<button type="button" role="tab" class="np-tab" data-np-tab="${k}" aria-selected="${tab === k}">${l}<span class="ct">${n}</span></button>`).join('') + `</div>` +
     (tab === 'journals' ? `<div class="np-jrow">` +
-      (jn.size > 1 ? `<button type="button" class="tb-btn" data-np-step="-1" aria-label="The journal before" title="The journal before">${ICON.chev}</button>` : '') +
+      (jn.size > 1 ? `<button type="button" class="tb-btn" data-np-step="-1" aria-label="Previous journal" title="The journal before">${ICON.chev}</button>` : '') +
       `<div class="np-tabs np-journals">` + (jn.size > 1 ? npJournalList(jn, list.length) : [...jn].map(([v, n]) => [v, v, n])).map(([v, l, n]) =>
       `<button type="button" class="np-tab" data-np-j="${esc(v)}" aria-selected="${NP.journal === v}">${esc(l.replace(/^The /, ''))}<span class="ct">${n}</span></button>`).join('') + `</div>` +
-      (jn.size > 1 ? `<button type="button" class="tb-btn np-next" data-np-step="1" aria-label="The next journal" title="The next journal">${ICON.chev}</button>` : '') +
+      (jn.size > 1 ? `<button type="button" class="tb-btn np-next" data-np-step="1" aria-label="Next journal" title="The next journal">${ICON.chev}</button>` : '') +
       `<button type="button" class="tb-btn np-jadd${NP.jAdd ? ' on' : ''}" data-np-jadd aria-expanded="${NP.jAdd}" aria-label="Follow another journal" title="Follow another journal">${ICON.plus}</button></div>` +
       (NP.jAdd ? `<div class="npf-find np-jfind"><input type="search" data-npf-find="journals" placeholder="Follow a journal: type its name" autocomplete="off" autocapitalize="off" spellcheck="false"><div class="npf-hits" data-npf-hits="journals"></div></div>` : '') : '') +
     (shown.length ? `<div class="np-list">` + shown.map(x => { const cites = x.why.some(w => w.k === 'cites'); return '' +
@@ -343,10 +343,10 @@ function npRender() {
       `<div class="np-meta">${esc(npAuthors(x.authors))}${x.venue ? ' · <i>' + esc(x.venue) + '</i>' : ''}${x.date ? ' · ' + esc(dateText(x.date)) : ''}</div>` +
       // (Its abstract, opened and closed in place.)
       `<button type="button" class="np-abs-btn" data-np-abs aria-expanded="${NP_OPEN.has(x.id)}">${ICON.chev}<span>Abstract</span></button>` +
-      `<div class="np-abs"${NP_OPEN.has(x.id) ? '' : ' hidden'}>${NP_OPEN.has(x.id) ? esc(NP_ABS.get(x.id) || 'No abstract is to be had for this one.') : ''}</div>` +
+      `<div class="np-abs"${NP_OPEN.has(x.id) ? '' : ' hidden'}>${NP_OPEN.has(x.id) ? esc(NP_ABS.get(x.id) || 'No abstract.') : ''}</div>` +
       `<div class="np-acts">${x.doi && gs ? `<button type="button" class="btn" data-np-add>${ICON.plus}<span>Add…</span></button><button type="button" class="btn" data-np-rl>${ICON.bookmark}<span>Reading list…</span></button>` : ''}` +
       `<button type="button" class="btn np-gone" data-np-gone>${ICON.x}<span>Dismiss</span></button></div></div>`; }).join('') + `</div>`
-      : `<p class="ms-dim np-none">${NP.busy ? 'Looking…' : NP.checked ? 'Nothing new here. LibLande looks again tomorrow, or now with Check now.' : 'LibLande looks for new papers once a day.'}</p>`);
+      : `<p class="ms-dim np-none">${NP.busy ? 'Looking…' : NP.checked ? 'Nothing new. Checked again tomorrow.' : 'LibLande looks for new papers once a day.'}</p>`);
 }
 // (The journal chosen, scrolled into view in its row.)
 function npShowJournal() {

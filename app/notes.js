@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/notes.js'] = '2026-11-10.06';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/notes.js'] = '2026-11-10.07';
 /* ------------------------------------------------------------ notes */
 // The details pane shows Details or Notes (a switch at its top, or Alt-N;
 // the choice kept). Notes has your notes, in a box you type in, formatted
@@ -212,7 +212,7 @@ function nvLink(el) {
   box.className = 'nv-linkbox';
   // (Not the browser's own check of the address: "example.org" is taken, with https:// added.)
   box.noValidate = true;
-  box.innerHTML = `<input type="text" inputmode="url" autocapitalize="off" placeholder="https:\/\/\u2026" aria-label="The link\u2019s address" autocomplete="off" spellcheck="false"><button type="submit" class="btn primary">Add link</button>`;
+  box.innerHTML = `<input type="text" inputmode="url" autocapitalize="off" placeholder="https:\/\/\u2026" aria-label="Link address" autocomplete="off" spellcheck="false"><button type="submit" class="btn primary">Add link</button>`;
   document.body.appendChild(box);
   const r = at.width || at.height ? at : host.getBoundingClientRect();
   box.style.left = Math.max(8, Math.min(innerWidth - box.offsetWidth - 8, r.left)) + 'px';
@@ -381,7 +381,7 @@ function notesViewHTML(e) {
   return `<section class="d-sec nv"><h3 class="nv-h">Your notes` + (gs ? `<button type="button" class="nv-pop" data-nv-pop title="Notes, large, with formatting buttons (${esc(keyHint('notesPop'))})">${POP_ICON}<span>Pop out</span></button>` : '') + `</h3>` +
     `<div class="nv-wrap"><div class="nv-box notes-rich" data-nv-box role="textbox" aria-multiline="true" aria-label="Your notes" data-placeholder="${gs ? 'Write your notes\u2026' : 'No notes.'}" style="height:${NOTES.h}px"></div>` +
     (gs ? `<span class="nv-grip" data-nv-grip title="Drag to make the box taller or shorter"></span>` : '') + `</div>` +
-    (gs ? `<p class="nv-hint">Saved as you leave the box \u00b7 drag its bottom edge to make it taller or shorter</p>` : '') + `</section>` +
+    (gs ? `<p class="nv-hint">Saved when you leave the box</p>` : '') + `</section>` +
     `<section class="d-sec nv-pdf"><h3 class="nv-h">From the PDF` + (pdf ? `<button type="button" class="nv-pop" data-nv-reader>Open in the reader \u2192</button>` : '') + `</h3>` +
     `<div data-nv-marks>${pdf ? '<p class="nv-none">Reading the PDF\u2019s highlights\u2026</p>' : '<p class="nv-none">No PDF here, so no highlights to show.</p>'}</div>` +
     (pdf ? `<div class="nv-foot" data-nv-foot hidden><button type="button" class="btn" data-nv-copyall>${ICON.copy}<span>Copy all, with the citation</span></button>` +
@@ -490,7 +490,7 @@ function openNotesPop(e) {
     `<div class="np-cite" hidden><input type="search" placeholder="A title or author in your library" aria-label="Find a publication to cite" autocomplete="off" spellcheck="false"><div class="np-cite-list"></div></div>` +
     `</div><div class="np-body"><div class="np-edit notes-rich" role="textbox" aria-multiline="true" aria-label="Your notes" data-placeholder="Write your notes\u2026"></div>` +
     (readablePdfs(e).length ? `<aside class="np-side"><h4>From the PDF \u00b7 insert a quotation</h4><div class="np-marks"><p class="nv-none">Reading the PDF\u2019s highlights\u2026</p></div></aside>` : '') + `</div>` +
-    `<div class="np-foot"><span>Markdown, kept in the .bib\u2019s Notes field \u00b7 saved as you type</span><span>Esc or Done to close</span></div></div>`;
+    `<div class="np-foot"><span>Markdown, in the .bib\u2019s Notes field \u00b7 saved as you type</span><span></span></div></div>`;
   document.body.appendChild(wrap);
   const ed = wrap.querySelector('.np-edit'), state_ = wrap.querySelector('.np-state');
   let timer = 0, range = null;
@@ -622,7 +622,7 @@ function rnHTML(e, where) {
     (handheld() ? '' : b('move', RN_MOVE[where === 'bottom' ? 'side' : 'bottom'][0], RN_MOVE[where === 'bottom' ? 'side' : 'bottom'][1]) +
       b('pop', 'Notes, large, with Cite (' + keyHint('notesPop') + ')', POP_ICON)) +
     (handheld() ? `<button type="button" class="rn-done" data-rn="done">Done</button>` : '') + `</div>` : '') +
-    `<div class="rn-edit notes-rich" role="textbox" aria-multiline="true" aria-label="Your notes" data-placeholder="${gs ? 'Write your notes\u2026 (select a passage in the paper, then Add to notes, to quote it)' : 'No notes.'}"></div>` +
+    `<div class="rn-edit notes-rich" role="textbox" aria-multiline="true" aria-label="Your notes" data-placeholder="${gs ? 'Write your notes\u2026' : 'No notes.'}"></div>` +
     `<div class="rn-marks" hidden></div>` +
     (gs ? `<div class="rn-foot"><button type="button" class="linkish" data-rn-marks aria-expanded="false">Highlights</button></div>` : '') + `</div>`;
 }
@@ -720,7 +720,7 @@ async function rnMarks() {
     try { labels = await doc.getPageLabels(); } catch (err) { labels = null; }
     if (!box.isConnected) return;
     RN.marks = { marks, labels };
-    box.innerHTML = marks.length ? nvMarksHTML(RN.marks, true) : '<p class="nv-none">No highlights or notes in the PDF yet (saved ones: those just made come once it\u2019s saved).</p>';
+    box.innerHTML = marks.length ? nvMarksHTML(RN.marks, true) : '<p class="nv-none">No saved highlights or notes yet.</p>';
   } catch (err) { if (box.isConnected) box.innerHTML = `<p class="nv-none">Couldn\u2019t read them: ${esc(errText(err))}</p>`; }
 }
 // Open (beside the paper or below it), or close.

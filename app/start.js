@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-11-10.06';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-11-10.07';
 // On GitHub Pages, every part of the app must be from the same version: a
 // part kept from an older one (the offline copy, served when the network
 // was slow) lacks what this page needs. Then the kept copies go, and the
@@ -121,17 +121,28 @@ function go(view) {
 }
 $('#back').addEventListener('click', () => go(app.dataset.view === 'detail' ? 'list' : 'groups'));
 function closeDrawer() { app.classList.remove('side-open'); }
+// The sidebar column folded or opened on a computer, the list sliding to
+// fill the room (as when going to the reader and back), unless less motion
+// is asked for.
+function foldSide(collapsed) {
+  const from = getComputedStyle(app).gridTemplateColumns;
+  app.classList.toggle('side-collapsed', collapsed);
+  store.set('sideCollapsed', collapsed);
+  if (!app.animate || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const to = getComputedStyle(app).gridTemplateColumns;
+  if (from !== to) app.animate({ gridTemplateColumns: [from, to] }, { duration: 200, easing: 'cubic-bezier(.2, .7, .3, 1)' });
+}
 $('#sideToggle').addEventListener('click', () => {
   if (phoneMQ.matches) go('groups');
   else if (tabletMQ.matches) app.classList.toggle('side-open');
-  else { app.classList.toggle('side-collapsed'); store.set('sideCollapsed', app.classList.contains('side-collapsed')); }
+  else foldSide(!app.classList.contains('side-collapsed'));
 });
 $('#sideClose').addEventListener('click', closeDrawer);
 // The LibLande icon at the top of the sidebar closes it too.
 $('.side-head .app-icon').addEventListener('click', () => {
   if (phoneMQ.matches) go('list');
   else if (tabletMQ.matches) closeDrawer();
-  else { app.classList.add('side-collapsed'); store.set('sideCollapsed', true); }
+  else foldSide(true);
 });
 $('#scrim').addEventListener('click', closeDrawer);
 const onLayout = () => {
@@ -282,7 +293,7 @@ async function waitForBuild(progress) {
   const start = Date.now();
   while (status && status.configured && status.building) {
     const secs = Math.round((Date.now() - start) / 1000);
-    if (secs > 10 * 60) throw new Error('The build is taking longer than expected. LibLande will keep trying in the background; check again in a few minutes.');
+    if (secs > 10 * 60) throw new Error('Still building. Check again in a few minutes.');
     if (progress) progress(secs);
     await new Promise(r => setTimeout(r, 4000));
     status = await callServer('getStatus');
@@ -714,6 +725,7 @@ if (RELOADING) {
     // (Settings: a panel over the library; the first setup fills the screen.)
     $('#setup').classList.toggle('pop', configured);
     $('#setHead').hidden = !configured;
+    $('#setTabs').hidden = !configured;
     $('#setupTitle').hidden = configured;
     $('#setupIntro').hidden = configured;
     $('#setupEdit').hidden = !configured;
@@ -928,7 +940,8 @@ if (RELOADING) {
       $('#setup').hidden = true;
       $('#settingsBtn').hidden = false; $('#addBtn').hidden = false;
       $('#bibLink').value = $('#papersLink').value = '';
-      toast('Library ready: ' + ENTRIES.length.toLocaleString() + ' publications', 3000);
+      // (New here: the tour and Features offered, once.)
+      toast('Library ready: ' + ENTRIES.length.toLocaleString() + ' publications', 15000, [{ label: 'Take the tour', run: startTour }, { label: 'Features', run: openFeatures }]);
     } catch (err) {
       setupMsg(errText(err), 'error');
     } finally {

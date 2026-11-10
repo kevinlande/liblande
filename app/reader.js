@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-10.06';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-10.07';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -152,7 +152,7 @@ function loadPdfJs() {
     })().catch(err => {
       pdfjsReady = null;
       console.warn(err);
-      throw new Error('The PDF reader couldn\u2019t load. Check your internet connection and try again.');
+      throw new Error('The PDF reader couldn\u2019t load. Check your connection.');
     });
   }
   return pdfjsReady;
@@ -627,6 +627,8 @@ async function softNext() {
 
 async function openReader(entry, file, pos) {
   const my = ++V.token;
+  $('#viewer').classList.remove('start');
+  $('#vStart').hidden = true;
   TAKEN.clear();
   $('#viewer').classList.remove('bars-hidden');
   V.restore = pos && pos.top != null ? pos : null;
@@ -640,7 +642,9 @@ async function openReader(entry, file, pos) {
   $('#vFind').hidden = true;
   $('#vFindBtn').setAttribute('aria-pressed', 'false');
   $('#vFindCount').textContent = '';
+  const fromLibrary = $('#viewer').hidden;
   $('#viewer').hidden = false;
+  if (fromLibrary) sideSweep(true);
   resetSide();
   clearBack();
   resetBookmarks();
@@ -783,8 +787,8 @@ async function openReader(entry, file, pos) {
     // it are no help): said plainly.
     const net = /load failed|failed to fetch|networkerror|respondwith|network connection/i.test(errText(err));
     if (net && isOffline()) {
-      vStatus(SAVED.has(file.id) ? 'This paper couldn\u2019t be opened offline: something it needs isn\u2019t on this device yet. Open it once while you\u2019re online, and it will open offline after that.'
-        : 'You\u2019re offline, and this paper isn\u2019t saved on this device. Papers are kept here once you\u2019ve opened them while online.', true);
+      vStatus(SAVED.has(file.id) ? 'Not available offline yet. Open it once online.'
+        : 'You\u2019re offline, and this paper isn\u2019t on this device. Open it once online.', true);
     } else vStatus(errText(err), true);
   }
 }
@@ -831,12 +835,80 @@ async function saveNow() {
 // Back to the library, with the papers left open: at once, saving any
 // changes in the background (the paper stays open, so nothing is lost if
 // that fails; you're told, and can come back to it).
+// Between the library and the reader on a computer, with the library's
+// sidebar a column beside the list: going to the reader, the column folds
+// shut (the list sliding left, as the sidebar button folds it), and the
+// reader is there as it closes; going back, the library is there at once
+// and the column opens again. (Not with the sidebar folded or sliding
+// over, on a phone, or with less motion asked for.)
+const LESS_MOTION = matchMedia('(prefers-reduced-motion: reduce)');
+function sideColumnWidth() {
+  if (!motionOK() || app.classList.contains('side-collapsed')) return 0;
+  const s = document.querySelector('.sidebar');
+  if (!s || getComputedStyle(s).position === 'fixed') return 0;
+  const r = s.getBoundingClientRect();
+  return r.width > 40 && r.left > -2 ? Math.round(r.width) : 0;
+}
+const motionOK = () => !phoneMQ.matches && !LESS_MOTION.matches && !!app.animate;
+const EASE = 'cubic-bezier(.2, .7, .3, 1)';
+// The library's switch between its halves: its highlight sliding from
+// Library to Reader (or back), and Library's count folding away (or
+// opening) as it goes. Drawn as a shape under the two, in the toolbar,
+// moving with it as the column folds. Returns a tidying-up, for when
+// the reader covers it.
+function switchSlide(toReader, ms) {
+  const pair = $('#readerPair'), libTab = $('#tabs .tab.pinned');
+  const tb = pair && pair.closest('.toolbar');
+  if (!tb || !libTab || pair.offsetParent === null || libTab.offsetParent === null) return Promise.resolve(() => {});
+  const ct = libTab.querySelector('.ct'), full = ct ? ct.scrollWidth : 0;
+  const box = () => tb.getBoundingClientRect();
+  const at = el => { const r = el.getBoundingClientRect(), b = box(); return { left: r.left - b.left, top: r.top - b.top, width: r.width, height: r.height }; };
+  // (Where it starts: under Library as it is, or under Reader with the count folded.)
+  if (!toReader && ct) { ct.style.maxWidth = '0px'; ct.style.opacity = '0'; }
+  const from = toReader ? at(libTab) : at(pair);
+  if (ct) { ct.style.maxWidth = toReader ? '0px' : full + 'px'; ct.style.opacity = toReader ? '0' : '1'; }
+  const to = toReader ? at(pair) : at(libTab);
+  const hl = document.createElement('div');
+  hl.className = 'sw-slide';
+  Object.assign(hl.style, { top: from.top + 'px', height: from.height + 'px', left: from.left + 'px', width: from.width + 'px' });
+  tb.classList.add('sliding');
+  tb.prepend(hl);
+  const a = hl.animate({ left: [from.left + 'px', to.left + 'px'], width: [from.width + 'px', to.width + 'px'] }, { duration: ms, easing: EASE, fill: 'forwards' });
+  if (ct) ct.animate({ maxWidth: toReader ? [full + 'px', '0px'] : ['0px', full + 'px'], opacity: toReader ? [1, 0] : [0, 1] }, { duration: ms, easing: EASE });
+  const tidy = () => { hl.remove(); tb.classList.remove('sliding'); if (ct) { ct.style.maxWidth = ''; ct.style.opacity = ''; } };
+  return new Promise(done => { let over = false; const end = () => { if (over) return; over = true; done(tidy); }; a.finished.then(end, end); setTimeout(end, ms + 250); });
+}
+// Going to the reader: the switch first, then the column folds, then the
+// reader is there. Back: the library is there with its column folded,
+// the switch slides back, then the column opens.
+async function sideSweep(opening) {
+  if (!motionOK()) return;
+  const v = $('#viewer'), w = sideColumnWidth();
+  const full = w + 'px minmax(0, 1fr)', none = '0px minmax(0, 1fr)';
+  if (opening) {
+    v.style.visibility = 'hidden';
+    let tidy = () => {}, fold = null;
+    try {
+      tidy = await switchSlide(true, 160);
+      if (w) { fold = app.animate({ gridTemplateColumns: [full, none] }, { duration: 200, easing: EASE, fill: 'forwards' }); await Promise.race([fold.finished.catch(() => {}), new Promise(r => setTimeout(r, 450))]); }
+    } finally {
+      v.style.visibility = '';
+      requestAnimationFrame(() => { tidy(); if (fold) fold.cancel(); });
+    }
+    return;
+  }
+  const hold = w ? app.animate({ gridTemplateColumns: [none, none] }, { duration: 1, fill: 'forwards' }) : null;
+  const tidy = await switchSlide(false, 160);
+  tidy();
+  if (hold) { hold.cancel(); app.animate({ gridTemplateColumns: [none, full] }, { duration: 200, easing: EASE }); }
+}
 async function closeReader() {
   hideQuote();
   if ($('#viewer').hidden) return;
   rememberTab();
   hidePanel();
   $('#viewer').hidden = true;
+  sideSweep(false);
   // (Where you were, kept now: the reading list's Continue card shows it.)
   if (notePosition.t) savePositions();
   renderPaperTabs();
@@ -857,7 +929,7 @@ function shutReader() {
   } else {
     PTABS.active = -1;
     renderPaperTabs();
-    $('#viewer').hidden = true;
+    if (!$('#viewer').hidden) showStart();
   }
 }
 function unloadDoc() {
@@ -895,33 +967,56 @@ function tabEntry(t) {
   return e && f ? { e, f } : null;
 }
 function saveTabs() {
-  store.set('readerTabs', PTABS.list.map(({ key, fileId, page, scale, top, left }) => ({ key, fileId, page, scale, top, left })));
+  store.set('readerTabs', PTABS.list.map(({ blank, key, fileId, page, scale, top, left }) => (blank ? { blank: true } : { key, fileId, page, scale, top, left })));
   store.set('readerActive', PTABS.active);
 }
 function renderPaperTabs() {
-  if (BYKEY.size) PTABS.list = PTABS.list.filter(t => tabEntry(t));
+  if (BYKEY.size) PTABS.list = PTABS.list.filter(t => t.blank || tabEntry(t));
   if (PTABS.active >= PTABS.list.length) PTABS.active = PTABS.list.length - 1;
   if (PTABS.active < 0 && PTABS.list.length) PTABS.active = 0;
   const nav = $('#vTabs');
   closeTabsMenu();
   nav.innerHTML = PTABS.list.map((t, i) => {
-    const x = tabEntry(t), title = x ? x.e.f.title || x.f.n : t.key;
+    const x = !t.blank && tabEntry(t), title = t.blank ? 'New tab' : x ? x.e.f.title || x.f.n : t.key;
     return `<div class="v-tab" role="tab" aria-selected="${i === PTABS.active}"><button type="button" class="v-tab-go" data-ptab="${i}" title="${esc(title)}">${esc(title)}</button>` +
       `<button type="button" class="v-tab-x" data-ptab-x="${i}" aria-label="Close ${esc(title)}" title="Close"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>`;
   }).join('');
   const n = PTABS.list.length;
   nav.classList.toggle('single', n < 2);
+  $('#viewer').classList.toggle('multi', n >= 2);
+  placePaperTabs();
   // (One paper open: no tabs, so its close button is beside its title.)
-  $('#vTitleX').hidden = n !== 1;
-  $('#readerBtn').hidden = !n;
+  $('#vTitleX').hidden = n !== 1 || $('#viewer').classList.contains('start');
+  // (On a phone, the book only with papers open; wider, Reader always, as
+  // half of the switch beside Library.)
+  $('#readerBtn').hidden = !n && phoneMQ.matches;
+  $('#readerBtn').classList.toggle('none', !n);
   readerMoreShown();
-  $('#readerCt').textContent = n > 1 ? String(n) : '';
+  $('#readerMore').hidden = !n;
+  // (Wider than a phone, the count even for one: it lists them.)
+  $('#readerCt').textContent = n > 1 || (n && !phoneMQ.matches) ? String(n) : '';
+  $('#readerCt').title = n ? 'Your open papers' : '';
+  $('#vReaderCt').textContent = n > 1 || (n && !phoneMQ.matches) ? String(n) : '';
   $('#readerBtn').setAttribute('aria-label', n === 1 ? 'Back to your open paper' : 'Back to your ' + n + ' open papers');
   saveTabs();
   const on = nav.querySelector('[aria-selected="true"]');
   if (on && !$('#viewer').hidden) on.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   tabsMore();
 }
+// Where the paper tabs go: in the reader's bar, in place of the title, when
+// it's wide enough for their titles (a Mac, an iPad on its side); their own
+// row under it when it isn't (an iPad upright, a phone).
+const TABS_IN_BAR = matchMedia('(min-width: 1000px)');
+function placePaperTabs() {
+  const wrap = $('.v-tabs-wrap'), bar = $('#viewer .v-bar'), title = bar && bar.querySelector('.v-title-wrap');
+  if (!wrap || !title) return;
+  const inBar = TABS_IN_BAR.matches;
+  if (inBar && wrap.parentNode !== bar) title.after(wrap);
+  else if (!inBar && wrap.parentNode === bar) bar.after(wrap);
+  $('#viewer').classList.toggle('tabs-in-bar', inBar);
+  (inBar && $('#viewer').classList.contains('multi') ? wrap : title).after($('#vNewTab'));
+}
+TABS_IN_BAR.addEventListener('change', () => { placePaperTabs(); tabsMore(); });
 // The tabs out of sight at each end of the strip, as buttons over its
 // ends: a tap lists them.
 const TABS_OUT = { left: [], right: [] };
@@ -963,8 +1058,8 @@ function tabsMenu(side) {
   m.dataset.side = side;
   m.setAttribute('role', 'menu');
   m.innerHTML = '<div class="menu-head">Open papers ' + (side === 'left' ? 'to the left' : 'to the right') + '</div>' + list.map(i => {
-    const t = PTABS.list[i], x = tabEntry(t), e = x && x.e;
-    const title = x ? e.f.title || x.f.n : t.key;
+    const t = PTABS.list[i], x = !t.blank && tabEntry(t), e = x && x.e;
+    const title = t.blank ? 'New tab' : x ? e.f.title || x.f.n : t.key;
     return `<div class="op-row"><button type="button" role="menuitem" data-tm="${i}"><span class="rc-title">${esc(title)}</span>` +
       (e ? `<span class="rc-sub">${esc(e.authorsShort || '')}${e.f.year ? ' \u00b7 ' + esc(e.f.year) : ''}</span>` : '') + '</button>' +
       `<button type="button" class="op-x" data-tm-x="${i}" aria-label="Close ${esc(title)}" title="Close it">${ICON.x}</button></div>`;
@@ -1002,7 +1097,9 @@ function rememberTab() {
   saveTabs();
 }
 function loadActiveTab() {
-  const t = PTABS.list[PTABS.active], x = t && tabEntry(t);
+  const t = PTABS.list[PTABS.active];
+  if (t && t.blank) { showStart(); return; }
+  const x = t && tabEntry(t);
   if (!x) { if (t) PTABS.list.splice(PTABS.active, 1); renderPaperTabs(); if (!PTABS.list.length) $('#viewer').hidden = true; else loadActiveTab(); return; }
   renderPaperTabs();
   openReader(x.e, x.f, t);
@@ -1022,6 +1119,16 @@ async function switchPaperTab(i) {
 async function closePaperTab(i) {
   const t = PTABS.list[i];
   if (!t) return;
+  // (A new tab, with nothing in it: just gone; the start page stays if it
+  // was the last.)
+  if (t.blank) {
+    const was = i === PTABS.active;
+    PTABS.list.splice(i, 1);
+    if (i < PTABS.active) PTABS.active--;
+    if (was) { PTABS.active = PTABS.list.length ? Math.min(i, PTABS.list.length - 1) : -1; if (PTABS.list.length) loadActiveTab(); else showStart(); }
+    else renderPaperTabs();
+    return;
+  }
   if (V.doc && V.file && V.file.id === t.fileId) {
     if (!keptNote(await saveNow())) return;
     shutReader();
@@ -1036,6 +1143,9 @@ async function closePaperTab(i) {
 function openPaper(entry, file) {
   noteSeen(entry.k);
   let i = PTABS.list.findIndex(t => t.fileId === file.id);
+  // (A new tab in front: the paper goes in it.)
+  const front = PTABS.list[PTABS.active];
+  if (i < 0 && front && front.blank) { i = PTABS.active; PTABS.list[i] = { key: entry.k, fileId: file.id }; }
   if (i < 0) {
     i = PTABS.active >= 0 ? PTABS.active + 1 : PTABS.list.length;
     PTABS.list.splice(i, 0, { key: entry.k, fileId: file.id });
@@ -1043,16 +1153,96 @@ function openPaper(entry, file) {
   switchPaperTab(i);
 }
 function showViewer() {
-  if (!PTABS.list.length) return;
+  if (!PTABS.list.length) { showStart(); return; }
   if (PTABS.active < 0) PTABS.active = 0;
   const t = PTABS.list[PTABS.active];
+  if (t.blank) { showStart(); return; }
   // (Also if it was changed while it was out of sight: made searchable.)
   if (!V.doc || !V.file || V.file.id !== t.fileId || V.stale === V.file.id) { V.stale = null; loadActiveTab(); return; }
+  const fromLibrary = $('#viewer').hidden;
   $('#viewer').hidden = false;
+  if (fromLibrary) sideSweep(true);
   renderPaperTabs();
   refit();
   allRibbons();
 }
+/* ---- the reader with no paper: a start page */
+// As an empty Safari tab: when no paper is open (Reader pressed with none,
+// the last one closed, or + for a new tab), the reader shows the papers
+// closed lately on this device, those read lately on your other devices
+// (where you got to there), and the reading list; one picked opens in
+// this tab, where you were.
+function showStart() {
+  const fromLibrary = $('#viewer').hidden;
+  if (V.doc) { rememberTab(); unloadDoc(); }
+  hideQuote();
+  $('#viewer').classList.add('start');
+  $('#vTitle').textContent = 'New tab';
+  $('#vPage').textContent = '';
+  $('#vStart').hidden = false;
+  $('#viewer').hidden = false;
+  if (fromLibrary) sideSweep(true);
+  renderPaperTabs();
+  renderStart();
+}
+function renderStart() {
+  const box = $('#vStart');
+  const open = new Set(PTABS.list.map(t => t.fileId).filter(Boolean));
+  const fileOf = (e, id) => (e.files || []).find(f => f.id === id);
+  const card = (e, f, line, extra, page) => `<button type="button" class="vs-card" data-vs-k="${esc(e.k)}" data-vs-f="${esc(f.id)}"${page ? ` data-vs-p="${page}"` : ''}>` +
+    opThumb(f.id) + `<span class="vs-tx"><span class="vs-t">${esc(e.f.title || f.n)}</span><span class="vs-m">${esc([e.authorsShort, e.f.year].filter(Boolean).join(' \u00b7 '))}</span>` +
+    `<span class="vs-w">${extra || ''}${esc(line)}</span>` +
+    (PROGRESS[e.k] && PROGRESS[e.k].p ? `<span class="vs-prog"><b style="width:${Math.min(100, PROGRESS[e.k].p)}%"></b></span>` : '') + `</span></button>`;
+  const pageOf = id => (POS[id] && POS[id].page ? 'p. ' + POS[id].page : '');
+  // Closed lately on this device.
+  const recent = RECENT.closed.filter(([k, id]) => !open.has(id) && BYKEY.get(k) && fileOf(BYKEY.get(k), id)).slice(0, 6)
+    .map(([k, id, t]) => card(BYKEY.get(k), fileOf(BYKEY.get(k), id), [pageOf(id), ago(t)].filter(Boolean).join(' · ')));
+  // Read lately on another device.
+  let files = null;
+  const where = id => {
+    if (!files) { files = new Map(); ENTRIES.forEach(e => (e.files || []).forEach(f => { if (f.id) files.set(f.id, { e, f }); })); }
+    return files.get(id);
+  };
+  const others = SYNC.position ? Object.entries(POS).filter(([id, x]) => x.dev !== DEVICE && x.page && !open.has(id) && where(id))
+    .sort((a, b) => b[1].at - a[1].at).slice(0, 6)
+    .map(([id, x]) => { const w = where(id); return card(w.e, w.f, 'p. ' + x.page + ' · ' + ago(Math.round(x.at / 1000)), x.name ? `<span class="vs-dev">${esc(x.name)}</span>` : '', x.page); }) : [];
+  // The reading list: up next, then later.
+  const rl = readingOrder().map(x => ({ x, e: BYKEY.get(x.key) })).filter(({ e }) => e && readablePdfs(e).length).slice(0, 6)
+    .map(({ x, e }) => card(e, readablePdfs(e)[0], '', `<span class="vs-tag">${x.list === 'next' ? 'Up next' : 'Later'}</span>`));
+  const col = (title, items, more) => `<section class="vs-col"><h3>${title}${more || ''}</h3>${items.length ? items.join('') : '<p class="vs-none">None yet.</p>'}</section>`;
+  // (Below the reader's bar, which lies over the page.)
+  box.style.paddingTop = ($('#vTop').getBoundingClientRect().height + 24) + 'px';
+  box.innerHTML = col('Recently opened', recent) + col('On your other devices', others) +
+    col('Reading list', rl, '<button type="button" class="linkish" data-vs-rl>Open the list</button>');
+  opThumbs(box);
+}
+$('#vStart').addEventListener('click', async ev => {
+  if (ev.target.closest('[data-vs-rl]')) { await closeReader(); setGroup('toread'); return; }
+  const c = ev.target.closest('[data-vs-k]');
+  if (!c) return;
+  const e = BYKEY.get(c.dataset.vsK), f = e && (e.files || []).find(x => x.id === c.dataset.vsF);
+  if (!e || !f) return;
+  // (From another device: opened at the page you got to there.)
+  if (c.dataset.vsP) {
+    const i = PTABS.list.findIndex(t => t.fileId === f.id), front = PTABS.list[PTABS.active];
+    if (i < 0 && !(front && front.blank)) PTABS.list.splice(PTABS.active >= 0 ? PTABS.active + 1 : PTABS.list.length, 0, { key: e.k, fileId: f.id, page: +c.dataset.vsP });
+    else if (i < 0) PTABS.list[PTABS.active] = { key: e.k, fileId: f.id, page: +c.dataset.vsP };
+  }
+  openPaper(e, f);
+});
+// + : a new tab, at the start page; the paper in front kept as it was.
+$('#vNewTab').addEventListener('click', async () => {
+  if (V.doc) {
+    if (!keptNote(await saveNow())) return;
+    rememberTab();
+    unloadDoc();
+  }
+  const i = PTABS.active >= 0 ? PTABS.active + 1 : PTABS.list.length;
+  PTABS.list.splice(i, 0, { blank: true });
+  PTABS.active = i;
+  showStart();
+});
+
 // (Put in another order by dragging: see tabDrag. The front tab stays in
 // front.)
 tabDrag($('#vTabs'), '.v-tab', (from, to) => {
@@ -1067,9 +1257,18 @@ $('#vTabs').addEventListener('click', ev => {
   const g = ev.target.closest('[data-ptab]');
   if (g && +g.dataset.ptab !== PTABS.active) switchPaperTab(+g.dataset.ptab);
 });
-$('#readerBtn').addEventListener('click', () => {
+$('#readerBtn').addEventListener('click', ev => {
   // (Not after a long press, which listed them.)
   if (RB.long) { RB.long = false; return; }
+  // (Wider than a phone, its count lists the open papers, as the \u25be does
+  // on a phone.)
+  if (ev.target.closest('#readerCt') && !phoneMQ.matches && PTABS.list.length) {
+    clearTimeout(RB.t);
+    if ($('#openMenu') && !RB.hov) { closeOpenMenu(); return; }
+    RB.hov = false;
+    if (!$('#openMenu')) openPapersMenu(ev.detail === 0);
+    return;
+  }
   closeOpenMenu();
   showViewer();
 });
@@ -4169,7 +4368,7 @@ async function showQuote() {
     QUOTE.el.className = 'quote-bar';
     QUOTE.el.innerHTML = `<button type="button" class="quote-go" title="Copy the passage as a quotation, with its citation (${esc(keyHint('quote'))})">${ICON.quote}<span>Quote</span></button>` +
       `<label class="quote-pg"><span>p.</span><input type="text" inputmode="numeric" autocomplete="off" aria-label="Page" readonly></label>` +
-      `<button type="button" class="quote-note" title="Add to your notes, as a quotation with its page; and highlight it">${NOTE_ICON}<span>Add to notes</span></button>`;
+      `<button type="button" class="quote-note" title="Quote in your notes, and highlight">${NOTE_ICON}<span>Add to notes</span></button>`;
     QUOTE.el.querySelector('.quote-go').addEventListener('click', quoteCopy);
     QUOTE.el.querySelector('.quote-note').addEventListener('click', rnAddQuote);
     // (Pressing in the bar keeps the selection.) The page box can be
@@ -4196,7 +4395,7 @@ async function showQuote() {
   inp.value = page;
   inp.size = Math.max(3, page.length + 1);
   QUOTE.el.classList.toggle('unsure', !sure);
-  QUOTE.el.querySelector('.quote-pg').title = sure ? 'The journal’s page (click to change it)' : 'A guess at the journal’s page: check it, and change it if need be';
+  QUOTE.el.querySelector('.quote-pg').title = sure ? 'The journal’s page (click to change it)' : 'Guessed page: check it';
   QUOTE.el.hidden = false;
   // Where the selecting ended: the point lifted from (a drag's end), else
   // the end of the selection (made with the keys, say). Just below it, so
@@ -5096,7 +5295,7 @@ async function showThumbs() {
   // Every page turned at once (a paper scanned sideways).
   const head = document.createElement('div');
   head.className = 'v-thumbs-head';
-  head.innerHTML = `<span>All pages</span><button type="button" data-split-all aria-label="Split all wide pages in two" title="Split all wide pages in two (two book pages scanned side by side)"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="1.5"/><path d="M12 2.5v19" stroke-dasharray="2.2 2"/></svg></button><button type="button" data-rot-all="-90" aria-label="Rotate all pages left" title="Rotate all pages left"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 9.5A8 8 0 1 1 6 16.5"/><path d="M4 4.5v5h5"/></svg></button><button type="button" data-rot-all="90" aria-label="Rotate all pages right" title="Rotate all pages right"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 9.5A8 8 0 1 0 18 16.5"/><path d="M20 4.5v5h-5"/></svg></button>`;
+  head.innerHTML = `<span>All pages</span><button type="button" data-split-all aria-label="Split all wide pages in two" title="Split two-page scans"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="1.5"/><path d="M12 2.5v19" stroke-dasharray="2.2 2"/></svg></button><button type="button" data-rot-all="-90" aria-label="Rotate all pages left" title="Rotate all pages left"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 9.5A8 8 0 1 1 6 16.5"/><path d="M4 4.5v5h5"/></svg></button><button type="button" data-rot-all="90" aria-label="Rotate all pages right" title="Rotate all pages right"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 9.5A8 8 0 1 0 18 16.5"/><path d="M20 4.5v5h-5"/></svg></button>`;
   list.appendChild(head);
   for (let n = 1; n <= doc.numPages; n++) {
     const box = document.createElement('div');
@@ -5332,7 +5531,7 @@ function marksSummary(withRef) {
 // is sent anywhere by LibLande: it's copied, for you to paste. (A scan
 // without text says so; a very long PDF is cut short, and says where.)
 const AI_MAX = 600000;
-const AI_BTN = `<button type="button" class="btn" data-ai-copy title="A prompt to paste into Claude: summarize this paper, weighing your highlights and notes (with its citation and text)">${ICON.ai}<span>Copy for AI</span></button>`;
+const AI_BTN = `<button type="button" class="btn" data-ai-copy title="Copy a prompt for Claude: this paper, with your highlights">${ICON.ai}<span>Copy for AI</span></button>`;
 async function aiPrompt(entry, doc, marks, pp) {
   const labels = await doc.getPageLabels().catch(() => null), useL = labels && labels.some((l, i) => l !== String(i + 1));
   const name = n => (pp && pp.get(n)) || (useL && labels[n - 1]) || String(n);
@@ -5474,7 +5673,7 @@ async function showOutline() {
     return;
   }
   // None: ways to make one.
-  body.innerHTML = `<p class="v-side-note">${o.none || 'This PDF has no outline (a table of contents built into the file), and no Contents page was found in its first pages. Many journal articles have neither.'}</p>` +
+  body.innerHTML = `<p class="v-side-note">${o.none || 'No outline, and no Contents page in the first pages.'}</p>` +
     `<div class="v-ol-make"><span>Make one:</span>` +
     `<button type="button" class="btn" data-ol-make="toc" title="The Contents page you\u2019re on, or else the one LibLande finds">From the Contents</button>` +
     `<button type="button" class="btn" data-ol-make="heads" title="Lines in larger type than the text">From the headings</button>` +
@@ -6176,8 +6375,8 @@ $('#vZoomOut').addEventListener('click', () => { if (V.doc) V.viewer.decreaseSca
 const FITS = [['page-fit', 'the whole page'], ['page-width', 'the page\u2019s width'], ['page-actual', 'actual size']];
 function zoomLabel(preset) {
   const b = $('#vZoomLevel'), i = FITS.findIndex(([v]) => v === preset), next = FITS[(i + 1) % FITS.length];
-  b.title = 'Fit ' + next[1] + (i >= 0 ? ' (now: ' + FITS[i][1] + ')' : '');
-  b.setAttribute('aria-label', 'Zoom ' + b.textContent + ': tap to fit ' + next[1]);
+  b.title = 'Fit ' + next[1];
+  b.setAttribute('aria-label', 'Zoom ' + b.textContent + ', fit ' + next[1]);
 }
 $('#vZoomLevel').addEventListener('click', () => {
   if (!V.doc) return;

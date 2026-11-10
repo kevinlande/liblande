@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/save.js'] = '2026-11-10.06';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/save.js'] = '2026-11-10.07';
 /* ---- saving markup */
 // A new mark isn't in the PDF's annotations until PDF.js commits it (on a
 // change of tool), so anything done with a tool counts as possibly
@@ -290,7 +290,7 @@ async function uploadKept(back) {
     if (KEPT_UP.again) setTimeout(uploadKept, 500);
   }
   if (done) toast('Marks made offline on ' + done + ' paper' + (done === 1 ? '' : 's') + ' saved to Google Drive', 4000);
-  else if (others) toast('Marks made offline couldn\u2019t be saved to Google Drive yet. They\u2019re kept on this device; opening the paper saves them.', 6000);
+  else if (others) toast('Offline marks not saved yet; open the paper to save them.', 6000);
 }
 window.addEventListener('online', () => setTimeout(() => uploadKept(true), 1500));
 // Upload a changed PDF in place of the one on Drive, once it's checked:
@@ -396,7 +396,7 @@ const ROT = { file: null, want: new Map(), timer: 0, busy: false };
 const rotatePage = (n, by) => rotatePages([n], by);
 function rotatePages(list, by) {
   if (!V.doc || !V.file || !V.viewer) return;
-  if (!gs || !navigator.onLine) { toast('Turning pages needs an internet connection, to save them to Google Drive.', 3500); return; }
+  if (!gs || !navigator.onLine) { toast('Turning pages needs a connection.', 3500); return; }
   if (ROT.file && ROT.file.id !== V.file.id) ROT.want.clear();
   ROT.file = V.file;
   for (const n of list) {
