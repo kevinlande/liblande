@@ -129,7 +129,7 @@
   };
   // Every citation's text and the References list, written where they've
   // changed. (After an insert, and when the panel opens.)
-  async function refreshDocument() {
+  async function refreshDocument(force) {
     if (!S.inWord || !S.entries.length) return;
     await Word.run(async ctx => {
       const ccs = ctx.document.contentControls;
@@ -148,16 +148,44 @@
       // (The list rewritten only when what it says has changed: compared
       // with its text in the document itself.)
       const flat = t => String(t || '').replace(/\s+/g, ' ').trim();
-      if (list && flat(list.text) !== flat(out.refs.length ? out.refs.map(r => r.text).join(' ') : '(No works cited yet.)')) list.insertHtml(refsHtml(out.refs), 'Replace');
       S.hasRefs = !!list;
       await ctx.sync();
+      if (list && (force || flat(list.text) !== flat(out.refs.length ? out.refs.map(r => r.text).join(' ') : NO_REFS))) await writeRefs(ctx, list, out.refs);
     });
     paintRefs();
     paintResults();
   }
-  const refsHtml = refs => refs.length
-    ? refs.map(r => '<p style="margin:0 0 0 0.5in;text-indent:-0.5in">' + r.html + '</p>').join('')
-    : '<p>(No works cited yet.)</p>';
+  // The References list written into its content control as text, in the
+  // document's own font (as typed there), titles in italics, each entry
+  // with APA's half-inch hanging indent.
+  const NO_REFS = '(No works cited yet.)';
+  async function writeRefs(ctx, cc, refs) {
+    // (The font of the text before the list, or else the document's first
+    // paragraph: set on every run, since an emptied list keeps whatever font
+    // it had, as Word's own default from an earlier version of it.)
+    const before = cc.paragraphs.getFirst().getPreviousOrNullObject();
+    before.load('font/name,font/size,isNullObject');
+    const first = ctx.document.body.paragraphs.getFirst();
+    first.load('font/name,font/size');
+    await ctx.sync();
+    const f = !before.isNullObject && before.font.name ? before.font : first.font;
+    const style = r => { r.font.italic = false; if (f.name) r.font.name = f.name; if (f.size) r.font.size = f.size; return r; };
+    cc.clear();
+    await ctx.sync();
+    if (!refs.length) style(cc.insertText(NO_REFS, 'End'));
+    refs.forEach((r, i) => {
+      if (i) style(cc.insertText('\n', 'End'));
+      const parts = r.parts.map(p => ({ t: p.t.replace(/\s+/g, ' '), i: p.i }));
+      if (parts.length) { parts[0].t = parts[0].t.replace(/^ /, ''); parts[parts.length - 1].t = parts[parts.length - 1].t.replace(/ $/, ''); }
+      parts.forEach(p => { if (p.t) style(cc.insertText(p.t, 'End')).font.italic = !!p.i; });
+    });
+    await ctx.sync();
+    const paras = cc.paragraphs;
+    paras.load('items');
+    await ctx.sync();
+    paras.items.forEach(p => { p.leftIndent = 36; p.firstLineIndent = -36; });
+    await ctx.sync();
+  }
 
   async function insertCitation() {
     const c = currentCite();
@@ -209,13 +237,18 @@
         await ctx.sync();
         if (ccs.items.length) { ccs.items[0].select('Start'); await ctx.sync(); return; }
         const out = LLWord.render(presentCites(), S.byKey);
-        const html = refsHtml(out.refs);
-        const r = ctx.document.getSelection().insertHtml(html, 'Replace');
-        const cc = r.insertContentControl();
+        // (Its own paragraph: the one the cursor is in, if empty, or a new
+        // one after it.)
+        const para = ctx.document.getSelection().paragraphs.getFirst();
+        para.load('text');
+        await ctx.sync();
+        const target = para.text.trim() ? para.insertParagraph('', 'After') : para;
+        const cc = target.getRange('Whole').insertContentControl();
         cc.tag = 'LL:refs';
         cc.title = 'LibLande References';
         cc.appearance = 'BoundingBox';
         await ctx.sync();
+        await writeRefs(ctx, cc, out.refs);
       });
       S.hasRefs = true;
       paintRefs();
@@ -488,6 +521,20 @@
     });
     document.addEventListener('click', ev => { if (!$('menu').hidden && !$('menu').contains(ev.target)) { $('menu').hidden = true; $('acct').setAttribute('aria-expanded', 'false'); } });
     $('mReload').addEventListener('click', () => { $('menu').hidden = true; reload(true); });
+    $('refresh').addEventListener('click', async () => {
+      const b = $('refresh');
+      if (b.classList.contains('busy')) return;
+      b.classList.add('busy');
+      hideErr('citeErr'); hideErr('refsErr');
+      try {
+        if (tokenOk() && navigator.onLine) { try { await fetchLibrary(false); } catch (e) { /* the copy here will do */ } }
+        readSettings();
+        await refreshDocument(true);
+        search();
+        readZotero();
+      } catch (e) { showErr($('pRefs').hidden ? 'citeErr' : 'refsErr', 'Couldn\u2019t refresh: ' + wordError(e)); }
+      b.classList.remove('busy');
+    });
     $('mOpen').addEventListener('click', () => { $('menu').hidden = true; openLibLande(); });
     $('mOut').addEventListener('click', async () => {
       $('menu').hidden = true;

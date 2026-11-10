@@ -33,13 +33,47 @@
   // Year letters (2011a, 2011b) for works with the same authors' surnames
   // and year, in the order of their titles; and the authors' short form for each
   // work, with more names where two "et al." forms would read the same.
+  // First authors with the same surname: one person if their initials fit
+  // together ("E. J." and "E."), different people if they don't ("E." and
+  // "A."). Different people get their initials in every citation, as APA
+  // asks: (E. J. Green, 2024; A. Green, 2024). Returns, by work, which
+  // person its first author is, and the initials it's cited with.
+  function people(entries) {
+    const initials = n => String((n && n[1]) || '').split(/[\s.\-]+/).filter(Boolean).map(w => w[0].toUpperCase());
+    const fits = (a, b) => { const n = Math.min(a.length, b.length); return a.slice(0, n).join() === b.slice(0, n).join(); };
+    const bySur = new Map();
+    entries.forEach(e => {
+      const n = NAMES(e)[0];
+      if (!n) return;
+      const sur = norm(n[0]);
+      if (!bySur.has(sur)) bySur.set(sur, []);
+      bySur.get(sur).push({ e, ini: initials(n) });
+    });
+    const who = new Map(), shown = new Map();
+    bySur.forEach((list, sur) => {
+      const groups = [];
+      // (The fullest initials first, so "E." joins "E. J." rather than
+      // starting a person of its own.)
+      list.slice().sort((a, b) => b.ini.length - a.ini.length).forEach(x => {
+        const g = groups.find(g => fits(g.ini, x.ini));
+        if (g) g.items.push(x); else groups.push({ ini: x.ini, items: [x] });
+      });
+      groups.forEach((g, i) => g.items.forEach(x => {
+        who.set(x.e.k, sur + ':' + i);
+        if (groups.length > 1 && g.ini.length) shown.set(x.e.k, g.ini.map(c => c + '.').join(' '));
+      }));
+    });
+    return { who, shown };
+  }
+
   function plan(entries) {
+    const P0 = people(entries);
     const groups = new Map();
     entries.forEach(e => {
       if (!NAMES(e).length) return;
-      // (By surnames, as the citations read: "Green, E. J." and "Green, E."
-      // in two entries are one author to a reader.)
-      const g = surKey(e) + '#' + baseYear(e);
+      // (By the people, as the citations read: "Green, E. J." and "Green,
+      // E." in two entries are one author; "Green, A." another.)
+      const g = P0.who.get(e.k) + '|' + NAMES(e).slice(1).map(n => norm(n[0])).join('|') + '#' + baseYear(e);
       if (!groups.has(g)) groups.set(g, []);
       groups.get(g).push(e);
     });
@@ -79,19 +113,21 @@
     }
     const names = new Map();
     entries.forEach(e => { if (NAMES(e).length) names.set(e.k, shortOf(e, used.get(e.k))); });
-    return { letter, names };
+    return { letter, names, initials: P0.shown };
   }
 
   // The authors as they read: "Smith & Lee" in parentheses, "Smith and
   // Lee" in a sentence; "Smith, Lee, & Park" with more names written out.
   function who(e, P, narr) {
-    const s = P.names.get(e.k);
+    let s = P.names.get(e.k);
     if (!s) {
       // (No authors or editors: the title's first words, as apaInText.)
       const t = apaInText(e).text;
       return t.slice(1, t.lastIndexOf(','));
     }
     const amp = narr ? 'and' : '&';
+    // (A first author who shares a surname with another: with initials.)
+    if (P.initials && P.initials.has(e.k)) s = [P.initials.get(e.k) + ' ' + s[0]].concat(s.slice(1));
     const etal = s[s.length - 1] === 'et al.';
     const L = etal ? s.slice(0, -1) : s;
     if (etal) return L.length === 1 ? L[0] + ' et al.' : L.join(', ') + ', et al.';
@@ -148,7 +184,7 @@
         const y = yearOf(e, P);
         const shown = y === baseYear(e) ? e : Object.assign({}, e, { f: Object.assign({}, e.f, { year: y.replace(/^\d{4}\//, '') }) });
         const r = apaCitationOf(shown);
-        return { k: e.k, text: r.text, html: r.html };
+        return { k: e.k, text: r.text, html: r.html, parts: r.parts };
       });
     return { texts, refs, missing, letters: P.letter };
   }

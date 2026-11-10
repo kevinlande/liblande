@@ -15,9 +15,15 @@
   [hidden] { display: none !important; }
   .ph { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); background: var(--panel); position: relative; flex: none; }
   .ph b { font-size: 14px; }
+  .logo { border-radius: 5px; flex: none; }
+  .hbtn { margin-left: auto; width: 28px; height: 28px; border: none; background: none; border-radius: 7px; cursor: pointer; display: grid; place-items: center; color: var(--muted); }
+  .hbtn:hover { background: var(--row); }
+  .hbtn svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .hbtn.busy svg { animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
   .pill { margin-left: auto; font-size: 11px; padding: 1px 7px; border-radius: 9px; background: var(--warn-soft); color: var(--warn); }
   .acct { margin-left: auto; width: 26px; height: 26px; border-radius: 50%; border: none; background: var(--soft); color: var(--accent); font-weight: 600; font-size: 12px; cursor: pointer; }
-  .pill:not([hidden]) + .acct { margin-left: 6px; }
+  .pill:not([hidden]) + .hbtn, .hbtn + .acct { margin-left: 4px; }
   .menu { position: absolute; right: 10px; top: 42px; min-width: 210px; background: var(--bg); border: 1px solid var(--line); border-radius: 9px; box-shadow: 0 8px 24px #0004; padding: 6px 0; z-index: 5; }
   .menu button { display: block; width: 100%; text-align: left; background: none; border: none; padding: 6px 12px; cursor: pointer; }
   .menu button:hover { background: var(--row); }
@@ -87,8 +93,9 @@
 </style>
 
 <header class="ph">
-  <b>LibLande</b>
+  <img class="logo" src="icons/icon-32.png" alt="" width="20" height="20"><b>LibLande</b>
   <span class="pill" id="offline" hidden>Offline</span>
+  <button class="hbtn" id="refresh" type="button" title="Refresh: your library, and this document’s citations and References" aria-label="Refresh"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/></svg></button>
   <button class="acct" id="acct" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Account" hidden>?</button>
   <div class="menu" id="menu" role="menu" hidden>
     <div class="who" id="menuWho"></div>
@@ -160,6 +167,6 @@ const safeUrl = u => /^https?:[/][/]/i.test(u) ? u : null;
 const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[‐-―]/g, '-');
 const cmpStr = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 </script>
-<script src="../app/apa.js"></script>
-<script src="engine.js"></script>
-<script src="panel.js"></script>
+<script src="../app/apa.js?v=2026-11-09.12"></script>
+<script src="engine.js?v=2026-11-09.12"></script>
+<script src="panel.js?v=2026-11-09.12"></script>
