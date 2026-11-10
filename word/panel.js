@@ -320,73 +320,139 @@
     $('zConvert').textContent = 'Convert ' + ready + ' to LibLande';
   }
 
-  // Each Zotero citation that can be made LibLande's: its field selected
-  // and replaced by the citation, as a LibLande content control; Zotero's
-  // bibliography replaced by the References list. (The first is checked
-  // before the rest: if its field is still there, Word replaced only its
-  // text, and nothing more is done.)
+  // Zotero's citations made LibLande's, a paragraph at a time: the
+  // paragraph's Office Open XML read, each Zotero field in it (begin,
+  // instruction, result, end) swapped for a LibLande content control holding
+  // the citation in the result's own formatting, and the paragraph put back.
+  // (Selecting a field and typing over it, Word on the Mac refused.)
+  // Zotero's bibliography, spanning paragraphs, is deleted as a field, with
+  // the References list put where it began.
+  const W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+  function swapFields(xml, M, made) {
+    const doc = new DOMParser().parseFromString(xml, 'application/xml');
+    const el = (name, attrs) => { const e = doc.createElementNS(W_NS, 'w:' + name); Object.entries(attrs || {}).forEach(([k, v]) => e.setAttributeNS(W_NS, 'w:' + k, v)); return e; };
+    let swapped = 0;
+    [...doc.getElementsByTagNameNS(W_NS, 'p')].forEach(p => {
+      const kids = [...p.childNodes];
+      let i = 0;
+      while (i < kids.length) {
+        const n = kids[i];
+        const fc = n.nodeType === 1 && n.localName === 'r' && n.getElementsByTagNameNS(W_NS, 'fldChar')[0];
+        if (!fc || fc.getAttributeNS(W_NS, 'fldCharType') !== 'begin') { i++; continue; }
+        // (Its runs, to the matching end; nested fields counted.)
+        let depth = 0, j = i, code = '', resultRun = null, phase = 'code';
+        for (; j < kids.length; j++) {
+          const k = kids[j];
+          if (k.nodeType !== 1) continue;
+          const c = k.getElementsByTagNameNS(W_NS, 'fldChar')[0];
+          const t = c && c.getAttributeNS(W_NS, 'fldCharType');
+          if (t === 'begin') depth++;
+          if (t === 'separate' && depth === 1) phase = 'result';
+          if (t === 'end' && --depth === 0) break;
+          if (phase === 'code') [...k.getElementsByTagNameNS(W_NS, 'instrText')].forEach(x => { code += x.textContent; });
+          else if (!resultRun && k.localName === 'r' && k.getElementsByTagNameNS(W_NS, 't')[0]) resultRun = k;
+        }
+        if (j >= kids.length || !/ZOTERO_ITEM/.test(code)) { i = j + 1; continue; }
+        const z = zoteroCite(code, M);
+        if (!z.cite) { i = j + 1; continue; }
+        const id = newId();
+        made[id] = z.cite;
+        const text = LLWord.render(Object.assign({}, presentCites(), made), S.byKey).texts[id];
+        const sdt = el('sdt'), pr = el('sdtPr'), content = el('sdtContent'), run = el('r'), t = el('t');
+        pr.appendChild(el('alias', { val: 'LibLande' }));
+        pr.appendChild(el('tag', { val: 'LL:' + id }));
+        sdt.appendChild(pr);
+        const rPr = resultRun && resultRun.getElementsByTagNameNS(W_NS, 'rPr')[0];
+        if (rPr) run.appendChild(rPr.cloneNode(true));
+        t.setAttributeNS('http://www.w3.org/XML/1998/namespace', 'xml:space', 'preserve');
+        t.textContent = text;
+        run.appendChild(t);
+        content.appendChild(run);
+        sdt.appendChild(content);
+        p.insertBefore(sdt, kids[i]);
+        for (let x = i; x <= j; x++) if (kids[x].parentNode === p) p.removeChild(kids[x]);
+        swapped++;
+        i = j + 1;
+      }
+    });
+    return { xml: swapped ? new XMLSerializer().serializeToString(doc) : null, swapped };
+  }
   async function convertZotero() {
     hideErr('refsErr');
     const b = $('zConvert');
     b.disabled = true;
     const M = zoteroMatcher();
-    let done = 0, kept = 0, bibl = false;
+    let done = 0, step = 'reading Zotero’s citations', bibl = false, keepBib = false;
+    const zCount = async ctx => { const f = ctx.document.body.fields; f.load('items/code'); await ctx.sync(); return f.items.filter(x => /ZOTERO_ITEM/.test(x.code || '')); };
     try {
       await Word.run(async ctx => {
-        const fields = ctx.document.body.fields;
-        fields.load('items/code');
-        await ctx.sync();
-        // (From the end back, so what's replaced doesn't move what's still to
-        // come; and Zotero's bibliography kept if any citation stays Zotero's,
-        // as LibLande's list wouldn't have its works.)
-        const zf = fields.items.filter(f => /ZOTERO_(ITEM|BIBL)/.test(f.code || '')).reverse();
-        const keepBib = zf.some(f => /ZOTERO_ITEM/.test(f.code) && !zoteroCite(f.code, M).cite);
-        const count = async () => { const f = ctx.document.body.fields; f.load('items/code'); await ctx.sync(); return f.items.filter(x => /ZOTERO_(ITEM|BIBL)/.test(x.code || '')).length; };
-        const before = zf.length;
-        let checked = false;
-        for (const f of zf) {
-          const isBib = /ZOTERO_BIBL/.test(f.code);
-          const z = isBib ? null : zoteroCite(f.code, M);
-          if (!isBib && !z.cite) { kept++; continue; }
-          if (isBib && keepBib) continue;
-          f.select();
+        let left = await zCount(ctx);
+        keepBib = left.some(f => !zoteroCite(f.code, M).cite);
+        // (A field whose paragraph gave nothing to swap, as one spanning
+        // paragraphs: passed over.)
+        const skip = new Set();
+        // (A paragraph at a time, from the end back, until none is left
+        // that can be converted.)
+        for (let guard = 0; guard < 500; guard++) {
+          const f = left.slice().reverse().find(x => zoteroCite(x.code, M).cite && !skip.has(x.code));
+          if (!f) break;
+          step = 'finding the citation’s paragraph';
+          const para = f.result.paragraphs.getFirst();
+          const ox = para.getOoxml();
           await ctx.sync();
-          const sel = ctx.document.getSelection();
-          if (isBib) {
-            const para = sel.insertParagraph('', 'Before');
-            sel.insertText('', 'Replace');
-            const cc = para.getRange('Whole').insertContentControl();
+          const made = {};
+          const out = swapFields(ox.value, M, made);
+          if (!out.xml) { skip.add(f.code); continue; }
+          step = 'putting the paragraph back';
+          // (Word can add an empty paragraph after one replaced this way:
+          // counted before and after, and taken out.)
+          const countParas = async () => { const ps = ctx.document.body.paragraphs; ps.load('items/text'); await ctx.sync(); return ps.items.length; };
+          const n0 = await countParas();
+          const placed = para.insertOoxml(out.xml, 'Replace');
+          await ctx.sync();
+          if ((await countParas()) > n0) {
+            const extra = placed.paragraphs.getLast().getNextOrNullObject();
+            extra.load('text');
+            await ctx.sync();
+            if (!extra.isNullObject && !extra.text.trim()) { extra.delete(); await ctx.sync(); }
+          }
+          Object.assign(S.cites, made);
+          if (S.present) S.present.push(...Object.keys(made));
+          const now = await zCount(ctx);
+          if (now.length >= left.length) throw new Error('Word put the paragraph back with Zotero’s field still in it.');
+          done += left.length - now.length;
+          left = now;
+        }
+        if (!keepBib) {
+          step = 'replacing Zotero’s bibliography';
+          const all = ctx.document.body.fields;
+          all.load('items/code');
+          await ctx.sync();
+          const bib = all.items.find(x => /ZOTERO_BIBL/.test(x.code || ''));
+          if (bib) {
+            const anchor = bib.result.paragraphs.getFirst().insertParagraph('', 'Before');
+            bib.delete();
+            const cc = anchor.getRange('Whole').insertContentControl();
             cc.tag = 'LL:refs'; cc.title = 'LibLande References'; cc.appearance = 'BoundingBox';
             await ctx.sync();
             bibl = true;
-          } else {
-            const id = newId();
-            const r = sel.insertText(LLWord.render(Object.assign({}, presentCites(), { [id]: z.cite }), S.byKey).texts[id], 'Replace');
-            const cc = r.insertContentControl();
-            cc.tag = 'LL:' + id; cc.title = 'LibLande'; cc.appearance = 'BoundingBox';
-            S.cites[id] = z.cite;
-            if (S.present) S.present.push(id);
-            await ctx.sync();
           }
-          // (The first: was the field itself replaced?)
-          if (!checked) {
-            checked = true;
-            if ((await count()) >= before) throw new Error('Word changed the citation\u2019s text but kept Zotero\u2019s field, so nothing more was converted. (Undo with \u2318Z.)');
-          }
-          if (!isBib) done++;
         }
       });
     } catch (e) {
       await saveSettings();
-      showErr('refsErr', (done ? 'Converted ' + done + ', then stopped: ' : 'Couldn\u2019t convert them: ') + wordError(e));
+      const m = (e && (e.message || e.code)) || String(e);
+      showErr('refsErr', (done ? 'Converted ' + done + ', then stopped' : 'Couldn’t convert them') + ' (while ' + step + '): ' + m + (done ? ' Undo with ⌘Z if you like.' : ''));
       b.disabled = false;
+      try { await refreshDocument(true); } catch (x) { /* Refresh will */ }
+      readZotero();
       return;
     }
     await saveSettings();
     b.disabled = false;
     try { await refreshDocument(true); } catch (e) { /* Refresh will */ }
     readZotero();
-    showErr('refsErr', 'Converted ' + done + ' citation' + (done === 1 ? '' : 's') + (bibl ? ' and the bibliography' : '') + (kept ? '; ' + kept + ' left as Zotero\u2019s' : '') + '.');
+    showErr('refsErr', 'Converted ' + done + ' citation' + (done === 1 ? '' : 's') + (bibl ? ' and the bibliography' : keepBib ? '; the bibliography stays Zotero’s, as some citations do' : '') + '.');
     $('refsErr').classList.add('ok');
   }
 
@@ -677,5 +743,5 @@
     });
   } else start();
   // (For testing in a browser.)
-  window.LLPanel = { S, useLibrary, search, toggle, paintChosen, view, zoteroCite, zoteroMatcher };
+  window.LLPanel = { S, useLibrary, search, toggle, paintChosen, view, zoteroCite, zoteroMatcher, swapFields };
 })();
