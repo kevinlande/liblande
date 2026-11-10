@@ -429,10 +429,22 @@
   const SEL = { card: null };
   function noticeSelection(w) {
     if (S.editing || S.chosen.length || !S.entries.length) { hideSelCard(); return; }
-    const end = w.at + w.text.length;
-    // (The cursor inside it, not just before or after it, as it is after
-    // one just linked; or a selection within it, or of all of it.)
-    const typed = LLWord.findTyped(w.para).find(t => w.text ? t.at <= w.at && end <= t.at + t.text.length : t.at < w.at && w.at < t.at + t.text.length);
+    // (The selection without the spaces and stops a double-click or a drag
+    // takes in at its ends.)
+    const sel = w.text.trim().replace(/[.,;:]+$/, '');
+    const s0 = w.at + (w.text.length - w.text.trimStart().length), s1 = s0 + sel.length;
+    const found = LLWord.findTyped(w.para);
+    // (The cursor inside one, not just before or after it, as it is after
+    // one just linked; a selection within one, or of it all; or one
+    // citation, and some words around it.)
+    let typed = sel ? found.find(t => t.at <= s0 && s1 <= t.at + t.text.length) : found.find(t => t.at < w.at && w.at < t.at + t.text.length);
+    if (!typed && sel) { const inside = found.filter(t => s0 <= t.at && t.at + t.text.length <= s1); if (inside.length === 1) typed = inside[0]; }
+    // (A citation selected without its parentheses, "Palmer, 1977": as one,
+    // linked as the words selected.)
+    if (!typed && sel && !/[()]/.test(sel)) {
+      const as = LLWord.findTyped('(' + sel + ')');
+      if (as.length === 1 && as[0].text.length === sel.length + 2) typed = { text: sel, at: s0, form: 'paren', parts: as[0].parts };
+    }
     if (typed) {
       // (The same one as shown already: left as it is, choices and all.)
       if (SEL.card && SEL.card.kind === 'typed' && SEL.card.t.text === typed.text && SEL.card.para === w.para) return;
@@ -445,7 +457,7 @@
     } else if (w.text.trim().length >= 3 && w.text.trim().length <= 200 && !/\r|\n/.test(w.text.trim())) {
       const text = w.text.trim();
       if (SEL.card && SEL.card.kind === 'text' && SEL.card.text === text) return;
-      SEL.card = { kind: 'text', text, hits: matches(text).slice(0, 5) };
+      SEL.card = { kind: 'text', text, hits: byRelevance(matches(text), text).slice(0, 5) };
     } else { hideSelCard(); return; }
     paintSelCard();
   }
@@ -1295,10 +1307,26 @@
     year: (a, b) => cmpStr(b.f.year || '', a.f.year || '') || cmpStr(norm(firstName(a)), norm(firstName(b))),
     added: (a, b) => cmpStr(b.f['date-added'] || '', a.f['date-added'] || ''),
   };
+  // (Words as typed, their punctuation aside: "(Palmer, 1977)" is
+  // "palmer 1977".)
+  const words = text => norm(text).split(/\s+/).map(t => t.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '')).filter(Boolean);
   const matches = text => {
-    const toks = norm(text).split(/\s+/).filter(Boolean);
+    const toks = words(text);
     return toks.length ? S.index.filter(x => toks.every(t => x.hay.includes(t))).map(x => x.e) : S.entries.slice();
   };
+  // The likeliest first: a word that's the first author's surname, or
+  // begins a word of the title, or is the year, counts most; then newest.
+  function byRelevance(list, text) {
+    const toks = words(text);
+    const score = e => {
+      const names = NAMES_OF(e), first = names[0] ? norm(names[0][0]) : '';
+      const title = norm(e.f.title || '').split(/[^\p{L}\p{N}]+/u);
+      return toks.reduce((n, t) => n + (first.startsWith(t) ? 5 : names.some(x => norm(x[0]).startsWith(t)) ? 3 : 0) +
+        (title.some(w => w.startsWith(t)) ? 3 : 0) + ((e.f.year || '').trim() === t ? 3 : 0), 0);
+    };
+    return list.map(e => [e, score(e)]).sort((a, b) => b[1] - a[1] || cmpStr(b[0].f.year || '', a[0].f.year || '')).map(x => x[0]);
+  }
+  const NAMES_OF = e => (e.a && e.a.length ? e.a : e.e || []);
   function search() {
     const text = $('q').value.trim();
     const counts = LLWord.counts(presentCites());
@@ -1307,7 +1335,8 @@
     const all = matches(text);
     const keep = listKeys(S.list);
     const inList = keep ? all.filter(e => keep.has(e.k)) : all;
-    S.results = inList.sort(SORTS[S.sort[sortKey()]] || SORTS.author);
+    // (Typed: the likeliest first; nothing typed: in the order chosen.)
+    S.results = text ? byRelevance(inList, text) : inList.sort(SORTS[S.sort[sortKey()]] || SORTS.author);
     S.more = keep && text ? all.length - inList.length : 0;
     S.shown = 100;
     S.marker = S.results.length && text ? 0 : -1;
