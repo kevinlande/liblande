@@ -1,9 +1,11 @@
 // LibLande for Word: the side panel. Search your library, choose works,
-// insert a citation at the cursor; the References list kept up to date.
-// Citations are Word content controls tagged "LL:<id>", their works kept in
-// the document's add-in settings ("liblande": {cites: {id: citation}}); the
-// References list is the one tagged "LL:refs". Their text comes from
-// engine.js (APA), for the whole document at once.
+// insert a citation at the cursor, or change one the cursor is in; the
+// References list kept up to date; citations typed by hand, or Zotero's,
+// made LibLande's; a plain copy. Citations are Word content controls tagged
+// "LL:<id>", their works kept in the document's add-in settings
+// ("liblande": {cites: {id: citation}, style}); the References list is the
+// one tagged "LL:refs". Their text comes from engine.js (APA) or citeproc-js
+// (another style), for the whole document at once.
 'use strict';
 (() => {
   const CLIENT_ID = '789682218462-98mjugngb46ttd01ucp9dcj71ufspjgn.apps.googleusercontent.com';
@@ -13,8 +15,9 @@
   const $ = id => document.getElementById(id);
   const S = {
     entries: [], byKey: new Map(), index: [],
-    cites: {}, present: null,
-    chosen: [], form: 'paren', pre: '', own: false,
+    cites: {}, present: null, style: 'apa',
+    chosen: [], form: 'paren', own: false,
+    editing: null, dirty: false, skipEdit: null,
     results: [], marker: -1, inWord: false,
   };
 
@@ -99,21 +102,125 @@
     S.entries = data.entries || [];
     ENTRIES = S.entries;
     CASE_SETS = null;
+    CSLW.engines.clear();
+    authorSet = null;
     S.byKey = new Map(S.entries.map(e => [e.k, e]));
     S.index = S.entries.map(e => ({ e, hay: norm([
       ...(e.a || []).map(n => n[0] + ' ' + (n[1] || '')), ...(e.e || []).map(n => n[0] + ' ' + (n[1] || '')),
       e.f.title, e.f.booktitle, e.f.journal, e.f.year, e.f.keywords, e.k].filter(Boolean).join(' ')) }));
   }
 
+
+  /* ---- the document's style: APA (engine.js), or a CSL style (citeproc-js) */
+  // The style kept with the document; its file and the engine fetched the
+  // first time and kept (the style's file on this device), as LibLande does.
+  const STYLES = [['apa', 'APA 7th'], ['chicago-author-date', 'Chicago author-date'], ['modern-language-association', 'MLA 9th'], ['harvard-cite-them-right', 'Harvard']];
+  const CSL_RAW = 'https://raw.githubusercontent.com/citation-style-language/';
+  const CSLW = { lib: null, engines: new Map(), loading: new Map() };
+  async function cslText(path, key) {
+    const kept = store.get(key, null);
+    if (kept) return kept;
+    const r = await fetch(CSL_RAW + path);
+    if (!r.ok) throw new Error('the style couldn\u2019t be fetched (' + r.status + ').');
+    const t = await r.text();
+    store.set(key, t);
+    return t;
+  }
+  function styleEngine(id) {
+    if (CSLW.engines.has(id)) return Promise.resolve(CSLW.engines.get(id));
+    if (!CSLW.loading.has(id)) {
+      const p = (async () => {
+        if (!CSLW.lib) {
+          const r = await fetch('../vendor/citeproc/2.4.63/citeproc_commonjs.js');
+          if (!r.ok) throw new Error('the style engine didn\u2019t load (' + r.status + ').');
+          CSLW.lib = new Function('module', (await r.text()) + '\n;return CSL;')({});
+        }
+        const [xml, locale] = await Promise.all([cslText('styles/master/' + id + '.csl', 'csl:' + id), cslText('locales/master/locales-en-US.xml', 'csl-locale:en-US')]);
+        const sys = { retrieveLocale: () => locale, retrieveItem: k => cslItem(S.byKey.get(k), k) };
+        const engine = new CSLW.lib.Engine(sys, xml, 'en-US');
+        engine.setOutputFormat('html');
+        CSLW.engines.set(id, engine);
+        return engine;
+      })();
+      p.catch(() => {}).finally(() => CSLW.loading.delete(id));
+      CSLW.loading.set(id, p);
+    }
+    return CSLW.loading.get(id);
+  }
+  // Ready to write the document in its style (or an error saying why not:
+  // nothing is rewritten in another style meanwhile).
+  async function styleReady() {
+    if (S.style === 'apa') return;
+    try { await styleEngine(S.style); } catch (e) { throw new Error((STYLES.find(x => x[0] === S.style) || [, S.style])[1] + ' isn\u2019t available here yet: ' + e.message); }
+  }
+  // Every citation's text and the References list, in the document's style.
+  // (A CSL style not yet fetched: APA, for the preview only.)
+  function renderAll(cites) {
+    const engine = S.style !== 'apa' && CSLW.engines.get(S.style);
+    if (!engine) return LLWord.render(cites, S.byKey);
+    const ids = Object.keys(cites);
+    const missing = [...new Set(ids.flatMap(id => cites[id].items.map(it => it.k)))].filter(k => !S.byKey.has(k));
+    const item = (c, it) => {
+      const x = { id: it.k };
+      const pre = c.form === 'narr' ? '' : String(it.pre || '').trim();
+      if (pre) x.prefix = LLWord.preText(pre);
+      const page = String(it.page || '').trim();
+      if (/^(pp?\.\s*)?\d/.test(page)) { x.locator = page.replace(/^pp?\.\s*/, '').replace(/\s*-+\s*/g, '\u2013'); x.label = 'page'; } else if (page) x.suffix = ', ' + page;
+      if (c.form === 'year') x['suppress-author'] = true;
+      return x;
+    };
+    const list = ids.map(id => {
+      const c = cites[id];
+      const its = (c.own ? c.items : LLWord.order(c.items, S.byKey)).filter(it => S.byKey.has(it.k))
+        .map((it, i) => Object.assign({}, it, { pre: it.pre || (i === 0 ? c.pre || '' : '') }));
+      return { id, c, its };
+    }).filter(x => x.its.length);
+    const done = engine.rebuildProcessorState(list.map(x => ({ citationID: x.id, citationItems: x.its.map(it => item(x.c, it)), properties: Object.assign({ noteIndex: 0 }, x.c.own ? { unsorted: true } : {}) })), 'html', []);
+    // (citeproc's mark for a citation with nothing to print: nothing.)
+    const plain = h => cslOut(h).text.replace(/\s*\[NO_PRINTED_FORM\]/g, '').trim();
+    const texts = {};
+    ids.forEach(id => { texts[id] = '(citation not found)'; });
+    done.forEach(([id, , html]) => { texts[id] = plain(html); });
+    // (In a sentence: the authors, then the rest of the citation.)
+    list.filter(x => x.c.form === 'narr').forEach(x => {
+      const parts = x.its.map(it => {
+        const who = plain(engine.makeCitationCluster([{ id: it.k, 'author-only': true }]));
+        const rest = plain(engine.makeCitationCluster([item({ form: 'year' }, Object.assign({}, it, { pre: '' }))]));
+        return rest && !/^\(\s*\)$/.test(rest) ? who + ' ' + rest : who;
+      });
+      texts[x.id] = parts.length === 1 ? parts[0] : parts.length === 2 ? parts.join(' and ') : parts.slice(0, -1).join(', ') + ', and ' + parts[parts.length - 1];
+    });
+    const bib = list.length ? engine.makeBibliography() : null;
+    const refs = bib ? bib[1].map((h, i) => Object.assign({ k: bib[0].entry_ids[i][0] }, cslOut(h))) : [];
+    return { texts, refs, missing };
+  }
+  async function chooseStyle(id) {
+    const was = S.style;
+    S.style = id;
+    hideErr('refsErr');
+    try {
+      await styleReady();
+      await saveSettings();
+      await refreshDocument(true);
+      paintChosen();
+    } catch (e) {
+      S.style = was;
+      $('style').value = was;
+      await saveSettings();
+      showErr('refsErr', wordError(e));
+    }
+  }
+
   /* ---- the document's citations (Word) */
   const SETTINGS = 'liblande';
   function readSettings() {
-    try { const v = Office.context.document.settings.get(SETTINGS); S.cites = (v && v.cites) || {}; } catch (e) { S.cites = {}; }
+    try { const v = Office.context.document.settings.get(SETTINGS); S.cites = (v && v.cites) || {}; S.style = (v && v.style) || 'apa'; } catch (e) { S.cites = {}; S.style = 'apa'; }
+    if ($('style')) $('style').value = S.style;
   }
   function saveSettings() {
     return new Promise(ok => {
       try {
-        Office.context.document.settings.set(SETTINGS, { v: 1, cites: S.cites });
+        Office.context.document.settings.set(SETTINGS, { v: 1, cites: S.cites, style: S.style });
         Office.context.document.settings.saveAsync(() => ok());
       } catch (e) { ok(); }
     });
@@ -131,13 +238,14 @@
   // changed. (After an insert, and when the panel opens.)
   async function refreshDocument(force) {
     if (!S.inWord || !S.entries.length) return;
+    await styleReady();
     await Word.run(async ctx => {
       const ccs = ctx.document.contentControls;
       ccs.load('items/tag,items/text');
       await ctx.sync();
       const mine = ccs.items.filter(c => /^LL:/.test(c.tag));
       S.present = mine.map(c => c.tag.slice(3)).filter(id => id !== 'refs');
-      const out = LLWord.render(presentCites(), S.byKey);
+      const out = renderAll(presentCites(), S.byKey);
       mine.forEach(c => {
         const id = c.tag.slice(3);
         if (id === 'refs') return;
@@ -192,8 +300,9 @@
     if (!c.items.length) return;
     hideErr('citeErr');
     const id = newId();
+    try { await styleReady(); } catch (e) { showErr('citeErr', e.message); return; }
     const all = Object.assign({}, presentCites(), { [id]: c });
-    const text = LLWord.render(all, S.byKey).texts[id];
+    const text = renderAll(all, S.byKey).texts[id];
     try {
       await Word.run(async ctx => {
         const sel = ctx.document.getSelection();
@@ -214,6 +323,7 @@
     } catch (e) { showErr('citeErr', 'Couldn\u2019t insert it: ' + wordError(e)); return; }
     S.cites[id] = c;
     if (S.present) S.present.push(id);
+    S.skipEdit = id;
     await saveSettings();
     clearChosen();
     $('q').value = '';
@@ -221,6 +331,95 @@
     $('q').focus();
     try { await refreshDocument(); } catch (e) { showErr('citeErr', 'The other citations couldn\u2019t be updated: ' + wordError(e)); }
   }
+  /* ---- editing a citation: the cursor in one opens it here */
+  // Its works, pages, words before, form and order, on Cite's own screen;
+  // Update rewrites it, Remove takes it out (Undo brings it back: its
+  // works stay in the settings). The cursor leaving it leaves it here too,
+  // unless something was changed.
+  function enterEdit(id) {
+    const c = S.cites[id];
+    const its = c.own ? c.items : LLWord.order(c.items, S.byKey);
+    S.editing = id;
+    S.dirty = false;
+    S.chosen = its.map((it, i) => ({ k: it.k, page: it.page || '', pre: it.pre || (i === 0 ? c.pre || '' : '') }));
+    S.formBefore = S.form;
+    S.form = c.form || 'paren';
+    S.own = !!c.own;
+    hideErr('citeErr');
+    paintChosen();
+    paintResults();
+  }
+  function leaveEdit() {
+    if (S.editing && S.formBefore) S.form = S.formBefore;
+    S.editing = null;
+    S.dirty = false;
+    clearChosen();
+    paintResults();
+  }
+  let selTimer = 0;
+  function onSelection() {
+    clearTimeout(selTimer);
+    selTimer = setTimeout(async () => {
+      let tag = '';
+      try {
+        await Word.run(async ctx => {
+          const cc = ctx.document.getSelection().parentContentControlOrNullObject;
+          cc.load('tag');
+          await ctx.sync();
+          tag = cc.isNullObject ? '' : cc.tag || '';
+        });
+      } catch (e) { return; }
+      const id = /^LL:/.test(tag) && tag !== 'LL:refs' ? tag.slice(3) : '';
+      if (!id || !S.cites[id]) {
+        S.skipEdit = null;
+        if (S.editing && !S.dirty) leaveEdit();
+        return;
+      }
+      // (Not the one just inserted or updated, with the cursor after it;
+      // and not over a new citation being made, or changes not yet saved.)
+      if (id === S.editing || id === S.skipEdit) return;
+      if (S.editing ? S.dirty : S.chosen.length) return;
+      enterEdit(id);
+    }, 200);
+  }
+  async function updateCitation() {
+    const id = S.editing, c = currentCite();
+    if (!id || !c.items.length) return;
+    hideErr('citeErr');
+    S.cites[id] = c;
+    await saveSettings();
+    try {
+      await refreshDocument();
+      await Word.run(async ctx => {
+        const ccs = ctx.document.contentControls.getByTag('LL:' + id);
+        ccs.load('items');
+        await ctx.sync();
+        if (ccs.items.length) { ccs.items[0].getRange('After').select(); await ctx.sync(); }
+      });
+    } catch (e) { showErr('citeErr', 'Couldn\u2019t update it: ' + wordError(e)); return; }
+    S.skipEdit = id;
+    leaveEdit();
+    $('q').value = '';
+    search();
+  }
+  async function removeCitation() {
+    const id = S.editing;
+    if (!id) return;
+    hideErr('citeErr');
+    try {
+      await Word.run(async ctx => {
+        const ccs = ctx.document.contentControls.getByTag('LL:' + id);
+        ccs.load('items');
+        await ctx.sync();
+        ccs.items.forEach(cc => cc.delete(false));
+        await ctx.sync();
+      });
+    } catch (e) { showErr('citeErr', 'Couldn\u2019t remove it: ' + wordError(e)); return; }
+    if (S.present) S.present = S.present.filter(x => x !== id);
+    leaveEdit();
+    try { await refreshDocument(); } catch (e) { /* Refresh will */ }
+  }
+
   function wordError(e) {
     const m = (e && (e.message || e.code)) || String(e);
     if (/protect|read.?only|locked/i.test(m)) return 'this document can\u2019t be changed (it\u2019s protected or read-only).';
@@ -236,7 +435,7 @@
         ccs.load('items');
         await ctx.sync();
         if (ccs.items.length) { ccs.items[0].select('Start'); await ctx.sync(); return; }
-        const out = LLWord.render(presentCites(), S.byKey);
+        const out = renderAll(presentCites(), S.byKey);
         // (Its own paragraph: the one the cursor is in, if empty, or a new
         // one after it.)
         const para = ctx.document.getSelection().paragraphs.getFirst();
@@ -282,10 +481,10 @@
     return {
       items,
       cite: {
-        items: items.map(x => ({ k: x.e.k, page: page(x.it).trim() })),
+        // (Each work's prefix: "see also" before the second.)
+        items: items.map(x => Object.assign({ k: x.e.k, page: page(x.it).trim() }, x.it.prefix && String(x.it.prefix).replace(/[,;\s]+$/, '').trim() ? { pre: String(x.it.prefix).replace(/[,;\s]+$/, '').trim() } : {})),
         form: its.some(it => it['suppress-author']) ? 'year' : 'paren',
-        pre: String(its[0].prefix || '').replace(/[,\s]+$/, '').trim(),
-        own: false,
+        own: its.slice(1).some(it => String(it.prefix || '').trim()),
       },
     };
   }
@@ -357,7 +556,7 @@
         if (!z.cite) { i = j + 1; continue; }
         const id = newId();
         made[id] = z.cite;
-        const text = LLWord.render(Object.assign({}, presentCites(), made), S.byKey).texts[id];
+        const text = renderAll(Object.assign({}, presentCites(), made), S.byKey).texts[id];
         const sdt = el('sdt'), pr = el('sdtPr'), content = el('sdtContent'), run = el('r'), t = el('t');
         pr.appendChild(el('alias', { val: 'LibLande' }));
         pr.appendChild(el('tag', { val: 'LL:' + id }));
@@ -382,7 +581,7 @@
     const b = $('zConvert');
     b.disabled = true;
     const M = zoteroMatcher();
-    let done = 0, step = 'reading Zotero’s citations', bibl = false, keepBib = false;
+    let done = 0, step = 'reading Zotero\u2019s citations', bibl = false, keepBib = false;
     const zCount = async ctx => { const f = ctx.document.body.fields; f.load('items/code'); await ctx.sync(); return f.items.filter(x => /ZOTERO_ITEM/.test(x.code || '')); };
     try {
       await Word.run(async ctx => {
@@ -396,7 +595,7 @@
         for (let guard = 0; guard < 500; guard++) {
           const f = left.slice().reverse().find(x => zoteroCite(x.code, M).cite && !skip.has(x.code));
           if (!f) break;
-          step = 'finding the citation’s paragraph';
+          step = 'finding the citation\u2019s paragraph';
           const para = f.result.paragraphs.getFirst();
           const ox = para.getOoxml();
           await ctx.sync();
@@ -419,12 +618,12 @@
           Object.assign(S.cites, made);
           if (S.present) S.present.push(...Object.keys(made));
           const now = await zCount(ctx);
-          if (now.length >= left.length) throw new Error('Word put the paragraph back with Zotero’s field still in it.');
+          if (now.length >= left.length) throw new Error('Word put the paragraph back with Zotero\u2019s field still in it.');
           done += left.length - now.length;
           left = now;
         }
         if (!keepBib) {
-          step = 'replacing Zotero’s bibliography';
+          step = 'replacing Zotero\u2019s bibliography';
           const all = ctx.document.body.fields;
           all.load('items/code');
           await ctx.sync();
@@ -442,7 +641,7 @@
     } catch (e) {
       await saveSettings();
       const m = (e && (e.message || e.code)) || String(e);
-      showErr('refsErr', (done ? 'Converted ' + done + ', then stopped' : 'Couldn’t convert them') + ' (while ' + step + '): ' + m + (done ? ' Undo with ⌘Z if you like.' : ''));
+      showErr('refsErr', (done ? 'Converted ' + done + ', then stopped' : 'Couldn\u2019t convert them') + ' (while ' + step + '): ' + m + (done ? ' Undo with \u2318Z if you like.' : ''));
       b.disabled = false;
       try { await refreshDocument(true); } catch (x) { /* Refresh will */ }
       readZotero();
@@ -452,7 +651,273 @@
     b.disabled = false;
     try { await refreshDocument(true); } catch (e) { /* Refresh will */ }
     readZotero();
-    showErr('refsErr', 'Converted ' + done + ' citation' + (done === 1 ? '' : 's') + (bibl ? ' and the bibliography' : keepBib ? '; the bibliography stays Zotero’s, as some citations do' : '') + '.');
+    showErr('refsErr', 'Converted ' + done + ' citation' + (done === 1 ? '' : 's') + (bibl ? ' and the bibliography' : keepBib ? '; the bibliography stays Zotero\u2019s, as some citations do' : '') + '.');
+    $('refsErr').classList.add('ok');
+  }
+
+
+  /* ---- Link citations: those typed by hand made LibLande's */
+  // Found in each paragraph's text (engine.js findTyped), matched to the
+  // library; all linked at once, each then listed with what it was linked
+  // to ("check" where it could have been another), to change if wrong.
+  // Not inside a citation already, nor in Zotero's.
+  const LINK = { found: [], rows: [], undo: [], open: -1 };
+  let authorSet = null;
+  const authors = () => authorSet || (authorSet = new Set(S.entries.flatMap(e => (e.a || []).concat(e.e || []).map(n => norm(String(n[0] || '').replace(/[{}\\]/g, ''))))));
+  async function scanTyped() {
+    if (!S.inWord || !S.entries.length) return;
+    let found = [];
+    await Word.run(async ctx => {
+      const paras = ctx.document.body.paragraphs;
+      paras.load('items/text');
+      const fields = ctx.document.body.fields;
+      fields.load('items/code');
+      await ctx.sync();
+      const zr = fields.items.filter(f => /ZOTERO/.test(f.code || '')).map(f => { const r = f.result; r.load('text'); return r; });
+      await ctx.sync();
+      const zText = zr.map(r => r.text || '');
+      paras.items.forEach((p, pi) => {
+        LLWord.findTyped(p.text || '').forEach(t => {
+          if (zText.some(z => z.includes(t.text))) return;
+          t.para = pi;
+          t.parts.forEach(pt => { pt.match = LLWord.matchTyped(pt, S.entries); });
+          t.ok = t.parts.every(pt => pt.match.every(m => m.pick));
+          // ("the Brexit vote (2016)": in a sentence, with no such author
+          // in the library, not taken for a citation.)
+          if (t.form === 'narr' && !t.ok && !authors().has(norm(t.parts[0].names[0]))) return;
+          found.push(t);
+        });
+      });
+      // (Those already inside a citation of LibLande's: passed over.)
+      const ranges = found.map(t => { const rs = paras.items[t.para].search(t.text, { matchCase: true }); rs.load('items'); return rs; });
+      await ctx.sync();
+      const parents = ranges.map(rs => rs.items.map(r => { const c = r.parentContentControlOrNullObject; c.load('tag'); return c; }));
+      await ctx.sync();
+      found = found.filter((t, i) => parents[i].some(c => c.isNullObject || !/^LL:/.test(c.tag || '')));
+    });
+    LINK.found = found;
+    paintLink();
+  }
+  function paintLink() {
+    const ok = LINK.found.filter(t => t.ok).length;
+    $('lCard').hidden = !LINK.found.length && !LINK.rows.length;
+    $('lCount').textContent = LINK.rows.length
+      ? 'Linked ' + LINK.undo.length + ' citation' + (LINK.undo.length === 1 ? '' : 's')
+      : LINK.found.length + ' typed citation' + (LINK.found.length === 1 ? '' : 's') + ' found';
+    $('lGo').hidden = !ok || LINK.rows.length > 0;
+    $('lGo').textContent = 'Link ' + ok + ' citation' + (ok === 1 ? '' : 's');
+    $('lUndo').hidden = !LINK.undo.length;
+    const rows = LINK.rows.length ? LINK.rows : LINK.found.filter(t => !t.ok).map(t => ({ typed: t.text, missing: true }));
+    $('lRows').innerHTML = rows.map((r, i) => {
+      if (r.missing) return '<div class="link-row" data-r="' + i + '" data-typed="' + esc(r.typed) + '"><span class="tag w">not found</span><span class="w" title="' + esc(r.typed) + '">' + esc(r.typed) + '</span><button class="mini" type="button" data-add>Add\u2026</button></div>';
+      const e = S.byKey.get(r.k);
+      let h = '<div class="link-row" data-r="' + i + '"><span class="tag' + (r.sure ? '' : ' w') + '">' + (r.sure ? 'linked' : 'check') + '</span>' +
+        '<span class="w" title="' + esc(r.typed + ' \u2192 ' + (e ? e.f.title : r.k)) + '">' + esc(r.typed) + ' \u2192 ' + esc(e ? e.f.title || r.k : r.k) + '</span>' +
+        '<button class="mini" type="button" data-change="' + i + '">' + (LINK.open === i ? 'Done' : 'Change') + '</button></div>';
+      if (LINK.open === i) {
+        h += '<div class="pick" data-pick="' + i + '">' + r.cands.map(c => '<button type="button" class="pk" data-k="' + esc(c.k) + '" aria-pressed="' + (c.k === r.k) + '"><span class="radio"></span><span><span class="t">' + esc(c.f.title || c.k) + '</span><span class="m"> ' + esc(metaOf(c)) + '</span></span></button>').join('') +
+          '<label class="search"><input type="search" data-find="' + i + '" placeholder="Another work\u2026" autocomplete="off" spellcheck="false"></label><div data-found="' + i + '"></div></div>';
+      }
+      return h;
+    }).join('');
+  }
+  async function linkTyped() {
+    hideErr('refsErr');
+    $('lGo').disabled = true;
+    const rows = [], undo = [];
+    try {
+      await Word.run(async ctx => {
+        const paras = ctx.document.body.paragraphs;
+        paras.load('items');
+        await ctx.sync();
+        const todo = LINK.found.filter(t => t.ok);
+        // (Each text once a paragraph; every place it's typed there, linked.)
+        const seen = new Set(), jobs = [];
+        todo.forEach(t => {
+          const key = t.para + '\u0001' + t.text;
+          if (seen.has(key)) return;
+          seen.add(key);
+          const rs = paras.items[t.para].search(t.text, { matchCase: true });
+          rs.load('items');
+          jobs.push({ t, rs });
+        });
+        await ctx.sync();
+        const parents = jobs.map(j => j.rs.items.map(r => { const c = r.parentContentControlOrNullObject; c.load('tag'); return c; }));
+        await ctx.sync();
+        jobs.forEach((j, ji) => j.rs.items.forEach((r, ri) => {
+          const c = parents[ji][ri];
+          if (!c.isNullObject && /^LL:/.test(c.tag || '')) return;
+          const id = newId(), t = j.t;
+          const items = [];
+          t.parts.forEach(pt => pt.match.forEach((m, yi) => {
+            const it = { k: m.pick.k, page: yi === pt.match.length - 1 ? pt.page : '' };
+            if (yi === 0 && pt.pre) it.pre = pt.pre;
+            rows.push({ id, idx: items.length, typed: pt.years.length > 1 ? pt.text + ' (' + pt.years[yi].y + pt.years[yi].letter + ')' : pt.text, k: m.pick.k, sure: m.sure, cands: m.cands });
+            items.push(it);
+          }));
+          S.cites[id] = { items, form: t.form, own: true };
+          const cc = r.insertContentControl();
+          cc.tag = 'LL:' + id; cc.title = 'LibLande'; cc.appearance = 'BoundingBox';
+          if (S.present) S.present.push(id);
+          undo.push({ id, typed: t.text });
+        }));
+        await ctx.sync();
+      });
+    } catch (e) {
+      $('lGo').disabled = false;
+      await saveSettings();
+      showErr('refsErr', 'Couldn\u2019t link them: ' + wordError(e));
+      return;
+    }
+    await saveSettings();
+    LINK.rows = rows.concat(LINK.found.filter(t => !t.ok).map(t => ({ typed: t.text, missing: true })));
+    LINK.undo = undo;
+    LINK.open = -1;
+    $('lGo').disabled = false;
+    try { await refreshDocument(); } catch (e) { /* Refresh will */ }
+    paintLink();
+  }
+  async function changeLink(i, k) {
+    const r = LINK.rows[i], c = S.cites[r.id];
+    if (!c || !c.items[r.idx]) return;
+    c.items[r.idx].k = k;
+    r.k = k; r.sure = true;
+    if (!r.cands.some(x => x.k === k) && S.byKey.get(k)) r.cands = r.cands.concat([S.byKey.get(k)]);
+    await saveSettings();
+    paintLink();
+    try { await refreshDocument(); } catch (e) { showErr('refsErr', wordError(e)); }
+  }
+  async function undoLinks() {
+    hideErr('refsErr');
+    try {
+      await Word.run(async ctx => {
+        const jobs = LINK.undo.map(u => { const ccs = ctx.document.contentControls.getByTag('LL:' + u.id); ccs.load('items'); return { u, ccs }; });
+        await ctx.sync();
+        jobs.forEach(j => j.ccs.items.forEach(cc => { cc.insertText(j.u.typed, 'Replace'); cc.delete(true); }));
+        await ctx.sync();
+      });
+    } catch (e) { showErr('refsErr', 'Couldn\u2019t undo it: ' + wordError(e)); return; }
+    const gone = new Set(LINK.undo.map(u => u.id));
+    if (S.present) S.present = S.present.filter(id => !gone.has(id));
+    LINK.rows = []; LINK.undo = []; LINK.open = -1;
+    try { await refreshDocument(); } catch (e) { /* Refresh will */ }
+    scanTyped().catch(() => {});
+  }
+  // A row's citation selected in the document (one not found: its text).
+  async function showLinkRow(row) {
+    try {
+      await Word.run(async ctx => {
+        if (row.missing) {
+          const rs = ctx.document.body.search(row.typed, { matchCase: true });
+          rs.load('items');
+          await ctx.sync();
+          if (rs.items.length) rs.items[0].select();
+        } else {
+          const ccs = ctx.document.contentControls.getByTag('LL:' + row.id);
+          ccs.load('items');
+          await ctx.sync();
+          if (ccs.items.length) ccs.items[0].select();
+        }
+        await ctx.sync();
+      });
+    } catch (e) { /* only a convenience */ }
+  }
+
+  /* ---- Make plain: citations and the References list as ordinary text */
+  // Here, in this document (Word's Undo takes it back); or a copy, opened
+  // in a new window for you to save where you like, this one staying as
+  // it is.
+  async function convertPlain() {
+    hideErr('refsErr');
+    $('plainAsk').hidden = true;
+    let n = 0, list = false;
+    try {
+      await Word.run(async ctx => {
+        const ccs = ctx.document.contentControls;
+        ccs.load('items/tag');
+        await ctx.sync();
+        ccs.items.filter(c => /^LL:/.test(c.tag || '')).forEach(c => { if (c.tag === 'LL:refs') list = true; else n++; c.delete(true); });
+        await ctx.sync();
+      });
+    } catch (e) { showErr('refsErr', 'Couldn\u2019t convert them: ' + wordError(e)); return; }
+    S.present = [];
+    S.hasRefs = false;
+    paintRefs();
+    paintResults();
+    showErr('refsErr', 'Converted ' + n + ' citation' + (n === 1 ? '' : 's') + (list ? ' and the References list' : '') + ' to plain text.');
+    $('refsErr').classList.add('ok');
+  }
+  // The document as Word has it now (.docx), in slices.
+  function documentBytes() {
+    return new Promise((ok, no) => {
+      Office.context.document.getFileAsync(Office.FileType.Compressed, { sliceSize: 4194304 }, res => {
+        if (res.status !== Office.AsyncResultStatus.Succeeded) { no(new Error(res.error && res.error.message || 'Word didn\u2019t give the document.')); return; }
+        const file = res.value, parts = [];
+        const next = i => file.getSliceAsync(i, r => {
+          if (r.status !== Office.AsyncResultStatus.Succeeded) { file.closeAsync(); no(new Error(r.error && r.error.message || 'Word didn\u2019t give the document.')); return; }
+          parts.push(new Uint8Array(r.value.data));
+          if (i + 1 < file.sliceCount) next(i + 1);
+          else { file.closeAsync(); ok(new Blob(parts)); }
+        });
+        next(0);
+      });
+    });
+  }
+  let jszip = null;
+  function loadJSZip() {
+    return jszip || (jszip = new Promise((ok, no) => {
+      const s = document.createElement('script');
+      s.src = '../vendor/jszip/3.10.2/jszip.min.js';
+      s.onload = () => ok(window.JSZip); s.onerror = () => { jszip = null; no(new Error('The zip reader didn\u2019t load. Are you online?')); };
+      document.head.appendChild(s);
+    }));
+  }
+  // LibLande's content controls taken out of a .docx's XML, their text kept.
+  function unwrapControls(xml) {
+    const doc = new DOMParser().parseFromString(xml, 'application/xml');
+    let n = 0;
+    [...doc.getElementsByTagNameNS(W_NS, 'sdt')].reverse().forEach(sdt => {
+      const tag = [...sdt.childNodes].find(c => c.localName === 'sdtPr');
+      const t = tag && tag.getElementsByTagNameNS(W_NS, 'tag')[0];
+      if (!t || !/^LL:/.test(t.getAttributeNS(W_NS, 'val') || t.getAttribute('w:val') || '')) return;
+      const content = [...sdt.childNodes].find(c => c.localName === 'sdtContent');
+      if (content) while (content.firstChild) sdt.parentNode.insertBefore(content.firstChild, sdt);
+      sdt.parentNode.removeChild(sdt);
+      n++;
+    });
+    return { xml: new XMLSerializer().serializeToString(doc), n };
+  }
+  async function plainCopy() {
+    hideErr('refsErr');
+    const b = $('plainCopy');
+    b.disabled = true;
+    let step = 'bringing the citations up to date';
+    try {
+      await refreshDocument();
+      step = 'reading the document';
+      const [blob, JSZip] = await Promise.all([documentBytes(), loadJSZip()]);
+      step = 'making the copy';
+      const zip = await JSZip.loadAsync(blob);
+      for (const name of Object.keys(zip.files).filter(n => /^word\/(document|header\d*|footer\d*|footnotes|endnotes)\.xml$/.test(n))) {
+        const out = unwrapControls(await zip.file(name).async('string'));
+        if (out.n) zip.file(name, out.xml);
+      }
+      // (Nor LibLande's place in it: its panel and its settings, which
+      // would have Word look for the add-in where the copy is opened.)
+      Object.keys(zip.files).filter(n => /^word\/webextensions\//.test(n)).forEach(n => zip.remove(n));
+      const types = zip.file('[Content_Types].xml'), rels = zip.file('_rels/.rels');
+      if (types) zip.file('[Content_Types].xml', (await types.async('string')).replace(/<Override [^>]*PartName="\/word\/webextensions\/[^"]*"[^>]*\/>/g, ''));
+      if (rels) zip.file('_rels/.rels', (await rels.async('string')).replace(/<Relationship [^>]*Target="[^"]*webextensions\/[^"]*"[^>]*\/>/g, ''));
+      const b64 = await zip.generateAsync({ type: 'base64', compression: 'DEFLATE' });
+      step = 'opening the copy';
+      await Word.run(async ctx => { ctx.application.createDocument(b64).open(); await ctx.sync(); });
+    } catch (e) {
+      b.disabled = false;
+      showErr('refsErr', 'Couldn\u2019t make the copy (while ' + step + '): ' + wordError(e));
+      return;
+    }
+    b.disabled = false;
+    showErr('refsErr', 'The plain copy opened in a new window: save it where you like (\u2318S). This document stays linked.');
     $('refsErr').classList.add('ok');
   }
 
@@ -506,39 +971,68 @@
   }
 
   /* ---- the citation being made */
-  const currentCite = () => ({ items: S.chosen.map(c => ({ k: c.k, page: c.page || '' })), form: S.form, pre: S.form === 'paren' ? S.pre : '', own: S.own });
+  // (Each work's own words before it: "see also" before the second. None
+  // in a sentence, Author (2011).)
+  const currentCite = () => ({
+    items: S.chosen.map(c => Object.assign({ k: c.k, page: c.page || '' }, S.form !== 'narr' && String(c.pre || '').trim() ? { pre: String(c.pre).trim() } : {})),
+    form: S.form, own: S.own,
+  });
+  // APA's order; the words before the first work stay first, before
+  // whichever work that now is (they were the whole citation's).
+  function sortChosen() {
+    const first = S.chosen.length ? S.chosen[0].pre || '' : '';
+    if (S.chosen.length) S.chosen[0].pre = '';
+    S.chosen = LLWord.order(S.chosen, S.byKey);
+    if (S.chosen.length) S.chosen[0].pre = first;
+  }
   function toggle(k) {
     const i = S.chosen.findIndex(c => c.k === k);
-    if (i >= 0) S.chosen.splice(i, 1); else S.chosen.push({ k, page: '' });
-    if (!S.own) S.chosen = LLWord.order(S.chosen, S.byKey);
+    if (i >= 0) S.chosen.splice(i, 1); else S.chosen.push({ k, page: '', pre: '' });
+    if (!S.own) sortChosen();
+    S.dirty = true;
     paintChosen();
     paintResults();
   }
-  function clearChosen() { S.chosen = []; S.own = false; S.pre = ''; $('pre').value = ''; paintChosen(); }
+  function clearChosen() { S.chosen = []; S.own = false; paintChosen(); }
   const label = c => { const e = S.byKey.get(c.k); if (!e) return c.k; const t = LLWord.render({ x: { items: [{ k: c.k }], form: 'paren' } }, S.byKey).texts.x; return t.slice(1, -1); };
+  // (The box before a work as wide as its words: "see also" whole.)
+  const fitPre = el => { el.style.width = '64px'; el.style.width = Math.min(130, Math.max(64, el.scrollWidth + 2)) + 'px'; };
   function paintChosen() {
-    $('foot').hidden = !S.chosen.length;
+    $('foot').hidden = !S.chosen.length && !S.editing;
+    $('editBar').hidden = !S.editing;
+    $('remove').hidden = !S.editing;
+    $('insert').firstChild.textContent = S.editing ? 'Update' : 'Insert';
+    $('insert').disabled = !S.chosen.length;
+    $('q').placeholder = S.editing ? 'Add a work\u2026' : 'Search your library';
+    $('chosen').innerHTML = '';
+    $('prev').textContent = '';
+    $('prevNote').hidden = true;
     if (!S.chosen.length) return;
     $('az').hidden = !S.own || S.chosen.length < 2;
     $('chosen').innerHTML = S.chosen.map((c, i) =>
       '<div class="ch" data-i="' + i + '">' + (S.chosen.length > 1 ? '<span class="grip" aria-label="Drag to reorder" title="Drag to reorder">\u22ee\u22ee</span>' : '') +
-      '<span class="n">' + esc(label(c)) + '</span>' +
-      '<input data-i="' + i + '" value="' + esc(c.page) + '" placeholder="page" aria-label="Page for ' + esc(label(c)) + '">' +
+      (S.form !== 'narr' ? '<input class="bf" data-i="' + i + '" data-f="pre" value="' + esc(c.pre || '') + '" placeholder="before" list="preList" aria-label="Words before ' + esc(label(c)) + '">' : '') +
+      '<span class="n" title="' + esc(label(c)) + '">' + esc(label(c)) + '</span>' +
+      '<input class="pg" data-i="' + i + '" data-f="page" value="' + esc(c.page) + '" placeholder="page" aria-label="Page for ' + esc(label(c)) + '">' +
       '<button class="x" type="button" data-i="' + i + '" aria-label="Remove ' + esc(label(c)) + '">\u2715</button></div>').join('');
+    $('chosen').querySelectorAll('.bf').forEach(fitPre);
     const y = (() => { const e = S.byKey.get(S.chosen[0].k); return e ? (e.f.year || 'n.d.') : '2011'; })();
     const names = { paren: '(Author, ' + y + ')', narr: 'Author (' + y + ')', year: '(' + y + ')' };
     document.querySelectorAll('#forms button').forEach(b => { b.textContent = names[b.dataset.form]; b.setAttribute('aria-checked', String(b.dataset.form === S.form)); });
-    $('preWrap').hidden = S.form !== 'paren';
     paintPreview();
   }
   function paintPreview() {
     if (!S.chosen.length) return;
-    const before = LLWord.render(presentCites(), S.byKey).texts;
-    const out = LLWord.render(Object.assign({}, presentCites(), { __new: currentCite() }), S.byKey);
-    $('prev').textContent = out.texts.__new;
-    const changed = Object.keys(before).filter(id => before[id] !== out.texts[id]).length;
+    const id = S.editing || '__new';
+    // (The others as they are now: worked out once while they don't change.)
+    const key = S.style + '\u0001' + JSON.stringify(presentCites());
+    if (!paintPreview.memo || paintPreview.memo.key !== key) paintPreview.memo = { key, texts: renderAll(presentCites(), S.byKey).texts };
+    const before = paintPreview.memo.texts;
+    const out = renderAll(Object.assign({}, presentCites(), { [id]: currentCite() }), S.byKey);
+    $('prev').textContent = out.texts[id];
+    const changed = Object.keys(before).filter(x => x !== id && before[x] !== out.texts[x]).length;
     $('prevNote').hidden = !changed;
-    $('prevNote').textContent = 'Also changes ' + changed + ' other citation' + (changed === 1 ? '' : 's') + ' (as 2011a, 2011b, or with more names).';
+    $('prevNote').textContent = 'Also changes ' + changed + ' other citation' + (changed === 1 ? '' : 's') + (S.style === 'apa' ? ' (as 2011a, 2011b, or with more names).' : '.');
   }
 
   /* ---- dragging works into an order of one's own */
@@ -578,6 +1072,7 @@
           const [c] = S.chosen.splice(from, 1);
           S.chosen.splice(to, 0, c);
           S.own = true;
+          S.dirty = true;
         }
         paintChosen();
       }, 160);
@@ -593,6 +1088,7 @@
     const works = new Set(Object.values(cites).flatMap(c => c.items.map(it => it.k))).size;
     $('refCount').textContent = n + ' citation' + (n === 1 ? '' : 's') + ' \u00b7 ' + works + ' work' + (works === 1 ? '' : 's');
     $('refsBtn').textContent = S.hasRefs ? 'Go to list' : 'Insert References here';
+    $('plainCard').hidden = !n && !S.hasRefs;
   }
 
   /* ---- errors, the header, views */
@@ -639,7 +1135,7 @@
         ev.preventDefault();
         if (S.results[S.marker]) toggle(S.results[S.marker].k);
       } else if (ev.key === 'Escape') {
-        if ($('q').value) { $('q').value = ''; search(); } else clearChosen();
+        if ($('q').value) { $('q').value = ''; search(); } else if (S.editing) leaveEdit(); else clearChosen();
       }
     });
     $('res').addEventListener('click', ev => {
@@ -647,23 +1143,30 @@
       if (it) { S.marker = [...$('res').querySelectorAll('.it')].indexOf(it); toggle(it.dataset.k); }
     });
     $('chosen').addEventListener('input', ev => {
-      const i = ev.target.dataset.i;
-      if (i != null && ev.target.tagName === 'INPUT') { S.chosen[+i].page = ev.target.value; paintPreview(); }
+      const i = ev.target.dataset.i, f = ev.target.dataset.f;
+      if (i == null || !f) return;
+      S.chosen[+i][f] = ev.target.value;
+      if (f === 'pre') fitPre(ev.target);
+      S.dirty = true;
+      // (Words before a later work: the order stays as it is.)
+      if (f === 'pre' && +i > 0 && ev.target.value.trim() && !S.own) { S.own = true; $('az').hidden = S.chosen.length < 2; }
+      paintPreview();
     });
     $('chosen').addEventListener('click', ev => {
       const x = ev.target.closest('.x');
-      if (x) { S.chosen.splice(+x.dataset.i, 1); paintChosen(); paintResults(); }
+      if (x) { S.chosen.splice(+x.dataset.i, 1); S.dirty = true; paintChosen(); paintResults(); }
     });
     $('chosen').addEventListener('pointerdown', dragStart);
-    $('az').addEventListener('click', () => { S.own = false; S.chosen = LLWord.order(S.chosen, S.byKey); paintChosen(); });
+    $('az').addEventListener('click', () => { S.own = false; sortChosen(); S.dirty = true; paintChosen(); });
     $('forms').addEventListener('click', ev => {
       const b = ev.target.closest('button');
-      if (b) { S.form = b.dataset.form; paintChosen(); }
+      if (b) { S.form = b.dataset.form; S.dirty = true; paintChosen(); }
     });
-    $('pre').addEventListener('input', () => { S.pre = $('pre').value; paintPreview(); });
-    $('insert').addEventListener('click', insertCitation);
+    $('insert').addEventListener('click', () => (S.editing ? updateCitation() : insertCitation()));
+    $('remove').addEventListener('click', removeCitation);
+    $('editX').addEventListener('click', () => leaveEdit());
     document.addEventListener('keydown', ev => {
-      if (ev.key === 'Enter' && (ev.metaKey || ev.ctrlKey) && S.chosen.length && !$('pCite').hidden) { ev.preventDefault(); insertCitation(); }
+      if (ev.key === 'Enter' && (ev.metaKey || ev.ctrlKey) && S.chosen.length && !$('pCite').hidden) { ev.preventDefault(); if (S.editing) updateCitation(); else insertCitation(); }
       if (ev.key === 'Escape' && !$('menu').hidden) { $('menu').hidden = true; $('acct').setAttribute('aria-expanded', 'false'); }
     });
     const tab = which => {
@@ -671,12 +1174,39 @@
       $('tRefs').setAttribute('aria-selected', String(which === 'refs'));
       $('pCite').hidden = which !== 'cite';
       $('pRefs').hidden = which !== 'refs';
-      if (which === 'refs') { paintRefs(); readZotero(); refreshDocument().catch(e => showErr('refsErr', wordError(e))); } else $('q').focus();
+      if (which === 'refs') { paintRefs(); readZotero(); if (!LINK.rows.length) scanTyped().catch(() => {}); refreshDocument().catch(e => showErr('refsErr', wordError(e))); } else $('q').focus();
     };
     $('tCite').addEventListener('click', () => tab('cite'));
     $('tRefs').addEventListener('click', () => tab('refs'));
     $('refsBtn').addEventListener('click', insertOrGoToRefs);
     $('zConvert').addEventListener('click', convertZotero);
+    $('style').innerHTML = STYLES.map(([id, name]) => '<option value="' + id + '">' + esc(name) + '</option>').join('');
+    $('style').value = S.style;
+    $('style').addEventListener('change', () => chooseStyle($('style').value));
+    $('lGo').addEventListener('click', linkTyped);
+    $('lUndo').addEventListener('click', undoLinks);
+    $('lRows').addEventListener('click', ev => {
+      const add = ev.target.closest('[data-add]');
+      if (add) { openLibLande(); return; }
+      const ch = ev.target.closest('[data-change]');
+      if (ch) { const i = +ch.dataset.change; LINK.open = LINK.open === i ? -1 : i; paintLink(); return; }
+      const pk = ev.target.closest('.pk');
+      if (pk) { changeLink(+pk.closest('[data-pick]').dataset.pick, pk.dataset.k); return; }
+      if (ev.target.closest('.pick')) return;
+      const row = ev.target.closest('.link-row');
+      if (row) { const rows = LINK.rows.length ? LINK.rows : LINK.found.filter(t => !t.ok).map(t => ({ typed: t.text, missing: true })); showLinkRow(rows[+row.dataset.r]); }
+    });
+    $('lRows').addEventListener('input', ev => {
+      const i = ev.target.dataset.find;
+      if (i == null) return;
+      const toks = norm(ev.target.value.trim()).split(/\s+/).filter(Boolean);
+      const hits = toks.length ? S.index.filter(x => toks.every(t => x.hay.includes(t))).slice(0, 6).map(x => x.e) : [];
+      document.querySelector('[data-found="' + i + '"]').innerHTML = hits.map(c => '<button type="button" class="pk" data-k="' + esc(c.k) + '" aria-pressed="false"><span class="radio"></span><span><span class="t">' + esc(c.f.title || c.k) + '</span><span class="m"> ' + esc(metaOf(c)) + '</span></span></button>').join('');
+    });
+    $('plainCopy').addEventListener('click', plainCopy);
+    $('plainAskBtn').addEventListener('click', () => { $('plainAsk').hidden = false; });
+    $('plainNo').addEventListener('click', () => { $('plainAsk').hidden = true; });
+    $('plainYes').addEventListener('click', convertPlain);
     $('signin').addEventListener('click', () => reload(false));
     $('acct').addEventListener('click', ev => {
       ev.stopPropagation();
@@ -697,6 +1227,7 @@
         await refreshDocument(true);
         search();
         readZotero();
+        if (!$('pRefs').hidden && !LINK.rows.length) await scanTyped();
       } catch (e) { showErr($('pRefs').hidden ? 'citeErr' : 'refsErr', 'Couldn\u2019t refresh: ' + wordError(e)); }
       b.classList.remove('busy');
     });
@@ -716,6 +1247,9 @@
 
   async function start() {
     wire();
+    if (S.inWord) {
+      try { Office.context.document.addHandlerAsync(Office.EventType.DocumentSelectionChanged, onSelection); } catch (e) { /* editing by cursor then unavailable */ }
+    }
     paintOffline();
     paintAccount();
     readSettings();
@@ -724,6 +1258,7 @@
     if (kept && kept.gz) {
       try { useLibrary(await gunzip(kept.gz)); } catch (e) { /* asked for again */ }
     }
+    if (S.style !== 'apa') styleEngine(S.style).catch(() => {});
     if (S.entries.length) {
       view('vMain');
       search();
@@ -743,5 +1278,5 @@
     });
   } else start();
   // (For testing in a browser.)
-  window.LLPanel = { S, useLibrary, search, toggle, paintChosen, view, zoteroCite, zoteroMatcher, swapFields };
+  window.LLPanel = { S, useLibrary, search, toggle, paintChosen, view, zoteroCite, zoteroMatcher, swapFields, enterEdit, leaveEdit, currentCite, renderAll, styleEngine, LINK, paintLink, paintRefs, unwrapControls };
 })();

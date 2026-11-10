@@ -62,8 +62,12 @@
   .ch.drag .grip { cursor: grabbing; }
   .grip { color: var(--faint); cursor: grab; width: 16px; text-align: center; letter-spacing: -2px; font-size: 12px; user-select: none; touch-action: none; }
   .ch .n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .ch input, .pre input { font: inherit; font-size: 12px; border: 1px solid var(--line); background: var(--field); color: var(--text); border-radius: 5px; padding: 2px 5px; }
-  .ch input { width: 82px; }
+  .ch input { font: inherit; font-size: 12px; border: 1px solid var(--line); background: var(--field); color: var(--text); border-radius: 5px; padding: 2px 5px; }
+  .ch input { width: 62px; flex: none; }
+  .ch input::placeholder { color: var(--faint); }
+  .ch .n { font-size: 12.5px; }
+  .editbar { display: flex; gap: 8px; align-items: center; background: var(--soft); border-radius: 8px; padding: 4px 4px 4px 10px; margin-bottom: 10px; }
+  .editbar span { flex: 1; font-weight: 500; }
   .x { width: 24px; height: 24px; border: none; background: none; color: var(--muted); border-radius: 5px; cursor: pointer; flex: none; }
   .x:hover { background: var(--row); }
   .opts { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
@@ -71,8 +75,6 @@
   .seg button { padding: 4px 7px; font-size: 12px; background: var(--field); border: none; cursor: pointer; }
   .seg button + button { border-left: 1px solid var(--line); }
   .seg button[aria-checked="true"] { background: var(--accent); color: var(--accent-ink); }
-  .pre { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); }
-  .pre input { width: 74px; }
   .prev { background: var(--field); border: 1px dashed var(--line); border-radius: 7px; padding: 7px 9px; font: 14px Garamond, "EB Garamond", Georgia, serif; margin-bottom: 8px; overflow-wrap: anywhere; }
   .note { font-size: 12px; color: var(--muted); margin: 0 0 8px; }
   .btns { display: flex; gap: 8px; }
@@ -90,6 +92,18 @@
   .link-row .w { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .tag { font-size: 11px; padding: 1px 6px; border-radius: 9px; background: var(--soft); color: var(--accent); white-space: nowrap; }
   .tag.w { background: var(--warn-soft); color: var(--warn); }
+  .mini { border: 1px solid var(--line); border-radius: 6px; padding: 2px 8px; font-size: 12px; background: var(--field); cursor: pointer; flex: none; }
+  .link-row { cursor: pointer; }
+  .pick { border: 1px solid var(--accent); border-radius: 8px; padding: 6px; margin: 2px 0 8px; background: var(--field); }
+  .pk { display: flex; gap: 8px; width: 100%; text-align: left; background: none; border: none; border-bottom: 1px solid var(--row); padding: 6px 4px; cursor: pointer; font-size: 12px; }
+  .pk:hover { background: var(--row); }
+  .radio { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--faint); flex: none; margin-top: 1px; }
+  .pk[aria-pressed="true"] .radio { border: 4px solid var(--accent); }
+  .pick .search { margin-top: 6px; }
+  .pk .t, .pk .m { display: block; }
+  .link-row .tag { flex: none; }
+  .ask { border: 1px solid var(--line); border-radius: 9px; padding: 10px; background: var(--panel); margin-top: 8px; }
+  .ask p { margin: 0 0 8px; font-weight: 500; }
   .err.ok { background: var(--soft); color: var(--accent); }
   .err { background: var(--warn-soft); color: var(--warn); border-radius: 8px; padding: 8px 10px; margin: 0 0 8px; }
 </style>
@@ -119,6 +133,7 @@
   <div class="view" id="pCite" role="tabpanel">
     <div class="scroll">
       <div class="body">
+        <div class="editbar" id="editBar" hidden><span>Editing citation</span><button class="x" type="button" id="editX" aria-label="Stop editing" title="Stop editing (Esc)">✕</button></div>
         <label class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg><input id="q" type="search" placeholder="Search your library" autocomplete="off" autocorrect="off" spellcheck="false" aria-label="Search your library" aria-controls="res"></label>
         <div class="res" id="res" role="listbox" aria-multiselectable="true"></div>
       </div>
@@ -131,12 +146,11 @@
         <span class="seg" role="radiogroup" aria-label="Form" id="forms">
           <button type="button" role="radio" data-form="paren" aria-checked="true"></button><button type="button" role="radio" data-form="narr" aria-checked="false"></button><button type="button" role="radio" data-form="year" aria-checked="false"></button>
         </span>
-        <label class="pre" id="preWrap">before <input id="pre" list="preList" placeholder="see"></label>
         <datalist id="preList"><option value="see"><option value="e.g."><option value="see also"><option value="cf."><option value="but see"></datalist>
       </div>
       <div class="prev" id="prev" aria-live="polite"></div>
       <p class="note" id="prevNote" hidden></p>
-      <div class="btns"><button class="btn primary grow" id="insert" type="button">Insert<kbd>&#x2318;&#x21a9;</kbd></button></div>
+      <div class="btns"><button class="btn primary grow" id="insert" type="button">Insert<kbd>&#x2318;&#x21a9;</kbd></button><button class="btn" id="remove" type="button" hidden>Remove</button></div>
     </div>
   </div>
   <div class="view" id="pRefs" role="tabpanel" hidden>
@@ -144,14 +158,26 @@
       <div class="err" id="refsErr" hidden></div>
       <div class="card">
         <h4>References</h4>
-        <div class="line"><b id="refCount"></b><select id="style" aria-label="Style"><option>APA 7th</option></select></div>
+        <div class="line"><b id="refCount"></b><select id="style" aria-label="Style"></select></div>
         <div class="btns"><button class="btn grow" id="refsBtn" type="button">Insert References here</button></div>
+      </div>
+      <div class="card" id="lCard" hidden>
+        <h4>Link citations</h4>
+        <div class="line"><b id="lCount"></b></div>
+        <div id="lRows"></div>
+        <div class="btns" style="margin-top:8px"><button class="btn primary grow" id="lGo" type="button" hidden></button><button class="btn grow" id="lUndo" type="button" hidden>Undo linking</button></div>
       </div>
       <div class="card" id="zCard" hidden>
         <h4>Zotero citations</h4>
         <div class="line"><b id="zCount"></b></div>
         <div id="zRows"></div>
         <div class="btns" style="margin-top:8px"><button class="btn primary grow" id="zConvert" type="button" hidden>Convert to LibLande</button></div>
+      </div>
+      <div class="card" id="plainCard" hidden>
+        <h4>Make plain</h4>
+        <p class="note">Every citation and the References list as ordinary text.</p>
+        <div class="btns" style="flex-direction:column"><button class="btn grow" id="plainCopy" type="button">Make a plain copy&#x2026;</button><button class="btn grow" id="plainAskBtn" type="button">Convert fields to plain text&#x2026;</button></div>
+        <div class="ask" id="plainAsk" hidden><p>Convert the citations and the References list in this document to plain text?</p><div class="btns"><button class="btn primary grow" id="plainYes" type="button">Convert</button><button class="btn grow" id="plainNo" type="button">Cancel</button></div></div>
       </div>
     </div></div>
   </div>
@@ -170,6 +196,7 @@ const safeUrl = u => /^https?:[/][/]/i.test(u) ? u : null;
 const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[‐-―]/g, '-');
 const cmpStr = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 </script>
-<script src="../app/apa.js?v=2026-11-09.14"></script>
-<script src="engine.js?v=2026-11-09.14"></script>
-<script src="panel.js?v=2026-11-09.14"></script>
+<script src="../app/apa.js?v=2026-11-10.01"></script>
+<script src="../app/csl.js?v=2026-11-10.01"></script>
+<script src="engine.js?v=2026-11-10.01"></script>
+<script src="panel.js?v=2026-11-10.01"></script>

@@ -1,8 +1,8 @@
 ﻿// LibLande: Notes: a publication's notes (the .bib's Notes field, written as Markdown) and its PDF's highlights and notes, in the details pane's Notes view and a large pop-out editor, both formatted as you type.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, apa, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
+// index.html: library, apa, csl, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/notes.js'] = '2026-11-09.14';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/notes.js'] = '2026-11-10.01';
 /* ------------------------------------------------------------ notes */
 // The details pane shows Details or Notes (a switch at its top, or Alt-N;
 // the choice kept). Notes has your notes, in a box you type in, formatted
