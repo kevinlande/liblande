@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-10.07';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-10.08';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -628,6 +628,7 @@ async function softNext() {
 async function openReader(entry, file, pos) {
   const my = ++V.token;
   $('#viewer').classList.remove('start');
+  $('#vSideBtn').disabled = false;
   $('#vStart').hidden = true;
   TAKEN.clear();
   $('#viewer').classList.remove('bars-hidden');
@@ -1177,6 +1178,7 @@ function showStart() {
   if (V.doc) { rememberTab(); unloadDoc(); }
   hideQuote();
   $('#viewer').classList.add('start');
+  $('#vSideBtn').disabled = true;
   $('#vTitle').textContent = 'New tab';
   $('#vPage').textContent = '';
   $('#vStart').hidden = false;
