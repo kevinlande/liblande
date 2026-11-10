@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-10.02';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-10.03';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -421,7 +421,39 @@ function addLinkTake() {
   } catch (err) { /* (no session storage: the link is just ignored) */ }
 }
 addLinkTake();
-window.addEventListener('hashchange', () => { addLinkTake(); if (ENTRIES && ENTRIES.length) addFromLink(); });
+window.addEventListener('hashchange', () => { addLinkTake(); openLinkTake(); if (ENTRIES && ENTRIES.length) { addFromLink(); openFromLink(); } });
+// Opening one publication from a link: "#open=<cite key>", with
+// "&view=notes" for its Notes or "&view=edit" for Edit (as LibLande for
+// Word opens it). Kept for the session until the library's open, as
+// #add is.
+const OPEN_LINK_KEY = 'landelib.openLink';
+function openLinkTake() {
+  try {
+    const h = new URLSearchParams(location.hash.slice(1)), k = h.get('open');
+    if (!k) return;
+    sessionStorage.setItem(OPEN_LINK_KEY, JSON.stringify({ k, view: h.get('view') || '' }));
+    history.replaceState(null, '', location.pathname + location.search);
+  } catch (err) { /* (as above) */ }
+}
+openLinkTake();
+function openFromLink() {
+  let p = null;
+  try { p = JSON.parse(sessionStorage.getItem(OPEN_LINK_KEY) || 'null'); sessionStorage.removeItem(OPEN_LINK_KEY); } catch (err) { p = null; }
+  if (!p || !p.k) return;
+  const e = BYKEY.get(p.k);
+  if (!e) { toast('\u201c' + p.k + '\u201d isn\u2019t in your library.', 6000); return; }
+  if (sheet) closeSheet();
+  // (Shown in the list: the search cleared, or All, if it's not there.)
+  if (!state.view.some(x => x.k === e.k)) {
+    if (state.q) { $('#q').value = ''; state.q = ''; }
+    if (state.group !== 'all' && !state.view.some(x => x.k === e.k)) setGroup('all'); else refresh(false);
+  }
+  const i = state.view.findIndex(x => x.k === e.k);
+  if (i >= 0) select(i); else { state.selKey = e.k; renderDetail(); }
+  if (phoneMQ.matches) go('detail');
+  if (p.view === 'notes') setDetailView('notes');
+  else if (p.view === 'edit' && gs && !$('#addBtn').hidden) openEdit(e);
+}
 async function addFromLink() {
   let p = null;
   try { p = JSON.parse(sessionStorage.getItem(ADD_LINK_KEY) || 'null'); sessionStorage.removeItem(ADD_LINK_KEY); } catch (err) { p = null; }

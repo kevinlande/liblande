@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-11-10.02';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-11-10.03';
 /* -------------------------------------------------------------- features */
 // What LibLande does, by area: each feature, what it's for, where to find
 // it, and its icon (see featIcon). Shown from the sidebar's foot (Features), with a box to find
@@ -80,7 +80,7 @@ const FEATURES = [
     ['Edit or make an outline', 'Change titles, drag to indent, add the page you\u2019re on, delete; or make one from the Contents or the headings. Saved into the PDF.', 'Edit and Make\u2026 in the Outline tab', 'ICON:pencil'],
   ] },
   { area: 'Citing and keeping up', items: [
-    ['LibLande in Word', 'A LibLande panel in Word on a Mac: the works a document cites, your whole library, or a group kept with the document (by author, year or date added); search them and insert citations at the cursor, with pages, words before each work (\u201csee also\u201d) and in the order you choose (or by year); put the cursor in one to change it. A References list keeps itself up to date, in APA, Chicago, MLA or Harvard. Your notes and a PDF\u2019s highlights, to quote with the page. Citations typed by hand, or Zotero\u2019s, become LibLande\u2019s; and a plain copy for a journal or co-author.', 'Settings \u203a Word, to install it', '#settingsBtn'],
+    ['LibLande in Word', 'A LibLande panel in Word on a Mac: the works a document cites, your whole library, or a group kept with the document (by author, year or date added); search them and insert citations at the cursor, with pages, words before each work (\u201csee also\u201d) and in the order you choose (or by year); put the cursor in one to change it. A References list keeps itself up to date, in APA, Chicago, MLA or Harvard. Your notes and a PDF\u2019s highlights, to quote with the page (or open in LibLande). Citations typed by hand, or Zotero\u2019s, become LibLande\u2019s; and a plain copy for a journal or co-author.', 'Settings \u203a Word, to install it', '#settingsBtn'],
     ['Copy a citation', 'APA, APA in text, BibTeX or the cite key, one publication or several; in the reader, the open paper\u2019s.', 'Copy, in the details pane; or the shortcuts (\u2325A for APA, \u21e7\u2325A in text, in the library or the reader)', 'ICON:quote'],
     ['Citation styles', 'Any citation style for Copy, Quote, the QR code, Export and Cite Check: APA by default, or Chicago, MLA, Harvard, a journal\u2019s own: any of the 10,000-odd Zotero uses, found by name. Downloaded once, then kept for offline use; the choice goes with your account. The Copy menu\u2019s Style row picks another for one copy. Cite Check puts your References into the style, leaving entries it doesn\u2019t recognise as you wrote them.', 'Settings \u203a Citing', 'ICON:quote'],
     ['QR code of references', 'A QR code that, scanned with a phone, shows the reference (or a selection\u2019s, some 10 to 15) as APA has it, to copy or open by DOI. Save it as a picture for a slide or handout.', 'Copy \u203a QR code\u2026, in the details, the reader\u2019s Citation tab, or for a selection', 'path:M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 18h2v2h-2zM14 18h2M18 14h2'],

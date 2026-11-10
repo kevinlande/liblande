@@ -155,12 +155,17 @@
   .gact { color: var(--accent); padding: 6px; background: none; border: none; cursor: pointer; text-align: left; width: 100%; }
   #gNew input { width: 100%; font: inherit; border: 1px solid var(--line); background: var(--field); color: var(--text); border-radius: 6px; padding: 6px 8px; margin: 4px 0 8px; }
   #gNew .err { margin: 0 0 8px; }
+  .sortrow .only { display: flex; align-items: center; gap: 5px; cursor: pointer; }
   .nw { padding: 9px 12px; border-bottom: 1px solid var(--row); cursor: pointer; }
   .nw:hover { background: color-mix(in srgb, var(--soft) 45%, transparent); }
   .nw .cnts { display: flex; gap: 6px; margin-top: 4px; align-items: center; }
   .chip { font-size: 11px; padding: 1px 7px; border-radius: 9px; background: var(--row); color: var(--muted); }
   .nw .cited { margin-left: auto; }
-  .back { display: inline-flex; align-items: center; gap: 4px; color: var(--accent); margin-bottom: 8px; font-size: 12px; background: none; border: none; cursor: pointer; padding: 0; }
+  /* (Back to the list: a bar that stays at the top while the notes scroll.) */
+  .backbar { position: sticky; top: -12px; z-index: 2; margin: -12px -12px 10px; padding: 8px 12px; background: var(--bg); border-bottom: 1px solid var(--line); }
+  .back { display: inline-flex; align-items: center; gap: 6px; color: var(--accent); font-size: 13px; font-weight: 600; background: var(--soft); border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); border-radius: 8px; cursor: pointer; padding: 5px 12px 5px 9px; }
+  .back:hover { background: color-mix(in srgb, var(--accent) 22%, var(--bg)); }
+  .back svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
   .nhead .t { font-size: 14px; }
   .nhead .m { margin: 2px 0 6px; }
   .nsec { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--faint); margin: 14px 0 6px; display: flex; align-items: center; }
@@ -268,6 +273,7 @@
     <div class="top">
       <label class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg><input id="nq" type="search" placeholder="Search notes and highlights" autocomplete="off" autocorrect="off" spellcheck="false" aria-label="Search notes and highlights"></label>
       <div class="subtabs" role="tablist" aria-label="List" id="nLists"></div>
+      <div class="sortrow"><label class="only"><input type="checkbox" id="nOnly"> With notes or highlights</label><label>Sort <select id="nSort" aria-label="Sort"><option value="author">Author</option><option value="year">Year</option><option value="added">Date added</option></select></label></div>
     </div>
     <div class="scroll" id="nBox"><div id="nList"></div><div class="body" id="nWork" hidden></div></div>
   </div>
@@ -294,8 +300,8 @@ const safeUrl = u => /^https?:[/][/]/i.test(u) ? u : null;
 const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[‐-―]/g, '-');
 const cmpStr = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 </script>
-<script src="../app/apa.js?v=2026-11-10.02"></script>
-<script src="../app/csl.js?v=2026-11-10.02"></script>
-<script src="../app/marks.js?v=2026-11-10.02"></script>
-<script src="engine.js?v=2026-11-10.02"></script>
-<script src="panel.js?v=2026-11-10.02"></script>
+<script src="../app/apa.js?v=2026-11-10.03"></script>
+<script src="../app/csl.js?v=2026-11-10.03"></script>
+<script src="../app/marks.js?v=2026-11-10.03"></script>
+<script src="engine.js?v=2026-11-10.03"></script>
+<script src="panel.js?v=2026-11-10.03"></script>

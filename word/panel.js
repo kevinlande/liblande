@@ -957,11 +957,14 @@
     const toks = norm($('nq').value.trim()).split(/\s+/).filter(Boolean);
     const keep = listKeys(S.list);
     const counts = LLWord.counts(presentCites());
-    // (A work shows with notes, or highlights found; in this document's
-    // list or a group's, also while its PDF is still to be read.)
+    // (Every work in the list; or, ticked, those with notes or highlights
+    // found, and in this document's list or a group's, those whose PDF is
+    // still to be read.)
     const has = e => { const fl = pdfOf(e), m = fl && NOTE.marks.get(fl.id); return notesOf(e).trim() || (m ? m.marks.length : keep && fl); };
+    const only = $('nOnly').checked;
+    $('nSort').value = S.sort[sortKey()];
     const list = (keep ? [...keep].map(k => S.byKey.get(k)).filter(Boolean) : S.entries.slice())
-      .filter(has)
+      .filter(e => !only || has(e))
       .filter(e => !toks.length || toks.every(t => { const fl = pdfOf(e); const hay = norm([e.f.title, firstName(e), e.f.year, notesOf(e), fl ? NOTE.text.get(fl.id) : ''].join(' ')); return hay.includes(t); }))
       .sort(SORTS[S.sort[sortKey()]] || SORTS.author);
     $('nList').innerHTML = list.slice(0, NOTE.shown).map(e => {
@@ -970,7 +973,7 @@
         (m && m.marks.length ? '<span class="chip">' + m.marks.length + ' highlight' + (m.marks.length === 1 ? '' : 's') + '</span>' : '');
       return '<div class="nw" data-k="' + esc(e.k) + '" role="button" tabindex="0"><div class="t">' + esc(e.f.title || e.k) + '</div><div class="m">' + esc(metaOf(e)) + '</div>' +
         '<div class="cnts">' + chips + (n ? '<span class="cited">cited ' + n + '\u00d7</span>' : '') + '</div></div>';
-    }).join('') || '<div class="empty">' + (toks.length ? 'Nothing matches.' : 'No notes or highlights here.') + '</div>';
+    }).join('') || '<div class="empty">' + (toks.length ? 'Nothing matches.' : only ? 'No notes or highlights here.' : 'Nothing here.') + '</div>';
     scanMarks(keep ? list : []);
   }
   // The PDFs of a short list (this document's works, or a group's) read in
@@ -1063,7 +1066,7 @@
     $('nWork').hidden = false;
     $('nBox').scrollTop = 0;
     const md = notesOf(e).trim(), fl = pdfOf(e);
-    $('nWork').innerHTML = '<button type="button" class="back" id="nBack">\u2039 Notes</button>' +
+    $('nWork').innerHTML = '<div class="backbar"><button type="button" class="back" id="nBack"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>All notes</button></div>' +
       '<div class="nhead"><div class="t">' + esc(e.f.title || e.k) + '</div><div class="m">' + esc(metaOf(e)) + '</div></div>' +
       '<div class="nsec">My notes<button type="button" id="nEdit">Edit in LibLande</button></div>' +
       (md ? '<div class="mynote">' + mdToHtml(md) + '</div>' : '<p class="note">No notes yet.</p>') +
@@ -1182,7 +1185,7 @@
     const kb = $('r' + S.marker);
     if (kb) kb.scrollIntoView({ block: 'nearest' });
     const add = $('addLib');
-    if (add) add.addEventListener('click', () => openLibLande());
+    if (add) add.addEventListener('click', () => addInLibLande($('q').value));
   }
   function chooseList(which) {
     S.list = which;
@@ -1500,7 +1503,10 @@
     $('menuWho').textContent = email || 'Signed in';
   }
   function paintOffline() { $('offline').hidden = navigator.onLine; }
-  const openLibLande = () => { try { Office.context.ui.openBrowserWindow(LIBLANDE); } catch (e) { window.open(LIBLANDE, '_blank'); } };
+  // LibLande, or a link into it: "#add=<what to look for>" opens Add with
+  // it looked up; "#open=<cite key>&view=notes" opens a work's Notes.
+  const openLibLande = (hash = '') => { try { Office.context.ui.openBrowserWindow(LIBLANDE + hash); } catch (e) { window.open(LIBLANDE + hash, '_blank'); } };
+  const addInLibLande = what => openLibLande(what && what.trim() ? '#add=' + encodeURIComponent(what.trim()) : '');
 
   async function reload(force) {
     try {
@@ -1608,13 +1614,16 @@
       else $('q').focus();
     };
     $('tNotes').addEventListener('click', () => tab('notes'));
+    $('nOnly').checked = !!store.get('notesOnly', false);
+    $('nOnly').addEventListener('change', () => { store.set('notesOnly', $('nOnly').checked); NOTE.shown = 100; paintNotesList(); });
+    $('nSort').addEventListener('change', () => { S.sort[sortKey()] = $('nSort').value; store.set('sorts', S.sort); NOTE.shown = 100; search(); });
     $('nq').addEventListener('input', () => { NOTE.shown = 100; if (NOTE.open) closeNotes(); else paintNotesList(); });
     $('nList').addEventListener('click', ev => { const w = ev.target.closest('.nw'); if (w) openNotes(w.dataset.k); });
     $('nList').addEventListener('keydown', ev => { const w = ev.target.closest('.nw'); if (w && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); openNotes(w.dataset.k); } });
     $('nBox').addEventListener('scroll', () => { const b = $('nBox'); if (!NOTE.open && b.scrollTop + b.clientHeight > b.scrollHeight - 300) { NOTE.shown += 100; paintNotesList(); } });
     $('nWork').addEventListener('click', ev => {
       if (ev.target.closest('#nBack')) { closeNotes(); return; }
-      if (ev.target.closest('#nEdit')) { openLibLande(); return; }
+      if (ev.target.closest('#nEdit')) { openLibLande('#open=' + encodeURIComponent(NOTE.open) + '&view=notes'); return; }
       const qb = ev.target.closest('.qb');
       if (qb) {
         const e = S.byKey.get(NOTE.open), fl = e && pdfOf(e), r = fl && NOTE.marks.get(fl.id), m = r && r.marks[+qb.dataset.m];
@@ -1632,7 +1641,8 @@
     $('lUndo').addEventListener('click', undoLinks);
     $('lRows').addEventListener('click', ev => {
       const add = ev.target.closest('[data-add]');
-      if (add) { openLibLande(); return; }
+      // (A citation not found: looked for by its names and year.)
+      if (add) { const row = add.closest('[data-typed]'); addInLibLande(row ? row.dataset.typed.replace(/[()\[\];,]|\bet al\.|&|\band\b|\b(see|also|e\.g\.|cf\.)\b/g, ' ').replace(/\s+/g, ' ') : ''); return; }
       const ch = ev.target.closest('[data-change]');
       if (ch) { const i = +ch.dataset.change; LINK.open = LINK.open === i ? -1 : i; paintLink(); return; }
       const pk = ev.target.closest('.pk');

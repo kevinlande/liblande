@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-10.02';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-10.03';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -249,8 +249,9 @@ const builtText = d => typeof d.built === 'number'
   ? new Date(d.built).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
   : d.built;
 function init(data, again) {
-  // (A paper sent from its web page, once the library's open: see addFromLink.)
-  if (!again) requestAnimationFrame(() => addFromLink());
+  // (A paper sent from its web page, or one to open, once the library's
+  // open: see addFromLink and openFromLink.)
+  if (!again) requestAnimationFrame(() => { addFromLink(); openFromLink(); });
   DATA = data;
   overlayOffline(data);
   ENTRIES = data.entries;
