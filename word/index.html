@@ -53,21 +53,57 @@
   .cited { align-self: flex-start; margin-top: 2px; font-size: 11px; line-height: 16px; color: var(--accent); background: var(--bg); border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); border-radius: 9px; padding: 0 7px; white-space: nowrap; flex: none; }
   .empty { text-align: center; color: var(--muted); padding: 22px 8px; }
   .empty .btn { margin-top: 10px; }
-  .foot { border-top: 1px solid var(--line); background: var(--panel); padding: 10px 12px 12px; flex: none; max-height: 60%; overflow-y: auto; }
-  .lbl { display: flex; align-items: center; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--faint); margin: 0 0 6px; }
-  .lbl button { margin-left: auto; text-transform: none; letter-spacing: 0; font-size: 12px; color: var(--accent); background: none; border: none; cursor: pointer; padding: 0 2px; }
+  /* The Cite tab: the search and the two lists on top, the citation's card
+     at the foot (three sizes: 1 its bar and buttons, 2 a few works, 3 up to
+     the search box). */
+  .top { padding: 12px 12px 0; flex: none; }
+  .subtabs { display: flex; margin-top: 10px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .subtabs button { flex: 1; padding: 5px 6px; font-size: 12px; color: var(--muted); background: var(--field); border: none; cursor: pointer; }
+  .subtabs button + button { border-left: 1px solid var(--line); }
+  .subtabs button[aria-selected="true"] { background: var(--soft); color: var(--accent); font-weight: 600; }
+  .subtabs i { font-style: normal; opacity: .7; font-weight: 400; margin-left: 4px; }
+  .sortrow { display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--faint); padding: 6px 0 2px; }
+  .sortrow select { font: inherit; font-size: 12px; color: var(--accent); background: none; border: none; cursor: pointer; }
+  #resBox .res { margin: 2px 0 0; }
+  .other { padding: 10px 12px; color: var(--muted); font-size: 12px; }
+  .other button { background: none; border: none; color: var(--accent); cursor: pointer; font: inherit; padding: 0 0 0 4px; }
+  #pCite.editing:not(.searching):not(.browsing) .lists { opacity: .5; cursor: pointer; }
+  .lists { transition: opacity .15s; }
+  .foot { margin: 0 8px 8px; border: 2px solid var(--accent); border-radius: 12px; box-shadow: 0 -6px 18px #0002; background: color-mix(in srgb, var(--accent) 6%, var(--bg)); padding: 0 12px 12px; overflow: hidden; flex: none; display: flex; flex-direction: column; max-height: calc(100% - 16px); }
+  .handle { display: flex; justify-content: center; padding: 5px 0 3px; background: var(--accent); margin: 0 -12px; border: none; cursor: ns-resize; touch-action: none; flex: none; }
+  .handle span { width: 34px; height: 4px; border-radius: 2px; background: var(--accent-ink); opacity: .6; }
+  .gbar { background: var(--accent); color: var(--accent-ink); margin: 0 -12px 10px; padding: 0 6px 9px 12px; cursor: pointer; flex: none; }
+  .gtop { display: flex; align-items: center; gap: 2px; }
+  .gk { flex: 1; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; opacity: .85; }
+  .gbar .ic { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 5px; border: none; background: none; color: inherit; cursor: pointer; font-size: 13px; line-height: 1; padding: 0; }
+  .gbar .ic:hover { background: rgba(0,0,0,.15); }
+  .gc { font: 14px/1.35 Garamond, "EB Garamond", Georgia, serif; margin-top: 1px; padding-right: 6px; overflow-wrap: anywhere; }
+  .galso { font-size: 11.5px; opacity: .85; margin-top: 4px; }
+  .cbody { display: flex; flex-direction: column; min-height: 0; }
+  .foot[data-size="1"] .cbody { display: none; }
+  .foot[data-size="2"] .chosen { max-height: 190px; }
+  .foot[data-size="3"] { flex: 1; }
+  .foot[data-size="3"] .cbody { flex: 1; }
+  #pCite.full .lists { display: none; }
+  .chosen { overflow-y: auto; min-height: 0; padding: 4px 6px; margin: -4px -6px 6px; }
+  .ch { background: var(--field); border: 1px solid var(--line); border-radius: 8px; padding: 6px 4px 7px 2px; display: grid; grid-template-columns: 16px 1fr 24px; column-gap: 6px; row-gap: 5px; align-items: center; }
+  .ch .grip { grid-row: 1 / span 2; }
+  .ch .nm { grid-column: 2; font-weight: 500; line-height: 1.3; overflow-wrap: anywhere; }
+  .ch .x { grid-column: 3; grid-row: 1; }
+  .ch .fl { grid-column: 2; display: flex; gap: 10px; align-items: center; font-size: 11px; color: var(--faint); flex-wrap: wrap; }
+  .ch .fl label { display: flex; align-items: center; gap: 4px; }
+  .ch input { font: inherit; font-size: 12px; border: 1px solid var(--line); background: var(--field); color: var(--text); border-radius: 5px; padding: 2px 5px; width: 82px; }
+  .ch input.pg { width: 70px; }
+  .order { margin-left: auto; display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+  .order button { font-size: 12px; padding: 4px 7px; background: var(--field); border: none; color: var(--accent); cursor: pointer; }
+  .order button + button { border-left: 1px solid var(--line); }
+  .order button[aria-pressed="true"] { background: var(--soft); font-weight: 600; }
+  .foot .btns { flex: none; }
   .chosen { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
-  .ch { display: flex; align-items: center; gap: 6px; background: var(--field); border: 1px solid var(--line); border-radius: 7px; padding: 3px 4px 3px 2px; }
   .ch.drag { box-shadow: 0 6px 16px #0004; border-color: var(--accent); position: relative; z-index: 2; cursor: grabbing; }
   .ch.drag .grip { cursor: grabbing; }
   .grip { color: var(--faint); cursor: grab; width: 16px; text-align: center; letter-spacing: -2px; font-size: 12px; user-select: none; touch-action: none; }
-  .ch .n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .ch input { font: inherit; font-size: 12px; border: 1px solid var(--line); background: var(--field); color: var(--text); border-radius: 5px; padding: 2px 5px; }
-  .ch input { width: 62px; flex: none; }
   .ch input::placeholder { color: var(--faint); }
-  .ch .n { font-size: 12.5px; }
-  .editbar { display: flex; gap: 8px; align-items: center; background: var(--soft); border-radius: 8px; padding: 4px 4px 4px 10px; margin-bottom: 10px; }
-  .editbar span { flex: 1; font-weight: 500; }
   .x { width: 24px; height: 24px; border: none; background: none; color: var(--muted); border-radius: 5px; cursor: pointer; flex: none; }
   .x:hover { background: var(--row); }
   .opts { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
@@ -75,7 +111,6 @@
   .seg button { padding: 4px 7px; font-size: 12px; background: var(--field); border: none; cursor: pointer; }
   .seg button + button { border-left: 1px solid var(--line); }
   .seg button[aria-checked="true"] { background: var(--accent); color: var(--accent-ink); }
-  .prev { background: var(--field); border: 1px dashed var(--line); border-radius: 7px; padding: 7px 9px; font: 14px Garamond, "EB Garamond", Georgia, serif; margin-bottom: 8px; overflow-wrap: anywhere; }
   .note { font-size: 12px; color: var(--muted); margin: 0 0 8px; }
   .btns { display: flex; gap: 8px; }
   .btn { border: 1px solid var(--line); background: var(--field); border-radius: 8px; padding: 7px 12px; font-weight: 500; cursor: pointer; }
@@ -104,6 +139,43 @@
   .link-row .tag { flex: none; }
   .ask { border: 1px solid var(--line); border-radius: 9px; padding: 10px; background: var(--panel); margin-top: 8px; }
   .ask p { margin: 0 0 8px; font-weight: 500; }
+  .subtabs { overflow-x: auto; scrollbar-width: none; }
+  .subtabs button { white-space: nowrap; }
+  .subtabs .gx { margin-left: 6px; opacity: .7; font-weight: 400; }
+  .subtabs .gx:hover { opacity: 1; }
+  .subtabs .add { flex: none; width: 30px; font-size: 15px; line-height: 1; color: var(--accent); }
+  .gmenu { position: fixed; left: 12px; right: 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 28px #0005; padding: 8px; z-index: 6; max-height: 70vh; overflow-y: auto; }
+  .gmenu .search { margin-bottom: 6px; }
+  .gmenu .g { display: flex; align-items: center; gap: 8px; padding: 6px; border-radius: 6px; width: 100%; text-align: left; background: none; border: none; cursor: pointer; }
+  .gmenu .g:hover { background: var(--row); }
+  .gmenu .g .n { flex: 1; }
+  .gmenu .g .c { color: var(--faint); font-size: 12px; }
+  .gico { width: 14px; color: var(--muted); }
+  .gsep { border-top: 1px solid var(--line); margin: 6px 0; }
+  .gact { color: var(--accent); padding: 6px; background: none; border: none; cursor: pointer; text-align: left; width: 100%; }
+  #gNew input { width: 100%; font: inherit; border: 1px solid var(--line); background: var(--field); color: var(--text); border-radius: 6px; padding: 6px 8px; margin: 4px 0 8px; }
+  #gNew .err { margin: 0 0 8px; }
+  .nw { padding: 9px 12px; border-bottom: 1px solid var(--row); cursor: pointer; }
+  .nw:hover { background: color-mix(in srgb, var(--soft) 45%, transparent); }
+  .nw .cnts { display: flex; gap: 6px; margin-top: 4px; align-items: center; }
+  .chip { font-size: 11px; padding: 1px 7px; border-radius: 9px; background: var(--row); color: var(--muted); }
+  .nw .cited { margin-left: auto; }
+  .back { display: inline-flex; align-items: center; gap: 4px; color: var(--accent); margin-bottom: 8px; font-size: 12px; background: none; border: none; cursor: pointer; padding: 0; }
+  .nhead .t { font-size: 14px; }
+  .nhead .m { margin: 2px 0 6px; }
+  .nsec { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--faint); margin: 14px 0 6px; display: flex; align-items: center; }
+  .nsec button { margin-left: auto; text-transform: none; letter-spacing: 0; color: var(--accent); background: none; border: none; cursor: pointer; font-size: 12px; }
+  .mynote { background: var(--field); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 12.5px; line-height: 1.45; overflow-wrap: anywhere; }
+  .mynote h3, .mynote h4 { margin: 4px 0; font-size: 13px; }
+  .mynote p, .mynote ul, .mynote ol, .mynote blockquote { margin: 0 0 6px; }
+  .mynote ul, .mynote ol { padding-left: 18px; }
+  .mynote blockquote { border-left: 3px solid var(--line); padding-left: 8px; color: var(--muted); }
+  .pgh { font-size: 11px; color: var(--faint); margin: 10px 0 0; }
+  .hlt { display: flex; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--row); }
+  .hlt .bar { width: 4px; border-radius: 2px; flex: none; background: var(--line); }
+  .hlt .q { flex: 1; min-width: 0; font: 13.5px/1.4 Garamond, "EB Garamond", Georgia, serif; overflow-wrap: anywhere; }
+  .hlt .q .note2 { display: block; font: 12px/1.4 -apple-system, system-ui, sans-serif; color: var(--muted); margin-top: 3px; }
+  .hlt .qb { align-self: flex-start; font-size: 11.5px; border: 1px solid var(--line); border-radius: 6px; padding: 1px 7px; background: var(--field); color: var(--accent); white-space: nowrap; cursor: pointer; }
   .err.ok { background: var(--soft); color: var(--accent); }
   .err { background: var(--warn-soft); color: var(--warn); border-radius: 8px; padding: 8px 10px; margin: 0 0 8px; }
 </style>
@@ -129,27 +201,38 @@
   <div class="tabs" role="tablist">
     <button type="button" role="tab" id="tCite" aria-selected="true" aria-controls="pCite">Cite</button>
     <button type="button" role="tab" id="tRefs" aria-selected="false" aria-controls="pRefs">References</button>
+    <button type="button" role="tab" id="tNotes" aria-selected="false" aria-controls="pNotes">Notes</button>
   </div>
   <div class="view" id="pCite" role="tabpanel">
-    <div class="scroll">
-      <div class="body">
-        <div class="editbar" id="editBar" hidden><span>Editing citation</span><button class="x" type="button" id="editX" aria-label="Stop editing" title="Stop editing (Esc)">✕</button></div>
-        <label class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg><input id="q" type="search" placeholder="Search your library" autocomplete="off" autocorrect="off" spellcheck="false" aria-label="Search your library" aria-controls="res"></label>
-        <div class="res" id="res" role="listbox" aria-multiselectable="true"></div>
+    <div class="top">
+      <label class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg><input id="q" type="search" placeholder="Search your library" autocomplete="off" autocorrect="off" spellcheck="false" aria-label="Search your library" aria-controls="res"></label>
+      <div class="lists" id="listsBox">
+        <div class="subtabs" role="tablist" aria-label="List" id="lists"><button type="button" role="tab" data-list="doc" aria-selected="false">In this document<i id="nDoc"></i></button><button type="button" role="tab" data-list="lib" aria-selected="true">Library<i id="nLib"></i></button></div>
+        <div class="sortrow"><span></span><label>Sort <select id="sort" aria-label="Sort"><option value="author">Author</option><option value="year">Year</option><option value="added">Date added</option></select></label></div>
       </div>
     </div>
-    <div class="foot" id="foot" hidden>
-      <div class="err" id="citeErr" hidden></div>
-      <div class="lbl"><span>This citation</span><button type="button" id="az" hidden>A&#x2013;Z</button></div>
-      <div class="chosen" id="chosen"></div>
-      <div class="opts">
-        <span class="seg" role="radiogroup" aria-label="Form" id="forms">
-          <button type="button" role="radio" data-form="paren" aria-checked="true"></button><button type="button" role="radio" data-form="narr" aria-checked="false"></button><button type="button" role="radio" data-form="year" aria-checked="false"></button>
-        </span>
-        <datalist id="preList"><option value="see"><option value="e.g."><option value="see also"><option value="cf."><option value="but see"></datalist>
+    <div class="scroll lists" id="resBox">
+      <div class="res" id="res" role="listbox" aria-multiselectable="true"></div>
+      <div class="other" id="other" hidden></div>
+    </div>
+    <div class="foot" id="foot" data-size="2" hidden>
+      <button class="handle" type="button" id="handle" aria-label="Size" title="Drag or click to change the size"><span></span></button>
+      <div class="gbar" id="gbar">
+        <div class="gtop"><span class="gk" id="gLabel"></span><button class="ic" type="button" id="cardX" aria-label="Close" title="Close (Esc)">&#x2715;</button></div>
+        <div class="gc" id="prev" aria-live="polite"></div>
+        <div class="galso" id="prevNote" hidden></div>
       </div>
-      <div class="prev" id="prev" aria-live="polite"></div>
-      <p class="note" id="prevNote" hidden></p>
+      <div class="err" id="citeErr" hidden></div>
+      <div class="cbody" id="cbody">
+        <div class="chosen" id="chosen"></div>
+        <div class="opts">
+          <span class="seg" role="radiogroup" aria-label="Form" id="forms">
+            <button type="button" role="radio" data-form="paren" aria-checked="true"></button><button type="button" role="radio" data-form="narr" aria-checked="false"></button><button type="button" role="radio" data-form="year" aria-checked="false"></button>
+          </span>
+          <span class="order" id="order" hidden><button type="button" id="az" aria-pressed="true" title="Alphabetical, as APA has it">A&#x2013;Z</button><button type="button" id="byYear" aria-pressed="false" title="Oldest first">Year</button></span>
+          <datalist id="preList"><option value="see"><option value="e.g."><option value="see also"><option value="cf."><option value="but see"></datalist>
+        </div>
+      </div>
       <div class="btns"><button class="btn primary grow" id="insert" type="button">Insert<kbd>&#x2318;&#x21a9;</kbd></button><button class="btn" id="remove" type="button" hidden>Remove</button></div>
     </div>
   </div>
@@ -181,6 +264,21 @@
       </div>
     </div></div>
   </div>
+  <div class="view" id="pNotes" role="tabpanel" hidden>
+    <div class="top">
+      <label class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg><input id="nq" type="search" placeholder="Search notes and highlights" autocomplete="off" autocorrect="off" spellcheck="false" aria-label="Search notes and highlights"></label>
+      <div class="subtabs" role="tablist" aria-label="List" id="nLists"></div>
+    </div>
+    <div class="scroll" id="nBox"><div id="nList"></div><div class="body" id="nWork" hidden></div></div>
+  </div>
+</div>
+
+<div class="gmenu" id="gmenu" role="dialog" aria-label="Add a group" hidden>
+  <label class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg><input id="gq" type="search" placeholder="Find a group" autocomplete="off" spellcheck="false" aria-label="Find a group"></label>
+  <div id="gList"></div>
+  <div class="gsep"></div>
+  <button type="button" class="gact" id="gMake"></button>
+  <div id="gNew" hidden><input id="gName" aria-label="The new group's name"><div class="err" id="gErr" hidden></div><div class="btns"><button type="button" class="btn primary grow" id="gMakeGo">Make the group</button></div></div>
 </div>
 
 <div class="view" id="vLoading">
@@ -196,7 +294,8 @@ const safeUrl = u => /^https?:[/][/]/i.test(u) ? u : null;
 const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[‐-―]/g, '-');
 const cmpStr = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 </script>
-<script src="../app/apa.js?v=2026-11-10.01"></script>
-<script src="../app/csl.js?v=2026-11-10.01"></script>
-<script src="engine.js?v=2026-11-10.01"></script>
-<script src="panel.js?v=2026-11-10.01"></script>
+<script src="../app/apa.js?v=2026-11-10.02"></script>
+<script src="../app/csl.js?v=2026-11-10.02"></script>
+<script src="../app/marks.js?v=2026-11-10.02"></script>
+<script src="engine.js?v=2026-11-10.02"></script>
+<script src="panel.js?v=2026-11-10.02"></script>

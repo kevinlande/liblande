@@ -1,10 +1,10 @@
 ﻿// LibLande: APA (7th edition): references, in-text citations, sentence case for titles, and APA's order.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, apa, csl, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
+// index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 // It's also loaded on its own by the Word add-in (word/index.html), which
 // supplies what it uses from the rest: ENTRIES, esc, safeUrl, norm, cmpStr.
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/apa.js'] = '2026-11-10.01';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/apa.js'] = '2026-11-10.02';
 // Sentence case for APA titles. A capitalized word is lowered unless it
 // looks like a name: braced in the .bib ({Darwin}), an acronym or
 // mixed-case word (DNA, fMRI), an adjective like "Bayesian", or a word the

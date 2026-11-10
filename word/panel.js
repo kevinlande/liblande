@@ -13,11 +13,14 @@
   const API = 'https://www.googleapis.com/drive/v3/';
   const LIBLANDE = 'https://kevinlande.github.io/liblande/';
   const $ = id => document.getElementById(id);
+  // (This panel's version, as its own script was asked for: "panel.js?v=...".)
+  const VERSION = (/[?&]v=([^&]+)/.exec(((document.currentScript || {}).src) || '') || [])[1] || '';
   const S = {
     entries: [], byKey: new Map(), index: [],
     cites: {}, present: null, style: 'apa',
     chosen: [], form: 'paren', own: false,
     editing: null, dirty: false, skipEdit: null,
+    list: null, sort: { doc: 'author', lib: 'added', grp: 'author' }, groups: [], tabsG: [], shown: 100, size: 2, searching: false,
     results: [], marker: -1, inWord: false,
   };
 
@@ -27,7 +30,23 @@
     set(k, v) { try { if (v == null) localStorage.removeItem('llw.' + k); else localStorage.setItem('llw.' + k, JSON.stringify(v)); } catch (e) { /* none */ } },
   };
   const idb = {
-    open() { return new Promise((ok, no) => { const r = indexedDB.open('llw', 1); r.onupgradeneeded = () => r.result.createObjectStore('lib'); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); }); },
+    // (One connection, given up if another panel's older one holds up the
+    // upgrade for long: the library is then fetched from Drive instead.)
+    db: null,
+    open() {
+      if (this.db) return this.db;
+      this.db = new Promise((ok, no) => {
+        const r = indexedDB.open('llw', 2);
+        const late = setTimeout(() => no(new Error('blocked')), 4000);
+        r.onupgradeneeded = () => { ['lib', 'marks'].forEach(n => { if (!r.result.objectStoreNames.contains(n)) r.result.createObjectStore(n); }); };
+        r.onsuccess = () => { clearTimeout(late); const db = r.result; db.onversionchange = () => { db.close(); this.db = null; }; ok(db); };
+        r.onerror = () => { clearTimeout(late); no(r.error); };
+      });
+      this.db.catch(() => { this.db = null; });
+      return this.db;
+    },
+    async getIn(store, k) { try { const db = await this.open(); return await new Promise(ok => { const q = db.transaction(store).objectStore(store).get(k); q.onsuccess = () => ok(q.result || null); q.onerror = () => ok(null); }); } catch (e) { return null; } },
+    async putIn(store, k, v) { try { const db = await this.open(); db.transaction(store, 'readwrite').objectStore(store).put(v, k); } catch (e) { /* kept in memory only */ } },
     async get() { try { const db = await this.open(); return await new Promise(ok => { const q = db.transaction('lib').objectStore('lib').get('current'); q.onsuccess = () => ok(q.result || null); q.onerror = () => ok(null); }); } catch (e) { return null; } },
     async put(v) { try { const db = await this.open(); db.transaction('lib', 'readwrite').objectStore('lib').put(v, 'current'); } catch (e) { /* kept in memory only */ } },
     async clear() { try { const db = await this.open(); db.transaction('lib', 'readwrite').objectStore('lib').delete('current'); } catch (e) { /* none */ } },
@@ -100,6 +119,7 @@
   }
   function useLibrary(data) {
     S.entries = data.entries || [];
+    S.groups = (data.groups || []).filter(g => g && g.name);
     ENTRIES = S.entries;
     CASE_SETS = null;
     CSLW.engines.clear();
@@ -214,13 +234,13 @@
   /* ---- the document's citations (Word) */
   const SETTINGS = 'liblande';
   function readSettings() {
-    try { const v = Office.context.document.settings.get(SETTINGS); S.cites = (v && v.cites) || {}; S.style = (v && v.style) || 'apa'; } catch (e) { S.cites = {}; S.style = 'apa'; }
+    try { const v = Office.context.document.settings.get(SETTINGS); S.cites = (v && v.cites) || {}; S.style = (v && v.style) || 'apa'; S.tabsG = (v && v.groups) || []; } catch (e) { S.cites = {}; S.style = 'apa'; S.tabsG = []; }
     if ($('style')) $('style').value = S.style;
   }
   function saveSettings() {
     return new Promise(ok => {
       try {
-        Office.context.document.settings.set(SETTINGS, { v: 1, cites: S.cites, style: S.style });
+        Office.context.document.settings.set(SETTINGS, { v: 1, cites: S.cites, style: S.style, groups: S.tabsG });
         Office.context.document.settings.saveAsync(() => ok());
       } catch (e) { ok(); }
     });
@@ -345,6 +365,8 @@
     S.formBefore = S.form;
     S.form = c.form || 'paren';
     S.own = !!c.own;
+    S.searching = false;
+    $('pCite').classList.remove('searching', 'browsing');
     hideErr('citeErr');
     paintChosen();
     paintResults();
@@ -921,27 +943,216 @@
     $('refsErr').classList.add('ok');
   }
 
-  /* ---- search */
+  /* ---- Notes: your notes and the PDF's highlights, for a work */
+  // The works in the open list with notes (the .bib's Notes field, as
+  // LibLande keeps them) or a PDF; one opened shows its notes, formatted
+  // (marks.js), and the PDF's highlights and notes page by page, read from
+  // Drive the first time and kept (until the PDF changes). Quote puts a
+  // highlight in the document with its citation and page.
+  const NOTE = { open: null, marks: new Map(), text: new Map(), shown: 100 };
+  const notesOf = e => String((e.r && e.r.annote != null ? e.r.annote : e.f.annote) || '').replace(/\\\{&\}|\\&/g, '&');
+  const pdfOf = e => (e.files || []).find(f => f.id && /\.pdf$/i.test(f.n || f.p || ''));
+  function paintNotesList() {
+    if (NOTE.open) return;
+    const toks = norm($('nq').value.trim()).split(/\s+/).filter(Boolean);
+    const keep = listKeys(S.list);
+    const counts = LLWord.counts(presentCites());
+    // (A work shows with notes, or highlights found; in this document's
+    // list or a group's, also while its PDF is still to be read.)
+    const has = e => { const fl = pdfOf(e), m = fl && NOTE.marks.get(fl.id); return notesOf(e).trim() || (m ? m.marks.length : keep && fl); };
+    const list = (keep ? [...keep].map(k => S.byKey.get(k)).filter(Boolean) : S.entries.slice())
+      .filter(has)
+      .filter(e => !toks.length || toks.every(t => { const fl = pdfOf(e); const hay = norm([e.f.title, firstName(e), e.f.year, notesOf(e), fl ? NOTE.text.get(fl.id) : ''].join(' ')); return hay.includes(t); }))
+      .sort(SORTS[S.sort[sortKey()]] || SORTS.author);
+    $('nList').innerHTML = list.slice(0, NOTE.shown).map(e => {
+      const fl = pdfOf(e), m = fl && NOTE.marks.get(fl.id), n = counts.get(e.k) || 0;
+      const chips = (notesOf(e).trim() ? '<span class="chip">Notes</span>' : '') +
+        (m && m.marks.length ? '<span class="chip">' + m.marks.length + ' highlight' + (m.marks.length === 1 ? '' : 's') + '</span>' : '');
+      return '<div class="nw" data-k="' + esc(e.k) + '" role="button" tabindex="0"><div class="t">' + esc(e.f.title || e.k) + '</div><div class="m">' + esc(metaOf(e)) + '</div>' +
+        '<div class="cnts">' + chips + (n ? '<span class="cited">cited ' + n + '\u00d7</span>' : '') + '</div></div>';
+    }).join('') || '<div class="empty">' + (toks.length ? 'Nothing matches.' : 'No notes or highlights here.') + '</div>';
+    scanMarks(keep ? list : []);
+  }
+  // The PDFs of a short list (this document's works, or a group's) read in
+  // the background, two at a time, for their highlights; kept, as when a
+  // work is opened. (Not the whole library's: thousands of downloads.)
+  const SCAN = { queue: [], running: 0, token: 0 };
+  function scanMarks(list) {
+    const want = list.map(pdfOf).filter(fl => fl && !NOTE.marks.has(fl.id));
+    const key = want.map(f => f.id).join();
+    if (key === SCAN.key && SCAN.running) return;
+    SCAN.key = key;
+    SCAN.queue = want.slice(0, 300);
+    SCAN.token++;
+    for (let i = SCAN.running; i < 2; i++) scanNext(SCAN.token);
+  }
+  async function scanNext(token) {
+    const fl = SCAN.queue.shift();
+    if (!fl || token !== SCAN.token || $('pNotes').hidden) return;
+    SCAN.running++;
+    try {
+      const kept = await idb.getIn('marks', fl.id);
+      if (kept) { NOTE.marks.set(fl.id, kept); NOTE.text.set(fl.id, kept.marks.map(m => m.text + ' ' + m.note).join(' ')); } else await marksOf(fl);
+    } catch (e) { /* tried again when opened */ }
+    SCAN.running--;
+    if (token !== SCAN.token) return;
+    clearTimeout(SCAN.paint);
+    // (The list shown again now and then; that also picks up where this
+    // left off.)
+    SCAN.paint = setTimeout(() => { if (!NOTE.open && !$('pNotes').hidden) paintNotesList(); }, 400);
+    scanNext(token);
+  }
+  let pdfjs = null;
+  function loadPdfJs() {
+    return pdfjs || (pdfjs = import(new URL('../vendor/pdf.js/6.4.299/pdf.min.mjs', location.href).href).then(lib => {
+      lib.GlobalWorkerOptions.workerSrc = new URL('../vendor/pdf.js/6.4.299/pdf.worker.min.mjs', location.href).href;
+      return lib;
+    }).catch(e => { pdfjs = null; throw new Error('The PDF reader didn\u2019t load. Are you online?'); }));
+  }
+  // A PDF's highlights and notes, top of each page first (as LibLande's
+  // own Notes and Annotations have them).
+  async function readMarks(doc) {
+    const marks = [];
+    for (let n = 1; n <= doc.numPages; n++) {
+      const page = await doc.getPage(n);
+      const anns = (await page.getAnnotations()).filter(a => MARK_NAMES[a.subtype]);
+      if (!anns.length) continue;
+      let items = null;
+      const onPage = [];
+      for (const a of anns) {
+        let text = '';
+        const note = a.subtype === 'Highlight' && isNoteOpacity(a.opacity);
+        if (a.quadPoints && a.quadPoints.length && !note) {
+          items = items || (await page.getTextContent()).items;
+          text = textInQuads(items, a.quadPoints);
+        }
+        const c = a.color;
+        const m = { page: n, y: a.rect ? a.rect[3] : null, color: c && c.length >= 3 ? 'rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ')' : null, text, note: (a.contentsObj && a.contentsObj.str) || '' };
+        if (m.text || m.note) onPage.push(m);
+      }
+      onPage.sort((p, q) => (q.y || 0) - (p.y || 0));
+      marks.push(...onPage);
+    }
+    return marks;
+  }
+  async function marksOf(fl) {
+    let stamp = '';
+    try { stamp = (await (await drive('files/' + encodeURIComponent(fl.id) + '?fields=modifiedTime')).json()).modifiedTime || ''; } catch (e) { /* offline: what's kept */ }
+    let r = NOTE.marks.get(fl.id) || await idb.getIn('marks', fl.id);
+    if (r && (!stamp || r.stamp === stamp)) { NOTE.marks.set(fl.id, r); return r; }
+    const lib = await loadPdfJs();
+    const data = new Uint8Array(await (await drive('files/' + encodeURIComponent(fl.id) + '?alt=media')).arrayBuffer());
+    const task = lib.getDocument({ data, cMapUrl: new URL('../vendor/pdf.js/6.4.299/cmaps/', location.href).href, cMapPacked: true });
+    const doc = await task.promise;
+    try {
+      let labels = null;
+      try { labels = await doc.getPageLabels(); } catch (e) { labels = null; }
+      r = { stamp, marks: await readMarks(doc), labels };
+    } finally { try { task.destroy(); } catch (e) { /* gone */ } }
+    NOTE.marks.set(fl.id, r);
+    NOTE.text.set(fl.id, r.marks.map(m => m.text + ' ' + m.note).join(' '));
+    idb.putIn('marks', fl.id, r);
+    return r;
+  }
+  const pageLabel = (r, n) => (r.labels && r.labels[n - 1]) || String(n);
+  async function openNotes(k) {
+    const e = S.byKey.get(k);
+    if (!e) return;
+    NOTE.open = k;
+    $('nList').hidden = true;
+    $('nWork').hidden = false;
+    $('nBox').scrollTop = 0;
+    const md = notesOf(e).trim(), fl = pdfOf(e);
+    $('nWork').innerHTML = '<button type="button" class="back" id="nBack">\u2039 Notes</button>' +
+      '<div class="nhead"><div class="t">' + esc(e.f.title || e.k) + '</div><div class="m">' + esc(metaOf(e)) + '</div></div>' +
+      '<div class="nsec">My notes<button type="button" id="nEdit">Edit in LibLande</button></div>' +
+      (md ? '<div class="mynote">' + mdToHtml(md) + '</div>' : '<p class="note">No notes yet.</p>') +
+      '<div class="nsec" id="nHlHead">Highlights</div><div id="nHl">' + (fl ? '<p class="note">Reading the PDF\u2026</p>' : '<p class="note">No PDF.</p>') + '</div>';
+    if (!fl) return;
+    let r;
+    try { r = await marksOf(fl); } catch (err) {
+      if (NOTE.open === k) $('nHl').innerHTML = '<p class="note">Couldn\u2019t read the PDF: ' + esc((err && err.message) || err) + '</p>';
+      return;
+    }
+    if (NOTE.open !== k) return;
+    $('nHlHead').firstChild.textContent = 'Highlights \u00b7 ' + r.marks.length;
+    let last = 0, h = '';
+    r.marks.forEach((m, i) => {
+      if (m.page !== last) { last = m.page; h += '<div class="pgh">Page ' + esc(pageLabel(r, m.page)) + '</div>'; }
+      h += '<div class="hlt"><span class="bar"' + (m.color ? ' style="background:' + esc(m.color) + '"' : '') + '></span><span class="q">' +
+        (m.text ? '\u201c' + esc(m.text) + '\u201d' : '') + (m.note ? '<span class="note2">' + esc(m.note) + '</span>' : '') + '</span>' +
+        (m.text ? '<button type="button" class="qb" data-m="' + i + '">Quote</button>' : '') + '</div>';
+    });
+    $('nHl').innerHTML = h || '<p class="note">No highlights or notes in the PDF yet.</p>';
+  }
+  function closeNotes() {
+    NOTE.open = null;
+    $('nWork').hidden = true;
+    $('nList').hidden = false;
+    paintNotesList();
+  }
+  // A highlight in the document at the cursor: "the passage" (Author, 2011,
+  // p. 4), the citation LibLande's.
+  async function quoteMark(k, m, page) {
+    const c = { items: [{ k, page: page ? 'p. ' + page : '' }], form: 'paren', own: false };
+    const id = newId();
+    try {
+      await styleReady();
+      const cite = renderAll(Object.assign({}, presentCites(), { [id]: c })).texts[id];
+      await Word.run(async ctx => {
+        const sel = ctx.document.getSelection();
+        const inside = sel.parentContentControlOrNullObject;
+        inside.load('tag');
+        await ctx.sync();
+        const at = !inside.isNullObject && /^LL:/.test(inside.tag) ? inside.getRange('After') : sel;
+        const q = at.insertText('\u201c' + m.text.trim() + '\u201d ', 'Replace');
+        const cc = q.insertText(cite, 'After').insertContentControl();
+        cc.tag = 'LL:' + id; cc.title = 'LibLande'; cc.appearance = 'BoundingBox';
+        await ctx.sync();
+        cc.getRange('After').select();
+        await ctx.sync();
+      });
+    } catch (e) { alertNotes('Couldn\u2019t quote it: ' + wordError(e)); return; }
+    S.cites[id] = c;
+    if (S.present) S.present.push(id);
+    S.skipEdit = id;
+    await saveSettings();
+    try { await refreshDocument(); } catch (e) { /* Refresh will */ }
+  }
+  function alertNotes(msg) { const p = document.createElement('div'); p.className = 'err'; p.textContent = msg; $('nWork').prepend(p); }
+
+  /* ---- the two lists, and search */
+  // "In this document" (the works it cites) and "Library" (all of it), each
+  // in its own order (author, year, or date added, newest first); what's
+  // typed searches the list that's open, and says how many more the library
+  // has. A document citing nothing opens on Library.
+  const firstName = e => { const n = (e.a && e.a[0]) || (e.e && e.e[0]); return n ? n[0] : (e.f.title || ''); };
+  const SORTS = {
+    author: (a, b) => cmpStr(norm(firstName(a)), norm(firstName(b))) || cmpStr(a.f.year || '', b.f.year || ''),
+    year: (a, b) => cmpStr(b.f.year || '', a.f.year || '') || cmpStr(norm(firstName(a)), norm(firstName(b))),
+    added: (a, b) => cmpStr(b.f['date-added'] || '', a.f['date-added'] || ''),
+  };
+  const matches = text => {
+    const toks = norm(text).split(/\s+/).filter(Boolean);
+    return toks.length ? S.index.filter(x => toks.every(t => x.hay.includes(t))).map(x => x.e) : S.entries.slice();
+  };
   function search() {
     const text = $('q').value.trim();
     const counts = LLWord.counts(presentCites());
-    if (!text) {
-      // (Nothing typed: what this document cites.)
-      const keys = [...counts.keys()].filter(k => S.byKey.has(k));
-      S.results = keys.map(k => S.byKey.get(k)).sort((a, b) => cmpStr(norm(firstName(a)), norm(firstName(b))));
-      S.heading = S.results.length ? 'Cited in this document' : '';
-    } else {
-      const toks = norm(text).split(/\s+/).filter(Boolean);
-      const hits = S.index.filter(x => toks.every(t => x.hay.includes(t))).map(x => x.e);
-      const lead = toks[0];
-      hits.sort((a, b) => (norm(firstName(b)).startsWith(lead) - norm(firstName(a)).startsWith(lead)) || cmpStr(b.f.year || '', a.f.year || ''));
-      S.results = hits.slice(0, 60);
-      S.heading = '';
-    }
+    if (!S.list) S.list = counts.size ? 'doc' : 'lib';
+    if (/^g:/.test(S.list) && !S.tabsG.some(t => 'g:' + t.name === S.list)) S.list = 'lib';
+    const all = matches(text);
+    const keep = listKeys(S.list);
+    const inList = keep ? all.filter(e => keep.has(e.k)) : all;
+    S.results = inList.sort(SORTS[S.sort[sortKey()]] || SORTS.author);
+    S.more = keep && text ? all.length - inList.length : 0;
+    S.shown = 100;
     S.marker = S.results.length && text ? 0 : -1;
+    paintLists();
+    $('sort').value = S.sort[sortKey()];
     paintResults();
+    if (!$('pNotes').hidden) { if (NOTE.open) closeNotes(); else paintNotesList(); }
   }
-  const firstName = e => { const n = (e.a && e.a[0]) || (e.e && e.e[0]); return n ? n[0] : (e.f.title || ''); };
   function metaOf(e) {
     const ns = (e.a && e.a.length ? e.a : e.e) || [];
     const ini = n => n[0] + (n[1] ? ', ' + n[1].split(/\s+/).map(w => w[0] ? w[0].toUpperCase() + '.' : '').join(' ') : '');
@@ -952,11 +1163,13 @@
     const counts = LLWord.counts(presentCites());
     const picked = new Set(S.chosen.map(c => c.k));
     const text = $('q').value.trim();
-    let html = S.heading ? '<div class="sub">' + esc(S.heading) + '</div>' : '';
+    let html = '';
     if (!S.results.length) {
-      html += text ? '<div class="empty">No matches.<br><button class="btn" type="button" id="addLib">Add to LibLande\u2026</button></div>' : '';
+      html = text && !S.more ? '<div class="empty">No matches.<br><button class="btn" type="button" id="addLib">Add to LibLande\u2026</button></div>'
+        : !text && S.list === 'doc' ? '<div class="empty">Nothing cited yet.</div>' : '';
     }
-    html += S.results.map((e, i) => {
+    // (A long list a hundred at a time, more as it's scrolled.)
+    html += S.results.slice(0, S.shown).map((e, i) => {
       const n = counts.get(e.k) || 0;
       return '<div class="it' + (i === S.marker ? ' kb' : '') + '" role="option" aria-selected="' + picked.has(e.k) + '" aria-checked="' + picked.has(e.k) + '" data-k="' + esc(e.k) + '" id="r' + i + '">' +
         '<span class="box" aria-hidden="true">' + (picked.has(e.k) ? '\u2713' : '') + '</span>' +
@@ -964,10 +1177,139 @@
         (n ? '<span class="cited">cited ' + n + '\u00d7</span>' : '') + '</div>';
     }).join('');
     $('res').innerHTML = html;
+    $('other').hidden = !S.more;
+    if (S.more) $('other').innerHTML = esc(S.more + (S.results.length ? ' more' : '') + ' in the library') + '<button type="button" id="showLib">Show</button>';
     const kb = $('r' + S.marker);
     if (kb) kb.scrollIntoView({ block: 'nearest' });
     const add = $('addLib');
     if (add) add.addEventListener('click', () => openLibLande());
+  }
+  function chooseList(which) {
+    S.list = which;
+    search();
+    $('resBox').scrollTop = 0;
+  }
+  // The works in a list (null for the whole library): the document's, or a
+  // group's (as the library has it, or as it was when its tab was made).
+  function listKeys(list) {
+    if (list === 'doc') return new Set(LLWord.counts(presentCites()).keys());
+    if (!/^g:/.test(list || '')) return null;
+    const name = list.slice(2), g = S.groups.find(x => x.name === name), t = S.tabsG.find(x => x.name === name);
+    return new Set((g && g.keys) || (t && t.keys) || []);
+  }
+  const sortKey = () => (/^g:/.test(S.list) ? 'grp' : S.list);
+  // The list tabs, on Cite and Notes: Document, Library, a tab for each of
+  // the document's groups (kept with it), and "+" for another.
+  function paintLists() {
+    const short = S.tabsG.length > 0;
+    const n = list => { const k = listKeys(list); return (k ? [...k].filter(x => S.byKey.has(x)).length : S.entries.length).toLocaleString('en-US'); };
+    const tab = (list, name, x) => '<button type="button" role="tab" data-list="' + esc(list) + '" aria-selected="' + (S.list === list) + '">' + esc(name) + '<i>' + n(list) + '</i>' +
+      (x && S.list === list ? '<span class="gx" data-drop="' + esc(list) + '" role="button" aria-label="Remove this tab" title="Remove this tab (the group stays in LibLande)">\u2715</span>' : '') + '</button>';
+    const html = tab('doc', short ? 'Document' : 'In this document') + tab('lib', 'Library') +
+      S.tabsG.map(t => tab('g:' + t.name, t.name.replace(/^\u2605\s*/, '\u2605 '), true)).join('') +
+      '<button type="button" class="add" data-add aria-label="Add a group" title="Add a group">+</button>';
+    ['lists', 'nLists'].forEach(id => { if ($(id)) $(id).innerHTML = html; });
+  }
+  function onListsClick(ev) {
+    const drop = ev.target.closest('[data-drop]');
+    if (drop) { dropGroupTab(drop.dataset.drop.slice(2)); return; }
+    if (ev.target.closest('[data-add]')) { openGroupMenu(ev.target.closest('[data-add]')); return; }
+    const b = ev.target.closest('button[data-list]');
+    if (b) chooseList(b.dataset.list);
+  }
+
+  /* ---- groups: one as a tab, kept with the document; or a new one */
+  function openGroupMenu(anchor) {
+    const m = $('gmenu');
+    m.hidden = false;
+    const r = anchor.getBoundingClientRect();
+    m.style.top = (r.bottom + 6) + 'px';
+    $('gq').value = '';
+    $('gNew').hidden = true;
+    paintGroupMenu();
+    $('gq').focus();
+  }
+  function closeGroupMenu() { $('gmenu').hidden = true; }
+  function paintGroupMenu() {
+    const toks = norm($('gq').value.trim()).split(/\s+/).filter(Boolean);
+    const have = new Set(S.tabsG.map(t => t.name));
+    const list = S.groups.filter(g => !have.has(g.name) && toks.every(t => norm(g.name).includes(t)))
+      .sort((a, b) => (/^\u2605/.test(a.name) - /^\u2605/.test(b.name)) || cmpStr(norm(a.name), norm(b.name)));
+    $('gList').innerHTML = list.map(g => '<button type="button" class="g" data-g="' + esc(g.name) + '"><span class="gico">' + (/^\u2605/.test(g.name) ? '\u2605' : '\u25a4') + '</span><span class="n">' + esc(g.name.replace(/^\u2605\s*/, '')) + '</span><span class="c">' + g.keys.length + '</span></button>').join('') ||
+      '<div class="note" style="padding:6px">' + (S.groups.length ? 'No other groups match.' : 'Your library has no groups yet.') + '</div>';
+    const n = LLWord.counts(presentCites()).size;
+    $('gMake').hidden = !n;
+    $('gMake').textContent = 'New group from this document\u2019s ' + n + ' work' + (n === 1 ? '' : 's') + '\u2026';
+  }
+  function addGroupTab(name, keys) {
+    const g = S.groups.find(x => x.name === name);
+    S.tabsG.push({ name, keys: (keys || (g && g.keys) || []).slice() });
+    saveSettings();
+    closeGroupMenu();
+    chooseList('g:' + name);
+  }
+  function dropGroupTab(name) {
+    S.tabsG = S.tabsG.filter(t => t.name !== name);
+    saveSettings();
+    if (S.list === 'g:' + name) S.list = 'lib';
+    search();
+  }
+  // A new LibLande group of the works this document cites, written into the
+  // .bib by LibLande's own code (edits.js, with its checks and a backup
+  // copy first), loaded here when first wanted.
+  let editsReady = null;
+  function loadEdits() {
+    return editsReady || (editsReady = (async () => {
+      window.LIBLANDE_BUILD_WORKER = false;
+      for (const f of ['../build.js', '../builder.js', '../edits.js']) {
+        await new Promise((ok, no) => { const sc = document.createElement('script'); sc.src = f + '?v=' + encodeURIComponent(VERSION); sc.onload = ok; sc.onerror = () => no(new Error('LibLande\u2019s editing code didn\u2019t load. Are you online?')); document.head.appendChild(sc); });
+      }
+      const io = async (path, opts, base) => {
+        if (!tokenOk()) await signIn('');
+        const r = await fetch((base || API) + path, Object.assign({}, opts, { headers: Object.assign({}, (opts || {}).headers, { Authorization: 'Bearer ' + token.value }) }));
+        if (!r.ok) {
+          let why = '';
+          try { why = ((await r.clone().json()).error || {}).message || ''; } catch (e) { /* none */ }
+          throw Object.assign(new Error('Google Drive answered ' + r.status + (why ? ': ' + why : '.')), { status: r.status });
+        }
+        return r;
+      };
+      const builder = window.makeLiblandeBuilder({ drive: io, reconcile: async () => {} });
+      return window.makeLiblandeEdits({ drive: io, builder, getToken: async force => { if (force || !tokenOk()) await signIn(''); return token.value; } });
+    })().catch(e => { editsReady = null; throw e; }));
+  }
+  const pad2 = n => String(n).padStart(2, '0');
+  function bibdeskTime(d = new Date()) {
+    const off = -d.getTimezoneOffset(), a = Math.abs(off);
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds()) + ' ' + (off >= 0 ? '+' : '-') + pad2(Math.floor(a / 60)) + pad2(a % 60);
+  }
+  const fileTime = (d = new Date()) => d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) + ' ' + pad2(d.getHours()) + pad2(d.getMinutes()) + pad2(d.getSeconds());
+  function docName() {
+    try { const u = Office.context.document.url || ''; const n = decodeURIComponent(u.split(/[\\/]/).pop() || '').replace(/\.docx?$/i, ''); if (n) return n; } catch (e) { /* none */ }
+    return 'This paper';
+  }
+  function askGroupName() {
+    $('gNew').hidden = false;
+    $('gName').value = docName();
+    $('gErr').hidden = true;
+    $('gName').focus();
+    $('gName').select();
+  }
+  async function makeGroup() {
+    const name = $('gName').value.trim();
+    const fail = m => { $('gErr').textContent = m; $('gErr').hidden = false; $('gMakeGo').disabled = false; };
+    if (!name) return fail('Give the group a name.');
+    if (name.length > 120) return fail('That name is too long (120 characters at most).');
+    if (S.groups.some(g => g.name === name)) return fail('There\u2019s already a group called \u201c' + name + '\u201d.');
+    const keys = [...LLWord.counts(presentCites()).keys()].filter(k => S.byKey.has(k));
+    $('gMakeGo').disabled = true;
+    try {
+      const edits = await loadEdits();
+      await edits.createGroup({ name, keys, modified: bibdeskTime(), backupName: fileTime() });
+    } catch (e) { fail('Couldn\u2019t make it: ' + ((e && e.message) || e)); return; }
+    $('gMakeGo').disabled = false;
+    S.groups.push({ name, keys: keys.slice() });
+    addGroupTab(name, keys);
   }
 
   /* ---- the citation being made */
@@ -979,12 +1321,17 @@
   });
   // APA's order; the words before the first work stay first, before
   // whichever work that now is (they were the whole citation's).
-  function sortChosen() {
+  // Or by year, the oldest first (by authors within a year): an order of
+  // one's own, as APA sees it.
+  const yearOf = c => { const e = S.byKey.get(c.k); return e ? (origYear(e) || ((e.f.year || '').trim()) || '9999') : '9999'; };
+  function sortChosen(how) {
     const first = S.chosen.length ? S.chosen[0].pre || '' : '';
     if (S.chosen.length) S.chosen[0].pre = '';
     S.chosen = LLWord.order(S.chosen, S.byKey);
+    if (how === 'year') S.chosen = S.chosen.map((c, i) => [c, i]).sort((a, b) => cmpStr(yearOf(a[0]), yearOf(b[0])) || a[1] - b[1]).map(x => x[0]);
     if (S.chosen.length) S.chosen[0].pre = first;
   }
+  const isByYear = () => S.chosen.every((c, i) => !i || cmpStr(yearOf(S.chosen[i - 1]), yearOf(c)) <= 0);
   function toggle(k) {
     const i = S.chosen.findIndex(c => c.k === k);
     if (i >= 0) S.chosen.splice(i, 1); else S.chosen.push({ k, page: '', pre: '' });
@@ -995,31 +1342,81 @@
   }
   function clearChosen() { S.chosen = []; S.own = false; paintChosen(); }
   const label = c => { const e = S.byKey.get(c.k); if (!e) return c.k; const t = LLWord.render({ x: { items: [{ k: c.k }], form: 'paren' } }, S.byKey).texts.x; return t.slice(1, -1); };
-  // (The box before a work as wide as its words: "see also" whole.)
-  const fitPre = el => { el.style.width = '64px'; el.style.width = Math.min(130, Math.max(64, el.scrollWidth + 2)) + 'px'; };
+  // The card: its bar says what's being done and holds the citation as it
+  // will read (changing as it's edited); under it, each work on two lines
+  // (its name; the words before it and its page, labelled), the form, and
+  // Insert or Update.
   function paintChosen() {
-    $('foot').hidden = !S.chosen.length && !S.editing;
-    $('editBar').hidden = !S.editing;
+    const n = S.chosen.length;
+    $('foot').hidden = !n && !S.editing;
+    $('pCite').classList.toggle('editing', !!S.editing);
+    if (!S.editing) $('pCite').classList.remove('browsing');
+    $('gLabel').textContent = (S.editing ? 'Editing' : 'New citation') + ' \u00b7 ' + n + ' work' + (n === 1 ? '' : 's');
+    $('cardX').title = S.editing ? 'Stop editing (Esc)' : 'Clear (Esc)';
     $('remove').hidden = !S.editing;
     $('insert').firstChild.textContent = S.editing ? 'Update' : 'Insert';
-    $('insert').disabled = !S.chosen.length;
+    $('insert').disabled = !n;
     $('q').placeholder = S.editing ? 'Add a work\u2026' : 'Search your library';
+    paintSize();
     $('chosen').innerHTML = '';
-    $('prev').textContent = '';
+    $('prev').textContent = n ? '' : '(no works)';
     $('prevNote').hidden = true;
-    if (!S.chosen.length) return;
-    $('az').hidden = !S.own || S.chosen.length < 2;
+    if (!n) return;
+    $('order').hidden = n < 2;
+    $('az').setAttribute('aria-pressed', String(!S.own));
+    $('byYear').setAttribute('aria-pressed', String(S.own && isByYear()));
     $('chosen').innerHTML = S.chosen.map((c, i) =>
-      '<div class="ch" data-i="' + i + '">' + (S.chosen.length > 1 ? '<span class="grip" aria-label="Drag to reorder" title="Drag to reorder">\u22ee\u22ee</span>' : '') +
-      (S.form !== 'narr' ? '<input class="bf" data-i="' + i + '" data-f="pre" value="' + esc(c.pre || '') + '" placeholder="before" list="preList" aria-label="Words before ' + esc(label(c)) + '">' : '') +
-      '<span class="n" title="' + esc(label(c)) + '">' + esc(label(c)) + '</span>' +
-      '<input class="pg" data-i="' + i + '" data-f="page" value="' + esc(c.page) + '" placeholder="page" aria-label="Page for ' + esc(label(c)) + '">' +
-      '<button class="x" type="button" data-i="' + i + '" aria-label="Remove ' + esc(label(c)) + '">\u2715</button></div>').join('');
-    $('chosen').querySelectorAll('.bf').forEach(fitPre);
+      '<div class="ch" data-i="' + i + '">' + (n > 1 ? '<span class="grip" aria-label="Drag to reorder" title="Drag to reorder">\u22ee\u22ee</span>' : '<span></span>') +
+      '<span class="nm">' + esc(label(c)) + '</span>' +
+      '<button class="x" type="button" data-i="' + i + '" aria-label="Remove ' + esc(label(c)) + '">\u2715</button>' +
+      '<div class="fl">' +
+      (S.form !== 'narr' ? '<label>before <input class="bf" data-i="' + i + '" data-f="pre" value="' + esc(c.pre || '') + '" list="preList" aria-label="Words before ' + esc(label(c)) + '"></label>' : '') +
+      '<label>page <input class="pg" data-i="' + i + '" data-f="page" value="' + esc(c.page) + '" aria-label="Page for ' + esc(label(c)) + '"></label></div></div>').join('');
     const y = (() => { const e = S.byKey.get(S.chosen[0].k); return e ? (e.f.year || 'n.d.') : '2011'; })();
     const names = { paren: '(Author, ' + y + ')', narr: 'Author (' + y + ')', year: '(' + y + ')' };
     document.querySelectorAll('#forms button').forEach(b => { b.textContent = names[b.dataset.form]; b.setAttribute('aria-checked', String(b.dataset.form === S.form)); });
     paintPreview();
+  }
+  // The card's size: 1 (its bar and buttons), 2 (a few works) or 3 (up to
+  // the search box); the one chosen last kept. While searching, 1, to give
+  // the results the room.
+  S.size = Math.max(1, Math.min(3, +store.get('cardSize', 2) || 2));
+  const sizeNow = () => (S.searching && S.chosen.length ? 1 : S.size);
+  function paintSize() {
+    const z = sizeNow();
+    $('foot').dataset.size = String(z);
+    $('pCite').classList.toggle('full', z === 3 && !$('foot').hidden);
+  }
+  function setSize(z) {
+    S.size = Math.max(1, Math.min(3, z));
+    store.set('cardSize', S.size);
+    S.searching = false;
+    $('pCite').classList.remove('searching');
+    paintSize();
+  }
+  function setSearching(on) {
+    if (S.searching === on) return;
+    S.searching = on;
+    $('pCite').classList.toggle('searching', on);
+    paintSize();
+  }
+  // The handle: dragged up, bigger; down, smaller; clicked, the next size.
+  function handleDrag(ev) {
+    ev.preventDefault();
+    const y0 = ev.clientY, z0 = sizeNow();
+    let moved = false;
+    const move = e => {
+      const steps = Math.round((y0 - e.clientY) / 60);
+      if (steps) moved = true;
+      if (moved) { $('foot').dataset.size = String(Math.max(1, Math.min(3, z0 + steps))); $('pCite').classList.toggle('full', $('foot').dataset.size === '3'); }
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      setSize(moved ? +$('foot').dataset.size : z0 % 3 + 1);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
   }
   function paintPreview() {
     if (!S.chosen.length) return;
@@ -1032,7 +1429,7 @@
     $('prev').textContent = out.texts[id];
     const changed = Object.keys(before).filter(x => x !== id && before[x] !== out.texts[x]).length;
     $('prevNote').hidden = !changed;
-    $('prevNote').textContent = 'Also changes ' + changed + ' other citation' + (changed === 1 ? '' : 's') + (S.style === 'apa' ? ' (as 2011a, 2011b, or with more names).' : '.');
+    $('prevNote').textContent = 'Also changes ' + changed + ' other citation' + (changed === 1 ? '' : 's') + (S.style === 'apa' ? ' (2011a, 2011b, or more names)' : '');
   }
 
   /* ---- dragging works into an order of one's own */
@@ -1052,7 +1449,7 @@
     try { grip.setPointerCapture(ev.pointerId); } catch (e) { /* fine without */ }
     const move = e => {
       const dy = Math.max(minDy - step / 3, Math.min(maxDy + step / 3, e.clientY - startY));
-      row.style.transform = 'translateY(' + dy + 'px) scale(1.02)';
+      row.style.transform = 'translateY(' + dy + 'px)';
       to = Math.max(0, Math.min(rows.length - 1, Math.round((tops[from] + dy - tops[0]) / step)));
       rows.forEach((r, i) => {
         if (r === row) return;
@@ -1124,7 +1521,37 @@
 
   /* ---- wiring */
   function wire() {
-    $('q').addEventListener('input', search);
+    $('q').addEventListener('input', () => { if ($('q').value.trim()) setSearching(true); search(); });
+    $('q').addEventListener('focus', () => setSearching(true));
+    $('q').addEventListener('blur', () => { if (!$('q').value.trim()) setTimeout(() => { if (document.activeElement !== $('q') && !$('q').value.trim()) setSearching(false); }, 200); });
+    // (Editing, the lists are grayed out: a click in them brings them back
+    // to full strength, without doing anything else.)
+    $('pCite').addEventListener('click', ev => {
+      const p = $('pCite');
+      if (!p.classList.contains('editing') || p.classList.contains('searching') || p.classList.contains('browsing') || !ev.target.closest('.lists')) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      p.classList.add('browsing');
+    }, true);
+    $('foot').addEventListener('pointerdown', () => $('pCite').classList.remove('browsing'));
+    $('lists').addEventListener('click', onListsClick);
+    $('nLists').addEventListener('click', onListsClick);
+    $('gq').addEventListener('input', paintGroupMenu);
+    $('gList').addEventListener('click', ev => { const g = ev.target.closest('[data-g]'); if (g) addGroupTab(g.dataset.g); });
+    $('gMake').addEventListener('click', askGroupName);
+    $('gMakeGo').addEventListener('click', makeGroup);
+    $('gName').addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); makeGroup(); } });
+    $('gmenu').addEventListener('keydown', ev => { if (ev.key === 'Escape') { ev.stopPropagation(); closeGroupMenu(); } });
+    document.addEventListener('pointerdown', ev => { if (!$('gmenu').hidden && !$('gmenu').contains(ev.target) && !ev.target.closest('[data-add]')) closeGroupMenu(); });
+    $('sort').addEventListener('change', () => { S.sort[sortKey()] = $('sort').value; store.set('sorts', S.sort); search(); });
+    $('other').addEventListener('click', ev => { if (ev.target.closest('#showLib')) chooseList('lib'); });
+    $('resBox').addEventListener('scroll', () => {
+      const b = $('resBox');
+      if (S.results.length > S.shown && b.scrollTop + b.clientHeight > b.scrollHeight - 300) { S.shown += 100; paintResults(); }
+    });
+    $('handle').addEventListener('pointerdown', handleDrag);
+    $('gbar').addEventListener('click', ev => { if (!ev.target.closest('#cardX')) setSize(sizeNow() % 3 + 1); });
+    $('cardX').addEventListener('click', () => { if (S.editing) leaveEdit(); else { clearChosen(); paintResults(); } });
     $('q').addEventListener('keydown', ev => {
       if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
         ev.preventDefault();
@@ -1135,7 +1562,9 @@
         ev.preventDefault();
         if (S.results[S.marker]) toggle(S.results[S.marker].k);
       } else if (ev.key === 'Escape') {
-        if ($('q').value) { $('q').value = ''; search(); } else if (S.editing) leaveEdit(); else clearChosen();
+        if ($('q').value) { $('q').value = ''; search(); }
+        else if (S.searching && S.chosen.length) { setSearching(false); $('q').blur(); }
+        else if (S.editing) leaveEdit(); else { clearChosen(); paintResults(); }
       }
     });
     $('res').addEventListener('click', ev => {
@@ -1146,10 +1575,9 @@
       const i = ev.target.dataset.i, f = ev.target.dataset.f;
       if (i == null || !f) return;
       S.chosen[+i][f] = ev.target.value;
-      if (f === 'pre') fitPre(ev.target);
       S.dirty = true;
       // (Words before a later work: the order stays as it is.)
-      if (f === 'pre' && +i > 0 && ev.target.value.trim() && !S.own) { S.own = true; $('az').hidden = S.chosen.length < 2; }
+      if (f === 'pre' && +i > 0 && ev.target.value.trim() && !S.own) { S.own = true; $('az').setAttribute('aria-pressed', 'false'); }
       paintPreview();
     });
     $('chosen').addEventListener('click', ev => {
@@ -1158,24 +1586,41 @@
     });
     $('chosen').addEventListener('pointerdown', dragStart);
     $('az').addEventListener('click', () => { S.own = false; sortChosen(); S.dirty = true; paintChosen(); });
+    $('byYear').addEventListener('click', () => { sortChosen('year'); S.own = true; S.dirty = true; paintChosen(); });
     $('forms').addEventListener('click', ev => {
       const b = ev.target.closest('button');
       if (b) { S.form = b.dataset.form; S.dirty = true; paintChosen(); }
     });
     $('insert').addEventListener('click', () => (S.editing ? updateCitation() : insertCitation()));
     $('remove').addEventListener('click', removeCitation);
-    $('editX').addEventListener('click', () => leaveEdit());
     document.addEventListener('keydown', ev => {
       if (ev.key === 'Enter' && (ev.metaKey || ev.ctrlKey) && S.chosen.length && !$('pCite').hidden) { ev.preventDefault(); if (S.editing) updateCitation(); else insertCitation(); }
       if (ev.key === 'Escape' && !$('menu').hidden) { $('menu').hidden = true; $('acct').setAttribute('aria-expanded', 'false'); }
     });
     const tab = which => {
-      $('tCite').setAttribute('aria-selected', String(which === 'cite'));
-      $('tRefs').setAttribute('aria-selected', String(which === 'refs'));
-      $('pCite').hidden = which !== 'cite';
-      $('pRefs').hidden = which !== 'refs';
-      if (which === 'refs') { paintRefs(); readZotero(); if (!LINK.rows.length) scanTyped().catch(() => {}); refreshDocument().catch(e => showErr('refsErr', wordError(e))); } else $('q').focus();
+      ['cite', 'refs', 'notes'].forEach(t => {
+        const id = t[0].toUpperCase() + t.slice(1);
+        $('t' + id).setAttribute('aria-selected', String(which === t));
+        $('p' + id).hidden = which !== t;
+      });
+      if (which === 'refs') { paintRefs(); readZotero(); if (!LINK.rows.length) scanTyped().catch(() => {}); refreshDocument().catch(e => showErr('refsErr', wordError(e))); }
+      else if (which === 'notes') { paintLists(); paintNotesList(); }
+      else $('q').focus();
     };
+    $('tNotes').addEventListener('click', () => tab('notes'));
+    $('nq').addEventListener('input', () => { NOTE.shown = 100; if (NOTE.open) closeNotes(); else paintNotesList(); });
+    $('nList').addEventListener('click', ev => { const w = ev.target.closest('.nw'); if (w) openNotes(w.dataset.k); });
+    $('nList').addEventListener('keydown', ev => { const w = ev.target.closest('.nw'); if (w && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); openNotes(w.dataset.k); } });
+    $('nBox').addEventListener('scroll', () => { const b = $('nBox'); if (!NOTE.open && b.scrollTop + b.clientHeight > b.scrollHeight - 300) { NOTE.shown += 100; paintNotesList(); } });
+    $('nWork').addEventListener('click', ev => {
+      if (ev.target.closest('#nBack')) { closeNotes(); return; }
+      if (ev.target.closest('#nEdit')) { openLibLande(); return; }
+      const qb = ev.target.closest('.qb');
+      if (qb) {
+        const e = S.byKey.get(NOTE.open), fl = e && pdfOf(e), r = fl && NOTE.marks.get(fl.id), m = r && r.marks[+qb.dataset.m];
+        if (m) quoteMark(e.k, m, pageLabel(r, m.page));
+      }
+    });
     $('tCite').addEventListener('click', () => tab('cite'));
     $('tRefs').addEventListener('click', () => tab('refs'));
     $('refsBtn').addEventListener('click', insertOrGoToRefs);
@@ -1259,6 +1704,7 @@
       try { useLibrary(await gunzip(kept.gz)); } catch (e) { /* asked for again */ }
     }
     if (S.style !== 'apa') styleEngine(S.style).catch(() => {});
+    S.sort = Object.assign(S.sort, store.get('sorts', {}));
     if (S.entries.length) {
       view('vMain');
       search();
@@ -1278,5 +1724,5 @@
     });
   } else start();
   // (For testing in a browser.)
-  window.LLPanel = { S, useLibrary, search, toggle, paintChosen, view, zoteroCite, zoteroMatcher, swapFields, enterEdit, leaveEdit, currentCite, renderAll, styleEngine, LINK, paintLink, paintRefs, unwrapControls };
+  window.LLPanel = { S, useLibrary, search, toggle, paintChosen, view, zoteroCite, zoteroMatcher, swapFields, enterEdit, leaveEdit, currentCite, renderAll, styleEngine, LINK, paintLink, paintRefs, unwrapControls, openNotes, readMarks, paintLists, addGroupTab, listKeys };
 })();

@@ -1,8 +1,8 @@
 ﻿// LibLande: Citation styles' data: a publication as CSL wants it (cslItem), and what citeproc-js gives back as LibLande's { text, html, parts } (cslOut). Shared with LibLande for Word (pages/word), which loads this file on its own.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, apa, csl, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
+// index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/csl.js'] = '2026-11-10.01';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/csl.js'] = '2026-11-10.02';
 /* ---- a publication as CSL wants it */
 const CSL_TYPES = { article: 'article-journal', book: 'book', proceedings: 'book', incollection: 'chapter', inbook: 'chapter',
   inproceedings: 'paper-conference', conference: 'paper-conference', phdthesis: 'thesis', mastersthesis: 'thesis',

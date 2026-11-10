@@ -1,8 +1,8 @@
 ﻿// LibLande: the PDF reader: pages, marks, tools, saving, the sidebar.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, apa, csl, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
+// index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-10.01';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-10.02';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -2263,8 +2263,8 @@ function decorateLine(ed) {
 // it takes its comment as any mark does. Every save turns it into a real
 // Text note (realLines); a Text note in the PDF, from any app, becomes
 // LibLande's when tapped (takeOverNote).
-const NOTE_OPACITY = 0.03, NOTE_PT = 16;
-const isNoteOpacity = op => op != null && Math.abs(op - NOTE_OPACITY) < 0.004;
+const NOTE_PT = 16;
+// (NOTE_OPACITY and isNoteOpacity: moved to marks.js.)
 const NOTE_KIND = new WeakMap();
 function isNoteEd(ed) {
   if (!ed || !ed.div || !ed.div.classList.contains('highlightEditor')) return false;
@@ -5210,40 +5210,7 @@ function sideChanged() {
   if (SIDE.tab === 'marks') showMarks();
 }
 
-// Annotations: every highlight, drawing, note and shape, by page, with the
-// highlighted words where the PDF has text.
-const MARK_NAMES = { Highlight: 'Highlight', Underline: 'Underline', StrikeOut: 'Strikethrough', Squiggly: 'Squiggly underline',
-  Ink: 'Drawing', Text: 'Note', FreeText: 'Text box', Square: 'Rectangle', Circle: 'Oval', Line: 'Line', Polygon: 'Shape',
-  PolyLine: 'Lines', Stamp: 'Stamp', Caret: 'Insertion' };
-function textInQuads(items, qp) {
-  const rects = [];
-  for (let i = 0; i + 7 < qp.length; i += 8) {
-    const xs = [qp[i], qp[i + 2], qp[i + 4], qp[i + 6]], ys = [qp[i + 1], qp[i + 3], qp[i + 5], qp[i + 7]];
-    rects.push([Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]);
-  }
-  const out = [], used = new Set();
-  for (const [x0, y0, x1, y1] of rects) {
-    const line = [];
-    for (const it of items) {
-      // (A line's words once, though the boxes of two lines overlap.)
-      if (!it.str || !it.transform || used.has(it)) continue;
-      const x = it.transform[4], y = it.transform[5], w = it.width || 0, h = it.height || Math.hypot(it.transform[2], it.transform[3]);
-      const cy = y + h / 2;
-      if (cy < y0 || cy > y1 || x + w < x0 || x > x1 || w <= 0) continue;
-      const a = Math.max(0, Math.round((x0 - x) / w * it.str.length)), b = Math.min(it.str.length, Math.round((x1 - x) / w * it.str.length));
-      if (b > a) { line.push([x, it.str.slice(a, b)]); used.add(it); }
-    }
-    line.sort((p, q) => p[0] - q[0]);
-    out.push(line.map(p => p[1]).join(''));
-  }
-  return joinBroken(out.join(' ').replace(/\s+/g, ' ').trim(), items.map(it => (it.str || '') + (it.hasEOL ? '\n' : '')).join(''));
-}
-// A word broken at a line's end ("na- ture"), joined: "nature", or
-// "sense-data" when the page has it so elsewhere, unbroken.
-function joinBroken(t, pageText) {
-  const page = norm(pageText || '');
-  return t.replace(/(\p{L}+)[-\u2010] (\p{Ll}+)/gu, (m, a, b) => page.includes(norm(a + '-' + b)) ? a + '-' + b : a + b);
-}
+// (MARK_NAMES, textInQuads and joinBroken: moved to marks.js.)
 // (my: the sidebar's turn, to stop if it moves on; null for a paper not
 // in the sidebar, as Copy for AI reads from the details.)
 async function collectMarks(doc, my) {

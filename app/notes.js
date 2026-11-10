@@ -1,8 +1,8 @@
 ﻿// LibLande: Notes: a publication's notes (the .bib's Notes field, written as Markdown) and its PDF's highlights and notes, in the details pane's Notes view and a large pop-out editor, both formatted as you type.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, apa, csl, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
+// index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/notes.js'] = '2026-11-10.01';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/notes.js'] = '2026-11-10.02';
 /* ------------------------------------------------------------ notes */
 // The details pane shows Details or Notes (a switch at its top, or Alt-N;
 // the choice kept). Notes has your notes, in a box you type in, formatted
@@ -23,18 +23,7 @@ const REDO_ICON = '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d
 const POP_ICON = '<svg class="i" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-8 8M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>';
 
 /* ---- Markdown, the little of it notes need */
-function mdInline(s) {
-  return esc(s)
-    .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (m, t, u) => `<a href="${u}" target="_blank" rel="noopener">${t}</a>`)
-    .replace(/\*\*(?=\S)([\s\S]*?\S)\*\*/g, '<b>$1</b>')
-    .replace(/(^|[^*\w])\*(?=\S)([^*]*?\S)\*(?![*\w])/g, '$1<i>$2</i>')
-    .replace(/(^|[^\w])_(?=\S)([^_]*?\S)_(?!\w)/g, '$1<i>$2</i>')
-    .replace(PG_TAG, (m, pre, tag, pg) => `${pre}<span class="pl" data-pg="${pg}">${tag}</span>`);
-}
-// A page in your notes, "p. 331" (or "pp. 331-2", or a roman one): shown
-// as a tag, which goes to that page of the paper. (Still plain text in the
-// .bib.)
-const PG_TAG = /(^|[\s(\[\u201c])(pp?\.\s?(\d+|[ivxlcdm]+)(?:\s?[\u2013-]\s?(?:\d+|[ivxlcdm]+))?)(?=[\s).,;:\]\u201d]|$)/gi;
+// (mdInline and PG_TAG: moved to marks.js.)
 // The tags made in what's been typed (outside those there, and links).
 function nvTagPages(el) {
   const sel = getSelection(), live = sel.rangeCount && el.contains(sel.anchorNode) ? nvOffset(el, sel.getRangeAt(0)) : -1;
@@ -79,26 +68,7 @@ function nvAtOffset(el, n) {
   r.selectNodeContents(el); r.collapse(false);
   return r;
 }
-function mdToHtml(md) {
-  const lines = String(md || '').replace(/\r\n?/g, '\n').split('\n'), out = [];
-  let para = [], list = null, quote = [];
-  const flushPara = () => { if (para.length) out.push('<p>' + para.map(mdInline).join('<br>') + '</p>'); para = []; };
-  const flushList = () => { if (list) out.push(`<${list.tag}>` + list.items.map(x => '<li>' + mdInline(x) + '</li>').join('') + `</${list.tag}>`); list = null; };
-  const flushQuote = () => { if (quote.length) out.push('<blockquote>' + mdToHtml(quote.join('\n')) + '</blockquote>'); quote = []; };
-  for (const line of lines) {
-    let m;
-    if (/^>\s?/.test(line)) { flushPara(); flushList(); quote.push(line.replace(/^>\s?/, '')); continue; }
-    flushQuote();
-    if ((m = /^(#{1,6})\s+(.*)$/.exec(line))) { flushPara(); flushList(); const t = m[1].length === 1 ? 'h3' : 'h4'; out.push(`<${t}>${mdInline(m[2])}</${t}>`); continue; }
-    if ((m = /^\s*[-*+]\s+(.*)$/.exec(line))) { flushPara(); if (!list || list.tag !== 'ul') { flushList(); list = { tag: 'ul', items: [] }; } list.items.push(m[1]); continue; }
-    if ((m = /^\s*\d+[.)]\s+(.*)$/.exec(line))) { flushPara(); if (!list || list.tag !== 'ol') { flushList(); list = { tag: 'ol', items: [] }; } list.items.push(m[1]); continue; }
-    if (!line.trim()) { flushPara(); flushList(); continue; }
-    flushList();
-    para.push(line);
-  }
-  flushPara(); flushList(); flushQuote();
-  return out.join('');
-}
+// (mdToHtml: moved to marks.js.)
 // What the editor holds, as Markdown again.
 function htmlToMd(root) {
   const mark = (s, m) => { const x = /^(\s*)([\s\S]*?)(\s*)$/.exec(s); return x[2] ? x[1] + m + x[2] + m + x[3] : s; };
