@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-11.02';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-11.03';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -3320,7 +3320,12 @@ detailEl.addEventListener('click', ev => {
   if (ev.target.closest('[data-copy-lib-sel]')) { openCopyTo(pickedEntries().filter(e => !e.ib).map(e => e.k)); return; }
   const cl = ev.target.closest('[data-copy-lib]');
   if (cl) { const d = cl.closest('details'); if (d) d.open = false; openCopyTo([cl.dataset.copyLib]); return; }
-  if (ev.target.closest('[data-pick-clear]')) { state.picked.clear(); paint(); renderPickBar(); renderDetail(); return; }
+  // (Clear: with a mouse, selecting ends too; on a touch screen, still
+  // selecting, to pick others; Done in the bar ends it.)
+  if (ev.target.closest('[data-pick-clear]')) {
+    if (!coarseMQ.matches) { setPicking(false); return; }
+    state.picked.clear(); paint(); renderPickBar(); renderDetail(); return;
+  }
   const cs = ev.target.closest('[data-copy-sel]');
   if (cs) { cs.closest('details').open = false; copyAs(cs.dataset.copySel); return; }
   const c = ev.target.closest('[data-copy]');

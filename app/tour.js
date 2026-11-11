@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-11-11.02';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-11-11.03';
 /* -------------------------------------------------------------- features */
 // What LibLande does, by area: each feature, what it's for, where to find
 // it, its icon (see featIcon), and other words it's found by (as "tag"
@@ -27,8 +27,8 @@ const FEATURES = [
     ['Groups as tabs', 'Each group you open stays as a tab along the toolbar; close one with its \u00d7. On an iPhone, one button lists them.', 'The tabs in the toolbar', '#tabs', 'tabs lists'],
     ['Static groups', 'Make a group with +, and drag publications onto it (on an iPad, hold one and drag).', 'Static groups in the sidebar', 'ICON:folder', 'collection folder group'],
     ['Several libraries', 'Make a new library (a folder with its own .bib), switch between them, and drag publications onto another to copy them with their PDFs.', 'Libraries in the sidebar; + beside it', 'ICON:lib', 'library switch copy'],
-    ['Select several', 'Give several publications keywords and groups at once, add them to your reading list, join versions, export or share them, or copy their citations; their PDFs show beside them.', 'Select in the toolbar, or \u2318-click and \u21e7-click', '#selectBtn', 'multiple batch bulk'],
-    ['Export', 'The selected publications as a .bib and an .rtf of citations, with their PDFs as they are, clean, or none; to Google Drive or this device, or shared to Mail, Messages or AirDrop.', 'Select several, then Export', 'path:M12 3v12M8 11l4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2', 'export bibtex rtf zip share airdrop mail'],
+    ['Select several', 'Give several publications keywords and groups at once, add them to your reading list, join versions, share them, or copy their citations; their PDFs show beside them.', 'Select in the toolbar, or \u2318-click and \u21e7-click', '#selectBtn', 'multiple batch bulk'],
+    ['Share', 'The selected publications as a .bib and an .rtf of citations, with their PDFs as they are, clean, or none; to Google Drive, this device, or another app (Mail, Messages, AirDrop).', 'Select several, then Share', 'path:M12 3v12M8 11l4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2', 'export bibtex rtf zip share airdrop mail'],
     ['Reading list', 'Papers to read: up next, later, or done; one list for each library. Each shows how far you\u2019ve read (tap the figure to start counting again).', 'The Reading list tab; the bookmark in the details or the reader', '#vRL', 'queue to read progress'],
     ['Possible duplicates', 'Publications that look like the same one, to join as versions of one or mark as different.', 'Possible duplicates in the sidebar', 'ICON:copy', 'duplicate merge versions'],
   ] },
@@ -78,7 +78,7 @@ const FEATURES = [
   { area: 'Citing and writing', items: [
     ['Copy a citation', 'APA, APA in text, BibTeX or the cite key, for one publication or several.', 'Copy, in the details; \u2325A for APA, \u21e7\u2325A in text', 'ICON:quote', 'reference bibtex cite key'],
     ['Quote a passage', 'Select a passage and copy it as a quotation with its printed page and citation; a long one as a block quotation.', 'Quote, beside the text you select; or \u2325C', 'ICON:quote', 'quotation'],
-    ['Citation styles', 'Any of Zotero\u2019s 10,000 styles for Copy, Quote, the QR code, Export and Cite Check; APA by default. Kept for offline use, and with your account. The Copy menu\u2019s Style row changes it for one copy.', 'Settings \u203a Citing', 'ICON:quote', 'csl chicago mla harvard style'],
+    ['Citation styles', 'Any of Zotero\u2019s 10,000 styles for Copy, Quote, the QR code, Share and Cite Check; APA by default. Kept for offline use, and with your account. The Copy menu\u2019s Style row changes it for one copy.', 'Settings \u203a Citing', 'ICON:quote', 'csl chicago mla harvard style'],
     ['LibLande in Word', 'A panel in Word for Mac: search your library, the document\u2019s works or a group; insert and edit citations; keep a References list in APA, Chicago, MLA or Harvard; quote your notes and highlights; and link typed or Zotero citations.', 'Install once: Settings \u203a Extensions \u203a Word', '#settingsBtn', 'microsoft word add-in plugin cite while you write zotero'],
     ['Cite Check', 'Checks a manuscript (a Google Doc or a file) against your library: citations without references, references never cited, details that differ. Fixes the References in a Google Doc.', 'Tools \u203a Cite Check', 'ICON:citecheck', 'manuscript references bibliography check'],
     ['QR code of references', 'A QR code that shows the reference (or up to about 15) on a phone, to copy or open by DOI. Save it for a slide or handout.', 'Copy \u203a QR code\u2026', 'path:M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 18h2v2h-2zM14 18h2M18 14h2', 'slides talk'],
@@ -187,7 +187,7 @@ const TOUR_STEPS = [
   { lib: true, sel: '#groups', title: 'Your groups', text: 'Your library and its groups: saved searches, static groups, keywords and types; drag to reorder. Libraries switches between libraries; Tools has Cite Check, New papers and Tidy keywords.', before: async () => { showLibSide(); await tourWait(300); } },
   { lib: true, sel: '#settingsBtn', title: 'Settings', text: 'Appearance, Sync, Library, Citing and Extensions. LibLande in Word installs from Extensions. Help, this tour and Features are at the foot of the sidebar.', before: async () => { showLibSide(); await tourWait(200); }, after: () => closeSidebarIfOverlay() },
   { lib: true, sel: '#tabs', title: 'Tabs and the reading list', text: 'Groups you open stay as tabs. The Reading list holds papers to read next, later, or done.', before: async () => { closeSidebarIfOverlay(); await tourWait(350); } },
-  { lib: true, sel: '#selectBtn', title: 'Select several', text: 'Give several publications keywords and groups at once, add them to your reading list, or export them with their PDFs.' },
+  { lib: true, sel: '#selectBtn', title: 'Select several', text: 'Give several publications keywords and groups at once, add them to your reading list, or share them with their PDFs.' },
   { lib: true, sel: '#refreshBtn', title: 'Saving and syncing', text: 'Changes go into your .bib on Google Drive. Check for changes picks up BibDesk\u2019s and your other devices\u2019; a cloud shows what\u2019s waiting while you\u2019re offline.' },
   { sel: '#vTop', title: 'Reading a paper', text: 'Papers open in tabs; + opens a new one, at a start page of papers closed lately, read on your other devices, or on your reading list. Library goes back and keeps them open; Reader, in the library, returns to them.', before: async () => (await toReader()) ? null : 'skip-reader' },
   { sel: '#vPalette', title: 'Marking up', text: 'Highlight (H), underline or strike through (U), draw (P), text box (T), sticky note (N), eraser (E). Hold a tool with a small triangle for its second kind. All saved into the PDF.' },

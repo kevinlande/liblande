@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-11.02';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-11.03';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -1349,6 +1349,8 @@ function renderPickBar() {
   $('#pickJoin').hidden = !(gs && n >= 2 && pickedEntries().every(x => !x.ib));
 }
 const SHOW_REFS = 200, SIDE_PDFS = 24;
+// Join: a merge, one branch curving into another (Copy has the two pages).
+const JOIN_ICON = '<svg class="i" viewBox="0 0 24 24"><circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="12" r="2"/><path d="M6 7v10"/><path d="M6 7c0 4 4 5 10 5"/></svg>';
 // Several selected: the buttons on one row, with their names while they
 // fit, then just icons (all but Export's, then all).
 function fitSelActs() {
@@ -1371,9 +1373,8 @@ function selectionHTML() {
   return (side ? `<div class="d-two">` : '') + `<div class="d-inner"><div class="d-kicker"><span class="d-type">Selection</span></div>` +
     `<h1 class="d-title">${n} publication${n === 1 ? '' : 's'} selected</h1>` +
     `<p class="d-venue">${withPdf} of them ${withPdf === 1 ? 'has' : 'have'} a PDF in Google Drive.</p>` +
-    `<div class="actions sel-acts">` + (gs ? `<button type="button" class="btn primary" data-export title="Export to Google Drive or this device">${ICON.download}<span>Export</span></button>` : '') +
-    (gs && navigator.canShare ? `<button type="button" class="btn" data-export="share" title="Share (Mail, Messages, AirDrop)" aria-label="Share (Mail, Messages, AirDrop)">${ICON.share}<span>Share</span></button>` : '') +
-    (gs && n >= 2 && list.every(x => !x.ib) ? `<button type="button" class="btn" data-join title="Join as versions of one" aria-label="Join as versions of one">${ICON.versions}<span>Versions</span></button>` : '') +
+    `<div class="actions sel-acts">` + (gs ? `<button type="button" class="btn primary" data-export title="Share: to Google Drive, this device, or another app">${ICON.share}<span>Share</span></button>` : '') +
+    (gs && n >= 2 && list.every(x => !x.ib) ? `<button type="button" class="btn" data-join title="Join as versions of one" aria-label="Join as versions of one">${JOIN_ICON}<span>Join</span></button>` : '') +
     (gs ? `<button type="button" class="btn" data-bulk title="Keywords and groups" aria-label="Keywords and groups">${ICON.tag}<span>Keywords</span></button>` +
       `<button type="button" class="btn" data-bulk-rl title="Add to reading list" aria-label="Add to reading list">${ICON.bookmark}<span>Reading list</span></button>` : '') +
     (gs && LIBS.list.length && list.some(x => !x.ib) ? `<button type="button" class="btn" data-copy-lib-sel title="Copy to another library" aria-label="Copy to another library">${ICON.lib}<span>Library</span></button>` : '') +
@@ -1382,10 +1383,10 @@ function selectionHTML() {
     `<button type="button" role="menuitem" class="mi" data-copy-sel="apa">${ICON.apa}<span>References <small class="mi-style" data-cite-label>${esc(citeShort())}</small></span><kbd>${esc(keyHint('copyApa'))}</kbd></button>` +
     `<button type="button" role="menuitem" class="mi" data-copy-sel="short">${ICON.intext}<span>In-text <small class="mi-style" data-cite-label>${esc(citeShort())}</small></span><kbd>${esc(keyHint('copyShort'))}</kbd></button>` +
     `<button type="button" role="menuitem" class="mi" data-copy-sel="qr">${ICON.qr}<span>QR code\u2026</span></button></div></details>` +
-    `<button type="button" class="btn" data-pick-clear title="Clear selection" aria-label="Clear selection">${ICON.x}<span>Clear</span></button>` + `</div>` +
+    `<button type="button" class="btn" data-pick-clear title="${coarseMQ.matches ? 'Clear the selection' : 'Clear the selection and stop selecting'}" aria-label="Clear selection">${ICON.x}<span>Clear</span></button>` + `</div>` +
     `<section class="d-sec"><h3>References (${esc(citeShort())})</h3><div class="apa-refs">` +
     citeList(list.slice(0, 400)).slice(0, SHOW_REFS).map(r => `<p>${r.html}</p>`).join('') +
-    (n > SHOW_REFS ? `<p class="d-venue">and ${(n - SHOW_REFS).toLocaleString()} more. Copy and Export include them all.</p>` : '') +
+    (n > SHOW_REFS ? `<p class="d-venue">and ${(n - SHOW_REFS).toLocaleString()} more. Copy and Share include them all.</p>` : '') +
     `</div></section></div>` + (side ? side + `</div>` : '');
 }
 
@@ -2145,19 +2146,19 @@ function openExport(dest) {
   sheet = { mode: 'export' };
   const withPdf = list.filter(e => (e.files || []).some(f => f.id)).length, n = list.length;
   const share = dest === 'share' && !!navigator.canShare;
-  showSheet(`<h2>Export ${n} publication${n === 1 ? '' : 's'}</h2>` +
+  showSheet(`<h2>Share ${n} publication${n === 1 ? '' : 's'}</h2>` +
     `<p class="exp-what" id="expWhat"></p>` +
-    `<fieldset class="fld grp-fieldset"><legend>Save to</legend><div class="exp-tiles">` +
-    expTile('expDest', 'drive', EXP_ICON.drive, 'Google Drive', 'A new folder in LibLande › Exports', !share) +
+    `<fieldset class="fld grp-fieldset"><legend>To</legend><div class="exp-tiles">` +
+    expTile('expDest', 'drive', EXP_ICON.drive, 'Google Drive', 'A new folder in LibLande \u203a Exports', !share) +
     expTile('expDest', 'device', ICON.download, 'This device', coarseMQ.matches ? 'Save to Files' : 'One .zip file', false) +
-    (navigator.canShare ? expTile('expDest', 'share', ICON.share, 'Share', 'Mail, Messages, AirDrop…', share) : '') +
+    (navigator.canShare ? expTile('expDest', 'share', ICON.share, 'Another app', 'Mail, Messages, AirDrop\u2026', share) : '') +
     `</div></fieldset>` +
     `<fieldset class="fld grp-fieldset"><legend>PDFs <span class="opt">(${withPdf} of ${n} have one)</span></legend><div class="exp-tiles">` +
     expTile('expPdf', 'asis', EXP_ICON.marked, 'As they are', 'With your highlights and notes', true) +
     expTile('expPdf', 'clean', ICON.eraser, 'Clean', 'Annotations removed', false) +
     expTile('expPdf', 'none', EXP_ICON.none, 'None', 'Just the .bib and .rtf', false) +
     `</div></fieldset>` +
-    `<div class="fld" id="expNameFld"><label for="expName">Folder name</label><input id="expName" type="text" value="${esc(exportDefaultName())}" autocomplete="off"></div>`, 'Export');
+    `<div class="fld" id="expNameFld"><label for="expName">Folder name</label><input id="expName" type="text" value="${esc(exportDefaultName())}" autocomplete="off"></div>`, 'Share');
   // What will be made, and the folder name only where there's a folder.
   const body = $('#sheetBody');
   const sync = () => {
