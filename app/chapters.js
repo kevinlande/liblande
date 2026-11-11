@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/chapters.js'] = '2026-11-11.03';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/chapters.js'] = '2026-11-11.04';
 /* ------------------------------------------------------------ link chapters */
 // A chapter is linked to its book by its crossref field (see findChapters).
 // Chapters added before that are linked here, after you've looked:

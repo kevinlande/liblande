@@ -174,8 +174,11 @@
     border-right-color: var(--glass-edge); }
   :root[data-glass] .app.side-open .scrim { background: rgba(0, 0, 0, .12); }
 }
-:root[data-glass] .listwrap > :is(.pick-bar, .rl-list-bar, .colhead) { position: relative; z-index: 2;
+:root[data-glass] .listwrap > :is(.rl-list-bar, .colhead) { position: relative; z-index: 2;
   background: color-mix(in srgb, var(--panel) 68%, transparent);
+  -webkit-backdrop-filter: saturate(180%) blur(22px); backdrop-filter: saturate(180%) blur(22px); }
+/* (The select bar still floats at the foot of the list, in glass.) */
+:root[data-glass] .listwrap > .pick-bar { background: color-mix(in srgb, var(--accent-soft) 82%, transparent);
   -webkit-backdrop-filter: saturate(180%) blur(22px); backdrop-filter: saturate(180%) blur(22px); }
 :root[data-glass] .list { margin-top: calc(-1 * (var(--tb-h, 0px) + var(--bars-h, 0px))); padding-top: calc(var(--tb-h, 0px) + var(--bars-h, 0px)); }
 :root[data-glass] .pull { top: calc(var(--tb-h, 0px) + var(--bars-h, 0px) + 6px); }

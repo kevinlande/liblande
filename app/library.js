@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-11.03';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-11.04';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -2360,7 +2360,7 @@ let listOver = 0, overWatch = null;
 function glassOver() {
   const main = $('#main'), tb = main.querySelector('.toolbar');
   const on = document.documentElement.hasAttribute('data-glass');
-  const bars = [...listEl.parentNode.children].filter(el => el !== listEl && !el.classList.contains('pull') && !el.classList.contains('status') &&
+  const bars = [...listEl.parentNode.children].filter(el => el !== listEl && !el.classList.contains('pull') && !el.classList.contains('status') && !el.classList.contains('pick-bar') &&
     (el.compareDocumentPosition(listEl) & Node.DOCUMENT_POSITION_FOLLOWING));
   if (!overWatch && window.ResizeObserver) {
     overWatch = new ResizeObserver(() => requestAnimationFrame(glassOver));
