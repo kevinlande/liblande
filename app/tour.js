@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-11-10.08';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-11-10.09';
 /* -------------------------------------------------------------- features */
 // What LibLande does, by area: each feature, what it's for, where to find
 // it, its icon (see featIcon), and other words it's found by (as "tag"
@@ -45,8 +45,7 @@ const FEATURES = [
   ] },
   { area: 'Reading', items: [
     ['Papers in tabs', 'Several papers open at once; going back to the library keeps them open. Reader, in the library\u2019s toolbar, goes back to them; its \u25be lists them, with a picture of each first page.', 'Reader, in the library\u2019s toolbar; the tabs along the top of the reader', 'path:M3.5 9h17v10.5h-17zM3.5 9V6a1 1 0 0 1 1-1H10l1.5 4M11.5 9V6a1 1 0 0 1 1-1H18l1.5 4', 'tabs open'],
-    ['A start page', 'With no paper open, the reader lists the papers you closed lately, those read lately on your other devices (where you got to there), and your reading list. + opens a new tab to it.', 'Reader, with no paper open; + beside the paper tabs', '#vNewTab', 'new tab empty start safari'],
-    ['Recently closed', 'Open again a paper you closed lately.', 'The page with an arrow, beside the title', '#vRecentBtn', 'history reopen'],
+    ['A start page', 'With no paper open, the reader lists the papers you closed lately, those read lately on your other devices (where you got to there), and your reading list. + opens a new tab to it.', 'Reader, with no paper open; + beside the paper tabs', '#vNewTab', 'new tab empty start safari recently closed reopen history'],
     ['Search in the paper', 'Every match highlighted; Return for the next.', '\u2318F, or the magnifier', '#vFindBtn', 'find text'],
     ['Zoom and fit', 'Pinch, double-tap, or + and \u2212. Click or tap the percentage to fit the whole page, the page\u2019s width, or actual size.', 'The reader\u2019s toolbar', 'path:M11 4.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM20 20l-4.2-4.2M11 8.5v5M8.5 11h5', 'size width fit'],
     ['Page tones', 'Light, sepia, dark or dark sepia pages, and a Warmth slider; the PDF isn\u2019t changed. A tap on the moon switches between your last two.', 'The moon in the reader\u2019s toolbar: rest the pointer on it (on an iPad or iPhone, hold it)', '#vDarkBtn', 'dark mode night sepia warmth'],
@@ -190,7 +189,7 @@ const TOUR_STEPS = [
   { lib: true, sel: '#tabs', title: 'Tabs and the reading list', text: 'Groups you open stay as tabs. The Reading list holds papers to read next, later, or done.', before: async () => { closeSidebarIfOverlay(); await tourWait(350); } },
   { lib: true, sel: '#selectBtn', title: 'Select several', text: 'Give several publications keywords and groups at once, add them to your reading list, or export them with their PDFs.' },
   { lib: true, sel: '#refreshBtn', title: 'Saving and syncing', text: 'Changes go into your .bib on Google Drive. Check for changes picks up BibDesk\u2019s and your other devices\u2019; a cloud shows what\u2019s waiting while you\u2019re offline.' },
-  { sel: '#vTop', title: 'Reading a paper', text: 'Papers open in tabs. Library goes back and keeps them open; Reader, in the library, returns to them. The page with an arrow reopens one you closed.', before: async () => (await toReader()) ? null : 'skip-reader' },
+  { sel: '#vTop', title: 'Reading a paper', text: 'Papers open in tabs; + opens a new one, at a start page of papers closed lately, read on your other devices, or on your reading list. Library goes back and keeps them open; Reader, in the library, returns to them.', before: async () => (await toReader()) ? null : 'skip-reader' },
   { sel: '#vPalette', title: 'Marking up', text: 'Highlight (H), underline or strike through (U), draw (P), text box (T), sticky note (N), eraser (E). Hold a tool with a small triangle for its second kind. All saved into the PDF.' },
   { sel: '#vSide', title: 'Annotations', text: 'Every highlight and note in the paper, by colour: go to one, copy them with the citation, or add them to your notes.', before: () => readerSide('marks') },
   { sel: '#vSide', title: 'Your notes', text: 'Your notes on the paper, beside it (\u2325N), the same as in its details.', before: () => readerSide('notes') },

@@ -942,7 +942,9 @@ body:has(#sheet:not([hidden])) .pick-bar { visibility: hidden; }
   .toolbar.fold-add #addBtn, .app:not(.picking) .toolbar.fold-sel #selectBtn, .toolbar.fold-rec #recentBtn { display: none; }
 }
 .toolbar .tb-btn.tb-reader { width: auto; padding: 0 7px; gap: 3px; }
-.tb-reader .ct { font: 600 11.5px var(--ui); font-variant-numeric: tabular-nums; }
+/* (How many papers are open: a badge, on a phone as wider.) */
+.tb-reader .ct { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--accent); color: var(--accent-ink); font: 600 11px var(--ui); display: inline-grid; place-items: center; font-variant-numeric: tabular-nums; }
+.tb-reader .ct:empty { display: none; }
 /* On a computer or an iPad, LibLande's two halves as one switch: Reader
    (with how many papers are open, and its \u25be) | Library, the half you're
    in filled. In the library, on another list, Library is shaded lightly; in
@@ -1522,10 +1524,19 @@ details.d-sec[open] summary { margin-bottom: 8px; }
    or more papers open; with one, its title as before.) */
 .viewer.tabs-in-bar .v-tabs-wrap { flex: 1 1 0; min-width: 0; }
 .viewer.tabs-in-bar .v-tabs { padding: 0; background: none; border-bottom: 0; }
-.viewer.tabs-in-bar.multi .v-title-wrap { display: none; }
-.viewer.tabs-in-bar:not(.multi) .v-tabs-wrap { display: none; }
+.viewer.tabs-in-bar .v-title-wrap { display: none; }
+.viewer.tabs-in-bar .v-tabs.single, .viewer.tabs-in-bar .v-tabs:empty { display: flex; }
+.viewer.tabs-in-bar .v-tabs-wrap { display: flex; align-items: center; }
+.viewer.tabs-in-bar .v-tabs { flex: 0 1 auto; min-width: 0; }
 .viewer.tabs-in-bar .v-tabs-more { bottom: 0; }
 :root[data-glass] .viewer.tabs-in-bar .v-tabs { background: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+/* (An iPad upright: the tab row always, its + at the end; the bar without
+   the title, which the tabs show.) */
+.viewer.tabs-row .v-title-wrap { display: none; }
+.viewer.tabs-row .v-bar .v-page { margin-left: auto; }
+.viewer.tabs-row .v-tabs-wrap { display: flex; align-items: center; background: var(--panel); border-bottom: 1px solid var(--line); }
+.viewer.tabs-row .v-tabs, .viewer.tabs-row .v-tabs.single, .viewer.tabs-row .v-tabs:empty { display: flex; flex: 0 1 auto; min-width: 0; border-bottom: 0; }
+.viewer.tabs-row .v-tabs-wrap .v-newtab { margin: 0 6px 0 2px; height: 28px; width: 28px; }
 .v-title { flex: 0 1 auto; min-width: 0; font: 600 14.5px/1.3 var(--serif); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .v-title-x { flex: none; width: 28px; height: 28px; opacity: .7; }
 .v-title-x .i { width: 14px; height: 14px; }

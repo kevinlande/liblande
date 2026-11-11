@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-10.08';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-10.09';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -906,6 +906,12 @@ async function sideSweep(opening) {
 async function closeReader() {
   hideQuote();
   if ($('#viewer').hidden) return;
+  // (Empty tabs aren't kept.)
+  if (PTABS.list.some(t => t.blank)) {
+    const front = PTABS.list[PTABS.active];
+    PTABS.list = PTABS.list.filter(t => !t.blank);
+    PTABS.active = front && !front.blank ? PTABS.list.indexOf(front) : Math.min(Math.max(PTABS.active, 0), PTABS.list.length - 1);
+  }
   rememberTab();
   hidePanel();
   $('#viewer').hidden = true;
@@ -962,6 +968,8 @@ function unloadDoc() {
 // the library with the tabs kept; Viewer in the sidebar comes back. The
 // tabs are remembered in this browser.
 const PTABS = { list: store.get('readerTabs', []), active: store.get('readerActive', -1) };
+// (An empty tab isn't kept: it's filled, or gone.)
+if (PTABS.list.some(t => t.blank)) { const front = PTABS.list[PTABS.active]; PTABS.list = PTABS.list.filter(t => !t.blank); PTABS.active = front && !front.blank ? PTABS.list.indexOf(front) : (PTABS.list.length ? 0 : -1); }
 function tabEntry(t) {
   const e = BYKEY.get(t.key);
   const f = e && (e.files || []).find(x => x.id === t.fileId);
@@ -1015,7 +1023,11 @@ function placePaperTabs() {
   if (inBar && wrap.parentNode !== bar) title.after(wrap);
   else if (!inBar && wrap.parentNode === bar) bar.after(wrap);
   $('#viewer').classList.toggle('tabs-in-bar', inBar);
-  (inBar && $('#viewer').classList.contains('multi') ? wrap : title).after($('#vNewTab'));
+  // (The tabs always shown, even for one paper, with + after them: in the
+  // bar, or narrower (an iPad upright, a phone) on a row of their own, with
+  // no title in the bar above.)
+  $('#viewer').classList.toggle('tabs-row', !inBar);
+  $('#vTabs').after($('#vNewTab'));
 }
 TABS_IN_BAR.addEventListener('change', () => { placePaperTabs(); tabsMore(); });
 // The tabs out of sight at each end of the strip, as buttons over its
@@ -1106,6 +1118,13 @@ function loadActiveTab() {
   openReader(x.e, x.f, t);
 }
 async function switchPaperTab(i) {
+  // (An empty tab in front, left for another: it goes.)
+  const cur = PTABS.list[PTABS.active];
+  if (cur && cur.blank && i !== PTABS.active && PTABS.list[i]) {
+    PTABS.list.splice(PTABS.active, 1);
+    if (i > PTABS.active) i--;
+    PTABS.active = -1;
+  }
   const t = PTABS.list[i];
   if (!t) return;
   if (V.doc && V.file && V.file.id === t.fileId) { PTABS.active = i; showViewer(); return; }
@@ -1234,6 +1253,9 @@ $('#vStart').addEventListener('click', async ev => {
 });
 // + : a new tab, at the start page; the paper in front kept as it was.
 $('#vNewTab').addEventListener('click', async () => {
+  // (Already in an empty tab, or on the start page with none: nothing more.)
+  const front = PTABS.list[PTABS.active];
+  if ((front && front.blank) || (!PTABS.list.length && $('#viewer').classList.contains('start'))) return;
   if (V.doc) {
     if (!keptNote(await saveNow())) return;
     rememberTab();
@@ -1407,33 +1429,7 @@ $('#recentBtn').addEventListener('click', () => {
   RECENT.back = state.group;
   setGroup('recent');
 });
-// In the reader: the papers closed lately (not ones still open), to reopen.
-function closeRecentMenu() { const m = $('#recentMenu'); if (m) m.remove(); }
-$('#vRecentBtn').addEventListener('click', () => {
-  if ($('#recentMenu')) { closeRecentMenu(); return; }
-  const open = new Set(PTABS.list.map(t => t.fileId));
-  const list = RECENT.closed.filter(x => !open.has(x[1]) && BYKEY.get(x[0])).slice(0, 15);
-  const m = document.createElement('div');
-  m.className = 'menu-list pdf-menu link-menu recent-menu';
-  m.id = 'recentMenu';
-  m.setAttribute('role', 'menu');
-  m.innerHTML = '<div class="menu-head">Recently closed</div>' + (list.length ? list.map((x, i) => {
-    const e = BYKEY.get(x[0]);
-    return `<button type="button" role="menuitem" data-rc="${i}"><span class="rc-title">${esc(e.f.title || e.k)}</span><span class="rc-sub">${esc(e.authorsShort || '')}${e.f.year ? ' \u00b7 ' + esc(e.f.year) : ''} \u00b7 ${ago(x[2])}</span></button>`;
-  }).join('') : '<p class="rc-none">No papers closed lately.</p>');
-  document.body.appendChild(m);
-  const r = $('#vRecentBtn').getBoundingClientRect();
-  m.style.left = Math.max(8, Math.min(window.innerWidth - m.offsetWidth - 8, r.right - m.offsetWidth)) + 'px';
-  m.style.top = (r.bottom + 6) + 'px';
-  m.addEventListener('click', ev => {
-    const b = ev.target.closest('[data-rc]');
-    if (!b) return;
-    closeRecentMenu();
-    const x = list[+b.dataset.rc], e = BYKEY.get(x[0]), f = e && (e.files || []).find(fl => fl.id === x[1]);
-    if (f) openPaper(e, f); else toast('That PDF isn\u2019t linked to the publication any more.', 3000);
-  });
-});
-document.addEventListener('pointerdown', ev => { if ($('#recentMenu') && !ev.target.closest('#recentMenu, #vRecentBtn')) closeRecentMenu(); }, true);
+// (The papers closed lately: on the start page, renderStart.)
 function discardAndClose() {
   if (V.file && gs) forgetKept(V.file.id).catch(() => {});
   if (V.doc) V.doc.annotationStorage.resetModified();
