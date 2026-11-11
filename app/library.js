@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-11.01';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-11.02';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -2921,9 +2921,16 @@ const detailWide = () => detailEl.clientWidth >= 700;
 new ResizeObserver(() => {
   if (!detailEl.querySelector('.d-inner') || detailEl.querySelector('.editing, [contenteditable="true"], textarea, input:focus')) return;
   if (!!detailEl.dataset.wide !== detailWide()) { const top = detailEl.scrollTop; renderDetail(); detailEl.scrollTop = top; }
+  else fitSelActs();
 }).observe(detailEl);
 function renderDetail() {
-  if (state.picking && state.picked.size && !phoneMQ.matches) { detailEl.innerHTML = selectionHTML(); return; }
+  if (state.picking && state.picked.size && !phoneMQ.matches) {
+    detailEl.innerHTML = selectionHTML();
+    detailEl.dataset.wide = detailWide() ? '1' : '';
+    fitSelActs();
+    loadThumbs();
+    return;
+  }
   const e = state.selKey && BYKEY.get(state.selKey);
   watchSeen(e && !state.picking ? e.k : null);
   if (phoneMQ.matches) $('#backLabel').textContent = app.dataset.view === 'detail' ? groupName(state.group) : 'Groups';
@@ -3302,7 +3309,11 @@ detailEl.addEventListener('focusout', ev => {
   }, 250);
 });
 detailEl.addEventListener('click', ev => {
-  if (ev.target.closest('[data-export]')) { openExport(); return; }
+  const ex = ev.target.closest('[data-export]');
+  if (ex) { openExport(ex.dataset.export); return; }
+  // (Several selected: a PDF beside them opens its paper.)
+  const rk = ev.target.closest('[data-read-key]'), re = rk && BYKEY.get(rk.dataset.readKey);
+  if (re) { openPaper(re, re.files[+rk.dataset.read]); return; }
   if (ev.target.closest('[data-join]')) { openJoin(pickedEntries()); return; }
   if (ev.target.closest('[data-bulk]')) { openBulk(); return; }
   if (ev.target.closest('[data-bulk-rl]')) { bulkReading(); return; }

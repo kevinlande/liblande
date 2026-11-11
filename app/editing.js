@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-11.01';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-11.02';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -1348,29 +1348,45 @@ function renderPickBar() {
   $('#pickBulk').hidden = $('#pickRL').hidden = !n || !gs;
   $('#pickJoin').hidden = !(gs && n >= 2 && pickedEntries().every(x => !x.ib));
 }
-const SHOW_REFS = 200;
+const SHOW_REFS = 200, SIDE_PDFS = 24;
+// Several selected: the buttons on one row, with their names while they
+// fit, then just icons (all but Export's, then all).
+function fitSelActs() {
+  const a = detailEl.querySelector('.sel-acts');
+  if (!a) return;
+  a.classList.remove('icons', 'icons-all');
+  if (a.scrollWidth > a.clientWidth + 1) a.classList.add('icons');
+  if (a.scrollWidth > a.clientWidth + 1) a.classList.add('icons-all');
+}
 function selectionHTML() {
   const list = pickedEntries();
   const withPdf = list.filter(e => (e.files || []).some(f => f.id)).length;
   const n = list.length;
-  return `<div class="d-inner"><div class="d-kicker"><span class="d-type">Selection</span></div>` +
+  // (Wide: their PDFs beside, small, each opening its paper; at most SIDE_PDFS.)
+  const pdfs = [];
+  list.forEach(e => (e.files || []).forEach((fl, j) => { if (fl.id) pdfs.push([e, fl, j]); }));
+  const side = detailWide() && pdfs.length ? `<aside class="d-side sel-side"><div class="sel-thumbs">` +
+    pdfs.slice(0, SIDE_PDFS).map(([e, fl, j]) => `<button type="button" class="thumb" data-read-key="${esc(e.k)}" data-read="${j}" title="Read ${esc(fl.n)}">${thumbBox(fl.id)}<span class="thumb-name">${esc(fl.n.replace(/\.pdf$/i, ''))}</span></button>`).join('') +
+    `</div>` + (pdfs.length > SIDE_PDFS ? `<p class="d-venue">and ${(pdfs.length - SIDE_PDFS).toLocaleString()} more</p>` : '') + `</aside>` : '';
+  return (side ? `<div class="d-two">` : '') + `<div class="d-inner"><div class="d-kicker"><span class="d-type">Selection</span></div>` +
     `<h1 class="d-title">${n} publication${n === 1 ? '' : 's'} selected</h1>` +
     `<p class="d-venue">${withPdf} of them ${withPdf === 1 ? 'has' : 'have'} a PDF in Google Drive.</p>` +
-    `<div class="actions sel-acts">` + (gs ? `<button type="button" class="btn primary" data-export>${ICON.share}<span>Export\u2026</span></button>` : '') +
-    (gs && n >= 2 && list.every(x => !x.ib) ? `<button type="button" class="btn" data-join>${ICON.versions}<span>Join as versions\u2026</span></button>` : '') +
-    (gs ? `<button type="button" class="btn" data-bulk>${ICON.tag}<span>Keywords and groups\u2026</span></button>` +
-      `<button type="button" class="btn" data-bulk-rl>${ICON.bookmark}<span>Add to reading list</span></button>` : '') +
-    (gs && LIBS.list.length && list.some(x => !x.ib) ? `<button type="button" class="btn" data-copy-lib-sel>${ICON.lib}<span>Copy to another library\u2026</span></button>` : '') +
-    `<details class="menu"><summary class="btn">${ICON.copy}<span>Copy</span>${ICON.chev}</summary>` +
+    `<div class="actions sel-acts">` + (gs ? `<button type="button" class="btn primary" data-export title="Export to Google Drive or this device">${ICON.download}<span>Export</span></button>` : '') +
+    (gs && navigator.canShare ? `<button type="button" class="btn" data-export="share" title="Share (Mail, Messages, AirDrop)" aria-label="Share (Mail, Messages, AirDrop)">${ICON.share}<span>Share</span></button>` : '') +
+    (gs && n >= 2 && list.every(x => !x.ib) ? `<button type="button" class="btn" data-join title="Join as versions of one" aria-label="Join as versions of one">${ICON.versions}<span>Versions</span></button>` : '') +
+    (gs ? `<button type="button" class="btn" data-bulk title="Keywords and groups" aria-label="Keywords and groups">${ICON.tag}<span>Keywords</span></button>` +
+      `<button type="button" class="btn" data-bulk-rl title="Add to reading list" aria-label="Add to reading list">${ICON.bookmark}<span>Reading list</span></button>` : '') +
+    (gs && LIBS.list.length && list.some(x => !x.ib) ? `<button type="button" class="btn" data-copy-lib-sel title="Copy to another library" aria-label="Copy to another library">${ICON.lib}<span>Library</span></button>` : '') +
+    `<details class="menu"><summary class="btn" title="Copy the citations" aria-label="Copy the citations">${ICON.copy}<span>Copy</span>${ICON.chev}</summary>` +
     `<div class="menu-list" role="menu"><button type="button" role="menuitem" class="mi" data-copy-sel="bibtex">${ICON.bib}<span>BibTeX</span><kbd>${esc(keyHint('copyBib'))}</kbd></button>` +
     `<button type="button" role="menuitem" class="mi" data-copy-sel="apa">${ICON.apa}<span>References <small class="mi-style" data-cite-label>${esc(citeShort())}</small></span><kbd>${esc(keyHint('copyApa'))}</kbd></button>` +
     `<button type="button" role="menuitem" class="mi" data-copy-sel="short">${ICON.intext}<span>In-text <small class="mi-style" data-cite-label>${esc(citeShort())}</small></span><kbd>${esc(keyHint('copyShort'))}</kbd></button>` +
     `<button type="button" role="menuitem" class="mi" data-copy-sel="qr">${ICON.qr}<span>QR code\u2026</span></button></div></details>` +
-    `<button type="button" class="btn" data-pick-clear>Clear selection</button></div>` +
+    `<button type="button" class="btn" data-pick-clear title="Clear selection" aria-label="Clear selection">${ICON.x}<span>Clear</span></button>` + `</div>` +
     `<section class="d-sec"><h3>References (${esc(citeShort())})</h3><div class="apa-refs">` +
     citeList(list.slice(0, 400)).slice(0, SHOW_REFS).map(r => `<p>${r.html}</p>`).join('') +
     (n > SHOW_REFS ? `<p class="d-venue">and ${(n - SHOW_REFS).toLocaleString()} more. Copy and Export include them all.</p>` : '') +
-    `</div></section></div>`;
+    `</div></section></div>` + (side ? side + `</div>` : '');
 }
 
 
@@ -2113,24 +2129,45 @@ function exportDefaultName() {
   const d = new Date();
   return 'LibLande export ' + d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
 }
-function openExport() {
+// The choices as tiles: an icon, a name, and a line under it.
+const EXP_ICON = {
+  drive: '<svg class="i" viewBox="0 0 24 24"><path d="M8.5 4h7l6 10.5-3.5 6h-12L2.5 14.5z"/><path d="M8.5 4l6.5 10.5h6.5"/><path d="M6 20.5l6.2-10.6"/></svg>',
+  marked: '<svg class="i" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M8 12.5h8" stroke-width="3.2" opacity=".45"/><path d="M8 17h5"/></svg>',
+  none: '<svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M6 18L18 6"/></svg>',
+};
+function expTile(name, value, icon, title, sub, on) {
+  return `<label class="exp-tile"><input type="radio" name="${name}" value="${value}"${on ? ' checked' : ''}>` +
+    `${icon}<b>${title}</b><small>${sub}</small></label>`;
+}
+function openExport(dest) {
   const list = pickedEntries();
   if (!list.length) { toast('Select some publications first', 2000); return; }
   sheet = { mode: 'export' };
   const withPdf = list.filter(e => (e.files || []).some(f => f.id)).length, n = list.length;
+  const share = dest === 'share' && !!navigator.canShare;
   showSheet(`<h2>Export ${n} publication${n === 1 ? '' : 's'}</h2>` +
-    `<fieldset class="fld grp-fieldset"><legend>Save to</legend><div class="exp-choices">` +
-    `<label class="check"><input type="radio" name="expDest" value="drive" checked> Google Drive (a new folder in LibLande \u203a Exports)</label>` +
-    `<label class="check"><input type="radio" name="expDest" value="device"> This device ${coarseMQ.matches ? '(Save to Files)' : '(a .zip file)'}</label>` +
-    // (Share: the system's share sheet, for Mail, Messages, AirDrop and other apps.)
-    (navigator.canShare ? `<label class="check"><input type="radio" name="expDest" value="share"> Share (Mail, Messages, AirDrop\u2026)</label>` : '') +
+    `<p class="exp-what" id="expWhat"></p>` +
+    `<fieldset class="fld grp-fieldset"><legend>Save to</legend><div class="exp-tiles">` +
+    expTile('expDest', 'drive', EXP_ICON.drive, 'Google Drive', 'A new folder in LibLande › Exports', !share) +
+    expTile('expDest', 'device', ICON.download, 'This device', coarseMQ.matches ? 'Save to Files' : 'One .zip file', false) +
+    (navigator.canShare ? expTile('expDest', 'share', ICON.share, 'Share', 'Mail, Messages, AirDrop…', share) : '') +
     `</div></fieldset>` +
-    `<div class="fld"><label for="expName">Folder name</label><input id="expName" type="text" value="${esc(exportDefaultName())}" autocomplete="off"></div>` +
-    `<fieldset class="fld grp-fieldset"><legend>PDFs <span class="opt">(${withPdf} of ${n} have one)</span></legend><div class="exp-choices">` +
-    `<label class="check"><input type="radio" name="expPdf" value="asis" checked> With annotations, as they are</label>` +
-    `<label class="check"><input type="radio" name="expPdf" value="clean"> Clean copies, with annotations removed</label>` +
-    `<label class="check"><input type="radio" name="expPdf" value="none"> No PDFs, just the .bib and .rtf files</label>` +
-    `</div></fieldset>`, 'Export');
+    `<fieldset class="fld grp-fieldset"><legend>PDFs <span class="opt">(${withPdf} of ${n} have one)</span></legend><div class="exp-tiles">` +
+    expTile('expPdf', 'asis', EXP_ICON.marked, 'As they are', 'With your highlights and notes', true) +
+    expTile('expPdf', 'clean', ICON.eraser, 'Clean', 'Annotations removed', false) +
+    expTile('expPdf', 'none', EXP_ICON.none, 'None', 'Just the .bib and .rtf', false) +
+    `</div></fieldset>` +
+    `<div class="fld" id="expNameFld"><label for="expName">Folder name</label><input id="expName" type="text" value="${esc(exportDefaultName())}" autocomplete="off"></div>`, 'Export');
+  // What will be made, and the folder name only where there's a folder.
+  const body = $('#sheetBody');
+  const sync = () => {
+    const d = (body.querySelector('[name=expDest]:checked') || {}).value, m = (body.querySelector('[name=expPdf]:checked') || {}).value;
+    $('#expNameFld').hidden = d === 'share';
+    const pdfs = m === 'none' || !withPdf ? '' : `, and ${withPdf} PDF${withPdf === 1 ? '' : 's'}${m === 'clean' ? ' (clean)' : ''}`;
+    $('#expWhat').innerHTML = `${ICON.bib}<span>references.bib, references.rtf (${esc(citeShort())})${pdfs}</span>`;
+  };
+  body.querySelectorAll('.exp-tiles input').forEach(r => r.addEventListener('change', sync));
+  sync();
 }
 
 async function driveCopy(id, name, folderId, token) {
