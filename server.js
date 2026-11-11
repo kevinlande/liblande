@@ -17,7 +17,7 @@
   window.LIBLANDE_PAGES = true;
   // (Which version each part of the app is from: index.html checks they
   // match. build.py fills it in.)
-  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-11-11.05';
+  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-11-11.06';
   const CLIENT_ID = '789682218462-98mjugngb46ttd01ucp9dcj71ufspjgn.apps.googleusercontent.com';
   // Google Drive (your .bib, papers and LibLande folder): all it needs.
   const SCOPE = 'https://www.googleapis.com/auth/drive';
@@ -342,8 +342,9 @@
       while (await builder.named(exportsFolder.id, name, 'id', true)) name = base + ' (' + n++ + ')';
       const folder = await (await drive('files?fields=id', { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, mimeType: FOLDER, parents: [exportsFolder.id] }) })).json();
-      await builder.writeFile(folder.id, 'references.bib', req.bib || '', 'text/plain');
-      await builder.writeFile(folder.id, 'references.rtf', req.rtf || '', 'application/rtf');
+      // (Left out when not wanted: null.)
+      if (req.bib != null) await builder.writeFile(folder.id, 'references.bib', req.bib, 'text/plain');
+      if (req.rtf != null) await builder.writeFile(folder.id, 'references.rtf', req.rtf, 'application/rtf');
       return { folderId: folder.id, url: 'https://drive.google.com/drive/folders/' + folder.id, name, token: await getToken() };
     },
     // Where a new publication's PDF is uploaded: LibLande/Inbox/Papers.

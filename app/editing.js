@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-11.05';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-11.06';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -2156,18 +2156,24 @@ function openExport(dest) {
     `<fieldset class="fld grp-fieldset"><legend>PDFs <span class="opt">(${withPdf} of ${n} have one)</span></legend><div class="exp-tiles">` +
     expTile('expPdf', 'asis', EXP_ICON.marked, 'As they are', 'With your highlights and notes', true) +
     expTile('expPdf', 'clean', ICON.eraser, 'Clean', 'Annotations removed', false) +
-    expTile('expPdf', 'none', EXP_ICON.none, 'None', 'Just the .bib and .rtf', false) +
+    expTile('expPdf', 'none', EXP_ICON.none, 'None', 'No PDFs', false) +
     `</div></fieldset>` +
+    // (The .bib and the reference list as files: kept as last chosen.)
+    `<label class="check exp-refs"><input type="checkbox" id="expRefs"${store.get('expRefs', true) ? ' checked' : ''}> Include references.bib and references.rtf</label>` +
     `<div class="fld" id="expNameFld"><label for="expName">Folder name</label><input id="expName" type="text" value="${esc(exportDefaultName())}" autocomplete="off"></div>`, 'Share');
   // What will be made, and the folder name only where there's a folder.
   const body = $('#sheetBody');
   const sync = () => {
     const d = (body.querySelector('[name=expDest]:checked') || {}).value, m = (body.querySelector('[name=expPdf]:checked') || {}).value;
     $('#expNameFld').hidden = d === 'share';
-    const pdfs = m === 'none' || !withPdf ? '' : `, and ${withPdf} PDF${withPdf === 1 ? '' : 's'}${m === 'clean' ? ' (clean)' : ''}`;
-    $('#expWhat').innerHTML = `${ICON.bib}<span>references.bib, references.rtf (${esc(citeShort())})${pdfs}</span>`;
+    const refs = $('#expRefs').checked;
+    const parts = (refs ? ['references.bib', `references.rtf (${esc(citeShort())})`] : [])
+      .concat(m === 'none' || !withPdf ? [] : [`${withPdf} PDF${withPdf === 1 ? '' : 's'}${m === 'clean' ? ' (clean)' : ''}`]);
+    if (d === 'share') parts.push('the references in the message');
+    $('#expWhat').innerHTML = `${ICON.bib}<span>${parts.length ? parts.join(', ').replace(/, ([^,]*)$/, ' and $1') : 'Nothing: choose PDFs or the references files'}</span>`;
   };
   body.querySelectorAll('.exp-tiles input').forEach(r => r.addEventListener('change', sync));
+  $('#expRefs').addEventListener('change', ev => { store.set('expRefs', ev.target.checked); sync(); });
   sync();
 }
 
@@ -2185,6 +2191,7 @@ async function runExport() {
   const mode = ($('#sheetBody').querySelector('input[name="expPdf"]:checked') || {}).value || 'asis';
   const dest = ($('#sheetBody').querySelector('input[name="expDest"]:checked') || {}).value || 'drive';
   const name = ($('#expName').value.trim() || exportDefaultName()).replace(/[\\:*?"<>|]+/g, '-').replace(/[/]/g, '-');
+  const withRefs = $('#expRefs').checked;
   // One PDF per linked file in Drive, named by cite key.
   const pdfs = [];
   if (mode !== 'none') {
@@ -2196,14 +2203,15 @@ async function runExport() {
       return bibtex(e, own.length ? { file: own.join(';') } : null);
     }).join('\n');
   const refs = citeList(list);
-  const docs = { rtf: apaRtf(refs) };
+  const docs = withRefs ? { rtf: apaRtf(refs) } : null;
+  if (!withRefs && !pdfs.length && dest !== 'share') { sheetMsg('Nothing to save: choose PDFs, or include the references files.', true); return; }
   // (Shared: the references in the message too, as one paper's share has its own.)
   const mail = dest === 'share' ? (list.length === 1 ? mailOf(list[0]) : { subject: shareSubject(list), text: refs.map(r => r.text).join('\n\n') }) : null;
   if (dest === 'device' || dest === 'share') { await exportToDevice(name, bib, docs, pdfs, mode, mail); return; }
   sheetBusy(true);
   sheetMsg('Creating the folder\u2026');
   try {
-    const res = await callServer('createExport', { name, bib, rtf: docs.rtf });
+    const res = await callServer('createExport', { name, bib: docs ? bib : null, rtf: docs ? docs.rtf : null });
     const failed = [];
     let done = 0;
     const one = async p => {
@@ -2226,7 +2234,7 @@ async function runExport() {
     const ok = pdfs.length - failed.length;
     sheetMsg('');
     $('#sheetBody').insertAdjacentHTML('beforeend', `<div class="export-done"><p><b>Exported to LibLande \u203a Exports \u203a ${esc(res.name)}</b>: ` +
-      `references.bib, references.rtf` + (pdfs.length ? ` and ${ok} PDF${ok === 1 ? '' : 's'}` + (mode === 'clean' ? ' (clean copies)' : '') : '') + `.</p>` +
+      exportWhat(!!docs, pdfs.length, ok, mode) + `.</p>` +
       (failed.length ? `<p class="warn">${failed.length} PDF${failed.length === 1 ? '' : 's'} couldn\u2019t be added: ${esc(failed.join('; '))}</p>` : '') +
       `<a class="btn primary" href="${esc(res.url)}" target="_blank" rel="noopener">${ICON.drive}<span>Open the folder in Google Drive</span></a></div>`);
     $('#sheetSave').hidden = true;
@@ -2264,10 +2272,10 @@ async function exportToDevice(name, bib, docs, pdfs, mode, mail) {
   sheetMsg('Preparing\u2026');
   try {
     // Every file of the export, kept as separate files.
-    const files = [
+    const files = docs ? [
       new File([bib], 'references.bib', { type: 'text/plain' }),
       new File([docs.rtf], 'references.rtf', { type: 'text/plain' }),
-    ];
+    ] : [];
     const failed = [];
     let done = 0;
     const one = async p => {
@@ -2286,7 +2294,8 @@ async function exportToDevice(name, bib, docs, pdfs, mode, mail) {
     // iPhone and iPad: the share sheet takes the files as they are (Save to
     // Files puts them in a folder you pick or make). Elsewhere: one .zip.
     // Share: the files as they are too, or one .zip if the sheet won't take them.
-    const separate = (share || coarseMQ.matches) && !!navigator.canShare && navigator.canShare({ files });
+    // (No files, shared: just the references, as the message.)
+    const separate = (share && !files.length) || ((share || coarseMQ.matches) && !!navigator.canShare && navigator.canShare({ files }));
     let zipBlob = null;
     if (!separate) {
       sheetMsg('Making the .zip file\u2026');
@@ -2294,12 +2303,12 @@ async function exportToDevice(name, bib, docs, pdfs, mode, mail) {
     }
     const ok = pdfs.length - failed.length;
     const size = separate ? files.reduce((n, f) => n + f.size, 0) : zipBlob.size;
-    const what = 'references.bib, references.rtf' + (pdfs.length ? ` and ${ok} PDF${ok === 1 ? '' : 's'}` + (mode === 'clean' ? ' (clean copies)' : '') : '');
+    const what = exportWhat(!!docs, pdfs.length, ok, mode);
     const how = share ? (coarseMQ.matches ? 'Tap' : 'Click') + ' Share, then choose an app.' : coarseMQ.matches ? 'Tap Save, then choose <b>Save to Files</b>.' : 'Click Save to download it.';
     sheetMsg('');
     $('#sheetBody').querySelectorAll('input').forEach(i => { i.disabled = true; });
-    $('#sheetBody').insertAdjacentHTML('beforeend', `<div class="export-done"><p><b>${separate ? files.length + ' files are ready' : esc(name) + '.zip is ready'}</b> ` +
-      `(${(size / 1048576).toFixed(1)} MB): ${esc(what)}.</p>` +
+    $('#sheetBody').insertAdjacentHTML('beforeend', `<div class="export-done"><p>` + (files.length ? `<b>${separate ? files.length + ' file' + (files.length === 1 ? ' is' : 's are') + ' ready' : esc(name) + '.zip is ready'}</b> ` +
+      `(${(size / 1048576).toFixed(1)} MB): ${esc(what)}.` : `<b>Ready:</b> the references, as the message.`) + `</p>` +
       (failed.length ? `<p class="warn">${failed.length} PDF${failed.length === 1 ? '' : 's'} couldn\u2019t be added: ${esc(failed.join('; '))}</p>` : '') +
       `<p>${how}</p></div>`);
     sheet = { mode: 'export-save', name, files: separate ? files : null, zipBlob, share, mail };
@@ -2329,9 +2338,14 @@ function shareSubject(list) {
   const shown = list.slice(0, 3).map(cite).join('; '), more = list.length - 3;
   return 'Papers: ' + shown + (more > 0 ? ' and ' + more + ' more' : '');
 }
+// What was made, for the message at the end.
+function exportWhat(refs, asked, ok, mode) {
+  const p = asked ? ok + ' PDF' + (ok === 1 ? '' : 's') + (mode === 'clean' ? ' (clean copies)' : '') : '';
+  return refs ? 'references.bib, references.rtf' + (p ? ' and ' + p : '') : p || 'the references';
+}
 // The files, and when shared, the references as the message (Mail's
 // subject and body).
-const shareData = (s, files) => s.mail ? { files, title: s.mail.subject, text: s.mail.text } : { files };
+const shareData = (s, files) => s.mail ? Object.assign(files.length ? { files } : {}, { title: s.mail.subject, text: s.mail.text }) : { files };
 function saveExport() {
   const s = sheet;
   const finish = () => { $('#sheetSave').hidden = true; $('#sheetCancel').textContent = 'Close'; };
