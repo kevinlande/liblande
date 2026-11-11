@@ -1179,8 +1179,8 @@
   }
   let pdfjs = null;
   function loadPdfJs() {
-    return pdfjs || (pdfjs = import(new URL('../vendor/pdf.js/6.4.299/pdf.min.mjs', location.href).href).then(lib => {
-      lib.GlobalWorkerOptions.workerSrc = new URL('../vendor/pdf.js/6.4.299/pdf.worker.min.mjs', location.href).href;
+    return pdfjs || (pdfjs = import(new URL('../vendor/pdf.js/6.5.438/pdf.min.mjs', location.href).href).then(lib => {
+      lib.GlobalWorkerOptions.workerSrc = new URL('../vendor/pdf.js/6.5.438/pdf.worker.min.mjs', location.href).href;
       return lib;
     }).catch(e => { pdfjs = null; throw new Error('The PDF reader didn\u2019t load. Are you online?'); }));
   }
@@ -1217,7 +1217,7 @@
     if (r && (!stamp || r.stamp === stamp)) { NOTE.marks.set(fl.id, r); return r; }
     const lib = await loadPdfJs();
     const data = new Uint8Array(await (await drive('files/' + encodeURIComponent(fl.id) + '?alt=media')).arrayBuffer());
-    const task = lib.getDocument({ data, cMapUrl: new URL('../vendor/pdf.js/6.4.299/cmaps/', location.href).href, cMapPacked: true });
+    const task = lib.getDocument({ data, cMapUrl: new URL('../vendor/pdf.js/6.5.438/cmaps/', location.href).href, cMapPacked: true });
     const doc = await task.promise;
     try {
       let labels = null;

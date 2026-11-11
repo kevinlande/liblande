@@ -2,17 +2,17 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-11.06';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-11.07';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
 // notes stored in the PDF and can add new ones. PDF.js loads the first time
 // a paper is opened.
-const PDFJS = './vendor/pdf.js/6.4.299/';
+const PDFJS = './vendor/pdf.js/6.5.438/';
 // PDF.js's decoders for images in some scans (JBIG2, JPEG 2000), character
 // maps and standard fonts: npm's package (the site's own copy on Pages).
 // Full addresses: the worker, started from a copy, can't follow a relative one.
-const PDFJS_DATA = new URL('./vendor/pdf.js/6.4.299/', location.href).href;
+const PDFJS_DATA = new URL('./vendor/pdf.js/6.5.438/', location.href).href;
 let pdfjsReady = null, viewerReady = null;
 // Whether a mark is selected (PDF.js 6 keeps this on the mark itself).
 const isPicked = ed => !!ed && (V.ui && V.ui.isSelected ? V.ui.isSelected(ed) : !!ed.isSelected);
