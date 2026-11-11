@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-11.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-11.05';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -2197,7 +2197,9 @@ async function runExport() {
     }).join('\n');
   const refs = citeList(list);
   const docs = { rtf: apaRtf(refs) };
-  if (dest === 'device' || dest === 'share') { await exportToDevice(name, bib, docs, pdfs, mode, dest === 'share'); return; }
+  // (Shared: the references in the message too, as one paper's share has its own.)
+  const mail = dest === 'share' ? (list.length === 1 ? mailOf(list[0]) : { subject: shareSubject(list), text: refs.map(r => r.text).join('\n\n') }) : null;
+  if (dest === 'device' || dest === 'share') { await exportToDevice(name, bib, docs, pdfs, mode, mail); return; }
   sheetBusy(true);
   sheetMsg('Creating the folder\u2026');
   try {
@@ -2256,7 +2258,8 @@ function loadJSZip() {
   return jszipReady;
 }
 
-async function exportToDevice(name, bib, docs, pdfs, mode, share) {
+async function exportToDevice(name, bib, docs, pdfs, mode, mail) {
+  const share = !!mail;
   sheetBusy(true);
   sheetMsg('Preparing\u2026');
   try {
@@ -2299,7 +2302,7 @@ async function exportToDevice(name, bib, docs, pdfs, mode, share) {
       `(${(size / 1048576).toFixed(1)} MB): ${esc(what)}.</p>` +
       (failed.length ? `<p class="warn">${failed.length} PDF${failed.length === 1 ? '' : 's'} couldn\u2019t be added: ${esc(failed.join('; '))}</p>` : '') +
       `<p>${how}</p></div>`);
-    sheet = { mode: 'export-save', name, files: separate ? files : null, zipBlob, share };
+    sheet = { mode: 'export-save', name, files: separate ? files : null, zipBlob, share, mail };
     $('#sheetSave').textContent = share ? 'Share\u2026' : 'Save\u2026';
   } catch (err) {
     sheetMsg(errText(err), true);
@@ -2316,6 +2319,19 @@ async function makeZip(name, files) {
   return zip.generateAsync({ type: 'blob', compression: 'STORE' });
 }
 
+// The subject for several shared: the group's name when they're all of
+// it (a course's readings, say); otherwise who and when, as cited, the
+// first three and how many more: Papers: Ford, 2023; Lee, 2020 and 5 more.
+function shareSubject(list) {
+  const g = state.group, keys = new Set(list.map(e => e.k));
+  if (!['all', 'inbox', 'dups', 'recent'].includes(g) && !String(state.q || '').trim() && state.view.length === list.length && state.view.every(e => keys.has(e.k))) return groupName(g);
+  const cite = e => citeInText(e).text.replace(/^\((.*)\)$/, '$1');
+  const shown = list.slice(0, 3).map(cite).join('; '), more = list.length - 3;
+  return 'Papers: ' + shown + (more > 0 ? ' and ' + more + ' more' : '');
+}
+// The files, and when shared, the references as the message (Mail's
+// subject and body).
+const shareData = (s, files) => s.mail ? { files, title: s.mail.subject, text: s.mail.text } : { files };
 function saveExport() {
   const s = sheet;
   const finish = () => { $('#sheetSave').hidden = true; $('#sheetCancel').textContent = 'Close'; };
@@ -2323,7 +2339,7 @@ function saveExport() {
     // (To share: the .zip through the share sheet; downloaded if it won't take it.)
     const zf = new File([s.zipBlob], s.name + '.zip', { type: 'application/zip' });
     if (s.share && navigator.canShare && navigator.canShare({ files: [zf] })) {
-      navigator.share({ files: [zf] }).then(finish).catch(err => {
+      navigator.share(shareData(s, [zf])).then(finish).catch(err => {
         if (err && err.name === 'AbortError') return;
         openIn(s.zipBlob, s.name + '.zip', 'application/zip', 'Downloading ' + s.name + '.zip.', 'download');
         finish();
@@ -2334,7 +2350,7 @@ function saveExport() {
     finish();
     return;
   }
-  navigator.share({ files: s.files }).then(finish).catch(async err => {
+  navigator.share(shareData(s, s.files)).then(finish).catch(async err => {
     if (err && err.name === 'AbortError') return;
     // The share sheet wouldn't take the files one by one (too many, or too
     // large): make one .zip file instead, for another tap on Save.
