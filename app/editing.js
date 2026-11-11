@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-10.09';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-11.01';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -1356,7 +1356,7 @@ function selectionHTML() {
   return `<div class="d-inner"><div class="d-kicker"><span class="d-type">Selection</span></div>` +
     `<h1 class="d-title">${n} publication${n === 1 ? '' : 's'} selected</h1>` +
     `<p class="d-venue">${withPdf} of them ${withPdf === 1 ? 'has' : 'have'} a PDF in Google Drive.</p>` +
-    `<div class="actions">` + (gs ? `<button type="button" class="btn primary" data-export>${ICON.share}<span>Export\u2026</span></button>` : '') +
+    `<div class="actions sel-acts">` + (gs ? `<button type="button" class="btn primary" data-export>${ICON.share}<span>Export\u2026</span></button>` : '') +
     (gs && n >= 2 && list.every(x => !x.ib) ? `<button type="button" class="btn" data-join>${ICON.versions}<span>Join as versions\u2026</span></button>` : '') +
     (gs ? `<button type="button" class="btn" data-bulk>${ICON.tag}<span>Keywords and groups\u2026</span></button>` +
       `<button type="button" class="btn" data-bulk-rl>${ICON.bookmark}<span>Add to reading list</span></button>` : '') +
@@ -2122,6 +2122,8 @@ function openExport() {
     `<fieldset class="fld grp-fieldset"><legend>Save to</legend><div class="exp-choices">` +
     `<label class="check"><input type="radio" name="expDest" value="drive" checked> Google Drive (a new folder in LibLande \u203a Exports)</label>` +
     `<label class="check"><input type="radio" name="expDest" value="device"> This device ${coarseMQ.matches ? '(Save to Files)' : '(a .zip file)'}</label>` +
+    // (Share: the system's share sheet, for Mail, Messages, AirDrop and other apps.)
+    (navigator.canShare ? `<label class="check"><input type="radio" name="expDest" value="share"> Share (Mail, Messages, AirDrop\u2026)</label>` : '') +
     `</div></fieldset>` +
     `<div class="fld"><label for="expName">Folder name</label><input id="expName" type="text" value="${esc(exportDefaultName())}" autocomplete="off"></div>` +
     `<fieldset class="fld grp-fieldset"><legend>PDFs <span class="opt">(${withPdf} of ${n} have one)</span></legend><div class="exp-choices">` +
@@ -2157,7 +2159,7 @@ async function runExport() {
     }).join('\n');
   const refs = citeList(list);
   const docs = { rtf: apaRtf(refs) };
-  if (dest === 'device') { await exportToDevice(name, bib, docs, pdfs, mode); return; }
+  if (dest === 'device' || dest === 'share') { await exportToDevice(name, bib, docs, pdfs, mode, dest === 'share'); return; }
   sheetBusy(true);
   sheetMsg('Creating the folder\u2026');
   try {
@@ -2216,7 +2218,7 @@ function loadJSZip() {
   return jszipReady;
 }
 
-async function exportToDevice(name, bib, docs, pdfs, mode) {
+async function exportToDevice(name, bib, docs, pdfs, mode, share) {
   sheetBusy(true);
   sheetMsg('Preparing\u2026');
   try {
@@ -2242,7 +2244,8 @@ async function exportToDevice(name, bib, docs, pdfs, mode) {
     await Promise.all(Array.from({ length: 2 }, async () => { while (queue.length) await one(queue.shift()); }));
     // iPhone and iPad: the share sheet takes the files as they are (Save to
     // Files puts them in a folder you pick or make). Elsewhere: one .zip.
-    const separate = coarseMQ.matches && !!navigator.canShare && navigator.canShare({ files });
+    // Share: the files as they are too, or one .zip if the sheet won't take them.
+    const separate = (share || coarseMQ.matches) && !!navigator.canShare && navigator.canShare({ files });
     let zipBlob = null;
     if (!separate) {
       sheetMsg('Making the .zip file\u2026');
@@ -2251,15 +2254,15 @@ async function exportToDevice(name, bib, docs, pdfs, mode) {
     const ok = pdfs.length - failed.length;
     const size = separate ? files.reduce((n, f) => n + f.size, 0) : zipBlob.size;
     const what = 'references.bib, references.rtf' + (pdfs.length ? ` and ${ok} PDF${ok === 1 ? '' : 's'}` + (mode === 'clean' ? ' (clean copies)' : '') : '');
-    const how = coarseMQ.matches ? 'Tap Save, then choose <b>Save to Files</b>.' : 'Click Save to download it.';
+    const how = share ? (coarseMQ.matches ? 'Tap' : 'Click') + ' Share, then choose an app.' : coarseMQ.matches ? 'Tap Save, then choose <b>Save to Files</b>.' : 'Click Save to download it.';
     sheetMsg('');
     $('#sheetBody').querySelectorAll('input').forEach(i => { i.disabled = true; });
     $('#sheetBody').insertAdjacentHTML('beforeend', `<div class="export-done"><p><b>${separate ? files.length + ' files are ready' : esc(name) + '.zip is ready'}</b> ` +
       `(${(size / 1048576).toFixed(1)} MB): ${esc(what)}.</p>` +
       (failed.length ? `<p class="warn">${failed.length} PDF${failed.length === 1 ? '' : 's'} couldn\u2019t be added: ${esc(failed.join('; '))}</p>` : '') +
       `<p>${how}</p></div>`);
-    sheet = { mode: 'export-save', name, files: separate ? files : null, zipBlob };
-    $('#sheetSave').textContent = 'Save\u2026';
+    sheet = { mode: 'export-save', name, files: separate ? files : null, zipBlob, share };
+    $('#sheetSave').textContent = share ? 'Share\u2026' : 'Save\u2026';
   } catch (err) {
     sheetMsg(errText(err), true);
   } finally {
@@ -2279,6 +2282,16 @@ function saveExport() {
   const s = sheet;
   const finish = () => { $('#sheetSave').hidden = true; $('#sheetCancel').textContent = 'Close'; };
   if (s.zipBlob) {
+    // (To share: the .zip through the share sheet; downloaded if it won't take it.)
+    const zf = new File([s.zipBlob], s.name + '.zip', { type: 'application/zip' });
+    if (s.share && navigator.canShare && navigator.canShare({ files: [zf] })) {
+      navigator.share({ files: [zf] }).then(finish).catch(err => {
+        if (err && err.name === 'AbortError') return;
+        openIn(s.zipBlob, s.name + '.zip', 'application/zip', 'Downloading ' + s.name + '.zip.', 'download');
+        finish();
+      });
+      return;
+    }
     openIn(s.zipBlob, s.name + '.zip', 'application/zip', 'Downloading ' + s.name + '.zip.');
     finish();
     return;
@@ -2291,7 +2304,7 @@ function saveExport() {
     sheetMsg('Making a .zip instead\u2026');
     try {
       s.zipBlob = await makeZip(s.name, s.files);
-      sheetMsg(s.name + '.zip is ready. Tap Save again, then choose Save to Files.');
+      sheetMsg(s.name + '.zip is ready. ' + (s.share ? 'Share it again.' : 'Tap Save again, then choose Save to Files.'));
     } catch (e) {
       sheetMsg(errText(e), true);
     } finally {

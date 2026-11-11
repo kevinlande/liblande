@@ -1317,6 +1317,10 @@ button.fileicon { border: 0; background: none; cursor: pointer; }
    buttons other than the first show just their icons.) */
 .actions > .btn, .actions > .menu > summary.btn { border-radius: var(--r-cap); }
 .actions > .btn, .actions > .menu { flex: 0 1 auto; min-width: 0; }
+/* (Several selected: the buttons wrap to a second row, names whole.) */
+.actions.sel-acts { flex-wrap: wrap; }
+.actions.sel-acts > .btn, .actions.sel-acts > .menu { flex: none; }
+.actions.sel-acts .btn { white-space: nowrap; }
 @container (max-width: 440px) { .d-inner .actions > :not(:first-child) > .btn > span, .d-inner .actions > .btn:not(:first-child) > span, .d-inner .actions > .menu:not(:first-child) > summary > span { display: none; } }
 .btn {
   display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 6px 12px;
