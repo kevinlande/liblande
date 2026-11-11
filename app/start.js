@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-11-11.07';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-11-11.08';
 // On GitHub Pages, every part of the app must be from the same version: a
 // part kept from an older one (the offline copy, served when the network
 // was slow) lacks what this page needs. Then the kept copies go, and the
@@ -749,6 +749,13 @@ if (RELOADING) {
       renderLibOthers(st);
       $('#curPapers').textContent = st.papersName || '';
       $('#changeLinks').hidden = false;
+      // (On Pages: this device's access to Drive, full or limited. Limited
+      // can be made full here; the other way is chosen at a first sign-in.)
+      if (window.LIBLANDE_PAGES) callServer('getAccess').then(a => {
+        $('#accessRow').hidden = false;
+        $('#curAccess').textContent = a.access === 'limited' ? 'Limited: the files you\u2019ve given LibLande' : 'Full';
+        $('#accessFull').hidden = a.access !== 'limited';
+      }).catch(() => {});
     }
     if (!configured) $('#linkFields').after($('#setLibs'));
     setupMsg(st && st.problem, 'error');
@@ -776,6 +783,12 @@ if (RELOADING) {
     SYNC[b.dataset.sync] = b.checked;
     store.set('sync', SYNC);
   }));
+  // Full access from now on: signed in again (a tap), then everything in
+  // Drive is in reach.
+  $('#accessFull').addEventListener('click', async () => {
+    try { await callServer('setAccess', 'full'); location.reload(); }
+    catch (e) { toast(errText(e), 4000); }
+  });
   $('#changeLinks').addEventListener('click', () => {
     $('#linkFields').hidden = false;
     $('#changeLinks').hidden = true;

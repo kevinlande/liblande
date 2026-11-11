@@ -216,7 +216,7 @@
 </header>
 
 <div class="view" id="vSignin" hidden>
-  <div class="body"><div class="empty">Sign in to Google to use your library.<br><button class="btn primary" id="signin" type="button">Sign in</button><div class="note" id="signinNote" style="margin-top:10px"></div></div></div>
+  <div class="body"><div class="empty">Sign in to Google to use your library.<br><button class="btn primary" id="signin" type="button">Sign in</button><span id="signinPick" hidden><br>With the access you chose in LibLande:<br><button class="btn primary" data-access="limited" type="button">Limited access</button> <button class="btn" data-access="full" type="button">Full access</button></span><div class="note" id="signinNote" style="margin-top:10px"></div></div></div>
 </div>
 
 <div class="view" id="vMain" hidden>
@@ -321,8 +321,8 @@ const safeUrl = u => /^https?:[/][/]/i.test(u) ? u : null;
 const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[‐-―]/g, '-');
 const cmpStr = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 </script>
-<script src="../app/apa.js?v=2026-11-11.07"></script>
-<script src="../app/csl.js?v=2026-11-11.07"></script>
-<script src="../app/marks.js?v=2026-11-11.07"></script>
-<script src="engine.js?v=2026-11-11.07"></script>
-<script src="panel.js?v=2026-11-11.07"></script>
+<script src="../app/apa.js?v=2026-11-11.08"></script>
+<script src="../app/csl.js?v=2026-11-11.08"></script>
+<script src="../app/marks.js?v=2026-11-11.08"></script>
+<script src="engine.js?v=2026-11-11.08"></script>
+<script src="panel.js?v=2026-11-11.08"></script>

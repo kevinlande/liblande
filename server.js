@@ -17,10 +17,17 @@
   window.LIBLANDE_PAGES = true;
   // (Which version each part of the app is from: index.html checks they
   // match. build.py fills it in.)
-  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-11-11.07';
+  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-11-11.08';
   const CLIENT_ID = '789682218462-98mjugngb46ttd01ucp9dcj71ufspjgn.apps.googleusercontent.com';
-  // Google Drive (your .bib, papers and LibLande folder): all it needs.
-  const SCOPE = 'https://www.googleapis.com/auth/drive';
+  // Google Drive, in one of two ways (docs/drive-file-plan.md):
+  // full: all of Drive (your .bib, papers and LibLande folder wherever
+  //   they are); Google warns that LibLande isn't verified.
+  // limited: only files LibLande made and files picked in Google's picker;
+  //   no warning.
+  const SCOPES = { full: 'https://www.googleapis.com/auth/drive', limited: 'https://www.googleapis.com/auth/drive.file' };
+  // Google's picker: the project's key (build.py fills it in from
+  // pages/picker-key.txt) and number.
+  const PICKER_KEY = 'AIzaSyCJ4i0w4SpEo6DS9Y9OjMUWgPYzeUIIg7g', APP_ID = CLIENT_ID.split('-')[0];
   const API = 'https://www.googleapis.com/drive/v3/', UPLOAD = 'https://www.googleapis.com/upload/drive/v3/';
   const FOLDER = 'application/vnd.google-apps.folder';
   // As in Code.gs.
@@ -39,8 +46,17 @@
   // that's missing or has run out waits for one: a bar asks for it, and any
   // tap will do. A token kept from last time is used while it lasts.
   let token = store.get('token', null);   // {value, at, expiresIn, scope}
+  // Which access this device uses. (A device signed in before there was a
+  // choice has full access; one never signed in asks, at sign-in.)
+  let access = store.get('access', null);
+  if (!access && token && token.scope === SCOPES.full) { access = 'full'; store.set('access', access); }
+  // (Until limited access can set up a library, the choice is offered only
+  // on a device that has opened LibLande with ?limited in its address.)
+  if (/[?&]limited\b/.test(location.search)) store.set('offerLimited', true);
+  if (!access && !store.get('offerLimited', false)) access = 'full';
+  const scope = () => SCOPES[access || 'full'];
   // (One asked for with other permissions is asked for again.)
-  if (token && token.scope !== SCOPE) token = null;
+  if (token && token.scope !== scope()) token = null;
   let email = store.get('email', '');
   let client = null, asking = false, waiters = [];
   const age = () => (token ? Date.now() - token.at : Infinity);
@@ -50,11 +66,14 @@
     if (client || !window.google || !google.accounts || !google.accounts.oauth2) return;
     client = google.accounts.oauth2.initTokenClient({
       client_id: CLIENT_ID,
-      scope: SCOPE,
+      scope: scope(),
+      // (Limited: not the full access this account may have given LibLande
+      // before, only the limited one.)
+      include_granted_scopes: access !== 'limited',
       callback: resp => {
         asking = false;
         if (resp.error) { bar('Google didn’t sign you in (' + resp.error + '). Tap to try again.'); return; }
-        token = { value: resp.access_token, at: Date.now(), expiresIn: +resp.expires_in || 3600, scope: SCOPE };
+        token = { value: resp.access_token, at: Date.now(), expiresIn: +resp.expires_in || 3600, scope: scope() };
         store.set('token', token);
         bar(null);
         const w = waiters; waiters = [];
@@ -72,6 +91,8 @@
   const OFFLINE_BAR = 'You\u2019re offline. LibLande will reconnect to Google Drive when you\u2019re back online.';
   function ask() {
     if (!navigator.onLine) { bar(OFFLINE_BAR); return; }
+    // (Never signed in on this device: full or limited access first.)
+    if (!access) { chooser(); return; }
     makeClient();
     if (!client || asking) return;
     asking = true;
@@ -97,14 +118,15 @@
     }
     return new Promise(resolve => {
       waiters.push(resolve);
-      bar(email ? 'Tap anywhere to reconnect to Google Drive' : 'Sign in with Google to open your library');
+      if (!access) chooser();
+      else bar(email ? 'Tap anywhere to reconnect to Google Drive' : 'Sign in with Google to open your library');
     });
   }
   // A tap renews a token that's missing, old or run out. (Not taps on a
   // page of a paper, where Google's window would interrupt a stroke; the
   // bar, or a tap anywhere else, does it then.)
   function onTap(ev) {
-    if (asking || !navigator.onLine) return;
+    if (asking || !navigator.onLine || !access) return;
     const onPage = ev.target && ev.target.closest && ev.target.closest('#vPages, #vPeekPages');
     if (waiters.length || (!onPage && token && age() > RENEW_AFTER)) ask();
   }
@@ -139,6 +161,118 @@
     }
     barEl.textContent = text;
     barEl.hidden = false;
+  }
+
+  // The first sign-in on a device: full or limited access. A card in the
+  // middle of the screen; choosing signs in (the tap opens Google's
+  // window).
+  let chooserEl = null;
+  function chooser() {
+    if (chooserEl) { chooserEl.hidden = false; return; }
+    bar(null);
+    const dark = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches;
+    const ink = dark ? '#e2e8e5' : '#1b2321', muted = dark ? '#a9b5b1' : '#5d6a66', card = dark ? '#262b2a' : '#fff', line = dark ? '#3a4341' : '#d8dfdc';
+    chooserEl = document.createElement('div');
+    chooserEl.id = 'pagesAccess';
+    chooserEl.setAttribute('role', 'dialog');
+    chooserEl.setAttribute('aria-label', 'Sign in with Google');
+    chooserEl.style.cssText = 'position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;padding:16px;background:rgba(0,0,0,.18);font:15px/1.4 -apple-system,BlinkMacSystemFont,sans-serif';
+    const opt = (key, title, sub, primary) => '<button type="button" data-access="' + key + '" style="display:grid;gap:2px;width:100%;text-align:left;padding:12px 14px;border-radius:12px;cursor:pointer;font:inherit;' +
+      (primary ? 'background:#1f6b5c;color:#fff;border:1px solid #1f6b5c' : 'background:' + card + ';color:' + ink + ';border:1px solid ' + line) + '">' +
+      '<b style="font-size:15px">' + title + '</b><span style="font-size:13px;opacity:.85">' + sub + '</span></button>';
+    chooserEl.innerHTML = '<div style="width:min(380px,100%);display:grid;gap:10px;padding:20px;border-radius:16px;background:' + card + ';color:' + ink + ';box-shadow:0 12px 40px rgba(0,0,0,.25)">' +
+      '<b style="font-size:18px">Sign in with Google</b>' +
+      '<span style="color:' + muted + ';font-size:13.5px">How much of your Google Drive LibLande can reach.</span>' +
+      opt('limited', 'Limited access', 'Only the files you give LibLande: your .bib and its PDFs, chosen once.', true) +
+      opt('full', 'Full access', 'All of your Google Drive, with nothing to choose. Google warns that LibLande isn\u2019t verified.', false) +
+      '</div>';
+    chooserEl.addEventListener('click', ev => {
+      const b = ev.target.closest('[data-access]');
+      if (!b) return;
+      chooserEl.hidden = true;
+      setAccess(b.dataset.access);
+      ask();
+    });
+    (document.body || document.documentElement).appendChild(chooserEl);
+  }
+  // Full or limited access from now on, on this device: signed in again
+  // with that, on the next tap.
+  function setAccess(mode) {
+    if (!SCOPES[mode]) return;
+    const changed = mode !== access;
+    access = mode;
+    store.set('access', mode);
+    if (changed) { token = null; store.set('token', null); client = null; }
+  }
+
+  /* ------------------------------------------------------------ Google's picker */
+  // Picking files or folders in Google's own picker: with limited access,
+  // how LibLande is given them. what: 'bib' (one .bib), 'pdfs' (several
+  // PDFs), 'folders' (several folders), 'folder' (one), 'files' (several
+  // of any kind). parent: a folder to start in. query: a search to start
+  // with. Answers [{id, name, mimeType}], or [] if cancelled.
+  let pickerReady = null;
+  function loadPicker() {
+    return pickerReady || (pickerReady = new Promise((ok, no) => {
+      const done = () => window.gapi.load('picker', { callback: ok, onerror: () => no(new Error('Google\u2019s picker didn\u2019t load.')) });
+      if (window.gapi && window.gapi.load) { done(); return; }
+      const s = document.createElement('script');
+      s.src = 'https://apis.google.com/js/api.js';
+      s.onload = done;
+      s.onerror = () => no(new Error('Google\u2019s picker didn\u2019t load. Are you online?'));
+      document.head.appendChild(s);
+    }).catch(e => { pickerReady = null; throw e; }));
+  }
+  async function pick(opts = {}) {
+    if (!PICKER_KEY || PICKER_KEY.indexOf('__') === 0) throw new Error('Google\u2019s picker isn\u2019t set up in this copy of LibLande.');
+    const what = opts.what || 'files';
+    const [t] = await Promise.all([getToken(), loadPicker()]);
+    const P = window.google.picker;
+    const folders = what === 'folders' || what === 'folder';
+    const view = new P.DocsView(folders ? P.ViewId.FOLDERS : P.ViewId.DOCS)
+      .setMode(P.DocsViewMode.LIST)
+      .setIncludeFolders(folders || !!opts.parent)
+      .setSelectFolderEnabled(folders);
+    if (folders) view.setMimeTypes(FOLDER);
+    else if (what === 'pdfs') view.setMimeTypes('application/pdf');
+    if (opts.parent) view.setParent(opts.parent);
+    if (opts.query) view.setQuery(opts.query);
+    const pb = new P.PickerBuilder()
+      .addView(view)
+      .setOAuthToken(t)
+      .setDeveloperKey(PICKER_KEY)
+      .setAppId(APP_ID)
+      .setTitle(opts.title || (what === 'bib' ? 'Choose your .bib file' : folders ? 'Choose folders' : what === 'pdfs' ? 'Choose PDFs' : 'Choose files'));
+    if (what !== 'bib' && what !== 'folder') pb.enableFeature(P.Feature.MULTISELECT_ENABLED).setMaxItems(5000);
+    return new Promise(ok => {
+      pb.setCallback(d => {
+        if (d.action === P.Action.PICKED) ok((d.docs || []).map(x => ({ id: x.id, name: x.name, mimeType: x.mimeType })));
+        else if (d.action === P.Action.CANCEL) ok([]);
+      });
+      pb.build().setVisible(true);
+    });
+  }
+  // Files just picked can take a moment to be LibLande's: each one not
+  // found is tried again, for up to half a minute. Answers {ok, missing}
+  // (ids).
+  async function settle(ids) {
+    const ok = [], waits = [0, 2000, 4000, 8000, 16000];
+    let left = ids.slice();
+    for (const w of waits) {
+      if (!left.length) break;
+      if (w) await new Promise(r => setTimeout(r, w));
+      const still = [];
+      const queue = left.slice();
+      await Promise.all(Array.from({ length: 6 }, async () => {
+        while (queue.length) {
+          const id = queue.shift();
+          try { await drive('files/' + encodeURIComponent(id) + '?fields=id&supportsAllDrives=true'); ok.push(id); }
+          catch (e) { still.push(id); }
+        }
+      }));
+      left = still;
+    }
+    return { ok, missing: left };
   }
 
   /* ------------------------------------------------------------ Drive */
@@ -277,6 +411,16 @@
     // (Your preferences read again, as another device may have changed
     // them.)
     refreshNow() { prefsMemo = null; return SERVER.getStatus(); },
+    // Full or limited access to Google Drive, on this device (see above).
+    getAccess() { return { access: access || 'full', email }; },
+    setAccess(mode) { setAccess(mode); return { access }; },
+    // Google's picker, then waiting for what was picked to be LibLande's.
+    async pickFiles(opts) {
+      const docs = await pick(opts);
+      if (!docs.length || opts.settle === false) return { docs, missing: [] };
+      const s = await settle(docs.map(d => d.id));
+      return { docs: docs.filter(d => s.ok.includes(d.id)), missing: docs.filter(d => s.missing.includes(d.id)) };
+    },
     async getPrefs() { prefsMemo = null; return loadPrefs(null); },
     // New settings, from the links pasted in Settings (as Code.gs's
     // saveSettings): the .bib and, if given, the papers folder, checked and

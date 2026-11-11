@@ -9,7 +9,9 @@
 'use strict';
 (() => {
   const CLIENT_ID = '789682218462-98mjugngb46ttd01ucp9dcj71ufspjgn.apps.googleusercontent.com';
-  const SCOPE = 'https://www.googleapis.com/auth/drive';
+  // Full or limited access to Drive, as in LibLande (docs/drive-file-plan.md):
+  // chosen at the first sign-in here, as it was there.
+  const SCOPES = { full: 'https://www.googleapis.com/auth/drive', limited: 'https://www.googleapis.com/auth/drive.file' };
   const API = 'https://www.googleapis.com/drive/v3/';
   const LIBLANDE = 'https://kevinlande.github.io/liblande/';
   const $ = id => document.getElementById(id);
@@ -54,6 +56,10 @@
 
   /* ---- signing in (Google's own sign-in, from the panel) */
   let token = store.get('token', null);
+  // (A panel signed in before there was a choice had full access.)
+  // (Offered once limited access can set up a library: until then, full.)
+  const OFFER_LIMITED = false;
+  let access = store.get('access', token || !OFFER_LIMITED ? 'full' : null);
   const tokenOk = () => token && token.exp > Date.now();
   let gisReady = null;
   function loadGis() {
@@ -65,10 +71,12 @@
     }));
   }
   async function signIn(prompt) {
+    if (!access) throw Object.assign(new Error(''), { choose: true });
     await loadGis();
     return new Promise((ok, no) => {
       const client = google.accounts.oauth2.initTokenClient({
-        client_id: CLIENT_ID, scope: SCOPE,
+        client_id: CLIENT_ID, scope: SCOPES[access],
+        include_granted_scopes: access !== 'limited',
         callback: t => {
           if (!t || !t.access_token) { no(new Error('Google didn\u2019t sign you in.')); return; }
           token = { value: t.access_token, exp: Date.now() + (Number(t.expires_in) || 3600) * 1000 - 60000 };
@@ -1689,7 +1697,7 @@
     $('acct').hidden = !email && !tokenOk();
     $('acct').textContent = (email[0] || '?').toUpperCase();
     $('acct').title = email;
-    $('menuWho').textContent = email || 'Signed in';
+    $('menuWho').textContent = (email || 'Signed in') + (access === 'limited' ? ' \u00b7 limited access' : '');
   }
   function paintOffline() { $('offline').hidden = navigator.onLine; }
   // LibLande, or a link into it: "#add=<what to look for>" opens Add with
@@ -1710,7 +1718,7 @@
       readZotero();
     } catch (e) {
       if (S.entries.length) { view('vMain'); showErr('citeErr', e.message); }
-      else { view('vSignin'); $('signinNote').textContent = e.message; }
+      else { view('vSignin'); $('signinNote').textContent = e.message; $('signinPick').hidden = !!access; $('signin').hidden = !access; }
     }
   }
 
@@ -1854,6 +1862,12 @@
     $('plainNo').addEventListener('click', () => { $('plainAsk').hidden = true; });
     $('plainYes').addEventListener('click', convertPlain);
     $('signin').addEventListener('click', () => reload(false));
+    // (The first sign-in: full or limited access, as chosen in LibLande.)
+    document.querySelectorAll('[data-access]').forEach(b => b.addEventListener('click', () => {
+      access = b.dataset.access;
+      store.set('access', access);
+      reload(false);
+    }));
     $('acct').addEventListener('click', ev => {
       ev.stopPropagation();
       const open = $('menu').hidden;
@@ -1882,6 +1896,8 @@
       $('menu').hidden = true;
       try { if (token && window.google && google.accounts) google.accounts.oauth2.revoke(token.value, () => {}); } catch (e) { /* gone anyway */ }
       token = null; store.set('token', null); store.set('email', null); store.set('libStamp', null);
+      // (Whoever signs in next chooses full or limited access again.)
+      access = OFFER_LIMITED ? null : 'full'; store.set('access', null);
       await idb.clear();
       S.entries = []; S.byKey = new Map(); S.index = [];
       paintAccount();
