@@ -19,7 +19,7 @@
  */
 (function (root) {
   'use strict';
-  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).builder = '2026-11-12.01';
+  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).builder = '2026-11-12.02';
   const FOLDER = 'application/vnd.google-apps.folder';
   const DATA_FOLDER = 'LibLande', LIBRARY_FILE = 'library.json.gz', INDEX_FILE = 'file-index.json',
     SETTINGS_FILE = 'settings.json', INBOX_FOLDER = 'Inbox', INBOX_FILE = 'LibLande inbox.bib';
@@ -30,6 +30,8 @@
 
   const q = s => "'" + String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
   const indexHash = files => fingerprint_(JSON.stringify(Object.keys(files).sort().map(k => [k, files[k]])));
+  // (The papers folder's index: its files, and those known only by name.)
+  const indexHashOf = index => indexHash(index.loose ? Object.assign({}, index.files, ...Object.keys(index.loose).map(n => ({ ['?' + n]: index.loose[n] }))) : index.files);
   const b64ToBytes = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
   const gzip = async s => new Uint8Array(await new Response(new Blob([s]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer());
 
@@ -243,6 +245,34 @@
       return { files, folders };
     }
 
+    // With limited access: every file LibLande has been given, listed (a
+    // folder it wasn't given hides what's in it from listTree). One in a
+    // folder it knows gets its path there; the rest are kept by name (null
+    // for a name two have), for the .bib's links that end in that name.
+    async function looseFiles(tree) {
+      const known = new Set(Object.values(tree.files)), pathOf = {}, loose = {};
+      Object.keys(tree.folders).forEach(p => { pathOf[tree.folders[p]] = p; });
+      const all = await listAll("mimeType != '" + FOLDER + "' and trashed = false", 'id,name,parents,mimeType');
+      all.forEach(f => {
+        if (known.has(f.id) || /^application\/vnd\.google-apps\./.test(f.mimeType || '')) return;
+        const parent = (f.parents || []).find(p => p in pathOf);
+        if (parent !== undefined) { tree.files[(pathOf[parent] ? pathOf[parent] + '/' : '') + f.name] = f.id; return; }
+        const n = f.name.normalize('NFC');
+        loose[n] = n in loose ? null : f.id;
+      });
+      return loose;
+    }
+    // Linked files not found by path, matched by name to those.
+    function resolveLoose(data, loose) {
+      let n = 0;
+      data.entries.forEach(e => (e.files || []).forEach(f => {
+        if (f.id || !f.x) return;
+        const id = loose[String(f.p || '').split('/').pop().normalize('NFC')];
+        if (id) { f.id = id; delete f.x; n++; }
+      }));
+      return n;
+    }
+
     // A child of a folder by name, comparing names in the same Unicode
     // form (macOS and Drive can store accented letters differently).
     async function childNamed(parentId, name, folder) {
@@ -368,14 +398,17 @@
       let lastFull = lp.lastFull || '';
       if (fullListing) {
         const tree = await listTree(papersId, prefix);
-        index = { papersId, prefix, files: tree.files, folders: tree.folders, hash: indexHash(tree.files) };
+        const loose = io.limited && io.limited() ? await looseFiles(tree) : null;
+        index = { papersId, prefix, files: tree.files, folders: tree.folders };
+        if (loose) index.loose = loose;
+        index.hash = indexHashOf(index);
         await writeIndex(folder, index);
         lastFull = String(Date.now());
       }
       if (!fullListing && Object.keys(filed.files).length) {
         Object.assign(index.files, filed.files);
         Object.assign(index.folders, filed.folders);
-        index.hash = indexHash(index.files);
+        index.hash = indexHashOf(index);
         await writeIndex(folder, index);
       }
       filed.files = {}; filed.folders = {};
@@ -403,10 +436,14 @@
       // Linked files the index doesn't have yet: looked up, then the
       // library put together here.
       if (out.data) {
+        if (index.loose) {
+          const n = resolveLoose(out.data, index.loose);
+          if (n) mark('matched ' + n + ' file' + (n === 1 ? '' : 's') + ' by name');
+        }
         if (!fullListing) {
           const found = await resolveMissing(out.data, index);
           if (found.looked) {
-            index.hash = indexHash(index.files);
+            index.hash = indexHashOf(index);
             await writeIndex(folder, index);
             props.signature = fingerprint_(bibStamp + ':' + inboxStamp + ':' + papersId + ':' + index.hash + ':' + inboxHash);
             mark('looked up ' + found.looked + ' new file' + (found.looked === 1 ? '' : 's') + ' (' + found.found + ' found)');

@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-11-12.01';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-11-12.02';
 // On GitHub Pages, every part of the app must be from the same version: a
 // part kept from an older one (the offline copy, served when the network
 // was slow) lacks what this page needs. Then the kept copies go, and the
@@ -287,6 +287,45 @@ function renderLibOthers(st) {
   }).join('');
 }
 
+// With limited access (Pages): the PDFs the library links that LibLande
+// hasn't been given yet, and giving it them in Google's picker. (Inbox
+// entries aside.)
+let ACCESS = 'full', OFFERED_ADD = false;
+const notAdded = () => ENTRIES.reduce((n, e) => n + (e.ib ? 0 : (e.files || []).filter(f => f.x).length), 0);
+const pdfsText = n => n.toLocaleString() + ' PDF' + (n === 1 ? '' : 's');
+function renderAddPapers() {
+  const n = notAdded();
+  $('#addPapersRow').hidden = ACCESS !== 'limited';
+  $('#curNotAdded').textContent = n ? pdfsText(n) + ' not added yet' : 'All added';
+}
+async function addPapers() {
+  const before = notAdded();
+  try {
+    const r = await callServer('addPapers');
+    if (!r.added) return;
+    toast('Adding ' + pdfsText(r.added) + ' to your library\u2026', 0);
+    status = await callServer('getStatus');
+    if (status.building) await waitForBuild();
+    if (status.stamp !== loadedStamp) await update(true);
+    const left = notAdded(), linked = Math.max(0, before - left);
+    toast(pdfsText(linked) + ' linked' + (left ? '; ' + pdfsText(left) + ' still to add' : ''), 8000, left ? [{ label: 'Add more', run: addPapers }] : null);
+    renderAddPapers();
+  } catch (err) {
+    toast('Couldn\u2019t add the PDFs: ' + errText(err), 6000);
+  }
+}
+// Once a session, when the library opens: how many are still to add.
+// (True if it said so.)
+async function offerAddPapers() {
+  if (!window.LIBLANDE_PAGES || OFFERED_ADD) return false;
+  try { ACCESS = (await callServer('getAccess')).access; } catch (e) { return false; }
+  const n = notAdded();
+  if (ACCESS !== 'limited' || !n) return false;
+  OFFERED_ADD = true;
+  toast(pdfsText(n) + ' your library links ' + (n === 1 ? 'isn\u2019t' : 'aren\u2019t') + ' in LibLande yet', 15000, [{ label: 'Add them', run: addPapers }]);
+  return true;
+}
+
 // A build runs on this device (pages/server.js and builder.js), in the
 // background; ask after it until it's done, reporting progress.
 async function waitForBuild(progress) {
@@ -478,7 +517,7 @@ if (RELOADING) {
       await show(lib, false);
       cache.put(lib);
     }
-  })().then(seedReading).then(() => { setTimeout(uploadKept, 3000); fetchAheadSoon(20000); refreshSaved(); }).catch(err => {
+  })().then(seedReading).then(() => { setTimeout(uploadKept, 3000); fetchAheadSoon(20000); refreshSaved(); offerAddPapers(); }).catch(err => {
     if (ENTRIES.length) toast('Couldn\u2019t check for updates: ' + errText(err), 5000);
     else showError(err);
   });
@@ -740,7 +779,7 @@ if (RELOADING) {
     g.textContent = text || '';
     g.classList.toggle('ok', !!ok);
   };
-  function resetPicks() { ['bib', 'papers', 'folders'].forEach(w => picked(w, '')); PICKED.bibParent = ''; }
+  function resetPicks() { ['bib', 'papers', 'folders', 'pdfs'].forEach(w => picked(w, '')); PICKED.bibParent = ''; }
   $('#pickSteps').addEventListener('click', async ev => {
     const b = ev.target.closest('[data-pick]');
     if (!b || b.disabled) return;
@@ -752,7 +791,8 @@ if (RELOADING) {
     try {
       const opts = what === 'bib' ? { what: 'bib', title: 'Choose your .bib file' }
         : what === 'papers' ? { what: 'folder', parent: PICKED.bibParent || undefined, title: 'Choose your papers folder' }
-          : { what: 'folders', parent: papersId, settle: false, title: 'Select every folder, then Select' };
+          : what === 'folders' ? { what: 'folders', parent: papersId, settle: false, title: 'Select every folder, then Select' }
+            : { what: 'pdfs', settle: false, title: 'Select your PDFs, then Select' };
       const res = await callServer('pickFiles', opts);
       const d = res.docs[0];
       if (!d) {
@@ -768,7 +808,8 @@ if (RELOADING) {
         $('#papersLink').value = d.id;
         picked('papers', d.name, true);
         picked('folders', '');
-      } else picked('folders', res.docs.length.toLocaleString() + ' folder' + (res.docs.length === 1 ? '' : 's'), true);
+      } else if (what === 'folders') picked('folders', res.docs.length.toLocaleString() + ' folder' + (res.docs.length === 1 ? '' : 's'), true);
+      else picked('pdfs', pdfsText(res.docs.length), true);
     } catch (err) {
       setupMsg(errText(err), 'error');
     } finally {
@@ -854,7 +895,9 @@ if (RELOADING) {
     // way is chosen at a first sign-in.)
     pickMode(false);
     if (window.LIBLANDE_PAGES) callServer('getAccess').then(a => {
+      ACCESS = a.access;
       pickMode(a.access === 'limited');
+      if (configured) renderAddPapers();
       if (!configured) return;
       $('#accessRow').hidden = false;
       $('#curAccess').textContent = a.access === 'limited' ? 'Limited: the files you\u2019ve given LibLande' : 'Full';
@@ -874,12 +917,14 @@ if (RELOADING) {
       $('#curBib').textContent = st.bibName || '';
       // (Other libraries: with the .bib file and folder, in Settings.)
       document.querySelector('#setupEdit .set-files').after($('#setLibs'));
+      // (A different .bib or folder: chosen right under the current ones.)
+      $('#changeLinks').after($('#linkFields'));
       // (The libraries used before, to switch back to.)
       renderLibOthers(st);
       $('#curPapers').textContent = st.papersName || '';
       $('#changeLinks').hidden = false;
     }
-    if (!configured) $('#linkFields').after($('#setLibs'));
+    if (!configured) { $('#setupEdit').after($('#linkFields')); $('#linkFields').after($('#setLibs')); }
     setupMsg(st && st.problem, 'error');
     if (configured) setSettingsTab(store.get('setTab', 'look'));
     $('#setup').scrollTop = 0;
@@ -907,6 +952,7 @@ if (RELOADING) {
   }));
   // Full access from now on: signed in again (a tap), then everything in
   // Drive is in reach.
+  $('#addPapersBtn').addEventListener('click', () => { closeSettings(); addPapers(); });
   $('#accessFull').addEventListener('click', async () => {
     try { await callServer('setAccess', 'full'); location.reload(); }
     catch (e) { toast(errText(e), 4000); }
@@ -1078,7 +1124,9 @@ if (RELOADING) {
       $('#setup').hidden = true;
       $('#settingsBtn').hidden = false; $('#addBtn').hidden = false;
       $('#bibLink').value = $('#papersLink').value = '';
-      // (New here: the tour and Features offered, once.)
+      // (New here: the tour and Features offered, once; with limited
+      // access, first the PDFs still to add.)
+      if (await offerAddPapers()) return;
       toast('Library ready: ' + ENTRIES.length.toLocaleString() + ' publications', 15000, [{ label: 'Take the tour', run: startTour }, { label: 'Features', run: openFeatures }]);
     } catch (err) {
       setupMsg(errText(err), 'error');

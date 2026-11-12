@@ -17,7 +17,7 @@
   window.LIBLANDE_PAGES = true;
   // (Which version each part of the app is from: index.html checks they
   // match. build.py fills it in.)
-  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-11-12.01';
+  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-11-12.02';
   const CLIENT_ID = '789682218462-98mjugngb46ttd01ucp9dcj71ufspjgn.apps.googleusercontent.com';
   // Google Drive, in one of two ways (docs/drive-file-plan.md):
   // full: all of Drive (your .bib, papers and LibLande folder wherever
@@ -422,6 +422,19 @@
       if (!docs.length || opts.settle === false) return { docs, missing: [] };
       const s = await settle(docs.map(d => d.id));
       return { docs: docs.filter(d => s.ok.includes(d.id)), missing: docs.filter(d => s.missing.includes(d.id)) };
+    },
+    // With limited access: PDFs given to LibLande in Google's picker, then
+    // the papers folder listed again (a build) so they're linked. The page
+    // waits for the build, as for any other.
+    async addPapers() {
+      const docs = await pick({ what: 'pdfs', title: 'Select your PDFs, then Select' });
+      if (!docs.length) return { added: 0 };
+      // (A moment for Google to pass them on; one not passed on yet is
+      // found at the next listing.)
+      await new Promise(r => setTimeout(r, 3000));
+      if (buildRun) await buildRun;
+      startBuild(await builder.look({ force: true }), { force: true });
+      return { added: docs.length };
     },
     async getPrefs() { prefsMemo = null; return loadPrefs(null); },
     // New settings, from the links pasted in Settings (as Code.gs's
@@ -928,15 +941,15 @@
   // builder.js builds the library here when the .bib or inbox changed; one
   // build at a time. A failed build's reason is passed on once, with the
   // next status.
-  const builder = window.makeLiblandeBuilder({ drive, reconcile: groups => edits.reconcileReading(groups) });
+  const builder = window.makeLiblandeBuilder({ drive, reconcile: groups => edits.reconcileReading(groups), limited: () => access === 'limited' });
   const edits = window.makeLiblandeEdits({ drive, builder, getToken });
   let buildRun = null, buildErr = null, lastBuilt = null;
   // w: what builder.look found. True if a build is under way.
-  function startBuild(w) {
+  function startBuild(w, o) {
     if (buildRun) return true;
     if (!w.configured || !w.needed || !navigator.onLine) return false;
     buildErr = null;
-    buildRun = builder.build({ daily: true }, w)
+    buildRun = builder.build(Object.assign({ daily: true }, o), w)
       .then(r => {
         // Handed to the page (LIBLANDE_BUILT), which then needn't download
         // the library it was just sent to Drive.

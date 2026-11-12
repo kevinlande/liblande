@@ -533,6 +533,7 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .set-file { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 10px; font-size: 14px; }
 .set-file > span:last-child { color: var(--muted); overflow-wrap: anywhere; }
 .set-files .linkish { justify-self: start; margin-top: 4px; font-size: 13.5px; }
+.set-files > .set-links { margin-bottom: 8px; }
 /* Other libraries: switch to one used before, or start a new one. */
 .set-libs { display: grid; gap: 6px; padding: 4px 0 8px; }
 .set-sec > .set-files:has(+ .set-libs) { border-bottom: 0; padding-bottom: 4px; }
@@ -584,6 +585,7 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .set-picks .hint { margin: -2px 0 4px 32px; }
 .set-newlib-go .linkish { align-self: center; font-size: 13.5px; }
 .setup:not(.head-mode) .in-settings { display: none; }
+.setup.head-mode .first-only { display: none; }
 .fields-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0 12px; }
 .fld { grid-column: 1 / -1; display: grid; gap: 4px; min-width: 0; align-content: start; }
 .fld.short { grid-column: span 1; }
