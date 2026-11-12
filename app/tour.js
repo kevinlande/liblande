@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-11-12.02';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-11-12.03';
 /* -------------------------------------------------------------- features */
 // What LibLande does, by area: each feature, what it's for, where to find
 // it, its icon (see featIcon), and other words it's found by (as "tag"
@@ -13,6 +13,7 @@ const FEATURES = [
   { area: 'Getting started', items: [
     ['Your BibDesk library, anywhere', 'Your .bib and its PDFs on Google Drive, on any computer, iPad or iPhone. Changes go back into the .bib, so BibDesk opens it as before.', 'Sign in with Google, then give the .bib\u2019s link', 'path:M7.5 18.5h9.8a3.7 3.7 0 0 0 .6-7.35A5.6 5.6 0 0 0 7.2 9.6a4.45 4.45 0 0 0 .3 8.9z', 'setup sign in bibtex drive import'],
     ['From Zotero, or from nothing', 'Bring in a Zotero library: its BibTeX export, with its files, becomes a new library in your Google Drive, each PDF filed and linked as BibDesk would. Or start with an empty one.', 'At setup; later, Settings \u203a Library \u203a Import from Zotero', 'path:M5 5.5h14L5 18.5h14', 'zotero import export new empty start'],
+    ['Sign out', 'Sign out of one device: its Google sign-in, settings, saved library and offline papers are forgotten there. Nothing in Google Drive changes, and other devices stay signed in.', 'Settings \u203a Library \u203a Google account', 'path:M14 4.5h4.5a1.5 1.5 0 0 1 1.5 1.5v12a1.5 1.5 0 0 1-1.5 1.5H14M10 8l-4 4 4 4M6 12h10', 'log out logout account switch account'],
     ['Install it', 'Add LibLande to your Dock or Home Screen, to open it like an app.', 'Safari\u2019s Share menu: Add to Dock, or Add to Home Screen', 'path:M4.5 4.5h15v15h-15zM12 8v8M8 12h8', 'app web app home screen'],
     ['iPad and iPhone', 'Made for touch and the Apple Pencil: write with the Pencil, scroll with a finger.', '', 'path:M6.5 3h11a1.5 1.5 0 0 1 1.5 1.5v15a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 19.5v-15A1.5 1.5 0 0 1 6.5 3zM11 18h2', 'pencil touch mobile'],
     ['Works offline', 'The library and the papers you\u2019ve read stay on the device. Marks and edits made offline go to Google Drive when you\u2019re back online.', 'The cloud in the toolbar shows what\u2019s waiting', '#netBadge', 'offline sync'],
@@ -27,7 +28,7 @@ const FEATURES = [
     ['Groups in the sidebar', 'Library, Recently viewed, Inbox (papers added in LibLande, to move into your library in BibDesk), Possible duplicates, Forthcoming; your saved searches, static groups, keywords and publication types. Drag to reorder; fold a section by its heading.', 'The sidebar (the button at the top left)', '#sideToggle', 'lists collections smart groups inbox fold arrange'],
     ['Groups as tabs', 'Each group you open stays as a tab along the toolbar; close one with its \u00d7. On an iPhone, one button lists them.', 'The tabs in the toolbar', '#tabs', 'tabs lists'],
     ['Static groups', 'Make a group with +, and drag publications onto it (on an iPad, hold one and drag).', 'Static groups in the sidebar', 'ICON:folder', 'collection folder group'],
-    ['Several libraries', 'Make a new library (a folder with its own .bib), switch between them, and drag publications onto another to copy them with their PDFs.', 'Libraries in the sidebar; + beside it', 'ICON:lib', 'library switch copy'],
+    ['Several libraries', 'Add an existing library (a BibDesk .bib or a Zotero export) or make a new one, switch between them, and drag publications onto another to copy them with their PDFs.', 'Libraries in the sidebar; + beside it; Settings \u203a Library', 'ICON:lib', 'library switch copy add'],
     ['Select several', 'Give several publications keywords and groups at once, add them to your reading list, join versions, share them, or copy their citations; their PDFs show beside them.', 'Select in the toolbar, or \u2318-click and \u21e7-click', '#selectBtn', 'multiple batch bulk'],
     ['Share', 'The selected publications as a .bib and an .rtf of citations, with their PDFs as they are, clean, or none; to Google Drive, this device, or another app (Mail, Messages, AirDrop), with the references in the message.', 'Select several, then Share', 'path:M12 3v12M8 11l4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2', 'export bibtex rtf zip share airdrop mail'],
     ['Reading list', 'Papers to read: up next, later, or done; one list for each library. Each shows how far you\u2019ve read (tap the figure to start counting again).', 'The Reading list tab; the bookmark in the details or the reader', '#vRL', 'queue to read progress'],
@@ -186,7 +187,7 @@ const TOUR_STEPS = [
     if (!state.selKey) { const r = $('#rows .row'); if (r) r.click(); await tourWait(400); }
   } },
   { lib: true, sel: '#groups', title: 'Your groups', text: 'Your library and its groups: saved searches, static groups, keywords and types; drag to reorder. Libraries switches between libraries; Tools has Cite Check, New papers and Tidy keywords.', before: async () => { showLibSide(); await tourWait(300); } },
-  { lib: true, sel: '#settingsBtn', title: 'Settings', text: 'Appearance, Sync, Library, Citing and Extensions. Library imports from Zotero and starts new libraries; LibLande in Word installs from Extensions. Help, this tour and Features are at the foot of the sidebar.', before: async () => { showLibSide(); await tourWait(200); }, after: () => closeSidebarIfOverlay() },
+  { lib: true, sel: '#settingsBtn', title: 'Settings', text: 'Appearance, Sync, Library, Citing and Extensions. Library adds, makes and switches libraries, and signs this device out; LibLande in Word installs from Extensions. Help, this tour and Features are at the foot of the sidebar.', before: async () => { showLibSide(); await tourWait(200); }, after: () => closeSidebarIfOverlay() },
   { lib: true, sel: '#tabs', title: 'Tabs and the reading list', text: 'Groups you open stay as tabs. The Reading list holds papers to read next, later, or done.', before: async () => { closeSidebarIfOverlay(); await tourWait(350); } },
   { lib: true, sel: '#selectBtn', title: 'Select several', text: 'Give several publications keywords and groups at once, add them to your reading list, or share them with their PDFs.' },
   { lib: true, sel: '#refreshBtn', title: 'Saving and syncing', text: 'Changes go into your .bib on Google Drive. Check for changes picks up BibDesk\u2019s and your other devices\u2019; a cloud shows what\u2019s waiting while you\u2019re offline.' },

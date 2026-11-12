@@ -17,7 +17,7 @@
   window.LIBLANDE_PAGES = true;
   // (Which version each part of the app is from: index.html checks they
   // match. build.py fills it in.)
-  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-11-12.02';
+  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-11-12.03';
   const CLIENT_ID = '789682218462-98mjugngb46ttd01ucp9dcj71ufspjgn.apps.googleusercontent.com';
   // Google Drive, in one of two ways (docs/drive-file-plan.md):
   // full: all of Drive (your .bib, papers and LibLande folder wherever
@@ -477,6 +477,28 @@
       return Object.assign(await SERVER.getStatus(), { imported: made });
     },
     copyToLibrary(req) { return edits.copyToLibrary(req); },
+    // Sign out of this device: changes kept here for Drive go first (or
+    // it stops, saying so); then Google's permission is given back and
+    // what this file keeps on the device (sign-in, access, kept lists) is
+    // forgotten. (Whether the full-or-limited choice is offered stays: it
+    // isn't the account's.) The page clears its own part, then reloads.
+    async signOut() {
+      if (freshOutbox().length) {
+        await flushOutbox().catch(() => {});
+        if (freshOutbox().length) throw new Error('Changes you made offline haven\u2019t reached Google Drive yet. Connect to the internet, let them save, then sign out.');
+      }
+      const t = token || store.get('token', null);
+      if (t && t.value && window.google && google.accounts && google.accounts.oauth2) {
+        try { google.accounts.oauth2.revoke(t.value, () => {}); } catch (e) { /* forgotten here anyway */ }
+      }
+      const offer = store.get('offerLimited', false);
+      try {
+        Object.keys(localStorage).filter(k => k.indexOf('liblande.pages.') === 0).forEach(k => localStorage.removeItem(k));
+      } catch (e) { /* private mode */ }
+      if (offer) store.set('offerLimited', true);
+      token = null; client = null; access = null; email = '';
+      return { ok: true };
+    },
     async forgetLibrary(bibId) { await edits.forgetLibrary({ bibId }); return SERVER.getStatus(); },
     async switchLibrary(bibId, papersId) {
       await edits.useLibrary({ bibId, papersId });

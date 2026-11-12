@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-11-12.02';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-11-12.03';
 // On GitHub Pages, every part of the app must be from the same version: a
 // part kept from an older one (the offline copy, served when the network
 // was slow) lacks what this page needs. Then the kept copies go, and the
@@ -280,7 +280,9 @@ let showSetup = () => {};
 let switchLibraryTo = () => {}, openNewLibrary = () => {};
 // Settings' other libraries: Switch to each, or × to take it off the list.
 function renderLibOthers(st) {
-  $('#libOthers').innerHTML = (st.libraries || []).filter(l => l.bibId).map(l => {
+  // (In Settings, the open one first, ticked.)
+  const cur = st.configured && st.bibName ? `<div class="set-lib cur">${ICON.check}<b>${esc(st.bibName.replace(/\.bib$/i, ''))}</b><em>open</em></div>` : '';
+  $('#libOthers').innerHTML = cur + (st.libraries || []).filter(l => l.bibId).map(l => {
     const name = esc((l.name || 'another library').replace(/\.bib$/i, ''));
     return `<div class="set-lib-row"><button type="button" class="set-lib" data-lib="${esc(l.bibId)}" data-papers="${esc(l.papersId || '')}">${ICON.lib}<span>Switch to <b>${name}</b></span></button>` +
       `<button type="button" class="tb-btn set-lib-x" data-lib-forget="${esc(l.bibId)}" data-name="${name}" title="Take ${name} off the list (its files stay in Google Drive)" aria-label="Take ${name} off the list">${ICON.x}</button></div>`;
@@ -411,6 +413,14 @@ const cache = {
       if (v && !v.gz && v.library) v.gz = b64ToBytes(v.library); /* older format */
       return v && v.gz ? v : null;
     } catch { return null; }
+  },
+  // (Sign out: none kept on this device.)
+  async clear() {
+    try {
+      const db = await this.db();
+      await new Promise(done => { const tx = db.transaction('lib', 'readwrite'); tx.objectStore('lib').delete('current'); tx.oncomplete = tx.onerror = tx.onabort = done; });
+      db.close();
+    } catch {}
   },
   async put(v) {
     try {
@@ -824,7 +834,6 @@ if (RELOADING) {
     $('#zotWhat').hidden = $('#zotNameRow').hidden = true;
     $('#zotName').value = '';
   }
-  $('#zotBtn').addEventListener('click', () => { const r = $('#zotRow'); r.hidden = !r.hidden; });
   $('#zotPick').addEventListener('click', () => $('#zotInput').click());
   $('#zotBibPick').addEventListener('click', () => $('#zotBibInput').click());
   const zotTake = async list => {
@@ -882,12 +891,26 @@ if (RELOADING) {
     $('#setupEdit').hidden = !configured;
     $('#linkFields').hidden = configured;
     $('#bibLink').value = $('#papersLink').value = '';
-    // (The first setup: from a .bib, from Zotero or from nothing. Settings:
-    // new libraries, either way, under Library.)
-    $('#setupWays').hidden = configured;
-    $('#newLibBtn').hidden = $('#zotBtn').hidden = !configured;
-    if (configured) { $('#newLibRow').hidden = $('#zotRow').hidden = true; $('#setupGo').hidden = false; }
-    else setWay('bib');
+    // (The first setup: from a .bib, from Zotero or from nothing, on the
+    // screen. Settings, under Libraries: Add an existing library (a .bib or
+    // Zotero) and New empty library, each opening below.)
+    $('#libActs').hidden = !configured;
+    $('#setupWays').querySelector('[data-way="new"]').hidden = configured;
+    if (configured) {
+      $('#libsHere').append($('#setLibs'));
+      $('#addLibRow').append($('#setupWays'), $('#linkFields'), $('#zotRow'));
+      libForm(null);
+    } else {
+      $('#setupIntro').after($('#setupWays'));
+      $('#setupEdit').after($('#linkFields'));
+      $('#linkFields').after($('#setLibs'));
+      $('#setLibs').append($('#zotRow'));
+      $('#addLibRow').hidden = true;
+      setWay('bib');
+    }
+    // (Libraries used before: in Settings with the open one; at a first
+    // setup, any listed, to go back to.)
+    renderLibOthers(st || {});
     resetPicks();
     zotReset();
     // (On Pages: this device's access to Drive. Limited: Google's picker
@@ -899,6 +922,9 @@ if (RELOADING) {
       pickMode(a.access === 'limited');
       if (configured) renderAddPapers();
       if (!configured) return;
+      $('#signOutSec').hidden = false;
+      $('#signOutBtn').disabled = false;
+      $('#curEmail').textContent = a.email ? 'Signed in as ' + a.email : 'Signed in with Google';
       $('#accessRow').hidden = false;
       $('#curAccess').textContent = a.access === 'limited' ? 'Limited: the files you\u2019ve given LibLande' : 'Full';
       $('#accessFull').hidden = a.access !== 'limited';
@@ -915,16 +941,8 @@ if (RELOADING) {
       citeLabels();
       $('#setup').querySelectorAll('[data-sync]').forEach(b => { b.checked = SYNC[b.dataset.sync] !== false; });
       $('#curBib').textContent = st.bibName || '';
-      // (Other libraries: with the .bib file and folder, in Settings.)
-      document.querySelector('#setupEdit .set-files').after($('#setLibs'));
-      // (A different .bib or folder: chosen right under the current ones.)
-      $('#changeLinks').after($('#linkFields'));
-      // (The libraries used before, to switch back to.)
-      renderLibOthers(st);
       $('#curPapers').textContent = st.papersName || '';
-      $('#changeLinks').hidden = false;
     }
-    if (!configured) { $('#setupEdit').after($('#linkFields')); $('#linkFields').after($('#setLibs')); }
     setupMsg(st && st.problem, 'error');
     if (configured) setSettingsTab(store.get('setTab', 'look'));
     $('#setup').scrollTop = 0;
@@ -957,10 +975,46 @@ if (RELOADING) {
     try { await callServer('setAccess', 'full'); location.reload(); }
     catch (e) { toast(errText(e), 4000); }
   });
-  $('#changeLinks').addEventListener('click', () => {
-    $('#linkFields').hidden = false;
-    $('#changeLinks').hidden = true;
-    $('#bibLink').focus();
+  // Settings > Libraries: one form open at a time, below the two buttons
+  // (which: 'add', 'new' or null).
+  function libForm(which) {
+    $('#addLibRow').hidden = which !== 'add';
+    $('#newLibRow').hidden = which !== 'new';
+    $('#addLibBtn').setAttribute('aria-expanded', String(which === 'add'));
+    $('#newLibBtn').setAttribute('aria-expanded', String(which === 'new'));
+    if (which === 'add') setWay('bib');
+    if (which === 'new') $('#newLibName').focus();
+  }
+  $('#addLibBtn').addEventListener('click', () => libForm($('#addLibRow').hidden ? 'add' : null));
+  $('#linkGo').addEventListener('click', () => saveSettingsPage());
+  // Sign out of this device: asked first, in a dialog (Cancel has the
+  // focus). Not while marks on a paper are still to reach Drive. Then the
+  // sign-in, this device's settings, the saved library and the papers kept
+  // for offline are all forgotten here, and LibLande starts again.
+  $('#signOutBtn').addEventListener('click', () => { $('#signOutAsk').showModal(); $('#signOutNo').focus(); });
+  $('#signOutNo').addEventListener('click', () => $('#signOutAsk').close());
+  $('#signOutYes').addEventListener('click', async () => {
+    const b = $('#signOutBtn');
+    $('#signOutAsk').close();
+    b.disabled = true;
+    try {
+      const kept = ((await JOURNAL.run('readonly', st => st.getAllKeys()).catch(() => [])) || []).filter(id => typeof id === 'string' && !id.startsWith('open:'));
+      if (V.dirty || V.bmDirty || V.saving || kept.length) {
+        throw new Error('Marks on ' + (kept.length > 1 ? kept.length + ' papers' : 'a paper') + ' haven\u2019t reached Google Drive yet. Open LibLande online and let them save, then sign out.');
+      }
+      setupMsg('Signing out\u2026', 'status');
+      await callServer('signOut');
+      try { Object.keys(localStorage).filter(k => k.indexOf('landelib.') === 0).forEach(k => localStorage.removeItem(k)); } catch (e) { /* private mode */ }
+      await cache.clear();
+      await Promise.all(['liblande-papers', 'liblande-libs-2'].map(n => caches.delete(n).catch(() => false)));
+      await Promise.all(['landelib', 'landelib-marks'].map(n => new Promise(done => {
+        try { const r = indexedDB.deleteDatabase(n); r.onsuccess = r.onerror = r.onblocked = () => done(); } catch (e) { done(); }
+      })));
+      location.reload();
+    } catch (err) {
+      setupMsg(errText(err), 'error');
+      b.disabled = false;
+    }
   });
   $('#setClose').addEventListener('click', closeSettings);
   // A library taken off the list: ×, then × again to be sure (its folder
@@ -1031,15 +1085,11 @@ if (RELOADING) {
     for (let i = 0; i < 150 && ($('#setup').hidden || $('#setupEdit').hidden); i++) await new Promise(r => setTimeout(r, 100));
     if ($('#setup').hidden) return;
     setSettingsTab('library');
-    $('#newLibRow').hidden = false;
+    libForm('new');
     $('#newLibRow').scrollIntoView({ block: 'center' });
     $('#newLibName').focus();
   };
-  $('#newLibBtn').addEventListener('click', () => {
-    const row = $('#newLibRow');
-    row.hidden = !row.hidden;
-    if (!row.hidden) $('#newLibName').focus();
-  });
+  $('#newLibBtn').addEventListener('click', () => libForm($('#newLibRow').hidden ? 'new' : null));
   const createLib = () => {
     const name = $('#newLibName').value.trim();
     if (!name) { setupMsg('Give the new library a name.', 'error'); $('#newLibName').focus(); return; }
@@ -1051,7 +1101,7 @@ if (RELOADING) {
     const b = ev.target.closest('[data-lib]');
     if (b) otherLibrary('switchLibrary', [b.dataset.lib, b.dataset.papers], 'Switching to ' + b.querySelector('b').textContent + '.', false, LIBS.list.find(l => l.bibId === b.dataset.lib));
   });
-  document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && !$('#setup').hidden && !$('#setHead').hidden) { ev.preventDefault(); closeSettings(); } });
+  document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && !$('#setup').hidden && !$('#setHead').hidden && !$('#signOutAsk').open) { ev.preventDefault(); closeSettings(); } });
   // With a saved copy, Settings shows before Google Drive has answered: wait
   // for the answer (or ask again, if it failed) rather than show the
   // first-time setup.

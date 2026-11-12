@@ -705,4 +705,4 @@ function checkRename_(before, after, oldKey, newKey) {
   return b;
 }
 
-;if (self.document) (self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {}).build = '2026-11-12.02';
+;if (self.document) (self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {}).build = '2026-11-12.03';

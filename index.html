@@ -221,6 +221,12 @@ try {
   </form>
 </div>
 <div class="setup" id="setup" hidden>
+  <dialog class="ask-box" id="signOutAsk" aria-labelledby="signOutTitle">
+    <h2 id="signOutTitle">Sign out of this device?</h2>
+    <p>LibLande forgets your Google sign-in here, and removes the library and papers it saved on this device for reading offline. Your settings on this device go back to how they started.</p>
+    <p>Nothing in Google Drive changes, and your other devices stay signed in.</p>
+    <div class="ask-acts"><button type="button" class="btn" id="signOutNo">Cancel</button><button type="button" class="btn ask-danger" id="signOutYes">Sign out</button></div>
+  </dialog>
   <form class="setup-card" id="setupForm" novalidate>
     <div class="set-top">
     <div class="sheet-head" id="setHead" hidden><button type="button" class="tb-btn sheet-x" id="setClose" aria-label="Cancel" title="Cancel (Esc)"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button><h2>Settings</h2><button type="submit" class="btn primary sheet-go" id="setSave">Save</button></div>
@@ -262,21 +268,21 @@ try {
         <label class="set-sync"><span>Keyboard shortcuts</span><span class="switch"><input type="checkbox" role="switch" data-sync="keys"><span aria-hidden="true"></span></span></label>
       </div>
       </section>
-      <section class="set-sec" data-stab="library"><h3 class="tab-named">Library</h3>
+      <section class="set-sec" data-stab="library"><h3 class="tab-named">Library</h3><h3>This library</h3>
       <div class="set-files">
         <div class="set-file"><span class="set-name">.bib file</span><span id="curBib"></span></div>
         <div class="set-file"><span class="set-name">Papers folder</span><span id="curPapers"></span></div>
         <div class="set-file" id="addPapersRow" hidden><span class="set-name">PDFs</span><span><span id="curNotAdded"></span> <button type="button" class="linkish" id="addPapersBtn">Add papers&#x2026;</button></span></div>
         <div class="set-file" id="accessRow" hidden><span class="set-name">Drive access</span><span><span id="curAccess"></span> <button type="button" class="linkish" id="accessFull" hidden>Switch to full access</button></span></div>
-        <button type="button" class="linkish" id="changeLinks">Use a different .bib file or folder&#x2026;</button>
-      </div>
-      <div class="set-row">
-        <div class="set-text"><span class="set-name">Backups</span><span class="hint">In Drive, LibLande &#x203a; Backups. The .bib: the last 10 changes, then one a day for two weeks, one a week for three months. PDFs: before the first save each day, kept 60 days.</span></div>
+        <div class="set-file"><span class="set-name">Backups</span><span>In Drive: LibLande &#x203a; Backups</span></div>
       </div>
       <div class="set-row">
         <div class="set-text"><label for="coversBox">Book covers</label><span class="hint">Looked up on Open Library by ISBN, or by title and author, and kept on this device.</span></div>
         <span class="switch"><input type="checkbox" role="switch" id="coversBox"><span aria-hidden="true"></span></span>
       </div>
+      </section>
+      <section class="set-sec" data-stab="library"><h3>Libraries</h3>
+      <div id="libsHere"></div>
       </section>
       <section class="set-sec" id="wordSec" data-stab="ext"><h3>Word</h3>
       <div class="set-group">
@@ -304,6 +310,12 @@ try {
         <p class="hint">Find PDF opens articles through your library&#x2019;s proxy, signed in with your library account. Its address (e.g. ezproxy.library.yorku.ca) or full login link.</p>
         <div id="proxyList"></div>
         <button type="button" class="linkish" id="proxyAdd">Add a library proxy&#x2026;</button>
+      </div>
+      </section>
+      <section class="set-sec" data-stab="library" id="signOutSec" hidden><h3>Google account</h3>
+      <div class="set-row">
+        <div class="set-text"><span class="set-name" id="curEmail"></span><span class="hint">Signing out affects only this device.</span></div>
+        <button type="button" class="btn set-reset" id="signOutBtn">Sign out&#x2026;</button>
       </div>
       </section>
       <section class="set-sec" id="webAddSec" data-stab="ext"><h3>Adding from the web</h3>
@@ -334,15 +346,19 @@ try {
         <div class="set-pick first-only"><span class="set-step">4</span><button type="button" class="btn" data-pick="pdfs">Choose your PDFs&#x2026;</button><span class="set-got" data-got="pdfs"></span></div>
         <p class="hint first-only">All your PDFs are listed together: scroll to the end, select them all, then Select. Any left out can be added later.</p>
       </div>
+      <div class="set-link-go in-settings"><button type="button" class="btn primary" id="linkGo">Open this library</button></div>
     </div>
     <div class="set-libs" id="setLibs">
       <div id="libOthers"></div>
-      <button type="button" class="linkish" id="newLibBtn">Start a new, empty library&#x2026;</button>
+      <div class="set-acts" id="libActs">
+        <button type="button" class="set-act" id="addLibBtn" aria-expanded="false"><b>Add an existing library</b><span>A BibDesk .bib in Drive, or a Zotero export</span></button>
+        <button type="button" class="set-act" id="newLibBtn" aria-expanded="false"><b>New empty library</b><span>A folder in My Drive with an empty .bib</span></button>
+      </div>
+      <div class="set-addlib" id="addLibRow" hidden></div>
       <div class="set-newlib" id="newLibRow" hidden>
-        <p class="hint">A new folder in My Drive with an empty .bib.<span class="in-settings"> Your current library stays; switch back here.</span></p>
+        <p class="hint first-only">A new folder in My Drive with an empty .bib.</p>
         <div class="set-newlib-go"><input id="newLibName" type="text" autocomplete="off" placeholder="Name, e.g. Teaching" aria-label="New library name"><button type="button" class="btn primary" id="newLibGo">Create</button></div>
       </div>
-      <button type="button" class="linkish" id="zotBtn">Import from Zotero&#x2026;</button>
       <div class="set-newlib" id="zotRow" hidden>
         <p class="hint">In Zotero, choose File &#x203a; Export Library&#x2026;, then BibTeX, with Export Files ticked. Then choose the folder Zotero made. LibLande copies it into a new library in your Google Drive.</p>
         <div class="set-newlib-go"><button type="button" class="btn" id="zotPick">Choose the folder&#x2026;</button><button type="button" class="linkish" id="zotBibPick">or just a .bib file</button></div>
@@ -359,7 +375,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-11-12.02</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-11-12.03</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -374,7 +390,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-11-12.02';
+      l.querySelector('small').textContent = 'Version 2026-11-12.03';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -386,7 +402,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-11-12.02): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-11-12.03): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });

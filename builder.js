@@ -19,7 +19,7 @@
  */
 (function (root) {
   'use strict';
-  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).builder = '2026-11-12.02';
+  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).builder = '2026-11-12.03';
   const FOLDER = 'application/vnd.google-apps.folder';
   const DATA_FOLDER = 'LibLande', LIBRARY_FILE = 'library.json.gz', INDEX_FILE = 'file-index.json',
     SETTINGS_FILE = 'settings.json', INBOX_FOLDER = 'Inbox', INBOX_FILE = 'LibLande inbox.bib';
@@ -249,18 +249,41 @@
     // folder it wasn't given hides what's in it from listTree). One in a
     // folder it knows gets its path there; the rest are kept by name (null
     // for a name two have), for the .bib's links that end in that name.
-    async function looseFiles(tree) {
-      const known = new Set(Object.values(tree.files)), pathOf = {}, loose = {};
+    // Not ones under `away` (folder IDs: the LibLande folder, other
+    // libraries'), which hold copies with the same names.
+    async function looseFiles(tree, away) {
+      const known = new Set(Object.values(tree.files)), pathOf = {}, loose = {}, up = {};
       Object.keys(tree.folders).forEach(p => { pathOf[tree.folders[p]] = p; });
-      const all = await listAll("mimeType != '" + FOLDER + "' and trashed = false", 'id,name,parents,mimeType');
+      const [all, dirs] = await Promise.all([
+        listAll("mimeType != '" + FOLDER + "' and trashed = false", 'id,name,parents,mimeType'),
+        away.size ? listAll("mimeType = '" + FOLDER + "' and trashed = false", 'id,parents') : [],
+      ]);
+      dirs.forEach(d => { up[d.id] = (d.parents || [])[0]; });
+      // (Up through the folders LibLande can see.)
+      const under = id => { for (let i = 0; id && i < 64; i++, id = up[id]) if (away.has(id)) return true; return false; };
       all.forEach(f => {
         if (known.has(f.id) || /^application\/vnd\.google-apps\./.test(f.mimeType || '')) return;
+        if (under((f.parents || [])[0])) return;
         const parent = (f.parents || []).find(p => p in pathOf);
         if (parent !== undefined) { tree.files[(pathOf[parent] ? pathOf[parent] + '/' : '') + f.name] = f.id; return; }
         const n = f.name.normalize('NFC');
         loose[n] = n in loose ? null : f.id;
       });
       return loose;
+    }
+    // Where copies of this library's PDFs can be, with the same names: the
+    // LibLande folder (Exports, the inbox) and the other libraries' papers
+    // folders (Copy to another library). Never this library's own.
+    async function awayFolders(s, folder, bib, papersId) {
+      const away = new Set(folder ? [folder] : []);
+      for (const l of s.libraries || []) {
+        if (l.bibId === s.bibId) continue;
+        if (l.papersId) { away.add(l.papersId); continue; }
+        try { const p = (await meta(l.bibId, 'parents')).parents; if (p && p[0]) away.add(p[0]); } catch (e) { /* gone, or not LibLande's */ }
+      }
+      away.delete(papersId);
+      if (bib.parents) away.delete(bib.parents[0]);
+      return away;
     }
     // Linked files not found by path, matched by name to those.
     function resolveLoose(data, loose) {
@@ -398,7 +421,7 @@
       let lastFull = lp.lastFull || '';
       if (fullListing) {
         const tree = await listTree(papersId, prefix);
-        const loose = io.limited && io.limited() ? await looseFiles(tree) : null;
+        const loose = io.limited && io.limited() ? await looseFiles(tree, await awayFolders(s, folder, bib, papersId)) : null;
         index = { papersId, prefix, files: tree.files, folders: tree.folders };
         if (loose) index.loose = loose;
         index.hash = indexHashOf(index);
