@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-11-12.07';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-11-12.08';
 // On GitHub Pages, every part of the app must be from the same version: a
 // part kept from an older one (the offline copy, served when the network
 // was slow) lacks what this page needs. Then the kept copies go, and the
@@ -938,6 +938,7 @@ if (RELOADING) {
       $('#accessRow').hidden = false;
       $('#curAccess').textContent = a.access === 'limited' ? 'Limited: the files you\u2019ve given LibLande' : 'Full';
       $('#accessFull').hidden = a.access !== 'limited';
+      $('#adoptRow').hidden = a.access !== 'limited';
     }).catch(() => {});
     if (configured) {
       // The theme previews as you choose; Save keeps it, Cancel puts it back.
@@ -984,6 +985,23 @@ if (RELOADING) {
   $('#accessFull').addEventListener('click', async () => {
     try { await callServer('setAccess', 'full'); location.reload(); }
     catch (e) { toast(errText(e), 4000); }
+  });
+  // Limited access: the LibLande folder used before (with full access),
+  // with your settings, reading list and preferences, given in Google's
+  // picker and used from now on; then LibLande starts again with it.
+  $('#adoptBtn').addEventListener('click', async () => {
+    const b = $('#adoptBtn');
+    b.disabled = true;
+    setupMsg(null);
+    try {
+      const r = await callServer('adoptDataFolder');
+      if (!r.adopted) return;
+      setupMsg('Using your earlier LibLande folder\u2026', 'status');
+      await cache.clear();
+      location.reload();
+    } catch (err) {
+      setupMsg('Couldn\u2019t use that folder: ' + errText(err), 'error');
+    } finally { b.disabled = false; }
   });
   // Settings > Libraries: one form open at a time, below the two buttons
   // (which: 'add', 'new' or null).

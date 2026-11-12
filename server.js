@@ -17,7 +17,7 @@
   window.LIBLANDE_PAGES = true;
   // (Which version each part of the app is from: index.html checks they
   // match. build.py fills it in.)
-  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-11-12.07';
+  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-11-12.08';
   const CLIENT_ID = '789682218462-98mjugngb46ttd01ucp9dcj71ufspjgn.apps.googleusercontent.com';
   // Google Drive, in one of two ways (docs/drive-file-plan.md):
   // full: all of Drive (your .bib, papers and LibLande folder wherever
@@ -207,7 +207,7 @@
   // Picking files or folders in Google's own picker: with limited access,
   // how LibLande is given them. what: 'bib' (one .bib), 'pdfs' (several
   // PDFs), 'folders' (several folders), 'folder' (one), 'files' (several
-  // of any kind). parent: a folder to start in. query: a search to start
+  // of any kind), 'all' (files and folders). parent: a folder to start in. query: a search to start
   // with. Answers [{id, name, mimeType}], or [] if cancelled.
   let pickerReady = null;
   function loadPicker() {
@@ -226,11 +226,11 @@
     const what = opts.what || 'files';
     const [t] = await Promise.all([getToken(), loadPicker()]);
     const P = window.google.picker;
-    const folders = what === 'folders' || what === 'folder';
+    const folders = what === 'folders' || what === 'folder', all = what === 'all';
     const view = new P.DocsView(folders ? P.ViewId.FOLDERS : P.ViewId.DOCS)
       .setMode(P.DocsViewMode.LIST)
-      .setIncludeFolders(folders || !!opts.parent)
-      .setSelectFolderEnabled(folders);
+      .setIncludeFolders(folders || all || !!opts.parent)
+      .setSelectFolderEnabled(folders || all);
     if (folders) view.setMimeTypes(FOLDER);
     else if (what === 'pdfs') view.setMimeTypes('application/pdf');
     if (opts.parent) view.setParent(opts.parent);
@@ -443,6 +443,26 @@
       if (buildRun) await buildRun;
       startBuild(await builder.look({ force: true }), { force: true });
       return { added: docs.length, folders: folders.length };
+    },
+    // Limited access: the LibLande folder used before (settings, reading
+    // list, preferences, backups) given to LibLande and used from now on.
+    // The folder, then everything in it, then what's in its Inbox. Answers
+    // {adopted}; the page then reloads.
+    async adoptDataFolder() {
+      // (The ones LibLande sees already are those it made itself.)
+      const mine = new Set((await builder.listAll('name = ' + q(DATA_FOLDER) + " and 'root' in parents and mimeType = '" + FOLDER + "' and trashed = false", 'id')).map(f => f.id));
+      const [folder] = await pick({ what: 'folder', query: DATA_FOLDER, title: 'Select your earlier LibLande folder, in My Drive, then Select' });
+      if (!folder) return { adopted: false };
+      if (folder.name !== DATA_FOLDER) throw new Error('That folder is \u201c' + folder.name + '\u201d. Choose the one named LibLande, in My Drive.');
+      if (mine.has(folder.id)) throw new Error('That\u2019s the LibLande folder made with limited access. Choose the other one named LibLande, the earlier one.');
+      const inside = await pick({ what: 'all', parent: folder.id, title: 'Select everything in it (\u2318A), then Select' });
+      if (!inside.length) return { adopted: false };
+      const inbox = inside.find(f => f.name === 'Inbox' && f.mimeType === FOLDER);
+      const more = inbox ? await pick({ what: 'all', parent: inbox.id, title: 'And everything in Inbox (\u2318A), then Select' }) : [];
+      await settle([folder.id].concat(inside.map(f => f.id), more.map(f => f.id)));
+      const r = await builder.adoptDataFolder(folder.id);
+      if (!r.ok) throw new Error('LibLande can\u2019t see the library or settings in that folder. Choose it again, and select everything in it (\u2318A).');
+      return { adopted: true, renamed: r.renamed };
     },
     async getPrefs() { prefsMemo = null; return loadPrefs(null); },
     // New settings, from the links pasted in Settings (as Code.gs's

@@ -19,7 +19,7 @@
  */
 (function (root) {
   'use strict';
-  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).builder = '2026-11-12.07';
+  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).builder = '2026-11-12.08';
   const FOLDER = 'application/vnd.google-apps.folder';
   const DATA_FOLDER = 'LibLande', LIBRARY_FILE = 'library.json.gz', INDEX_FILE = 'file-index.json',
     SETTINGS_FILE = 'settings.json', INBOX_FOLDER = 'Inbox', INBOX_FILE = 'LibLande inbox.bib';
@@ -514,7 +514,27 @@
       try { return JSON.parse(raw); } catch (e) { return null; }
     }
 
-    return { look, build, settings, updateSettings, dataFolder, named, meta, text, textAt, remember, noteFile, readJson, writeFile, listAll, notUtf8: id => notUtf8.has(id) };
+    // (Looked for again: a LibLande folder just given, with limited access.)
+    function forgetDataFolder() { dataId = null; dataChecked = 0; known = null; }
+    // With limited access: the LibLande folder made before (by full access,
+    // or the Apps Script version), given in Google's picker with what's in
+    // it, used from now on. id: the folder picked. The one limited access
+    // made beside it is renamed "LibLande (unused)" (nothing deleted).
+    // Answers {ok, renamed}.
+    async function adoptDataFolder(id) {
+      forgetDataFolder();
+      const found = await dataFolder();
+      if (found !== id) return { ok: false };
+      const others = (await listAll('name = ' + q(DATA_FOLDER) + " and 'root' in parents and mimeType = '" + FOLDER + "' and trashed = false", 'id'))
+        .filter(f => f.id !== id);
+      for (const f of others) {
+        await io.drive('files/' + encodeURIComponent(f.id) + '?fields=id', { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: DATA_FOLDER + ' (unused)' }) });
+      }
+      forgetDataFolder();
+      return { ok: true, renamed: others.length };
+    }
+    return { look, build, settings, updateSettings, dataFolder, adoptDataFolder, named, meta, text, textAt, remember, noteFile, readJson, writeFile, listAll, notUtf8: id => notUtf8.has(id) };
   }
 
   root.makeLiblandeBuilder = makeBuilder;
