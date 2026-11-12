@@ -17,7 +17,7 @@
   window.LIBLANDE_PAGES = true;
   // (Which version each part of the app is from: index.html checks they
   // match. build.py fills it in.)
-  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-11-12.12';
+  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-11-12.13';
   const CLIENT_ID = '789682218462-98mjugngb46ttd01ucp9dcj71ufspjgn.apps.googleusercontent.com';
   // Google Drive, in one of two ways (docs/drive-file-plan.md):
   // full: all of Drive (your .bib, papers and LibLande folder wherever
@@ -227,13 +227,16 @@
     const [t] = await Promise.all([getToken(), loadPicker()]);
     const P = window.google.picker;
     const folders = what === 'folders' || what === 'folder', all = what === 'all';
+    // (One .bib or one folder: My Drive's folders, to go down through, not
+    // every file at once; unless it starts with a search.)
+    const browse = (what === 'bib' || what === 'folder') && !opts.query;
     const view = new P.DocsView(folders ? P.ViewId.FOLDERS : P.ViewId.DOCS)
       .setMode(P.DocsViewMode.LIST)
-      .setIncludeFolders(folders || all || !!opts.parent)
+      .setIncludeFolders(folders || all || browse || !!opts.parent)
       .setSelectFolderEnabled(folders || all);
     if (folders) view.setMimeTypes(FOLDER);
     else if (what === 'pdfs') view.setMimeTypes('application/pdf');
-    if (opts.parent) view.setParent(opts.parent);
+    if (opts.parent || browse) view.setParent(opts.parent || 'root');
     if (opts.query) view.setQuery(opts.query);
     const pb = new P.PickerBuilder()
       .addView(view)
