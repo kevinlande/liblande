@@ -230,7 +230,7 @@ try {
   <form class="setup-card" id="setupForm" novalidate>
     <div class="set-top">
     <div class="sheet-head" id="setHead" hidden><button type="button" class="tb-btn sheet-x" id="setClose" aria-label="Cancel" title="Cancel (Esc)"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button><h2>Settings</h2><button type="submit" class="btn primary sheet-go" id="setSave">Save</button></div>
-      <div class="set-tabs" hidden role="tablist" aria-label="Settings" id="setTabs"><button type="button" role="tab" data-stab="look">Appearance</button><button type="button" role="tab" data-stab="sync">Sync</button><button type="button" role="tab" data-stab="library">Library</button><button type="button" role="tab" data-stab="cite">Citing</button><button type="button" role="tab" data-stab="ext">Extensions</button></div>
+      <div class="set-tabs" hidden role="tablist" aria-label="Settings" id="setTabs"><button type="button" role="tab" data-stab="library">Library</button><button type="button" role="tab" data-stab="look">Appearance</button><button type="button" role="tab" data-stab="cite">Citing</button><button type="button" role="tab" data-stab="sync">Sync</button><button type="button" role="tab" data-stab="ext">Extensions</button></div>
     </div>
     <h2 id="setupTitle">Set up LibLande</h2>
     <p id="setupIntro">Your references and their PDFs, kept in your Google Drive as a BibDesk library: a .bib file and a folder of papers.</p>
@@ -268,12 +268,21 @@ try {
         <label class="set-sync"><span>Keyboard shortcuts</span><span class="switch"><input type="checkbox" role="switch" data-sync="keys"><span aria-hidden="true"></span></span></label>
       </div>
       </section>
+      <section class="set-sec" data-stab="library" id="signOutSec" hidden><h3>Google account</h3>
+      <div class="set-files">
+        <div class="set-file"><span class="set-name">Signed in as</span><span id="curEmail"></span></div>
+        <div class="set-file" id="accessRow" hidden><span class="set-name">Drive access</span><span><span id="curAccess"></span> <button type="button" class="linkish" id="accessFull" hidden>Switch to full access</button></span></div>
+      </div>
+      <div class="set-row">
+        <div class="set-text"><span class="hint">Signing out affects only this device.</span></div>
+        <button type="button" class="btn set-reset" id="signOutBtn">Sign out&#x2026;</button>
+      </div>
+      </section>
       <section class="set-sec" data-stab="library"><h3 class="tab-named">Library</h3><h3>This library</h3>
       <div class="set-files">
         <div class="set-file"><span class="set-name">.bib file</span><span id="curBib"></span></div>
         <div class="set-file"><span class="set-name">Papers folder</span><span id="curPapers"></span></div>
         <div class="set-file" id="addPapersRow" hidden><span class="set-name">PDFs</span><span><span id="curNotAdded"></span> <button type="button" class="linkish" id="addPapersBtn">Add papers&#x2026;</button></span></div>
-        <div class="set-file" id="accessRow" hidden><span class="set-name">Drive access</span><span><span id="curAccess"></span> <button type="button" class="linkish" id="accessFull" hidden>Switch to full access</button></span></div>
         <div class="set-file"><span class="set-name">Backups</span><span>In Drive: LibLande &#x203a; Backups</span></div>
       </div>
       <div class="set-row">
@@ -310,12 +319,6 @@ try {
         <p class="hint">Find PDF opens articles through your library&#x2019;s proxy, signed in with your library account. Its address (e.g. ezproxy.library.yorku.ca) or full login link.</p>
         <div id="proxyList"></div>
         <button type="button" class="linkish" id="proxyAdd">Add a library proxy&#x2026;</button>
-      </div>
-      </section>
-      <section class="set-sec" data-stab="library" id="signOutSec" hidden><h3>Google account</h3>
-      <div class="set-row">
-        <div class="set-text"><span class="set-name" id="curEmail"></span><span class="hint">Signing out affects only this device.</span></div>
-        <button type="button" class="btn set-reset" id="signOutBtn">Sign out&#x2026;</button>
       </div>
       </section>
       <section class="set-sec" id="webAddSec" data-stab="ext"><h3>Adding from the web</h3>
@@ -375,7 +378,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-11-12.04</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-11-12.05</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -390,7 +393,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-11-12.04';
+      l.querySelector('small').textContent = 'Version 2026-11-12.05';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -402,7 +405,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.textContent = 'LibLande hit an error (version 2026-11-12.04): ' + msg + ' (tap to dismiss)';
+    bar.textContent = 'LibLande hit an error (version 2026-11-12.05): ' + msg + ' (tap to dismiss)';
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });

@@ -602,6 +602,9 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .set-lib.cur em { margin-left: auto; font-style: normal; color: var(--muted); font-size: 12.5px; }
 .set-link-go { display: flex; justify-content: flex-end; margin-top: 4px; }
 .setup:not(.head-mode) .set-link-go { display: none; }
+/* Settings' messages (switching, taking a library off, errors): kept in
+   view at the foot of the panel, not out of sight below the last tab. */
+.setup.head-mode .setup-error:not([hidden]), .setup.head-mode .setup-status:not([hidden]) { position: sticky; bottom: 8px; z-index: 2; margin: 8px 0 0; padding: 10px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); }
 .btn.set-reset { flex: none; color: var(--warn); border-color: var(--warn); }
 /* A question to be sure (Sign out): the browser's own dialog. */
 .ask-box { width: min(420px, calc(100% - 32px)); padding: 20px; border: 0; border-radius: 14px; background: var(--panel); color: var(--text); box-shadow: var(--shadow); }

@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-11-12.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-11-12.05';
 // On GitHub Pages, every part of the app must be from the same version: a
 // part kept from an older one (the offline copy, served when the network
 // was slow) lacks what this page needs. Then the kept copies go, and the
@@ -99,10 +99,10 @@ function copy(text, msg, html) {
 }
 
 /* ------------------------------------------------------------ settings' tabs */
-// Settings in tabs: Appearance, Sync, Library, Citing, Extensions (Word,
-// adding from the web); the one open last opened again.
+// Settings in tabs: Library, Appearance, Citing, Sync, Extensions (Word,
+// adding from the web); the one open last opened again (Library at first).
 function setSettingsTab(t) {
-  if (!document.querySelector('#setupEdit .set-sec[data-stab="' + t + '"]')) t = 'look';
+  if (!document.querySelector('#setupEdit .set-sec[data-stab="' + t + '"]')) t = 'library';
   store.set('setTab', t);
   document.querySelectorAll('#setTabs [data-stab]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.stab === t)));
   document.querySelectorAll('#setupEdit .set-sec').forEach(s => s.classList.toggle('off-tab', s.dataset.stab !== t));
@@ -934,7 +934,7 @@ if (RELOADING) {
       if (!configured) return;
       $('#signOutSec').hidden = false;
       $('#signOutBtn').disabled = false;
-      $('#curEmail').textContent = a.email ? 'Signed in as ' + a.email : 'Signed in with Google';
+      $('#curEmail').textContent = a.email || 'Google';
       $('#accessRow').hidden = false;
       $('#curAccess').textContent = a.access === 'limited' ? 'Limited: the files you\u2019ve given LibLande' : 'Full';
       $('#accessFull').hidden = a.access !== 'limited';
@@ -954,7 +954,7 @@ if (RELOADING) {
       $('#curPapers').textContent = st.papersName || '';
     }
     setupMsg(st && st.problem, 'error');
-    if (configured) setSettingsTab(store.get('setTab', 'look'));
+    if (configured) setSettingsTab(store.get('setTab', 'library'));
     $('#setup').scrollTop = 0;
     if (!configured) $('#bibLink').focus();
   };
