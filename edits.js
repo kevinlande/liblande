@@ -14,19 +14,16 @@
  * is made again on the new text, or, after a few tries, not made at all.
  * On this device, one change runs at a time.
  *
- * makeLiblandeEdits(io): io.drive (as in server.js), io.builder (its
- * Drive helpers and settings), io.getToken.
+ * makeLiblandeEdits(io): io.builder (its settings, and the files' storage,
+ * builder.storage: Google Drive now).
  */
 (function (root) {
   'use strict';
-  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).edits = '2026-11-12.09';
-  const FOLDER = 'application/vnd.google-apps.folder';
-  const UPLOAD = 'https://www.googleapis.com/upload/drive/v3/';
+  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).edits = '2026-11-12.10';
   const READING_FILE = 'reading-list.json',
     INBOX_FOLDER = 'Inbox', INBOX_FILE = 'LibLande inbox.bib', BACKUP_FOLDER = 'Backups';
   const READING_GROUP = '★ Reading List';
   const BUSY = 'LibLande is updating your library right now. Try again in a minute.';
-  const q = s => "'" + String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
   const pad = n => String(n).padStart(2, '0');
   // The time in a backup copy's name ("Library 2026-10-21 175041.bib"),
   // or null for a file that isn't a copy of this one.
@@ -342,10 +339,9 @@
 
   function makeEdits(io) {
     const B = io.builder;
-    const json = async (path, opts, base) => (await io.drive(path, opts, base)).json();
+    // (Files reached only through the storage: builder.js.)
+    const S = B.storage;
     const meta = (id, fields) => B.meta(id, fields);
-    const patch = (id, body, params) => json('files/' + encodeURIComponent(id) + '?fields=id' + (params || ''),
-      { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
 
     // One change at a time on this device.
     let chain = Promise.resolve();
@@ -355,8 +351,7 @@
     async function subFolder(parentId, name, create) {
       const f = await B.named(parentId, name, 'id,name', true);
       if (f || !create) return f || null;
-      return json('files?fields=id,name', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, mimeType: FOLDER, parents: [parentId] }) });
+      return S.mkdir(parentId, name);
     }
     async function settings() { return B.settings(false); }
     const mainBibId = async () => {
@@ -389,8 +384,7 @@
     async function backup(m, when) {
       const folder = await subFolder(await B.dataFolder(), BACKUP_FOLDER, true);
       const base = m.name.replace(/\.bib$/i, '');
-      const copy = await json('files/' + encodeURIComponent(m.id) + '/copy?fields=id,size', { method: 'POST',
-        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: base + ' ' + (when || fileTime()) + '.bib', parents: [folder.id] }) });
+      const copy = await S.copy(m.id, folder.id, base + ' ' + (when || fileTime()) + '.bib', 'id,size');
       if (!copy || String(copy.size) !== String(m.size)) throw new Error('LibLande couldn’t make a backup copy, so it didn’t save.');
       return folder;
     }
@@ -402,14 +396,13 @@
     // of Test Library, "Test Library 2 2026-..." isn't.)
     async function pruneBackups(m, folder, now) {
       const base = m.name.replace(/\.bib$/i, '');
-      const all = (await B.listAll(q(folder.id) + ' in parents and name contains ' + q(base) + ' and trashed = false', 'id,name', 'createdTime desc'))
+      const all = (await S.children(folder.id, { nameContains: base, fields: 'id,name', order: 'createdTime desc' }))
         .map(f => ({ f, when: backupTime(f.name, base) })).filter(x => x.when != null).sort((a, b) => b.when - a.when);
       const old = backupsToTrash(all.map(x => x.when), now || Date.now());
-      for (const i of old) await patch(all[i].f.id, { trashed: true });
+      for (const i of old) await S.trash(all[i].f.id);
     }
     async function writeText(m, text) {
-      const saved = await json('files/' + encodeURIComponent(m.id) + '?uploadType=media&fields=id,modifiedTime,size', { method: 'PATCH',
-        headers: { 'Content-Type': (m.mimeType || 'text/plain') + '; charset=UTF-8' }, body: new Blob([text]) }, UPLOAD);
+      const saved = await S.replace(m.id, new Blob([text]), (m.mimeType || 'text/plain') + '; charset=UTF-8', 'id,modifiedTime,size');
       B.remember(m.id, saved.modifiedTime, text);
       return saved;
     }
@@ -497,7 +490,7 @@
       });
       const folder = await authorFolder(rootId, name.folder, blocked);
       const taken = {};
-      (await B.listAll(q(folder.id) + ' in parents and trashed = false', 'name')).forEach(f => { taken[f.name.normalize('NFC')] = true; });
+      (await S.children(folder.id, { fields: 'name' })).forEach(f => { taken[f.name.normalize('NFC')] = true; });
       const file = await meta(uploadId, 'id,name,parents');
       const ext = ((/\.[A-Za-z0-9]{1,5}$/.exec(file.name) || ['.pdf'])[0]).toLowerCase();
       let fileName = null;
@@ -507,7 +500,7 @@
       }
       if (!fileName) throw new Error('The folder ' + folder.name + ' already has 100 files named “' + name.base + '”.');
       const oldParent = file.parents && file.parents[0], oldName = file.name;
-      await patch(file.id, { name: fileName }, '&addParents=' + encodeURIComponent(folder.id) + (oldParent ? '&removeParents=' + encodeURIComponent(oldParent) : ''));
+      await S.move(file.id, folder.id, oldParent, fileName);
       const relPath = segs.concat([folder.name, fileName]).join('/');
       return {
         relPath,
@@ -515,7 +508,7 @@
         folderPath: segs.concat([folder.name]).join('/'),
         folderId: folder.id,
         undo: async () => {
-          try { await patch(file.id, { name: oldName }, oldParent ? '&addParents=' + encodeURIComponent(oldParent) + '&removeParents=' + encodeURIComponent(folder.id) : ''); } catch (e) { /* leave it filed */ }
+          try { await S.move(file.id, oldParent || null, oldParent ? folder.id : null, oldName); } catch (e) { /* leave it filed */ }
         },
       };
     }
@@ -532,7 +525,7 @@
       const exact = await B.named(parentId, name, 'id,name', true);
       if (exact) return exact;
       const want = folderKey(name);
-      const hit = (await B.listAll(q(parentId) + " in parents and mimeType = '" + FOLDER + "' and trashed = false", 'id,name')).find(f => folderKey(f.name) === want);
+      const hit = (await S.children(parentId, { folders: true, fields: 'id,name' })).find(f => folderKey(f.name) === want);
       if (hit) return hit;
       if (blocked) {
         const e = new Error('Your papers folder has a folder \u201c' + name + '\u201d that LibLande hasn\u2019t been given yet (BibDesk made it later). Add papers, choose that folder, then try again.');
@@ -661,7 +654,7 @@
         }
       }, req.backupName);
       noteFiled(filed);
-      if (req.replace && req.replaceId) { try { await patch(req.replaceId, { trashed: true }); } catch (e) { /* already gone */ } }
+      if (req.replace && req.replaceId) { try { await S.trash(req.replaceId); } catch (e) { /* already gone */ } }
       return { hash: out.hash, file: filed.info, replaced: !!(req.replace && nums.length) };
     });
 
@@ -786,7 +779,7 @@
       });
       if (other || (s.papersId || '') !== papersId) {
         const old = await B.named(folder, 'library.json.gz', 'id');
-        if (old) await patch(old.id, { trashed: true });
+        if (old) await S.trash(old.id);
       }
       return { name: bib.name };
     });
@@ -804,9 +797,8 @@
     async function libraryFolder(asked) {
       const base = String(asked || '').replace(/[\/\\:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim() || 'New library';
       let name = base, n = 2;
-      while (await B.named('root', name, 'id', true)) name = base + ' ' + n++;
-      const folder = await json('files?fields=id,name', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, mimeType: FOLDER, parents: ['root'] }) });
+      while (await B.named(S.root, name, 'id', true)) name = base + ' ' + n++;
+      const folder = await S.mkdir(S.root, name);
       const text = '%% This BibTeX bibliography file was created using LibLande.\n%% Created ' + new Date().toISOString().slice(0, 10) + '\n\n%% Saved with string encoding Unicode (UTF-8) \n\n';
       const bib = await B.writeFile(folder.id, name + '.bib', text, 'text/plain');
       // (Its papers in a folder of their own, beside the .bib.)
@@ -874,10 +866,7 @@
         async function uploadOne(j) {
           const name = j.x.file.name || norm(j.x.path).split('/').pop();
           const type = j.x.file.type || (/\.pdf$/i.test(name) ? 'application/pdf' : 'application/octet-stream');
-          const boundary = 'liblande' + Math.random().toString(36).slice(2);
-          const blob = new Blob(['--' + boundary + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' + JSON.stringify({ name, parents: [made.folderId], mimeType: type }) +
-            '\r\n--' + boundary + '\r\nContent-Type: ' + type + '\r\n\r\n', j.x.file, '\r\n--' + boundary + '--'], { type: 'multipart/related; boundary=' + boundary });
-          const up = await json('files?uploadType=multipart&fields=id', { method: 'POST', headers: { 'Content-Type': blob.type }, body: blob }, UPLOAD);
+          const up = await S.create(made.folderId, name, j.x.file, type, { mimeType: type, fields: 'id' });
           const filed = await fileOne(up.id, j.e.fields);
           filedAs.set(j, filed.relPath);
           done++;
@@ -895,7 +884,7 @@
         await F.useLibrary({ bibId: made.bibId, papersId: made.papersId });
         return Object.assign(made, { entries: plan.entries.length, files: jobs.length, missing });
       } catch (e) {
-        try { await patch(made.folderId, { trashed: true }); } catch (err) { /* left */ }
+        try { await S.trash(made.folderId); } catch (err) { /* left */ }
         throw e;
       }
     };
@@ -927,8 +916,7 @@
           info.files.forEach(n => { set[n] = null; });
           let n = 1;
           for (const id of it.fileIds || []) {
-            const c = await json('files/' + encodeURIComponent(id) + '/copy?fields=id', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ parents: [tbib.parents[0]] }) });
+            const c = await S.copy(id, tbib.parents[0], null, 'id');
             copies.push(c.id);
             const filed = await filePdf(tbib, c.id, info.fields, prefix);
             set['bdsk-file-' + n++] = bdskValue(filed.relPath);
@@ -943,7 +931,7 @@
           }, req.backupName);
         }
       } catch (e) {
-        for (const id of copies) { try { await patch(id, { trashed: true }); } catch (err) { /* gone */ } }
+        for (const id of copies) { try { await S.trash(id); } catch (err) { /* gone */ } }
         throw e;
       }
       return { copied: ready.map(r => r.key), skipped, files: copies.length };

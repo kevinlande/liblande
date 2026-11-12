@@ -12,14 +12,15 @@
  * lastFull): a device that finds them current leaves the library be.
  *
  * makeBuilder(io): io.drive(path, opts, base) is an authorised Drive
- * request that throws unless it worked; io.reconcile(groups) brings the
+ * request that throws unless it worked (or io.storage, the files' storage:
+ * makeDriveStorage); io.reconcile(groups) brings the
  * reading list in line with the "Reading List" group after a build. The
  * parsing runs in a worker (build-worker.js) when there is one, so the
  * page doesn't freeze; otherwise here.
  */
 (function (root) {
   'use strict';
-  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).builder = '2026-11-12.09';
+  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).builder = '2026-11-12.10';
   const FOLDER = 'application/vnd.google-apps.folder';
   const DATA_FOLDER = 'LibLande', LIBRARY_FILE = 'library.json.gz', INDEX_FILE = 'file-index.json',
     SETTINGS_FILE = 'settings.json', INBOX_FOLDER = 'Inbox', INBOX_FILE = 'LibLande inbox.bib';
@@ -61,30 +62,130 @@
   }
   root.liblandeAssemble = assemble;
 
-  function makeBuilder(io) {
-    const get = async path => (await io.drive(path)).json();
+  /* ------------------------------------------------------------ storage */
+  // Where a library's files are: Google Drive (and later Dropbox, with the
+  // same calls: docs/dropbox-plan.md). The builder, edits.js and server.js
+  // reach files only through this. drive(path, opts, base) is an
+  // authorised Drive request that throws unless it worked.
+  // File records look like Drive's: {id, name, mimeType, parents,
+  // modifiedTime, createdTime, size, trashed, md5Checksum, properties};
+  // `fields` names the ones wanted (another storage may give more).
+  // Folders' children are asked for with o: folders (true: folders only),
+  // name, nameContains, createdBefore (ISO time), fields, order.
+  function makeDriveStorage(drive) {
+    const enc = encodeURIComponent;
+    const json = async (path, opts, base) => (await drive(path, opts, base)).json();
     // All the files matching a query (every page of the answer).
-    async function listAll(query, fields, order) {
+    async function search(query, fields, order) {
       const out = [];
       let page = null;
       do {
-        const j = await get('files?q=' + encodeURIComponent(query) + '&pageSize=1000' +
-          '&fields=' + encodeURIComponent('nextPageToken,files(' + fields + ')') +
-          (order ? '&orderBy=' + encodeURIComponent(order) : '') + (page ? '&pageToken=' + encodeURIComponent(page) : ''));
+        const j = await json('files?q=' + enc(query) + '&pageSize=1000' +
+          '&fields=' + enc('nextPageToken,files(' + fields + ')') +
+          (order ? '&orderBy=' + enc(order) : '') + (page ? '&pageToken=' + enc(page) : ''));
         (j.files || []).forEach(f => out.push(f));
         page = j.nextPageToken;
       } while (page);
       return out;
     }
-    const meta = (id, fields) => get('files/' + encodeURIComponent(id) + '?fields=' + encodeURIComponent(fields));
-    const named = async (parentId, name, fields, folder) => (await listAll('name = ' + q(name) + ' and ' + q(parentId) +
-      ' in parents and trashed = false' + (folder ? " and mimeType = '" + FOLDER + "'" : ''), fields || 'id,name,modifiedTime', 'modifiedTime desc'))[0] || null;
+    // (Always in this order: name, parent, the rest, trashed last.)
+    const query = (parentIds, o) => (o.name != null ? 'name = ' + q(o.name) + ' and ' : '') +
+      (parentIds.length > 1 ? '(' + parentIds.map(id => q(id) + ' in parents').join(' or ') + ')' : q(parentIds[0]) + ' in parents') +
+      (o.nameContains ? ' and name contains ' + q(o.nameContains) : '') +
+      (o.createdBefore ? " and createdTime < '" + o.createdBefore + "'" : '') +
+      (o.folders ? " and mimeType = '" + FOLDER + "'" : '') + ' and trashed = false';
+    const multipart = (metadata, body, type) => {
+      const boundary = 'liblande' + Math.random().toString(36).slice(2);
+      return new Blob(['--' + boundary + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' + JSON.stringify(metadata) +
+        '\r\n--' + boundary + '\r\nContent-Type: ' + type + '\r\n\r\n', body, '\r\n--' + boundary + '--'], { type: 'multipart/related; boundary=' + boundary });
+    };
+    const S = {
+      kind: 'drive',
+      root: 'root',
+      meta: (id, fields) => json('files/' + enc(id) + '?fields=' + enc(fields)),
+      children: (parentId, o = {}) => search(query([parentId], o), o.fields || 'id,name', o.order),
+      // The newest one with that name (or null).
+      named: async (parentId, name, fields, folder) =>
+        (await search(query([parentId], { name, folders: folder }), fields || 'id,name,modifiedTime', 'modifiedTime desc'))[0] || null,
+      // Every file (or, folders: true, every folder) LibLande can see.
+      everything: o => search("mimeType " + (o.folders ? '=' : '!=') + " '" + FOLDER + "' and trashed = false", o.fields || 'id,name'),
+      bytes: async id => (await drive('files/' + enc(id) + '?alt=media')).arrayBuffer(),
+      mkdir: (parentId, name) => json('files?fields=id,name', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, mimeType: FOLDER, parents: [parentId] }) }),
+      // A new file. o: fields, properties, mimeType (in its record).
+      create: (parentId, name, body, type, o = {}) => {
+        const metadata = { name, parents: [parentId] };
+        if (o.mimeType) metadata.mimeType = o.mimeType;
+        if (o.properties) metadata.properties = o.properties;
+        const blob = multipart(metadata, body, type);
+        return json('files?uploadType=multipart&fields=' + enc(o.fields || 'id,modifiedTime'), { method: 'POST', headers: { 'Content-Type': blob.type }, body: blob }, UPLOAD);
+      },
+      // A file's content replaced (the same file, its ID kept).
+      replace: (id, body, type, fields) => json('files/' + enc(id) + '?uploadType=media&fields=' + enc(fields || 'id,modifiedTime'),
+        { method: 'PATCH', headers: { 'Content-Type': type }, body }, UPLOAD),
+      // A file in a folder by name, written in place (keeping its ID) or
+      // made, with properties if given.
+      async writeFile(folderId, name, body, type, properties) {
+        const old = await S.named(folderId, name, 'id');
+        const metadata = old ? {} : { name, parents: [folderId] };
+        if (properties) metadata.properties = properties;
+        const blob = multipart(metadata, body, type);
+        const path = (old ? 'files/' + enc(old.id) : 'files') + '?uploadType=multipart&fields=id,modifiedTime';
+        return json(path, { method: old ? 'PATCH' : 'POST', headers: { 'Content-Type': blob.type }, body: blob }, UPLOAD);
+      },
+      // Its record changed: name, properties, trashed.
+      update: (id, changes) => json('files/' + enc(id) + '?fields=id', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(changes || {}) }),
+      // Moved from one folder to another (either may be left out), and
+      // renamed if a name is given.
+      move: (id, toId, fromId, name) => json('files/' + enc(id) + '?fields=id' + (toId ? '&addParents=' + enc(toId) : '') + (fromId ? '&removeParents=' + enc(fromId) : ''),
+        { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(name != null ? { name } : {}) }),
+      trash: id => S.update(id, { trashed: true }),
+      copy: (id, parentId, name, fields) => json('files/' + enc(id) + '/copy?fields=' + enc(fields || 'id'), { method: 'POST',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(name != null ? { name, parents: [parentId] } : { parents: [parentId] }) }),
+      // Every file and folder under a folder, with paths from `prefix`;
+      // many folders asked about at once.
+      async tree(rootId, prefix) {
+        const rootKey = prefix || '';
+        const files = {}, folders = {};
+        folders[rootKey] = rootId;
+        let frontier = [{ id: rootId, path: rootKey }], count = 0;
+        while (frontier.length) {
+          const next = [], chunks = [];
+          for (let i = 0; i < frontier.length; i += PARALLEL_BATCH) chunks.push(frontier.slice(i, i + PARALLEL_BATCH));
+          for (let c = 0; c < chunks.length; c += PARALLEL_REQUESTS) {
+            const group = chunks.slice(c, c + PARALLEL_REQUESTS);
+            const answers = await Promise.all(group.map(chunk => search(query(chunk.map(f => f.id), {}), 'id,name,parents,mimeType')));
+            answers.forEach((items, g) => {
+              const pathById = {};
+              group[g].forEach(f => { pathById[f.id] = f.path; });
+              items.forEach(f => {
+                const parent = (f.parents || []).find(p => p in pathById);
+                if (parent === undefined) return;
+                const path = (pathById[parent] ? pathById[parent] + '/' : '') + f.name;
+                if (f.mimeType === FOLDER) { folders[path] = f.id; next.push({ id: f.id, path }); } else files[path] = f.id;
+                if (++count > MAX_FILES) throw new Error('The papers folder holds more than ' + MAX_FILES + ' files. Choose the folder that holds just your papers.');
+              });
+            });
+          }
+          frontier = next;
+        }
+        return { files, folders };
+      },
+    };
+    return S;
+  }
+  root.makeLiblandeDriveStorage = makeDriveStorage;
+
+  function makeBuilder(io) {
+    const S = io.storage || makeDriveStorage(io.drive);
+    const meta = (id, fields) => S.meta(id, fields);
+    const named = (parentId, name, fields, folder) => S.named(parentId, name, fields, folder);
     // (A file that isn't UTF-8 is read as well as it can be, and noted:
     // edits refuse to write it back, which would garble its accented
     // letters. A \ufffd written in the file itself is fine.)
     const notUtf8 = new Set();
     const text = async id => {
-      const buf = await (await io.drive('files/' + encodeURIComponent(id) + '?alt=media')).arrayBuffer();
+      const buf = await S.bytes(id);
       try { const t = new TextDecoder('utf-8', { fatal: true }).decode(buf); notUtf8.delete(id); return t; } catch (e) {
         notUtf8.add(id);
         return new TextDecoder('utf-8').decode(buf);
@@ -129,30 +230,20 @@
       // (The oldest first: with limited access a second LibLande folder can
       // be made beside one it can't see, and full access keeps to the
       // first.)
-      const folders = (await listAll('name = ' + q(DATA_FOLDER) + " and 'root' in parents and mimeType = '" + FOLDER + "' and trashed = false", 'id,createdTime'))
+      const folders = (await S.children(S.root, { name: DATA_FOLDER, folders: true, fields: 'id,createdTime' }))
         .sort((a, b) => String(a.createdTime || '').localeCompare(String(b.createdTime || '')));
       for (const f of folders) {
         if (await named(f.id, LIBRARY_FILE, 'id') || await named(f.id, SETTINGS_FILE, 'id')) return (dataId = f.id);
       }
       if (folders.length) return (dataId = folders[0].id);
       if (!create) return null;
-      const made = await (await io.drive('files?fields=id', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: DATA_FOLDER, mimeType: FOLDER, parents: ['root'] }) })).json();
+      const made = await S.mkdir(S.root, DATA_FOLDER);
       return (dataId = made.id);
     }
 
     // Write a file in the LibLande folder (in place, keeping its ID), with
-    // Drive properties if given.
-    async function writeFile(folderId, name, body, type, properties) {
-      const old = await named(folderId, name, 'id');
-      const metadata = old ? {} : { name, parents: [folderId] };
-      if (properties) metadata.properties = properties;
-      const boundary = 'liblande' + Math.random().toString(36).slice(2);
-      const blob = new Blob(['--' + boundary + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' + JSON.stringify(metadata) +
-        '\r\n--' + boundary + '\r\nContent-Type: ' + type + '\r\n\r\n', body, '\r\n--' + boundary + '--'], { type: 'multipart/related; boundary=' + boundary });
-      const path = (old ? 'files/' + encodeURIComponent(old.id) : 'files') + '?uploadType=multipart&fields=id,modifiedTime';
-      return (await io.drive(path, { method: old ? 'PATCH' : 'POST', headers: { 'Content-Type': blob.type }, body: blob }, UPLOAD)).json();
-    }
+    // properties if given.
+    const writeFile = (folderId, name, body, type, properties) => S.writeFile(folderId, name, body, type, properties);
 
     async function writeIndex(folder, index) {
       const body = JSON.stringify(index), w = await writeFile(folder, INDEX_FILE, body, 'application/json');
@@ -214,36 +305,8 @@
       return null;
     }
 
-    // Every file and folder under a folder, with paths from `prefix`; many
-    // folders asked about at once.
-    async function listTree(rootId, prefix) {
-      const rootKey = prefix || '';
-      const files = {}, folders = {};
-      folders[rootKey] = rootId;
-      let frontier = [{ id: rootId, path: rootKey }], count = 0;
-      while (frontier.length) {
-        const next = [], chunks = [];
-        for (let i = 0; i < frontier.length; i += PARALLEL_BATCH) chunks.push(frontier.slice(i, i + PARALLEL_BATCH));
-        for (let c = 0; c < chunks.length; c += PARALLEL_REQUESTS) {
-          const group = chunks.slice(c, c + PARALLEL_REQUESTS);
-          const answers = await Promise.all(group.map(chunk =>
-            listAll('(' + chunk.map(f => q(f.id) + ' in parents').join(' or ') + ') and trashed = false', 'id,name,parents,mimeType')));
-          answers.forEach((items, g) => {
-            const pathById = {};
-            group[g].forEach(f => { pathById[f.id] = f.path; });
-            items.forEach(f => {
-              const parent = (f.parents || []).find(p => p in pathById);
-              if (parent === undefined) return;
-              const path = (pathById[parent] ? pathById[parent] + '/' : '') + f.name;
-              if (f.mimeType === FOLDER) { folders[path] = f.id; next.push({ id: f.id, path }); } else files[path] = f.id;
-              if (++count > MAX_FILES) throw new Error('The papers folder holds more than ' + MAX_FILES + ' files. Choose the folder that holds just your papers.');
-            });
-          });
-        }
-        frontier = next;
-      }
-      return { files, folders };
-    }
+    // Every file and folder under a folder, with paths from `prefix`.
+    const listTree = (rootId, prefix) => S.tree(rootId, prefix);
 
     // With limited access: every file LibLande has been given, listed (a
     // folder it wasn't given hides what's in it from listTree). One in a
@@ -255,8 +318,8 @@
       const known = new Set(Object.values(tree.files)), pathOf = {}, loose = {}, up = {};
       Object.keys(tree.folders).forEach(p => { pathOf[tree.folders[p]] = p; });
       const [all, dirs] = await Promise.all([
-        listAll("mimeType != '" + FOLDER + "' and trashed = false", 'id,name,parents,mimeType'),
-        away.size ? listAll("mimeType = '" + FOLDER + "' and trashed = false", 'id,parents') : [],
+        S.everything({ fields: 'id,name,parents,mimeType' }),
+        away.size ? S.everything({ folders: true, fields: 'id,parents' }) : [],
       ]);
       dirs.forEach(d => { up[d.id] = (d.parents || [])[0]; });
       // (Up through the folders LibLande can see.)
@@ -315,7 +378,7 @@
     // form (macOS and Drive can store accented letters differently).
     async function childNamed(parentId, name, folder) {
       const want = name.normalize('NFC');
-      const kids = await listAll(q(parentId) + ' in parents and trashed = false' + (folder ? " and mimeType = '" + FOLDER + "'" : ''), 'id,name');
+      const kids = await S.children(parentId, { folders: folder, fields: 'id,name' });
       const hit = kids.find(f => f.name.normalize('NFC') === want);
       return hit ? hit.id : null;
     }
@@ -468,8 +531,7 @@
       // Nothing that matters changed (the daily listing found no new
       // files): note what was checked, and leave the library as it is.
       if (!o.force && lib && current && lp.signature === signature) {
-        await io.drive('files/' + encodeURIComponent(lib.id) + '?fields=id', { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ properties: props }) });
+        await S.update(lib.id, { properties: props });
         return false;
       }
 
@@ -533,16 +595,12 @@
       forgetDataFolder();
       const found = await dataFolder();
       if (found !== id) return { ok: false };
-      const others = (await listAll('name = ' + q(DATA_FOLDER) + " and 'root' in parents and mimeType = '" + FOLDER + "' and trashed = false", 'id'))
-        .filter(f => f.id !== id);
-      for (const f of others) {
-        await io.drive('files/' + encodeURIComponent(f.id) + '?fields=id', { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: DATA_FOLDER + ' (unused)' }) });
-      }
+      const others = (await S.children(S.root, { name: DATA_FOLDER, folders: true, fields: 'id' })).filter(f => f.id !== id);
+      for (const f of others) await S.update(f.id, { name: DATA_FOLDER + ' (unused)' });
       forgetDataFolder();
       return { ok: true, renamed: others.length };
     }
-    return { look, build, settings, updateSettings, dataFolder, adoptDataFolder, named, meta, text, textAt, remember, noteFile, readJson, writeFile, listAll, notUtf8: id => notUtf8.has(id) };
+    return { storage: S, look, build, settings, updateSettings, dataFolder, adoptDataFolder, named, meta, text, textAt, remember, noteFile, readJson, writeFile, notUtf8: id => notUtf8.has(id) };
   }
 
   root.makeLiblandeBuilder = makeBuilder;

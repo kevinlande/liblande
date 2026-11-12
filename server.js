@@ -17,7 +17,7 @@
   window.LIBLANDE_PAGES = true;
   // (Which version each part of the app is from: index.html checks they
   // match. build.py fills it in.)
-  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-11-12.09';
+  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-11-12.10';
   const CLIENT_ID = '789682218462-98mjugngb46ttd01ucp9dcj71ufspjgn.apps.googleusercontent.com';
   // Google Drive, in one of two ways (docs/drive-file-plan.md):
   // full: all of Drive (your .bib, papers and LibLande folder wherever
@@ -28,7 +28,7 @@
   // Google's picker: the project's key (build.py fills it in from
   // pages/picker-key.txt) and number.
   const PICKER_KEY = 'AIzaSyCJ4i0w4SpEo6DS9Y9OjMUWgPYzeUIIg7g', APP_ID = CLIENT_ID.split('-')[0];
-  const API = 'https://www.googleapis.com/drive/v3/', UPLOAD = 'https://www.googleapis.com/upload/drive/v3/';
+  const API = 'https://www.googleapis.com/drive/v3/';
   const FOLDER = 'application/vnd.google-apps.folder';
   // As in Code.gs.
   const DATA_FOLDER = 'LibLande', LIBRARY_FILE = 'library.json.gz',
@@ -324,27 +324,22 @@
     }
     return r;
   }
-  const q = s => "'" + String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
-  async function list(query, fields = 'id,name,modifiedTime,createdTime,size,mimeType', order = '') {
-    const r = await drive('files?q=' + encodeURIComponent(query) + '&fields=' + encodeURIComponent('files(' + fields + ')') +
-      '&pageSize=1000' + (order ? '&orderBy=' + encodeURIComponent(order) : ''));
-    return (await r.json()).files || [];
-  }
-  async function fileIn(folderId, name) {
-    return (await list('name = ' + q(name) + ' and ' + q(folderId) + ' in parents and trashed = false', undefined, 'modifiedTime desc'))[0] || null;
-  }
+  // The files' storage (Google Drive now): the builder's, made below.
+  // Files are reached only through it; drive() is for sign-in, the picker
+  // and what's Drive's alone.
+  const storage = () => builder.storage;
+  const textOf = async id => new TextDecoder().decode(await storage().bytes(id));
+  const fileIn = (folderId, name) => storage().named(folderId, name, 'id,name,modifiedTime,createdTime,size,mimeType');
   async function subFolder(parentId, name, create) {
-    const f = (await list('name = ' + q(name) + ' and ' + q(parentId) + " in parents and mimeType = '" + FOLDER + "' and trashed = false"))[0];
+    const f = await storage().named(parentId, name, 'id,name', true);
     if (f || !create) return f || null;
-    const r = await drive('files?fields=id', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, mimeType: FOLDER, parents: [parentId] }) });
-    return r.json();
+    return storage().mkdir(parentId, name);
   }
   async function readJson(folderId, name) {
     const f = await fileIn(folderId, name);
     if (!f) return null;
     // (As builder.readJson: a file that can't be read throws.)
-    const raw = await (await drive('files/' + encodeURIComponent(f.id) + '?alt=media')).text();
+    const raw = await textOf(f.id);
     try { return JSON.parse(raw); } catch (e) { return null; }
   }
   // LibLande's folder in My Drive: as the builder finds it (the same one
@@ -450,7 +445,7 @@
     // {adopted}; the page then reloads.
     async adoptDataFolder() {
       // (The ones LibLande sees already are those it made itself.)
-      const mine = new Set((await builder.listAll('name = ' + q(DATA_FOLDER) + " and 'root' in parents and mimeType = '" + FOLDER + "' and trashed = false", 'id')).map(f => f.id));
+      const mine = new Set((await storage().children(storage().root, { name: DATA_FOLDER, folders: true, fields: 'id' })).map(f => f.id));
       const [folder] = await pick({ what: 'folder', query: DATA_FOLDER, title: 'Select your earlier LibLande folder (My Drive \u203a LibLande, with Backups, Inbox and Exports in it), then Select' });
       if (!folder) return { adopted: false };
       if (folder.name !== DATA_FOLDER) throw new Error('That folder is \u201c' + folder.name + '\u201d. Choose the one named LibLande, in My Drive.');
@@ -557,8 +552,7 @@
       const base = String(req.name || '').replace(/[\/\\:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim() || 'LibLande export ' + day();
       let name = base, n = 2;
       while (await builder.named(exportsFolder.id, name, 'id', true)) name = base + ' (' + n++ + ')';
-      const folder = await (await drive('files?fields=id', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, mimeType: FOLDER, parents: [exportsFolder.id] }) })).json();
+      const folder = await storage().mkdir(exportsFolder.id, name);
       // (Left out when not wanted: null.)
       if (req.bib != null) await builder.writeFile(folder.id, 'references.bib', req.bib, 'text/plain');
       if (req.rtf != null) await builder.writeFile(folder.id, 'references.rtf', req.rtf, 'application/rtf');
@@ -579,12 +573,12 @@
       return { id: lib.id, stamp: Date.parse(lib.modifiedTime), token: await getToken() };
     },
     getToken() { return getToken(); },
-    // The library, when the page's own download of it failed: through
-    // drive() here, which waits and asks again. (Handed over as it is: Apps
-    // Script had to send it as base64 text.)
+    // The library, when the page's own download of it failed: through the
+    // storage here (drive(), which waits and asks again). (Handed over as
+    // it is: Apps Script had to send it as base64 text.)
     async getLibrary() {
       const info = await SERVER.getLibraryInfo();
-      const gz = new Uint8Array(await (await drive('files/' + encodeURIComponent(info.id) + '?alt=media')).arrayBuffer());
+      const gz = new Uint8Array(await storage().bytes(info.id));
       return { stamp: info.stamp, gz };
     },
     // Your preferences (theme, tools, recently viewed...), in
@@ -595,19 +589,16 @@
     async backupPdf(fileId) {
       const backups = await subFolder(await dataFolder(), BACKUP_FOLDER, true);
       const folder = await subFolder(backups.id, 'PDFs', true);
-      const file = await (await drive('files/' + encodeURIComponent(fileId) + '?fields=name,size')).json();
+      const file = await storage().meta(fileId, 'name,size');
       const name = day() + ' ' + file.name.replace(/[.]pdf$/i, '') + ' (' + fileId.slice(-6) + ').pdf';
       if (!(await fileIn(folder.id, name))) {
-        const copy = await (await drive('files/' + encodeURIComponent(fileId) + '/copy?fields=id,size', { method: 'POST',
-          headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, parents: [folder.id] }) })).json();
+        const copy = await storage().copy(fileId, folder.id, name, 'id,size');
         if (!copy || copy.size !== file.size) throw new Error('LibLande couldn’t make a backup copy of the PDF, so it didn’t save your markup.');
       }
       if (store.get('pdfBackupsPruned', '') !== day()) {
         const cutoff = new Date(Date.now() - PDF_BACKUP_DAYS * 24 * 60 * 60 * 1000).toISOString();
-        const old = await list(q(folder.id) + " in parents and createdTime < '" + cutoff + "' and trashed = false", 'id');
-        for (const f of old) {
-          await drive('files/' + encodeURIComponent(f.id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ trashed: true }) });
-        }
+        const old = await storage().children(folder.id, { createdBefore: cutoff, fields: 'id' });
+        for (const f of old) await storage().trash(f.id);
         store.set('pdfBackupsPruned', day());
       }
       return true;
@@ -617,7 +608,7 @@
       await Promise.all((ids || []).slice(0, 8).map(async id => {
         out[id] = null;
         try {
-          const meta = await (await drive('files/' + encodeURIComponent(id) + '?fields=thumbnailLink')).json();
+          const meta = await storage().meta(id, 'thumbnailLink');
           if (!meta.thumbnailLink) return;
           const url = meta.thumbnailLink.replace(/=s\d+$/, '=s400');
           try {
@@ -781,7 +772,7 @@
   let prefsId = null;
   async function readPrefs() {
     if (prefsId) {
-      try { return JSON.parse(await (await drive('files/' + encodeURIComponent(prefsId) + '?alt=media')).text()); } catch (e) {
+      try { return JSON.parse(await textOf(prefsId)); } catch (e) {
         if (e.offline) throw e;
         prefsId = null;
       }
@@ -795,7 +786,7 @@
   async function writePrefs(value) {
     if (prefsId) {
       try {
-        await drive('files/' + encodeURIComponent(prefsId) + '?uploadType=media&fields=id', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(value) }, UPLOAD);
+        await storage().replace(prefsId, JSON.stringify(value), 'application/json', 'id');
         return;
       } catch (e) { if (e.offline) throw e; prefsId = null; }
     }
@@ -850,7 +841,7 @@
   async function folderName(id) {
     if (!id) return '';
     if (!(id in names)) {
-      try { names[id] = (await (await drive('files/' + encodeURIComponent(id) + '?fields=name')).json()).name; } catch (e) { return ''; }
+      try { names[id] = (await storage().meta(id, 'name')).name; } catch (e) { return ''; }
     }
     return names[id];
   }
