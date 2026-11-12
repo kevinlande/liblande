@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-12.14';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-12.15';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -427,11 +427,19 @@ function openLinkTake() {
   } catch (err) { /* (as above) */ }
 }
 openLinkTake();
-function openFromLink() {
+async function openFromLink() {
   let p = null;
   try { p = JSON.parse(sessionStorage.getItem(OPEN_LINK_KEY) || 'null'); sessionStorage.removeItem(OPEN_LINK_KEY); } catch (err) { p = null; }
   if (!p || !p.k) return;
-  const e = BYKEY.get(p.k);
+  let e = BYKEY.get(p.k);
+  // (Not in the library as it opened: one just added in Word, say. The
+  // .bib checked for changes first, and the library built again.)
+  if (!e) {
+    toast('Looking for \u201c' + p.k + '\u201d in your .bib\u2026', 0, null, true);
+    await rebuildNow();
+    toast('', 1);
+    e = BYKEY.get(p.k);
+  }
   if (!e) { toast('\u201c' + p.k + '\u201d isn\u2019t in your library.', 6000); return; }
   if (sheet) closeSheet();
   // (Shown in the list: the search cleared, or All, if it's not there.)
