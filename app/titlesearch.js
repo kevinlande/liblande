@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/titlesearch.js'] = '2026-11-12.11';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/titlesearch.js'] = '2026-11-12.12';
 /* ------------------------------------------------------------ title search */
 // A title (with an author or a year, if you like) typed in Add's lookup
 // box, instead of a DOI: candidates from Crossref (articles, chapters, and
@@ -126,7 +126,8 @@ const TS_SOURCES = [['Crossref', tsCrossref], ['OpenAlex', tsOpenAlex], ['Open L
 // Merged: one for each DOI, or else each title by the same first author
 // (the one with a DOI kept, or else Open Library's, whose books are
 // better than OpenAlex's); scored by how much of what you typed is in its
-// title, authors and year, and how much of its title you typed. A book
+// title, authors and year (an author most), and how much of its title
+// you typed. A book
 // review (an article with a book's title, or seen to be one) is marked,
 // and put below.
 function tsMerge(q, found) {
@@ -149,9 +150,13 @@ function tsMerge(q, found) {
   const books = new Set(out.filter(c => c.type === 'book').map(c => plainTitle(c.title)));
   out.forEach(c => {
     if (c.type === 'article' && books.has(plainTitle(c.title))) c.review = true;
-    const tw = tsWords(c.title), all = new Set(tw.concat(tsWords(c.people.map(tsFamily).join(' ')), [c.year]));
+    const fam = new Set(tsWords(c.people.map(tsFamily).join(' '))), tw = tsWords(c.title), all = new Set(tw.concat([...fam], [c.year]));
     const hit = [...qw].filter(w => all.has(w)).length;
-    c.score = (qw.size ? 2 * hit / qw.size : 0) + (tw.length ? tw.filter(w => qw.has(w)).length / tw.length : 0) - c.rank * 0.02 - (c.review ? 0.6 : 0);
+    // (A word typed that's one of its authors counts more: "kuhn
+    // structure" is Kuhn's book before the many works on "Kuhn's
+    // Structure".)
+    const byAuthor = [...qw].some(w => fam.has(w));
+    c.score = (qw.size ? 2 * hit / qw.size : 0) + (tw.length ? tw.filter(w => qw.has(w)).length / tw.length : 0) + (byAuthor ? 0.5 : 0) - c.rank * 0.02 - (c.review ? 0.6 : 0);
     // (With "author:", one of its names must be among the authors; with
     // "title:", most of its words in the title.)
     const names = new Set(tsWords(c.people.join(' ')));
