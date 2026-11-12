@@ -246,19 +246,32 @@
     }
   }
 
-  /* ---- the document's citations (Word) */
+  /* ---- the document: Word's (Google Docs gives the same calls) */
+  // D, the document the panel works in (null in a browser, as when testing):
+  //  readState(), saveState(v): what's kept with the document (its
+  //    citations' works, the style, the group tabs);
+  //  refresh(render, force): its citations found (render(ids) gives their
+  //    texts and the References list) and those changed rewritten; the
+  //    list rewritten if what it says changed (or force). Answers {hasRefs};
+  //  insert(id, text): a citation at the selection (never inside another),
+  //    the cursor after it;
+  //  goAfter(id): the cursor after a citation;
+  //  remove(id, restore): a citation taken out (restore: text in its place);
+  //  insertRefs(refsOf): the References list made at the cursor (refsOf()
+  //    gives it), or gone to if there is one: 'made' or 'went';
+  //  watch(cb): cb(tag, where) as the selection moves: tag the citation's
+  //    ("LL:<id>", "LL:refs") or '', where {text, para, at} for a selection
+  //    in no citation (or null).
+  let D = null;
   const SETTINGS = 'liblande';
-  function readSettings() {
-    try { const v = Office.context.document.settings.get(SETTINGS); S.cites = (v && v.cites) || {}; S.style = (v && v.style) || 'apa'; S.tabsG = (v && v.groups) || []; } catch (e) { S.cites = {}; S.style = 'apa'; S.tabsG = []; }
+  async function readSettings() {
+    let v = null;
+    try { v = D ? await D.readState() : null; } catch (e) { v = null; }
+    S.cites = (v && v.cites) || {}; S.style = (v && v.style) || 'apa'; S.tabsG = (v && v.groups) || [];
     if ($('style')) $('style').value = S.style;
   }
   function saveSettings() {
-    return new Promise(ok => {
-      try {
-        Office.context.document.settings.set(SETTINGS, { v: 1, cites: S.cites, style: S.style, groups: S.tabsG });
-        Office.context.document.settings.saveAsync(() => ok());
-      } catch (e) { ok(); }
-    });
+    return D ? D.saveState({ v: 1, cites: S.cites, style: S.style, groups: S.tabsG }).catch(() => {}) : Promise.resolve();
   }
   const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   // The citations in the document now (some may have been deleted, or
@@ -272,74 +285,78 @@
   // Every citation's text and the References list, written where they've
   // changed. (After an insert, and when the panel opens.)
   async function refreshDocument(force) {
-    if (!S.inWord || !S.entries.length) return;
+    if (!D || !S.entries.length) return;
     await styleReady();
-    await Word.run(async ctx => {
-      const ccs = ctx.document.contentControls;
-      ccs.load('items/tag,items/text');
-      await ctx.sync();
-      const mine = ccs.items.filter(c => /^LL:/.test(c.tag));
-      S.present = mine.map(c => c.tag.slice(3)).filter(id => id !== 'refs');
-      const out = renderAll(presentCites(), S.byKey);
-      mine.forEach(c => {
-        const id = c.tag.slice(3);
-        if (id === 'refs') return;
-        const want = out.texts[id];
-        if (want && c.text !== want) c.insertText(want, 'Replace');
-      });
-      const list = mine.find(c => c.tag === 'LL:refs');
-      // (The list rewritten only when what it says has changed: compared
-      // with its text in the document itself.)
-      const flat = t => String(t || '').replace(/\s+/g, ' ').trim();
-      S.hasRefs = !!list;
-      await ctx.sync();
-      if (list && (force || flat(list.text) !== flat(out.refs.length ? out.refs.map(r => r.text).join(' ') : NO_REFS))) await writeRefs(ctx, list, out.refs);
-    });
+    const r = await D.refresh(ids => { S.present = ids; return renderAll(presentCites(), S.byKey); }, force);
+    S.hasRefs = r.hasRefs;
     paintRefs();
     paintResults();
   }
-  // The References list written into its content control as text, in the
-  // document's own font (as typed there), titles in italics, each entry
-  // with APA's half-inch hanging indent.
   const NO_REFS = '(No works cited yet.)';
-  async function writeRefs(ctx, cc, refs) {
-    // (The font of the text before the list, or else the document's first
-    // paragraph: set on every run, since an emptied list keeps whatever font
-    // it had, as Word's own default from an earlier version of it.)
-    const before = cc.paragraphs.getFirst().getPreviousOrNullObject();
-    before.load('font/name,font/size,isNullObject');
-    const first = ctx.document.body.paragraphs.getFirst();
-    first.load('font/name,font/size');
-    await ctx.sync();
-    const f = !before.isNullObject && before.font.name ? before.font : first.font;
-    const style = r => { r.font.italic = false; if (f.name) r.font.name = f.name; if (f.size) r.font.size = f.size; return r; };
-    cc.clear();
-    await ctx.sync();
-    if (!refs.length) style(cc.insertText(NO_REFS, 'End'));
-    refs.forEach((r, i) => {
-      if (i) style(cc.insertText('\n', 'End'));
-      const parts = r.parts.map(p => ({ t: p.t.replace(/\s+/g, ' '), i: p.i }));
-      if (parts.length) { parts[0].t = parts[0].t.replace(/^ /, ''); parts[parts.length - 1].t = parts[parts.length - 1].t.replace(/ $/, ''); }
-      parts.forEach(p => { if (p.t) style(cc.insertText(p.t, 'End')).font.italic = !!p.i; });
-    });
-    await ctx.sync();
-    const paras = cc.paragraphs;
-    paras.load('items');
-    await ctx.sync();
-    paras.items.forEach(p => { p.leftIndent = 36; p.firstLineIndent = -36; });
-    await ctx.sync();
-  }
 
-  async function insertCitation(given) {
-    const c = given || currentCite();
-    if (!c.items.length) return;
-    hideErr('citeErr');
-    const id = newId();
-    try { await styleReady(); } catch (e) { showErr('citeErr', e.message); return; }
-    const all = Object.assign({}, presentCites(), { [id]: c });
-    const text = renderAll(all, S.byKey).texts[id];
-    try {
-      await Word.run(async ctx => {
+  // Word's: content controls tagged "LL:<id>" (and "LL:refs"), the
+  // settings in the document's own.
+  function wordDoc() {
+    // The References list written into its content control as text, in the
+    // document's own font (as typed there), titles in italics, each entry
+    // with APA's half-inch hanging indent.
+    async function writeRefs(ctx, cc, refs) {
+      // (The font of the text before the list, or else the document's first
+      // paragraph: set on every run, since an emptied list keeps whatever font
+      // it had, as Word's own default from an earlier version of it.)
+      const before = cc.paragraphs.getFirst().getPreviousOrNullObject();
+      before.load('font/name,font/size,isNullObject');
+      const first = ctx.document.body.paragraphs.getFirst();
+      first.load('font/name,font/size');
+      await ctx.sync();
+      const f = !before.isNullObject && before.font.name ? before.font : first.font;
+      const style = r => { r.font.italic = false; if (f.name) r.font.name = f.name; if (f.size) r.font.size = f.size; return r; };
+      cc.clear();
+      await ctx.sync();
+      if (!refs.length) style(cc.insertText(NO_REFS, 'End'));
+      refs.forEach((r, i) => {
+        if (i) style(cc.insertText('\n', 'End'));
+        const parts = r.parts.map(p => ({ t: p.t.replace(/\s+/g, ' '), i: p.i }));
+        if (parts.length) { parts[0].t = parts[0].t.replace(/^ /, ''); parts[parts.length - 1].t = parts[parts.length - 1].t.replace(/ $/, ''); }
+        parts.forEach(p => { if (p.t) style(cc.insertText(p.t, 'End')).font.italic = !!p.i; });
+      });
+      await ctx.sync();
+      const paras = cc.paragraphs;
+      paras.load('items');
+      await ctx.sync();
+      paras.items.forEach(p => { p.leftIndent = 36; p.firstLineIndent = -36; });
+      await ctx.sync();
+    }
+    let selTimer = 0;
+    return {
+      readState: async () => Office.context.document.settings.get(SETTINGS),
+      saveState: v => new Promise(ok => {
+        try {
+          Office.context.document.settings.set(SETTINGS, v);
+          Office.context.document.settings.saveAsync(() => ok());
+        } catch (e) { ok(); }
+      }),
+      refresh: (render, force) => Word.run(async ctx => {
+        const ccs = ctx.document.contentControls;
+        ccs.load('items/tag,items/text');
+        await ctx.sync();
+        const mine = ccs.items.filter(c => /^LL:/.test(c.tag));
+        const out = render(mine.map(c => c.tag.slice(3)).filter(id => id !== 'refs'));
+        mine.forEach(c => {
+          const id = c.tag.slice(3);
+          if (id === 'refs') return;
+          const want = out.texts[id];
+          if (want && c.text !== want) c.insertText(want, 'Replace');
+        });
+        const list = mine.find(c => c.tag === 'LL:refs');
+        // (The list rewritten only when what it says has changed: compared
+        // with its text in the document itself.)
+        const flat = t => String(t || '').replace(/\s+/g, ' ').trim();
+        await ctx.sync();
+        if (list && (force || flat(list.text) !== flat(out.refs.length ? out.refs.map(r => r.text).join(' ') : NO_REFS))) await writeRefs(ctx, list, out.refs);
+        return { hasRefs: !!list };
+      }),
+      insert: (id, text) => Word.run(async ctx => {
         const sel = ctx.document.getSelection();
         const inside = sel.parentContentControlOrNullObject;
         inside.load('tag');
@@ -354,7 +371,84 @@
         await ctx.sync();
         cc.getRange('After').select();
         await ctx.sync();
-      });
+      }),
+      goAfter: id => Word.run(async ctx => {
+        const ccs = ctx.document.contentControls.getByTag('LL:' + id);
+        ccs.load('items');
+        await ctx.sync();
+        if (ccs.items.length) { ccs.items[0].getRange('After').select(); await ctx.sync(); }
+      }),
+      remove: (id, restore) => Word.run(async ctx => {
+        const ccs = ctx.document.contentControls.getByTag('LL:' + id);
+        ccs.load('items');
+        await ctx.sync();
+        ccs.items.forEach(cc => { if (restore) { cc.insertText(restore, 'Replace'); cc.delete(true); } else cc.delete(false); });
+        await ctx.sync();
+      }),
+      insertRefs: refsOf => Word.run(async ctx => {
+        const ccs = ctx.document.contentControls.getByTag('LL:refs');
+        ccs.load('items');
+        await ctx.sync();
+        if (ccs.items.length) { ccs.items[0].select('Start'); await ctx.sync(); return 'went'; }
+        // (Its own paragraph: the one the cursor is in, if empty, or a new
+        // one after it.)
+        const para = ctx.document.getSelection().paragraphs.getFirst();
+        para.load('text');
+        await ctx.sync();
+        const target = para.text.trim() ? para.insertParagraph('', 'After') : para;
+        const cc = target.getRange('Whole').insertContentControl();
+        cc.tag = 'LL:refs';
+        cc.title = 'LibLande References';
+        cc.appearance = 'BoundingBox';
+        await ctx.sync();
+        await writeRefs(ctx, cc, refsOf());
+        return 'made';
+      }),
+      watch(cb) {
+        Office.context.document.addHandlerAsync(Office.EventType.DocumentSelectionChanged, () => {
+          clearTimeout(selTimer);
+          selTimer = setTimeout(async () => {
+            let tag = '', where = null;
+            try {
+              await Word.run(async ctx => {
+                const sel = ctx.document.getSelection();
+                const cc = sel.parentContentControlOrNullObject;
+                cc.load('tag');
+                await ctx.sync();
+                tag = cc.isNullObject ? '' : cc.tag || '';
+                if (tag) return;
+                // (Where the selection is in its paragraph, for a citation typed
+                // there: the paragraph's text, and how much of it comes before.
+                // Not to be had for every selection, as one over a picture.)
+                try {
+                  sel.load('text');
+                  const para = sel.paragraphs.getFirst();
+                  para.load('text');
+                  const before = para.getRange('Start').expandTo(sel.getRange('Start'));
+                  before.load('text');
+                  await ctx.sync();
+                  where = { text: sel.text || '', para: para.text || '', at: (before.text || '').length };
+                } catch (e) { where = null; }
+              });
+            } catch (e) { return; }
+            cb(tag, where);
+          }, 200);
+        });
+      },
+    };
+  }
+
+  async function insertCitation(given) {
+    const c = given || currentCite();
+    if (!c.items.length) return;
+    hideErr('citeErr');
+    const id = newId();
+    try { await styleReady(); } catch (e) { showErr('citeErr', e.message); return; }
+    const all = Object.assign({}, presentCites(), { [id]: c });
+    const text = renderAll(all, S.byKey).texts[id];
+    try {
+      if (!D) throw new Error('there\u2019s no document to put it in.');
+      await D.insert(id, text);
     } catch (e) { showErr('citeErr', 'Couldn\u2019t insert it: ' + wordError(e)); return null; }
     S.cites[id] = c;
     if (S.present) S.present.push(id);
@@ -395,47 +489,22 @@
     clearChosen();
     paintResults();
   }
-  let selTimer = 0;
-  function onSelection() {
-    clearTimeout(selTimer);
-    selTimer = setTimeout(async () => {
-      let tag = '', where = null;
-      try {
-        await Word.run(async ctx => {
-          const sel = ctx.document.getSelection();
-          const cc = sel.parentContentControlOrNullObject;
-          cc.load('tag');
-          await ctx.sync();
-          tag = cc.isNullObject ? '' : cc.tag || '';
-          if (tag) return;
-          // (Where the selection is in its paragraph, for a citation typed
-          // there: the paragraph's text, and how much of it comes before.
-          // Not to be had for every selection, as one over a picture.)
-          try {
-            sel.load('text');
-            const para = sel.paragraphs.getFirst();
-            para.load('text');
-            const before = para.getRange('Start').expandTo(sel.getRange('Start'));
-            before.load('text');
-            await ctx.sync();
-            where = { text: sel.text || '', para: para.text || '', at: (before.text || '').length };
-          } catch (e) { where = null; }
-        });
-      } catch (e) { return; }
-      const id = /^LL:/.test(tag) && tag !== 'LL:refs' ? tag.slice(3) : '';
-      if (!id || !S.cites[id]) {
-        S.skipEdit = null;
-        if (S.editing && !S.dirty) leaveEdit();
-        if (!tag && where) noticeSelection(where); else hideSelCard();
-        return;
-      }
-      hideSelCard();
-      // (Not the one just inserted or updated, with the cursor after it;
-      // and not over a new citation being made, or changes not yet saved.)
-      if (id === S.editing || id === S.skipEdit) return;
-      if (S.editing ? S.dirty : S.chosen.length) return;
-      enterEdit(id);
-    }, 200);
+  // The selection moved (D.watch): a citation under it opens for editing;
+  // selected text, or a typed citation, is shown at the top of Cite.
+  function onDocSelection(tag, where) {
+    const id = /^LL:/.test(tag) && tag !== 'LL:refs' ? tag.slice(3) : '';
+    if (!id || !S.cites[id]) {
+      S.skipEdit = null;
+      if (S.editing && !S.dirty) leaveEdit();
+      if (!tag && where) noticeSelection(where); else hideSelCard();
+      return;
+    }
+    hideSelCard();
+    // (Not the one just inserted or updated, with the cursor after it;
+    // and not over a new citation being made, or changes not yet saved.)
+    if (id === S.editing || id === S.skipEdit) return;
+    if (S.editing ? S.dirty : S.chosen.length) return;
+    enterEdit(id);
   }
   /* ---- a citation typed by hand, selected (or the cursor in it): linked */
   // The Cite tab shows it at the top with the works it could be (engine.js
@@ -611,12 +680,7 @@
     await saveSettings();
     try {
       await refreshDocument();
-      await Word.run(async ctx => {
-        const ccs = ctx.document.contentControls.getByTag('LL:' + id);
-        ccs.load('items');
-        await ctx.sync();
-        if (ccs.items.length) { ccs.items[0].getRange('After').select(); await ctx.sync(); }
-      });
+      if (D) await D.goAfter(id);
     } catch (e) { showErr('citeErr', 'Couldn\u2019t update it: ' + wordError(e)); return; }
     S.skipEdit = id;
     leaveEdit();
@@ -628,13 +692,7 @@
     if (!id) return;
     hideErr('citeErr');
     try {
-      await Word.run(async ctx => {
-        const ccs = ctx.document.contentControls.getByTag('LL:' + id);
-        ccs.load('items');
-        await ctx.sync();
-        ccs.items.forEach(cc => cc.delete(false));
-        await ctx.sync();
-      });
+      if (D) await D.remove(id);
     } catch (e) { showErr('citeErr', 'Couldn\u2019t remove it: ' + wordError(e)); return; }
     if (S.present) S.present = S.present.filter(x => x !== id);
     leaveEdit();
@@ -651,25 +709,8 @@
   async function insertOrGoToRefs() {
     hideErr('refsErr');
     try {
-      await Word.run(async ctx => {
-        const ccs = ctx.document.contentControls.getByTag('LL:refs');
-        ccs.load('items');
-        await ctx.sync();
-        if (ccs.items.length) { ccs.items[0].select('Start'); await ctx.sync(); return; }
-        const out = renderAll(presentCites(), S.byKey);
-        // (Its own paragraph: the one the cursor is in, if empty, or a new
-        // one after it.)
-        const para = ctx.document.getSelection().paragraphs.getFirst();
-        para.load('text');
-        await ctx.sync();
-        const target = para.text.trim() ? para.insertParagraph('', 'After') : para;
-        const cc = target.getRange('Whole').insertContentControl();
-        cc.tag = 'LL:refs';
-        cc.title = 'LibLande References';
-        cc.appearance = 'BoundingBox';
-        await ctx.sync();
-        await writeRefs(ctx, cc, out.refs);
-      });
+      if (!D) throw new Error('there\u2019s no document to put it in.');
+      await D.insertRefs(() => renderAll(presentCites(), S.byKey).refs);
       S.hasRefs = true;
       paintRefs();
     } catch (e) { showErr('refsErr', 'Couldn\u2019t put the list there: ' + wordError(e)); }
@@ -1415,15 +1456,7 @@
     try {
       const edits = await loadEdits();
       await edits.saveEntries({ items: [], removes: [{ key: c.e.k, expectHash: c.hash }], modified: bibdeskTime(), backupName: fileTime() });
-      if (c.id && S.inWord) {
-        await Word.run(async ctx => {
-          const ccs = ctx.document.contentControls.getByTag('LL:' + c.id);
-          ccs.load('items');
-          await ctx.sync();
-          ccs.items.forEach(cc => { if (c.replaced) { cc.insertText(c.replaced, 'Replace'); cc.delete(true); } else cc.delete(false); });
-          await ctx.sync();
-        });
-      }
+      if (c.id && D) await D.remove(c.id, c.replaced);
       if (c.id) {
         delete S.cites[c.id];
         if (S.present) S.present = S.present.filter(x => x !== c.id);
@@ -2027,7 +2060,7 @@
       hideErr('citeErr'); hideErr('refsErr');
       try {
         if (tokenOk() && navigator.onLine) { try { await fetchLibrary(false); } catch (e) { /* the copy here will do */ } }
-        readSettings();
+        await readSettings();
         await refreshDocument(true);
         search();
         readZotero();
@@ -2053,12 +2086,11 @@
 
   async function start() {
     wire();
-    if (S.inWord) {
-      try { Office.context.document.addHandlerAsync(Office.EventType.DocumentSelectionChanged, onSelection); } catch (e) { /* editing by cursor then unavailable */ }
-    }
+    if (S.inWord) D = wordDoc();
+    if (D) { try { D.watch(onDocSelection); } catch (e) { /* editing by cursor then unavailable */ } }
     paintOffline();
     paintAccount();
-    readSettings();
+    await readSettings();
     // The library kept here opens at once; Drive is asked for a newer one.
     const kept = await idb.get();
     if (kept && kept.gz) {
