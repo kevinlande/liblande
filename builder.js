@@ -19,7 +19,7 @@
  */
 (function (root) {
   'use strict';
-  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).builder = '2026-11-12.08';
+  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).builder = '2026-11-12.09';
   const FOLDER = 'application/vnd.google-apps.folder';
   const DATA_FOLDER = 'LibLande', LIBRARY_FILE = 'library.json.gz', INDEX_FILE = 'file-index.json',
     SETTINGS_FILE = 'settings.json', INBOX_FOLDER = 'Inbox', INBOX_FILE = 'LibLande inbox.bib';
@@ -397,9 +397,14 @@
       const bibStamp = String(Date.parse(bib.modifiedTime));
       const inboxStamp = inbox ? String(Date.parse(inbox.modifiedTime)) : '';
       const fullDue = !!o.daily && Date.now() - Number(lp.lastFull || 0) > FULL_CHECK_MS;
-      const current = lp.buildVersion === String(BUILD_VERSION);
+      // (A library built with the other access, full or limited, is built
+      // again: a full one links PDFs limited access can't open, a limited
+      // one misses some full access can. One LibLande folder used by both
+      // kinds of device: built again at each change of kind.)
+      const limited = !!(io.limited && io.limited());
+      const current = lp.buildVersion === String(BUILD_VERSION) && (lp.limited || '') === (limited ? '1' : '');
       const needed = !!o.force || !lib || fullDue || !current || lp.bibStamp !== bibStamp || (lp.inboxStamp || '') !== inboxStamp;
-      return { configured: true, needed, s, folder, bib, inboxFolder, inbox, lib, lp, bibStamp, inboxStamp, fullDue, current };
+      return { configured: true, needed, s, folder, bib, inboxFolder, inbox, lib, lp, bibStamp, inboxStamp, fullDue, current, limited };
     }
 
     async function build(o, w) {
@@ -409,6 +414,7 @@
       w = w || await look(o);
       if (!w.configured || !w.needed) return false;
       const { s, folder, bib, inboxFolder, inbox, lib, lp, bibStamp, inboxStamp, fullDue, current } = w;
+      const limited = !!w.limited;
       // The .bib (11 MB, say) starts downloading now, alongside the rest,
       // when it changed (not for the daily look at the papers folder,
       // which may find nothing new).
@@ -429,7 +435,8 @@
       if (indexFile && !o.force) {
         try {
           const saved = JSON.parse(await textAt(indexFile.id, indexFile.modifiedTime));
-          if (saved.papersId === papersId && saved.prefix === prefix && saved.files && saved.folders) index = saved;
+          // (Not one listed with the other access.)
+          if (saved.papersId === papersId && saved.prefix === prefix && saved.files && saved.folders && !!saved.limited === limited) index = saved;
         } catch (e) { /* list it again */ }
       }
       const fullListing = !index || fullDue;
@@ -439,6 +446,7 @@
         const loose = io.limited && io.limited() ? await looseFiles(tree, await awayFolders(s, folder, bib, papersId)) : null;
         index = { papersId, prefix, files: tree.files, folders: tree.folders };
         if (loose) index.loose = loose;
+        if (limited) index.limited = true;
         index.hash = indexHashOf(index);
         await writeIndex(folder, index);
         lastFull = String(Date.now());
@@ -455,7 +463,8 @@
       // (Listed while the .bib downloads: see readTexts.)
       const inboxHash = indexHash(inboxPaths);
       const signature = fingerprint_(bibStamp + ':' + inboxStamp + ':' + papersId + ':' + index.hash + ':' + inboxHash);
-      const props = { bibStamp, inboxStamp, signature, buildVersion: String(BUILD_VERSION), lastFull };
+      // (null: the mark taken off a library built again with full access.)
+      const props = { bibStamp, inboxStamp, signature, buildVersion: String(BUILD_VERSION), lastFull, limited: limited ? '1' : null };
       // Nothing that matters changed (the daily listing found no new
       // files): note what was checked, and leave the library as it is.
       if (!o.force && lib && current && lp.signature === signature) {
@@ -470,7 +479,6 @@
       if (inboxText != null) job.inbox = { text: inboxText, ids: inboxPaths, opts: { built: 0, source: INBOX_FILE, papersPrefix: '' } };
       // (Limited access: the library's parts always back, for the folders
       // LibLande can't see.)
-      const limited = !!(io.limited && io.limited());
       if (limited) job.keep = true;
       const out = await parse(job);
       mark('parsed');

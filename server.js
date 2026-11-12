@@ -17,7 +17,7 @@
   window.LIBLANDE_PAGES = true;
   // (Which version each part of the app is from: index.html checks they
   // match. build.py fills it in.)
-  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-11-12.08';
+  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-11-12.09';
   const CLIENT_ID = '789682218462-98mjugngb46ttd01ucp9dcj71ufspjgn.apps.googleusercontent.com';
   // Google Drive, in one of two ways (docs/drive-file-plan.md):
   // full: all of Drive (your .bib, papers and LibLande folder wherever
@@ -451,7 +451,7 @@
     async adoptDataFolder() {
       // (The ones LibLande sees already are those it made itself.)
       const mine = new Set((await builder.listAll('name = ' + q(DATA_FOLDER) + " and 'root' in parents and mimeType = '" + FOLDER + "' and trashed = false", 'id')).map(f => f.id));
-      const [folder] = await pick({ what: 'folder', query: DATA_FOLDER, title: 'Select your earlier LibLande folder, in My Drive, then Select' });
+      const [folder] = await pick({ what: 'folder', query: DATA_FOLDER, title: 'Select your earlier LibLande folder (My Drive \u203a LibLande, with Backups, Inbox and Exports in it), then Select' });
       if (!folder) return { adopted: false };
       if (folder.name !== DATA_FOLDER) throw new Error('That folder is \u201c' + folder.name + '\u201d. Choose the one named LibLande, in My Drive.');
       if (mine.has(folder.id)) throw new Error('That\u2019s the LibLande folder made with limited access. Choose the other one named LibLande, the earlier one.');
