@@ -56,10 +56,11 @@
 
   /* ---- signing in (Google's own sign-in, from the panel) */
   let token = store.get('token', null);
-  // (A panel signed in before there was a choice had full access.)
-  // (Offered once limited access can set up a library: until then, full.)
-  const OFFER_LIMITED = false;
-  let access = store.get('access', token || !OFFER_LIMITED ? 'full' : null);
+  // (A panel signed in before there was a choice had full access, though
+  // its token may have gone: a remembered email says so. One never signed
+  // in asks.)
+  let access = store.get('access', token || store.get('email', null) ? 'full' : null);
+  if (access === 'full' && !store.get('access', null)) store.set('access', access);
   const tokenOk = () => token && token.exp > Date.now();
   let gisReady = null;
   function loadGis() {
@@ -1897,7 +1898,7 @@
       try { if (token && window.google && google.accounts) google.accounts.oauth2.revoke(token.value, () => {}); } catch (e) { /* gone anyway */ }
       token = null; store.set('token', null); store.set('email', null); store.set('libStamp', null);
       // (Whoever signs in next chooses full or limited access again.)
-      access = OFFER_LIMITED ? null : 'full'; store.set('access', null);
+      access = null; store.set('access', null);
       await idb.clear();
       S.entries = []; S.byKey = new Map(); S.index = [];
       paintAccount();

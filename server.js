@@ -17,7 +17,7 @@
   window.LIBLANDE_PAGES = true;
   // (Which version each part of the app is from: index.html checks they
   // match. build.py fills it in.)
-  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-11-12.05';
+  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-11-12.06';
   const CLIENT_ID = '789682218462-98mjugngb46ttd01ucp9dcj71ufspjgn.apps.googleusercontent.com';
   // Google Drive, in one of two ways (docs/drive-file-plan.md):
   // full: all of Drive (your .bib, papers and LibLande folder wherever
@@ -49,11 +49,8 @@
   // Which access this device uses. (A device signed in before there was a
   // choice has full access; one never signed in asks, at sign-in.)
   let access = store.get('access', null);
-  if (!access && token && token.scope === SCOPES.full) { access = 'full'; store.set('access', access); }
-  // (Until limited access can set up a library, the choice is offered only
-  // on a device that has opened LibLande with ?limited in its address.)
-  if (/[?&]limited\b/.test(location.search)) store.set('offerLimited', true);
-  if (!access && !store.get('offerLimited', false)) access = 'full';
+  // (Its token may have gone; a remembered email says it signed in.)
+  if (!access && ((token && token.scope === SCOPES.full) || store.get('email', ''))) { access = 'full'; store.set('access', access); }
   const scope = () => SCOPES[access || 'full'];
   // (One asked for with other permissions is asked for again.)
   if (token && token.scope !== scope()) token = null;
@@ -177,14 +174,15 @@
     chooserEl.setAttribute('role', 'dialog');
     chooserEl.setAttribute('aria-label', 'Sign in with Google');
     chooserEl.style.cssText = 'position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;padding:16px;background:rgba(0,0,0,.18);font:15px/1.4 -apple-system,BlinkMacSystemFont,sans-serif';
-    const opt = (key, title, sub, primary) => '<button type="button" data-access="' + key + '" style="display:grid;gap:2px;width:100%;text-align:left;padding:12px 14px;border-radius:12px;cursor:pointer;font:inherit;' +
+    const opt = (key, title, sub, best, primary) => '<button type="button" data-access="' + key + '" style="display:grid;gap:2px;width:100%;text-align:left;padding:12px 14px;border-radius:12px;cursor:pointer;font:inherit;' +
       (primary ? 'background:#1f6b5c;color:#fff;border:1px solid #1f6b5c' : 'background:' + card + ';color:' + ink + ';border:1px solid ' + line) + '">' +
-      '<b style="font-size:15px">' + title + '</b><span style="font-size:13px;opacity:.85">' + sub + '</span></button>';
+      '<b style="font-size:15px">' + title + '</b><span style="font-size:13px;opacity:.85">' + sub + '</span><span style="font-size:13px;opacity:.85">' + best + '</span></button>';
     chooserEl.innerHTML = '<div style="width:min(380px,100%);display:grid;gap:10px;padding:20px;border-radius:16px;background:' + card + ';color:' + ink + ';box-shadow:0 12px 40px rgba(0,0,0,.25)">' +
       '<b style="font-size:18px">Sign in with Google</b>' +
       '<span style="color:' + muted + ';font-size:13.5px">How much of your Google Drive LibLande can reach.</span>' +
-      opt('limited', 'Limited access', 'Only the files you give LibLande: your .bib and its PDFs, chosen once.', true) +
-      opt('full', 'Full access', 'All of your Google Drive, with nothing to choose. Google warns that LibLande isn\u2019t verified.', false) +
+      opt('limited', 'Limited access', 'Only the files you give LibLande: your .bib and its PDFs, chosen once.', '(Best for a new, Zotero or small library.)', true) +
+      opt('full', 'Full access', 'All of your Google Drive, with nothing to choose. Google warns that LibLande isn\u2019t verified.', '(Best for a large library you also edit in other apps.)', false) +
+      '<a href="privacy.html#access" target="_blank" rel="noopener" style="justify-self:start;color:' + muted + ';font-size:13px">What each allows</a>' +
       '</div>';
     chooserEl.addEventListener('click', ev => {
       const b = ev.target.closest('[data-access]');
@@ -490,8 +488,7 @@
     // Sign out of this device: changes kept here for Drive go first (or
     // it stops, saying so); then Google's permission is given back and
     // what this file keeps on the device (sign-in, access, kept lists) is
-    // forgotten. (Whether the full-or-limited choice is offered stays: it
-    // isn't the account's.) The page clears its own part, then reloads.
+    // forgotten. The page clears its own part, then reloads.
     async signOut() {
       if (freshOutbox().length) {
         await flushOutbox().catch(() => {});
@@ -501,11 +498,9 @@
       if (t && t.value && window.google && google.accounts && google.accounts.oauth2) {
         try { google.accounts.oauth2.revoke(t.value, () => {}); } catch (e) { /* forgotten here anyway */ }
       }
-      const offer = store.get('offerLimited', false);
       try {
         Object.keys(localStorage).filter(k => k.indexOf('liblande.pages.') === 0).forEach(k => localStorage.removeItem(k));
       } catch (e) { /* private mode */ }
-      if (offer) store.set('offerLimited', true);
       token = null; client = null; access = null; email = '';
       return { ok: true };
     },

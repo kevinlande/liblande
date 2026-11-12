@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-11-12.05';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-11-12.06';
 /* -------------------------------------------------------------- features */
 // What LibLande does, by area: each feature, what it's for, where to find
 // it, its icon (see featIcon), and other words it's found by (as "tag"
@@ -11,7 +11,9 @@
 // features come and go.
 const FEATURES = [
   { area: 'Getting started', items: [
-    ['Your BibDesk library, anywhere', 'Your .bib and its PDFs on Google Drive, on any computer, iPad or iPhone. Changes go back into the .bib, so BibDesk opens it as before.', 'Sign in with Google, then give the .bib\u2019s link', 'path:M7.5 18.5h9.8a3.7 3.7 0 0 0 .6-7.35A5.6 5.6 0 0 0 7.2 9.6a4.45 4.45 0 0 0 .3 8.9z', 'setup sign in bibtex drive import'],
+    ['Your BibDesk library, anywhere', 'Your .bib and its PDFs on Google Drive, on any computer, iPad or iPhone. Changes go back into the .bib, so BibDesk opens it as before.', 'Sign in with Google, then choose your .bib', 'path:M7.5 18.5h9.8a3.7 3.7 0 0 0 .6-7.35A5.6 5.6 0 0 0 7.2 9.6a4.45 4.45 0 0 0 .3 8.9z', 'setup sign in bibtex drive import'],
+    ['Limited access', 'Give LibLande only your library: the .bib, its folders and its PDFs, chosen in Google\u2019s picker. The rest of your Google Drive stays out of reach, and Google shows no warning. Or full access, with nothing to choose.', 'Chosen at the first sign-in; Settings \u203a Library \u203a Google account', 'path:M7 10.5V8a5 5 0 0 1 10 0v2.5M5.5 10.5h13v9.5h-13zM12 14v2.5', 'drive.file permission privacy picker unverified warning'],
+    ['Add papers', 'With limited access: PDFs (and author folders) BibDesk added since are counted, and LibLande offers to add them; choose them in Google\u2019s picker and they\u2019re linked.', 'Settings \u203a Library \u203a Add papers; the message when the library opens', 'path:M5.5 3.5h9l4 4v13h-13zM14.5 3.5v4h4M12 10.5v6M9 13.5h6', 'limited access link pdfs new folder grant'],
     ['From Zotero, or from nothing', 'Bring in a Zotero library: its BibTeX export, with its files, becomes a new library in your Google Drive, each PDF filed and linked as BibDesk would. Or start with an empty one.', 'At setup; later, Settings \u203a Library \u203a Import from Zotero', 'path:M5 5.5h14L5 18.5h14', 'zotero import export new empty start'],
     ['Sign out', 'Sign out of one device: its Google sign-in, settings, saved library and offline papers are forgotten there. Nothing in Google Drive changes, and other devices stay signed in.', 'Settings \u203a Library \u203a Google account', 'path:M14 4.5h4.5a1.5 1.5 0 0 1 1.5 1.5v12a1.5 1.5 0 0 1-1.5 1.5H14M10 8l-4 4 4 4M6 12h10', 'log out logout account switch account'],
     ['Install it', 'Add LibLande to your Dock or Home Screen, to open it like an app.', 'Safari\u2019s Share menu: Add to Dock, or Add to Home Screen', 'path:M4.5 4.5h15v15h-15zM12 8v8M8 12h8', 'app web app home screen'],
@@ -187,7 +189,7 @@ const TOUR_STEPS = [
     if (!state.selKey) { const r = $('#rows .row'); if (r) r.click(); await tourWait(400); }
   } },
   { lib: true, sel: '#groups', title: 'Your groups', text: 'Your library and its groups: saved searches, static groups, keywords and types; drag to reorder. Libraries switches between libraries; Tools has Cite Check, New papers and Tidy keywords.', before: async () => { showLibSide(); await tourWait(300); } },
-  { lib: true, sel: '#settingsBtn', title: 'Settings', text: 'Library, Appearance, Citing, Sync and Extensions. Library adds, makes and switches libraries, and signs this device out; LibLande in Word installs from Extensions. Help, this tour and Features are at the foot of the sidebar.', before: async () => { showLibSide(); await tourWait(200); }, after: () => closeSidebarIfOverlay() },
+  { lib: true, sel: '#settingsBtn', title: 'Settings', text: 'Library, Appearance, Citing, Sync and Extensions. Library adds, makes and switches libraries, adds papers with limited access, and signs this device out; LibLande in Word installs from Extensions. Help, this tour and Features are at the foot of the sidebar.', before: async () => { showLibSide(); await tourWait(200); }, after: () => closeSidebarIfOverlay() },
   { lib: true, sel: '#tabs', title: 'Tabs and the reading list', text: 'Groups you open stay as tabs. The Reading list holds papers to read next, later, or done.', before: async () => { closeSidebarIfOverlay(); await tourWait(350); } },
   { lib: true, sel: '#selectBtn', title: 'Select several', text: 'Give several publications keywords and groups at once, add them to your reading list, or share them with their PDFs.' },
   { lib: true, sel: '#refreshBtn', title: 'Saving and syncing', text: 'Changes go into your .bib on Google Drive. Check for changes picks up BibDesk\u2019s and your other devices\u2019; a cloud shows what\u2019s waiting while you\u2019re offline.' },
