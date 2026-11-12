@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-11-12.13';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-11-12.14';
 /* -------------------------------------------------------------- features */
 // What LibLande does, by area: each feature, what it's for, where to find
 // it, its icon (see featIcon), and other words it's found by (as "tag"
@@ -84,7 +84,7 @@ const FEATURES = [
     ['Copy a citation', 'APA, APA in text, BibTeX or the cite key, for one publication or several.', 'Copy, in the details; \u2325A for APA, \u21e7\u2325A in text', 'ICON:quote', 'reference bibtex cite key'],
     ['Quote a passage', 'Select a passage and copy it as a quotation with its printed page and citation; a long one as a block quotation.', 'Quote, beside the text you select; or \u2325C', 'ICON:quote', 'quotation'],
     ['Citation styles', 'Any of Zotero\u2019s 10,000 styles for Copy, Quote, the QR code, Share and Cite Check; APA by default. Kept for offline use, and with your account. The Copy menu\u2019s Style row changes it for one copy.', 'Settings \u203a Citing', 'ICON:quote', 'csl chicago mla harvard style'],
-    ['LibLande in Word', 'A panel in Word for Mac: search your library, the document\u2019s works or a group; insert and edit citations; keep a References list in APA, Chicago, MLA or Harvard; quote your notes and highlights; and link typed or Zotero citations.', 'Install once: Settings \u203a Extensions \u203a Word', '#settingsBtn', 'microsoft word add-in plugin cite while you write zotero'],
+    ['LibLande in Word', 'A panel in Word for Mac: search your library, the document\u2019s works or a group; insert and edit citations; find a work that isn\u2019t in your library online, and add and cite it in one go; keep a References list in APA, Chicago, MLA or Harvard; quote your notes and highlights; and link typed or Zotero citations.', 'Install once: Settings \u203a Extensions \u203a Word', '#settingsBtn', 'microsoft word add-in plugin cite while you write zotero online add book'],
     ['Cite Check', 'Checks a manuscript (a Google Doc or a file) against your library: citations without references, references never cited, details that differ. Fixes the References in a Google Doc.', 'Tools \u203a Cite Check', 'ICON:citecheck', 'manuscript references bibliography check'],
     ['QR code of references', 'A QR code that shows the reference (or up to about 15) on a phone, to copy or open by DOI. Save it for a slide or handout.', 'Copy \u203a QR code\u2026', 'path:M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 18h2v2h-2zM14 18h2M18 14h2', 'slides talk'],
     ['Copy for AI', 'A prompt for Claude: outline this paper, weighing your highlights and notes, with its text and citation. Copied, not sent.', 'The reader\u2019s Annotations tab; Copy \u203a For AI in the details', 'ICON:ai', 'claude summary ai'],
@@ -202,7 +202,7 @@ const TOUR_STEPS = [
   { sel: '#vTools, .v-tools', title: 'Reading view', text: 'Search (\u2318F), light or dark pages, split screen, and the zoom: click or tap the percentage to fit the page or its width.' },
   { sel: '#vSide', title: 'Outline, pages and bookmarks', text: 'Jump by chapter; edit the outline, or make one from the Contents. Pages turns or splits pages; Bookmarks lists pages you\u2019ve marked.', before: () => readerSide('outline') },
   { sel: '#vShare', title: 'Share', text: 'Send the PDF to Mail or any app with its citation, or download it. Clean leaves out your marks.' },
-  { title: 'That\u2019s the tour', text: 'Start by adding a paper with + (or drop a PDF on it), and open one with Read. To cite in Word, install the add-in from Settings \u203a Extensions. Everything else is in Features, at the foot of the sidebar.' },
+  { title: 'That\u2019s the tour', text: 'Start by adding a paper with + (or drop a PDF on it), and open one with Read. To cite in Word (and add works found online as you write), install the add-in from Settings \u203a Extensions. Everything else is in Features, at the foot of the sidebar.' },
 ];
 function startTour() {
   if (TOUR.on) return;

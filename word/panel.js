@@ -126,17 +126,23 @@
     } catch (e) { /* only shown in the menu */ }
     paintAccount();
   }
+  const hayOf = e => norm([
+    ...(e.a || []).map(n => n[0] + ' ' + (n[1] || '')), ...(e.e || []).map(n => n[0] + ' ' + (n[1] || '')),
+    e.f.title, e.f.booktitle, e.f.journal, e.f.year, e.f.keywords, e.k].filter(Boolean).join(' '));
   function useLibrary(data) {
-    S.entries = data.entries || [];
+    // (Works added here, kept until the library is built with them: from
+    // a .bib saved since, which has them, or has them renamed or gone.)
+    const have = new Set((data.entries || []).map(e => e.k));
+    const added = (store.get('added', null) || []).filter(a => a && a.e && !have.has(a.e.k) && !(a.at && data.built >= a.at));
+    store.set('added', added.length ? added : null);
+    S.entries = (data.entries || []).concat(added.map(a => a.e));
     S.groups = (data.groups || []).filter(g => g && g.name);
     ENTRIES = S.entries;
     CASE_SETS = null;
     CSLW.engines.clear();
     authorSet = null;
-    S.byKey = new Map(S.entries.map(e => [e.k, e]));
-    S.index = S.entries.map(e => ({ e, hay: norm([
-      ...(e.a || []).map(n => n[0] + ' ' + (n[1] || '')), ...(e.e || []).map(n => n[0] + ' ' + (n[1] || '')),
-      e.f.title, e.f.booktitle, e.f.journal, e.f.year, e.f.keywords, e.k].filter(Boolean).join(' ')) }));
+    S.byKey = BYKEY = new Map(S.entries.map(e => [e.k, e]));
+    S.index = S.entries.map(e => ({ e, hay: hayOf(e) }));
   }
 
 
@@ -349,7 +355,7 @@
         cc.getRange('After').select();
         await ctx.sync();
       });
-    } catch (e) { showErr('citeErr', 'Couldn\u2019t insert it: ' + wordError(e)); return; }
+    } catch (e) { showErr('citeErr', 'Couldn\u2019t insert it: ' + wordError(e)); return null; }
     S.cites[id] = c;
     if (S.present) S.present.push(id);
     S.skipEdit = id;
@@ -359,6 +365,7 @@
     search();
     $('q').focus();
     try { await refreshDocument(); } catch (e) { showErr('citeErr', 'The other citations couldn\u2019t be updated: ' + wordError(e)); }
+    return id;
   }
   /* ---- editing a citation: the cursor in one opens it here */
   // Its works, pages, words before, form and order, on Cite's own screen;
@@ -438,6 +445,8 @@
   const SEL = { card: null };
   function noticeSelection(w) {
     if (S.editing || S.chosen.length || !S.entries.length) { hideSelCard(); return; }
+    // (A work just added and cited: said so until something is selected.)
+    if (SEL.card && SEL.card.kind === 'added' && !w.text.trim()) return;
     // (The selection without the spaces and stops a double-click or a drag
     // takes in at its ends.)
     const sel = w.text.trim().replace(/[.,;:]+$/, '');
@@ -467,6 +476,7 @@
       const text = w.text.trim();
       if (SEL.card && SEL.card.kind === 'text' && SEL.card.text === text) return;
       SEL.card = { kind: 'text', text, hits: byRelevance(matches(text), text).slice(0, 5) };
+      if (!SEL.card.hits.length) findOnline(text, () => { if (SEL.card && SEL.card.kind === 'text' && SEL.card.text === ONLINE.q) paintSelCard(); });
     } else { hideSelCard(); return; }
     paintSelCard();
   }
@@ -501,12 +511,17 @@
         const ready = c.items.every(it => it.k);
         body += '<div class="alt"><button type="button" class="primary" data-linkall' + (ready ? '' : ' disabled') + '>' + (c.items.length === 2 ? 'Link both' : 'Link all ' + c.items.length) + '</button></div>';
       }
+    } else if (c.kind === 'added') {
+      label = 'Added';
+      shown = '\u201c' + (c.e.f.title || c.e.k) + '\u201d';
+      body = '<p class="note">Added to your library' + (c.cite ? ' and cited: ' + esc(c.cite) : '') + '</p>' +
+        '<div class="alt"><button type="button" class="go" data-editlib>Edit in LibLande\u2026</button><button type="button" data-undoadd>Undo</button></div>';
     } else {
       label = 'Selected text';
       shown = '\u201c' + c.text + '\u201d';
-      body = '<p class="note">' + (c.hits.length ? 'Not a citation. Searched for in your library:' : 'Not a citation, and nothing in your library matches it.') + '</p>' +
-        c.hits.map(e => workRow(e, -1, 0, false, 'Cite here')).join('') +
-        '<div class="alt"><button type="button" class="go" data-addtext>Add to LibLande\u2026</button></div>';
+      body = c.hits.length ? '<p class="note">Not a citation. Searched for in your library:</p>' + c.hits.map(e => workRow(e, -1, 0, false, 'Cite here')).join('')
+        : '<p class="note">Not a citation, and not in your library.</p>' + (ONLINE.q === c.text ? onlineHtml() : '');
+      body += '<div class="alt"><button type="button" class="go" data-addtext>' + (c.hits.length ? 'Add to LibLande\u2026' : 'More in LibLande\u2026') + '</button></div>';
     }
     $('selLabel').textContent = label;
     $('selText').textContent = shown;
@@ -566,6 +581,9 @@
     if (b.id === 'selX') { hideSelCard(); return; }
     if (b.hasAttribute('data-linkall')) { linkSelected(); return; }
     if (b.hasAttribute('data-addtext')) { addInLibLande(c.text); return; }
+    if (b.dataset.online != null) { addOnline(+b.dataset.online, c.text, b); return; }
+    if (b.hasAttribute('data-editlib')) { openLibLande('#open=' + encodeURIComponent(c.e.k) + '&view=edit'); return; }
+    if (b.hasAttribute('data-undoadd')) { undoAdd(b); return; }
     if (b.dataset.addlib != null) { const it = c.items[+b.dataset.addlib]; addInLibLande(it.pt.names.join(' ') + ' ' + it.pt.years[it.yi].y); return; }
     if (b.dataset.search != null) { c.items[+b.dataset.search].finding = true; paintSelCard(); const f = document.querySelector('[data-find="' + b.dataset.search + '"]'); if (f) f.focus(); return; }
     if (b.classList.contains('lk')) {
@@ -1305,6 +1323,127 @@
   }
   function alertNotes(msg) { const p = document.createElement('div'); p.className = 'err'; p.textContent = msg; $('nWork').prepend(p); }
 
+  /* ---- works found online, to add to the library and cite */
+  // What's selected or typed that nothing in the library matches: looked
+  // for as LibLande's Add looks (Crossref, OpenAlex and Open Library:
+  // app/titlesearch.js), the best three not in the library shown, each to
+  // add to the .bib (edits.js, with its checks and a backup copy first)
+  // and cite in one go.
+  const ONLINE = { q: '', list: null, failed: false, t: 0, seq: 0, adding: false };
+  // paint: shows the answer, when it comes, where it was asked for.
+  function findOnline(q, paint) {
+    q = q.trim();
+    if (ONLINE.q === q) return;
+    clearTimeout(ONLINE.t);
+    const seq = ++ONLINE.seq;
+    Object.assign(ONLINE, { q, list: null, failed: false });
+    if (!tsIsQuery(q) || !navigator.onLine) { Object.assign(ONLINE, { list: [], failed: !navigator.onLine }); paint(); return; }
+    // (Asked once typing pauses.)
+    ONLINE.t = setTimeout(async () => {
+      let r;
+      try { r = await tsFind(q); } catch (e) { r = { list: [], failed: TS_SOURCES.map(x => x[0]) }; }
+      if (seq !== ONLINE.seq) return;
+      ONLINE.list = r.list.filter(c => !c.have).slice(0, 3);
+      ONLINE.failed = !r.list.length && r.failed.length === TS_SOURCES.length;
+      paint();
+    }, 600);
+    paint();
+  }
+  // ("Kuhn, T. S. & Hacking, I. . 2012 . Chicago", as metaOf has a work.)
+  function onlineMeta(c) {
+    const ini = p => { const [last, first] = String(p).split(/,\s*/); return last + (first ? ', ' + first.split(/\s+/).map(w => w[0] ? w[0].toUpperCase() + '.' : '').join(' ') : ''); };
+    const ps = c.people;
+    const who = !ps.length ? '' : ps.length === 1 ? ini(ps[0]) : ps.length === 2 ? ini(ps[0]) + ' & ' + ini(ps[1]) : ini(ps[0]) + ' et al.';
+    return [who + (who && c.eds ? (ps.length > 1 ? ' (Eds.)' : ' (Ed.)') : ''), c.year, c.venue && c.venue !== c.title ? c.venue : ''].filter(Boolean).join(' · ');
+  }
+  function onlineHtml() {
+    if (!ONLINE.list) return '<p class="note busy">Searching online</p>';
+    if (!ONLINE.list.length) return '<p class="note">' + (ONLINE.failed ? 'Couldn’t search online just now.' : 'Nothing found online either. Try fewer words, or an author’s name.') + '</p>';
+    return '<p class="note">Found online:</p>' + ONLINE.list.map((c, i) => '<div class="cand"><div class="tx"><div class="t">' + esc(c.title) + '</div>' +
+      '<div class="m"><span class="kind">' + esc(c.review ? 'Book review' : TS_KINDS[c.type] || 'Other') + '</span>' + esc(onlineMeta(c)) + '</div></div>' +
+      '<button type="button" class="lk" data-online="' + i + '">Add and cite</button></div>').join('');
+  }
+  // One added and cited: with a DOI, its details as LibLande's Add has
+  // them (lookup.js); or else what the search found. Cited in place of
+  // the words selected (replaced), or at the cursor; or, while a
+  // citation's being made or edited, put in it.
+  async function addOnline(i, replaced, btn) {
+    const c = ONLINE.list && ONLINE.list[i];
+    if (!c || ONLINE.adding) return;
+    ONLINE.adding = true;
+    if (btn) { btn.disabled = true; btn.textContent = 'Adding…'; }
+    try {
+      let got = null;
+      if (c.doi) { try { got = await liblandeLookup.lookupDoi(c.doi); } catch (e) { got = null; } }
+      const type = got ? got.type : c.type;
+      const fields = Object.assign({}, got ? got.fields : c.fields);
+      Object.keys(fields).forEach(n => { fields[n] = String(fields[n] == null ? '' : fields[n]).trim(); if (!fields[n]) delete fields[n]; });
+      if (!fields.title) throw new Error('it has no title.');
+      const edits = await loadEdits();
+      const key = makeCiteKey(fields), now = bibdeskTime(), at = Date.now();
+      const res = await edits.addToMain({ type, key, fields, now, backupName: fileTime() });
+      // (Shown here at once, as the build would have it; kept on this
+      // device until the library is built again with it.)
+      const e = { k: key, t: type, f: Object.assign({}, fields, { 'date-added': now, 'date-modified': now }) };
+      if (fields.author) e.a = parseNames_(fields.author);
+      if (fields.editor) e.e = parseNames_(fields.editor);
+      if (fields.url) e.u = [fields.url];
+      S.entries.push(e);
+      S.byKey.set(key, e);
+      S.index.push({ e, hay: hayOf(e) });
+      CASE_SETS = null; authorSet = null; CSLW.engines.clear();
+      store.set('added', (store.get('added', null) || []).concat([{ e, at }]));
+      ONLINE.q = ''; ONLINE.list = null;
+      if (S.chosen.length || S.editing) { toggle(key); $('q').value = ''; search(); return; }
+      const id = await insertCitation({ items: [{ k: key, page: '' }], form: 'paren', own: false });
+      SEL.card = { kind: 'added', e, id, replaced, hash: res.hash, cite: id ? '(' + label({ k: key }) + ')' : '' };
+      paintSelCard();
+    } catch (err) {
+      const m = 'Couldn’t add it: ' + ((err && err.message) || err);
+      if (replaced && SEL.card) showSelErr(m); else showErr('citeErr', m);
+      if (btn && btn.isConnected) { btn.disabled = false; btn.textContent = 'Add and cite'; }
+    } finally {
+      ONLINE.adding = false;
+    }
+  }
+  // Undo: the citation taken out (the words selected put back), and the
+  // work taken out of the .bib, if it hasn't been changed since.
+  async function undoAdd(btn) {
+    const c = SEL.card;
+    if (!c || c.kind !== 'added') return;
+    btn.disabled = true;
+    try {
+      const edits = await loadEdits();
+      await edits.saveEntries({ items: [], removes: [{ key: c.e.k, expectHash: c.hash }], modified: bibdeskTime(), backupName: fileTime() });
+      if (c.id && S.inWord) {
+        await Word.run(async ctx => {
+          const ccs = ctx.document.contentControls.getByTag('LL:' + c.id);
+          ccs.load('items');
+          await ctx.sync();
+          ccs.items.forEach(cc => { if (c.replaced) { cc.insertText(c.replaced, 'Replace'); cc.delete(true); } else cc.delete(false); });
+          await ctx.sync();
+        });
+      }
+      if (c.id) {
+        delete S.cites[c.id];
+        if (S.present) S.present = S.present.filter(x => x !== c.id);
+        await saveSettings();
+      }
+      S.entries = ENTRIES = S.entries.filter(x => x !== c.e);
+      S.byKey.delete(c.e.k);
+      S.index = S.index.filter(x => x.e !== c.e);
+      CASE_SETS = null; authorSet = null; CSLW.engines.clear();
+      const kept = (store.get('added', null) || []).filter(a => a && a.e && a.e.k !== c.e.k);
+      store.set('added', kept.length ? kept : null);
+      hideSelCard();
+      try { await refreshDocument(); } catch (e) { /* Refresh will */ }
+      search();
+    } catch (err) {
+      btn.disabled = false;
+      showSelErr('Couldn’t undo it: ' + ((err && err.message) || err));
+    }
+  }
+
   /* ---- the two lists, and search */
   // "In this document" (the works it cites) and "Library" (all of it), each
   // in its own order (author, year, or date added, newest first); what's
@@ -1352,6 +1491,8 @@
     paintLists();
     $('sort').value = S.sort[sortKey()];
     paintResults();
+    // (Nothing in the library: what's found online, under it.)
+    if (text && !S.results.length && !S.more) findOnline(text, () => { if ($('q').value.trim() === ONLINE.q && !S.results.length) paintResults(); });
     if (!$('pNotes').hidden) { if (NOTE.open) closeNotes(); else paintNotesList(); }
   }
   function metaOf(e) {
@@ -1366,7 +1507,8 @@
     const text = $('q').value.trim();
     let html = '';
     if (!S.results.length) {
-      html = text && !S.more ? '<div class="empty">No matches.<br><button class="btn" type="button" id="addLib">Add to LibLande\u2026</button></div>'
+      html = text && !S.more ? '<div class="empty">No matches in your library.</div><div class="sbd online">' + (ONLINE.q === text ? onlineHtml() : '') +
+          '<div class="alt"><button type="button" class="go" id="addLib">More in LibLande\u2026</button></div></div>'
         : !text && S.list === 'doc' ? '<div class="empty">Nothing cited yet.</div>' : '';
     }
     // (A long list a hundred at a time, more as it's scrolled.)
@@ -1384,6 +1526,7 @@
     if (kb) kb.scrollIntoView({ block: 'nearest' });
     const add = $('addLib');
     if (add) add.addEventListener('click', () => addInLibLande($('q').value));
+    $('res').querySelectorAll('[data-online]').forEach(b => b.addEventListener('click', () => addOnline(+b.dataset.online, '', b)));
   }
   function chooseList(which) {
     S.list = which;

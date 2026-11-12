@@ -1,8 +1,11 @@
 ﻿// LibLande: Search by title, in Add a publication: candidates from Crossref, OpenAlex and Open Library, one chosen to fill in the form.
+// (Also loaded on its own by LibLande for Word, to find works online and
+// make a new one's cite key: pages/word/index.html gives it what it uses
+// from the rest. Its page wiring is only for LibLande's Add.)
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/titlesearch.js'] = '2026-11-12.13';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/titlesearch.js'] = '2026-11-12.14';
 /* ------------------------------------------------------------ title search */
 // A title (with an author or a year, if you like) typed in Add's lookup
 // box, instead of a DOI: candidates from Crossref (articles, chapters, and
@@ -173,6 +176,33 @@ function tsHave(c) {
     (t && plainTitle(e.f.title) === t && (!c.year || !/^\d{4}$/.test(e.f.year || '') || e.f.year === c.year))) || null;
 }
 
+// One source asked, given 12 seconds to answer.
+const tsAsk = (get, q, signal) => Promise.race([get(q, signal), new Promise((ok, no) => setTimeout(() => no(new Error('no answer')), 12000))]);
+// All the sources asked at once, and their matches merged: { list, failed }
+// (the sources that didn't answer). For LibLande for Word.
+async function tsFind(q, signal) {
+  const found = {}, failed = [];
+  await Promise.all(TS_SOURCES.map(async ([name, get]) => {
+    try { found[name] = await tsAsk(get, q, signal); } catch (err) { failed.push(name); }
+  }));
+  return { list: tsMerge(q, found), failed };
+}
+
+// A new publication's cite key: the first author's (or editor's) surname,
+// the title's first word that matters, and the year, as
+// "kuhn_structure_1962" (a letter added if the library has it).
+function makeCiteKey(v) {
+  const fold = s => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const first = (v.author || v.editor || '').split(/\s+and\s+/i)[0].replace(/[{}\\]/g, '');
+  const last = first.indexOf(',') >= 0 ? first.split(',')[0] : (first.trim().split(/\s+/).pop() || 'anon');
+  const stop = new Set('a an the on of in and for to from with by at as is are be'.split(' '));
+  const word = (fold(v.title).match(/[a-z0-9]+/g) || []).find(w => !stop.has(w)) || 'untitled';
+  const base = (fold(last).replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'anon') + '_' + word + '_' + (v.year || 'nd');
+  let key = base, n = 1;
+  while (BYKEY.has(key)) key = base + String.fromCharCode(97 + n++);
+  return key;
+}
+
 async function tsSearch(q) {
   clearTimeout(TS.t);
   q = String(q || '').trim();
@@ -191,7 +221,7 @@ async function tsSearch(q) {
   // over.)
   await Promise.all(TS_SOURCES.map(async ([name, get]) => {
     try {
-      found[name] = await Promise.race([get(q, ctl && ctl.signal), new Promise((ok, no) => setTimeout(() => no(new Error('no answer')), 12000))]);
+      found[name] = await tsAsk(get, q, ctl && ctl.signal);
     } catch (err) { if (!(ctl && ctl.signal.aborted)) failed.push(name); }
     if (seq !== TS.seq) return;
     TS.list = tsMerge(q, found);
@@ -248,7 +278,9 @@ function tsChoose(c) {
 
 // In the box: searched on a pause in typing (or Return, in fillFromBox);
 // Down goes into the list, Up and Down move in it, Esc closes it.
-$('#sheetBody').addEventListener('input', ev => {
+// (Only in LibLande itself, which has Add.)
+const TS_PAGE = !!document.getElementById('sheetBody');
+if (TS_PAGE) $('#sheetBody').addEventListener('input', ev => {
   if (ev.target.id !== 'doiLookup' || !sheet || sheet.mode !== 'add') return;
   clearTimeout(TS.t);
   const q = ev.target.value;
@@ -256,11 +288,11 @@ $('#sheetBody').addEventListener('input', ev => {
   if (tsWords(q).length < 2) return;
   TS.t = setTimeout(() => tsSearch(q), TS_PAUSE);
 });
-$('#sheetBody').addEventListener('click', ev => {
+if (TS_PAGE) $('#sheetBody').addEventListener('click', ev => {
   const b = ev.target.closest('#tsList [data-ts]');
   if (b && TS.list[+b.dataset.ts]) tsChoose(TS.list[+b.dataset.ts]);
 });
-$('#sheetBody').addEventListener('keydown', ev => {
+if (TS_PAGE) $('#sheetBody').addEventListener('keydown', ev => {
   const box = $('#tsList');
   if (!box || box.hidden) return;
   const items = [...box.querySelectorAll('.ts-item')], at = items.indexOf(document.activeElement);
@@ -383,7 +415,7 @@ async function photoFind(asks, text) {
   const ctl = typeof AbortController === 'function' ? new AbortController() : null;
   const found = [];
   await Promise.all(asks.flatMap(q => TS_SOURCES.map(async ([, get]) => {
-    try { found.push(...await Promise.race([get(q, ctl && ctl.signal), new Promise((ok, no) => setTimeout(() => no(new Error('no answer')), 12000))])); } catch (err) { /* passed over */ }
+    try { found.push(...await tsAsk(get, q, ctl && ctl.signal)); } catch (err) { /* passed over */ }
   })));
   if (ctl) ctl.abort();
   const out = [], byKey = new Map();
@@ -454,9 +486,9 @@ async function fromPhoto(file) {
     if (btn && btn.isConnected) btn.disabled = false;
   }
 }
-$('#sheetBody').addEventListener('click', ev => {
+if (TS_PAGE) $('#sheetBody').addEventListener('click', ev => {
   if (ev.target.closest('#photoGo')) { const i = $('#photoIn'); i.value = ''; i.click(); }
 });
-$('#sheetBody').addEventListener('change', ev => {
+if (TS_PAGE) $('#sheetBody').addEventListener('change', ev => {
   if (ev.target.id === 'photoIn' && ev.target.files[0]) fromPhoto(ev.target.files[0]);
 });

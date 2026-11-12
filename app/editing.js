@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-12.13';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-12.14';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -92,17 +92,8 @@ function balanced(v) {
   }
   return depth === 0;
 }
-function makeCiteKey(v) {
-  const fold = s => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-  const first = (v.author || v.editor || '').split(/\s+and\s+/i)[0].replace(/[{}\\]/g, '');
-  const last = first.indexOf(',') >= 0 ? first.split(',')[0] : (first.trim().split(/\s+/).pop() || 'anon');
-  const stop = new Set('a an the on of in and for to from with by at as is are be'.split(' '));
-  const word = (fold(v.title).match(/[a-z0-9]+/g) || []).find(w => !stop.has(w)) || 'untitled';
-  const base = (fold(last).replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'anon') + '_' + word + '_' + (v.year || 'nd');
-  let key = base, n = 1;
-  while (BYKEY.has(key)) key = base + String.fromCharCode(97 + n++);
-  return key;
-}
+// (makeCiteKey, a new publication's cite key: titlesearch.js, shared with
+// LibLande for Word.)
 
 function formFieldNames(type, present) {
   const list = ['title', 'author', 'year'].concat(ORIG_TYPES.has(type) || present('origdate') ? ['origdate'] : [], TYPE_FIELDS[type] || TYPE_FIELDS.misc, ['doi', 'url']);

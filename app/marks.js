@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/marks.js'] = '2026-11-12.13';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/marks.js'] = '2026-11-12.14';
 /* ---- a PDF's marks */
 // A note is a highlight drawn this faint (see reader.js).
 const NOTE_OPACITY = 0.03;

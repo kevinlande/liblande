@@ -198,6 +198,11 @@
   .sbd .alt button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 500; }
   .sbd .alt button:disabled { opacity: .5; cursor: default; }
   .sbd .search { margin-top: 6px; }
+  .kind { display: inline-block; font-size: 11px; padding: 0 5px; border-radius: 4px; background: var(--soft); color: var(--accent); margin-right: 5px; }
+  .note.busy::after { content: ''; display: inline-block; width: 9px; height: 9px; margin-left: 6px; border: 1.5px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -1px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #res .online { border-top: 1px solid var(--row); padding-top: 4px; }
+  #res .online + .empty, #res .empty + .online { margin-top: 0; }
   .err.ok { background: var(--soft); color: var(--accent); }
   .err { background: var(--warn-soft); color: var(--warn); border-radius: 8px; padding: 8px 10px; margin: 0 0 8px; }
 </style>
@@ -320,9 +325,19 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const safeUrl = u => /^https?:[/][/]/i.test(u) ? u : null;
 const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[‐-―]/g, '-');
 const cmpStr = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+// (And what app/titlesearch.js uses: finding works online, and a new
+// one's cite key.)
+var BYKEY = new Map();
+const plainTitle = t => norm(String(t || '')).replace(/[^a-z0-9]+/g, '');
+const looksLikeBibtex = t => /@\s*[A-Za-z]+\s*[{(]/.test(t) && /=/.test(t);
+const NP_OA = 'https://api.openalex.org';
+const npFetch = (u, o) => fetch(u, o);
+const npDoi = d => String(d || '').trim().replace(/^https?:\/\/(dx\.)?doi\.org\//i, '').replace(/^doi:\s*/i, '').toLowerCase();
 </script>
-<script src="../app/apa.js?v=2026-11-12.13"></script>
-<script src="../app/csl.js?v=2026-11-12.13"></script>
-<script src="../app/marks.js?v=2026-11-12.13"></script>
-<script src="engine.js?v=2026-11-12.13"></script>
-<script src="panel.js?v=2026-11-12.13"></script>
+<script src="../app/apa.js?v=2026-11-12.14"></script>
+<script src="../app/csl.js?v=2026-11-12.14"></script>
+<script src="../app/marks.js?v=2026-11-12.14"></script>
+<script src="../app/titlesearch.js?v=2026-11-12.14"></script>
+<script src="../lookup.js?v=2026-11-12.14"></script>
+<script src="engine.js?v=2026-11-12.14"></script>
+<script src="panel.js?v=2026-11-12.14"></script>
