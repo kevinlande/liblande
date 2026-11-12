@@ -586,6 +586,8 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .set-newlib-go .linkish { align-self: center; font-size: 13.5px; }
 .setup:not(.head-mode) .in-settings { display: none; }
 .setup.head-mode .first-only { display: none; }
+/* (Full access: the .bib and papers folder picked, nothing more.) */
+.set-picks.full .limited-only, .set-picks:not(.full) .full-only { display: none; }
 /* Settings > Libraries: the list, then add one or make one; their forms
    open below. */
 .set-acts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 6px; }

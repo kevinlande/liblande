@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-11-12.10';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-11-12.11';
 // On GitHub Pages, every part of the app must be from the same version: a
 // part kept from an older one (the offline copy, served when the network
 // was slow) lacks what this page needs. Then the kept copies go, and the
@@ -788,11 +788,15 @@ if (RELOADING) {
     const b = ev.target.closest('[data-way]');
     if (b) setWay(b.dataset.way);
   });
-  // With limited access: the .bib, the papers folder and the folders in
-  // it, chosen in Google's picker, which gives them to LibLande. (The
-  // choices go in the link boxes, hidden, as IDs.)
+  // On Pages: the .bib and the papers folder chosen in Google's picker
+  // (with limited access, also the folders in it and the PDFs, which gives
+  // them to LibLande). (The choices go in the link boxes, hidden, as IDs.)
   const PICKED = { bibParent: '' };
-  function pickMode(on) { $('#linkInputs').hidden = on; $('#pickSteps').hidden = !on; }
+  function pickMode(on, limited) {
+    $('#linkInputs').hidden = on;
+    $('#pickSteps').hidden = !on;
+    $('#pickSteps').classList.toggle('full', !limited);
+  }
   const limitedPicks = () => !$('#pickSteps').hidden;
   const picked = (what, text, ok) => {
     const g = $('#pickSteps').querySelector('[data-got="' + what + '"]');
@@ -923,13 +927,13 @@ if (RELOADING) {
     renderLibOthers(st || {});
     resetPicks();
     zotReset();
-    // (On Pages: this device's access to Drive. Limited: Google's picker
-    // in place of links. In Settings, limited can be made full; the other
+    // (On Pages: this device's access to Drive, and Google's picker in
+    // place of links. In Settings, limited can be made full; the other
     // way is chosen at a first sign-in.)
     pickMode(false);
     if (window.LIBLANDE_PAGES) callServer('getAccess').then(a => {
       ACCESS = a.access;
-      pickMode(a.access === 'limited');
+      pickMode(true, a.access === 'limited');
       if (configured) renderAddPapers();
       if (!configured) return;
       $('#signOutSec').hidden = false;
@@ -1189,7 +1193,7 @@ if (RELOADING) {
     if (go.disabled) return;
     const bibLink = $('#bibLink').value.trim(), papersLink = $('#papersLink').value.trim();
     if (!bibLink) { setupMsg(limitedPicks() ? 'Choose your .bib file first.' : 'Paste the link to your .bib file first.', 'error'); return; }
-    if (limitedPicks() && !papersLink) { setupMsg('Choose your papers folder too.', 'error'); return; }
+    if (limitedPicks() && ACCESS === 'limited' && !papersLink) { setupMsg('Choose your papers folder too.', 'error'); return; }
     go.disabled = cancel.disabled = true;
     setupMsg('Reading your .bib file and finding your papers. A large library takes a minute or two.', 'status');
     try {

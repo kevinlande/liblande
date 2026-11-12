@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Getting started with LibLande</title>
+<meta name="description" content="How to set up LibLande, a free reference manager and PDF reader that keeps your library in your own Google Drive.">
+<link rel="icon" href="icon.png">
+<style>
+:root { --bg: #ffffff; --text: #1b2321; --muted: #5d6a66; --line: #d8dfdc; --accent: #1f6b5c; --soft: #f1f5f3; }
+@media (prefers-color-scheme: dark) { :root { --bg: #151a19; --text: #e4e9e7; --muted: #9aa6a2; --line: #2c3533; --accent: #6cc0a4; --soft: #1d2423; } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
+main { max-width: 680px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 26px; margin: 0 0 8px; }
+h2 { font-size: 18px; margin: 32px 0 6px; }
+h3 { font-size: 16px; margin: 18px 0 2px; }
+.lede { color: var(--muted); margin: 0 0 20px; }
+a { color: var(--accent); }
+ul, ol { padding-left: 22px; }
+li { margin: 4px 0; }
+.open { display: inline-block; margin: 4px 0 8px; padding: 9px 18px; border-radius: 8px; background: var(--accent); color: var(--bg); font-weight: 600; text-decoration: none; }
+.note { background: var(--soft); border-left: 3px solid var(--accent); padding: 10px 14px; border-radius: 4px; }
+.note p { margin: 0; }
+b.ui { font-weight: 600; }
+footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+</style>
+</head>
+<body>
+<main>
+<h1>Getting started with LibLande</h1>
+<p class="lede">LibLande is a reference manager and PDF reader that runs in your browser. Your references and papers stay in your own Google Drive, as a BibTeX library: a .bib file and a folder of PDFs.</p>
+<a class="open" href="./">Open LibLande</a>
+
+<div class="note"><p>LibLande is a personal project by Kevin Lande, free for anyone to use. It is still changing, and comes with no promise of support. Your files stay in your Google Drive, so you can stop using it at any time and keep everything.</p></div>
+
+<h2>What you need</h2>
+<ul>
+  <li>A Google account.</li>
+  <li>A Mac, iPad or iPhone with Safari works best. Chrome and other current browsers work too.</li>
+  <li>Optional: a BibDesk library or a Zotero library to bring in.</li>
+</ul>
+
+<h2>1. Sign in and choose access</h2>
+<p>Open LibLande and sign in with your Google account. LibLande then asks how much of your Google Drive it may use:</p>
+<ul>
+  <li><b>Limited access</b> (best for most people): LibLande sees only the files you choose for it in Google&#8217;s file picker, and the files it makes itself.</li>
+  <li><b>Full access</b>: LibLande finds your PDFs itself. This suits a large library that you also edit in other apps, like BibDesk. Google will warn you that LibLande isn&#8217;t verified.</li>
+</ul>
+<p>You can switch from limited to full access later. <a href="privacy.html#access">What each allows</a></p>
+
+<h2>2. Set up your library</h2>
+<p>Choose where to start from.</p>
+
+<h3>Nothing yet</h3>
+<p>Give your library a name, and LibLande makes an empty one in your Google Drive.</p>
+
+<h3>Zotero</h3>
+<ol>
+  <li>In Zotero, choose <b class="ui">File &#8250; Export Library&#8230;</b>, then <b class="ui">BibTeX</b>, with <b class="ui">Export Files</b> ticked.</li>
+  <li>In LibLande, choose the folder Zotero made.</li>
+</ol>
+<p>LibLande copies your references and PDFs into a new library in your Google Drive. Zotero itself is left as it was.</p>
+
+<h3>A BibDesk .bib</h3>
+<p>Your .bib and its papers need to be in Google Drive, for example by keeping your BibDesk folder in Google Drive for desktop.</p>
+<ul>
+  <li>Choose your .bib file in Google&#8217;s picker, then the folder your PDFs are in. With BibDesk&#8217;s AutoFile, that&#8217;s <b class="ui">Papers</b>, beside the .bib.</li>
+  <li><b>With limited access</b>, also choose the folders in it and your PDFs, which gives them to LibLande.</li>
+</ul>
+<p>LibLande builds your library, which takes a minute or two for a large one. BibDesk can keep using the same .bib, and LibLande picks up its changes.</p>
+
+<h2>3. Add it to your Dock or Home Screen</h2>
+<p>In Safari, open the <b class="ui">Share</b> menu and choose <b class="ui">Add to Dock</b> (Mac) or <b class="ui">Add to Home Screen</b> (iPad, iPhone). LibLande then opens like an app. Papers you&#8217;ve opened can be read offline.</p>
+
+<h2>4. First things to try</h2>
+<ul>
+  <li><b>Add a paper</b> with <b class="ui">+</b>: a title, DOI, ISBN or arXiv ID, some BibTeX, or a photo of the paper. Drop a PDF on a publication to attach it, or use <b class="ui">Find PDF</b> to look for a free copy.</li>
+  <li><b>Read and mark up</b>: open a paper, then highlight, underline, draw or add notes. Your marks are saved into the PDF itself, so other PDF readers show them too.</li>
+  <li><b>Quote and cite</b>: select a passage and choose <b class="ui">Quote</b> to copy it with its page and citation. APA is the default, and other styles are in <b class="ui">Settings &#8250; Citing</b>.</li>
+  <li><b>Keep a reading list</b> of papers to read next, later, or done.</li>
+  <li><b>Cite in Word</b> with the LibLande add-in, from <b class="ui">Settings &#8250; Extensions</b>.</li>
+  <li><b>Take the tour</b>, or browse <b class="ui">Features</b>, from the foot of the sidebar.</li>
+</ul>
+
+<h2>Good to know</h2>
+<ul>
+  <li><b>Other devices</b>: sign in with the same Google account. With limited access, you don&#8217;t need to choose your files again.</li>
+  <li><b>New PDFs, with limited access</b>: give LibLande the PDFs you add outside it with <b class="ui">Settings &#8250; Library &#8250; Add papers&#8230;</b>. PDFs you add in LibLande need nothing more.</li>
+  <li><b>Backups</b>: LibLande keeps copies of your .bib and of PDFs before it changes them, in <b class="ui">LibLande &#8250; Backups</b> in your Google Drive.</li>
+  <li><b>Signing out</b> (<b class="ui">Settings &#8250; Library</b>) removes what LibLande kept on that device. Nothing in your Google Drive changes.</li>
+  <li><b>Privacy</b>: LibLande has no server of its own and collects no analytics. <a href="privacy.html">Privacy policy</a></li>
+</ul>
+
+<h2>Problems or ideas</h2>
+<p>Report them at <a href="https://github.com/kevinlande/liblande/issues">github.com/kevinlande/liblande/issues</a>.</p>
+
+<footer><a href="./">LibLande</a> · <a href="privacy.html">Privacy Policy</a> · <a href="terms.html">Terms of Service</a></footer>
+</main>
+</body>
+</html>

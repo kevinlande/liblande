@@ -17,7 +17,7 @@
   window.LIBLANDE_PAGES = true;
   // (Which version each part of the app is from: index.html checks they
   // match. build.py fills it in.)
-  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-11-12.10';
+  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-11-12.11';
   const CLIENT_ID = '789682218462-98mjugngb46ttd01ucp9dcj71ufspjgn.apps.googleusercontent.com';
   // Google Drive, in one of two ways (docs/drive-file-plan.md):
   // full: all of Drive (your .bib, papers and LibLande folder wherever
@@ -181,7 +181,7 @@
       '<b style="font-size:18px">Sign in with Google</b>' +
       '<span style="color:' + muted + ';font-size:13.5px">How much of your Google Drive LibLande can reach.</span>' +
       opt('limited', 'Limited access', 'Only the files you give LibLande: your .bib and its PDFs, chosen once.', '(Best for a new, Zotero or small library.)', true) +
-      opt('full', 'Full access', 'All of your Google Drive, with nothing to choose. Google warns that LibLande isn\u2019t verified.', '(Best for a large library you also edit in other apps.)', false) +
+      opt('full', 'Full access', 'All of your Google Drive: LibLande finds your PDFs itself. Google warns that LibLande isn\u2019t verified.', '(Best for a large library you also edit in other apps.)', false) +
       '<a href="privacy.html#access" target="_blank" rel="noopener" style="justify-self:start;color:' + muted + ';font-size:13px">What each allows</a>' +
       '</div>';
     chooserEl.addEventListener('click', ev => {
@@ -460,7 +460,7 @@
       return { adopted: true, renamed: r.renamed };
     },
     async getPrefs() { prefsMemo = null; return loadPrefs(null); },
-    // New settings, from the links pasted in Settings (as Code.gs's
+    // New settings, from the files picked (or links pasted) in Settings (as Code.gs's
     // saveSettings): the .bib and, if given, the papers folder, checked and
     // kept in settings.json. A library built from other ones goes to the
     // Drive trash, and is built again.
@@ -471,15 +471,15 @@
       try { bib = await builder.meta(bibId, 'id,name,parents,trashed'); } catch (e) {
         throw new Error('LibLande couldn\u2019t open that file. Check that the link is to a file you can open in Google Drive.');
       }
-      if (!/\.bib$/i.test(bib.name)) throw new Error('\u201c' + bib.name + '\u201d isn\u2019t a .bib file. Paste the link to your BibTeX library.');
+      if (!/\.bib$/i.test(bib.name)) throw new Error('\u201c' + bib.name + '\u201d isn\u2019t a .bib file. Choose your BibTeX library.');
       let papersId = '';
       if (papersLink && String(papersLink).trim()) {
         papersId = idFromLink(papersLink);
         let ok = false;
         try { ok = !!papersId && (await builder.meta(papersId, 'mimeType')).mimeType === FOLDER; } catch (e) { ok = false; }
-        if (!ok) throw new Error('LibLande couldn\u2019t open that papers folder. Paste the link to a folder, or leave the box empty.');
+        if (!ok) throw new Error('LibLande couldn\u2019t open that papers folder. Choose a folder, or leave it out.');
       } else if (!(bib.parents && bib.parents[0])) {
-        throw new Error('LibLande can\u2019t see the folder that holds this .bib file. Paste the link to your papers folder too.');
+        throw new Error('LibLande can\u2019t see the folder that holds this .bib file. Choose your papers folder too.');
       }
       await edits.useLibrary({ bibId, papersId });
       lastBuilt = null; window.LIBLANDE_BUILT = null;
