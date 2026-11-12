@@ -19,7 +19,7 @@
  */
 (function (root) {
   'use strict';
-  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).builder = '2026-11-11.08';
+  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).builder = '2026-11-12.01';
   const FOLDER = 'application/vnd.google-apps.folder';
   const DATA_FOLDER = 'LibLande', LIBRARY_FILE = 'library.json.gz', INDEX_FILE = 'file-index.json',
     SETTINGS_FILE = 'settings.json', INBOX_FOLDER = 'Inbox', INBOX_FILE = 'LibLande inbox.bib';
@@ -124,7 +124,11 @@
         dataId = null;
       }
       dataChecked = Date.now();
-      const folders = await listAll('name = ' + q(DATA_FOLDER) + " and 'root' in parents and mimeType = '" + FOLDER + "' and trashed = false", 'id');
+      // (The oldest first: with limited access a second LibLande folder can
+      // be made beside one it can't see, and full access keeps to the
+      // first.)
+      const folders = (await listAll('name = ' + q(DATA_FOLDER) + " and 'root' in parents and mimeType = '" + FOLDER + "' and trashed = false", 'id,createdTime'))
+        .sort((a, b) => String(a.createdTime || '').localeCompare(String(b.createdTime || '')));
       for (const f of folders) {
         if (await named(f.id, LIBRARY_FILE, 'id') || await named(f.id, SETTINGS_FILE, 'id')) return (dataId = f.id);
       }
@@ -183,10 +187,17 @@
     async function relativePath(fromId, toId) {
       if (!fromId) return null;
       if (fromId === toId) return '';
+      // (A folder LibLande may not open, as with limited access: the chain
+      // stops there, with just its ID.)
       const chain = async id => {
         const out = [];
         for (let i = 0; id && i < 64; i++) {
-          const f = await meta(id, 'id,name,parents');
+          let f;
+          try { f = await meta(id, 'id,name,parents'); } catch (e) {
+            if (e.status !== 403 && e.status !== 404) throw e;
+            out.push({ id, name: '', parents: [] });
+            break;
+          }
           out.push(f);
           id = f.parents && f.parents[0];
         }

@@ -19,7 +19,7 @@
  */
 (function (root) {
   'use strict';
-  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).edits = '2026-11-11.08';
+  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).edits = '2026-11-12.01';
   const FOLDER = 'application/vnd.google-apps.folder';
   const UPLOAD = 'https://www.googleapis.com/upload/drive/v3/';
   const READING_FILE = 'reading-list.json',
@@ -255,6 +255,41 @@
       const after = parseBib_(next)[0];
       if (after.length !== before.length + raws.length || keys.some(k => !after.some(e => e[1] === k))) {
         throw new Error('The copied entries didn\u2019t come out right, so LibLande didn\u2019t save them.');
+      }
+      return { text: next };
+    },
+    // Importing (a Zotero export, say): each entry's linked files (its
+    // `file` field), the fields its PDFs' names come from, and whether it
+    // has BibDesk's dates. A cite key used twice: only the first.
+    importPlan(text) {
+      const seen = new Set(), entries = [];
+      parseBib_(text)[0].forEach(e => {
+        if (seen.has(e[1])) return;
+        seen.add(e[1]);
+        const f = e[2];
+        const year = f.year || ((/\d{4}/.exec(f.date || '') || [''])[0]);
+        entries.push({
+          key: e[1], paths: f.file ? fileFieldPaths_(f.file) : [],
+          fields: { author: f.author || '', editor: f.editor || '', title: f.title || '', year },
+          added: !!f['date-added'], modified: !!f['date-modified'],
+        });
+      });
+      return { entries };
+    },
+    // Then each entry's fields changed (sets: key -> {field: value, or ''
+    // to remove}), every other byte as it was, and checked.
+    importApply(text, sets) {
+      const before = parseBib_(text)[0], first = new Map();
+      before.forEach((e, i) => { if (!first.has(e[1])) first.set(e[1], i); });
+      let next = text;
+      for (let i = before.length - 1; i >= 0; i--) {
+        const e = before[i], set = sets[e[1]];
+        if (!set || first.get(e[1]) !== i) continue;
+        next = next.slice(0, e[3]) + editEntry_(next.slice(e[3], e[4]), e[1], set) + next.slice(e[4]);
+      }
+      const after = parseBib_(next)[0];
+      if (after.length !== before.length || after.some((e, i) => e[1] !== before[i][1])) {
+        throw new Error('The imported entries didn\u2019t come out right, so LibLande didn\u2019t save them.');
       }
       return { text: next };
     },
@@ -748,8 +783,8 @@
     });
     // A new library: a folder in My Drive (named as asked, or with a number
     // if that's taken) with an empty .bib in it, BibDesk's way, then used.
-    F.createLibrary = async req => {
-      const base = String(req.name || '').replace(/[\/\\:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim() || 'New library';
+    async function libraryFolder(asked) {
+      const base = String(asked || '').replace(/[\/\\:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim() || 'New library';
       let name = base, n = 2;
       while (await B.named('root', name, 'id', true)) name = base + ' ' + n++;
       const folder = await json('files?fields=id,name', { method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -758,8 +793,93 @@
       const bib = await B.writeFile(folder.id, name + '.bib', text, 'text/plain');
       // (Its papers in a folder of their own, beside the .bib.)
       const papers = await subFolder(folder.id, 'Papers', true);
-      await F.useLibrary({ bibId: bib.id, papersId: papers.id });
       return { name, folderId: folder.id, bibId: bib.id, papersId: papers.id };
+    }
+    F.createLibrary = async req => {
+      const made = await libraryFolder(req.name);
+      await F.useLibrary({ bibId: made.bibId, papersId: made.papersId });
+      return made;
+    };
+    // A new library from another program's .bib (Zotero's export, with its
+    // files): a folder as above, each linked file uploaded and filed in
+    // Papers the way AutoFile would, the entries linked to them BibDesk's
+    // way (bdsk-file-N, in place of `file`) and given today's date added if
+    // they have none; then used. Everything made goes to the Drive trash if
+    // it fails partway.
+    // req: {name, bibText, files: [{path (from the .bib's folder), file}],
+    // now (BibDesk's time), onProgress(done, total)}.
+    F.importLibrary = async req => {
+      const text = String(req.bibText || '').replace(/^\uFEFF/, '');
+      if (!/@\w+\s*\{/.test(text)) throw new Error('That .bib has no publications in it.');
+      const plan = await run('importPlan', text);
+      const norm = p => String(p || '').replace(/\\/g, '/').replace(/^(\.\/)+/, '').normalize('NFC');
+      const byPath = new Map(), byName = new Map();
+      (req.files || []).forEach(x => {
+        const p = norm(x.path), n = p.split('/').pop();
+        byPath.set(p, x);
+        byName.set(n, byName.has(n) ? null : x);
+      });
+      // (By its path from the .bib, or else by its name alone, if no other
+      // file has it. Web-page snapshots are left out.)
+      const local = p => byPath.get(norm(p)) || byName.get(norm(p).split('/').pop()) || null;
+      const jobs = [];
+      let missing = 0;
+      plan.entries.forEach(e => e.paths.forEach((p, i) => {
+        if (/\.html?$/i.test(p)) return;
+        const x = local(p);
+        if (x) jobs.push({ e, i, x }); else missing++;
+      }));
+      const made = await libraryFolder(req.name);
+      try {
+        const bibMeta = await meta(made.bibId, 'id,name,parents');
+        const sets = {};
+        plan.entries.forEach(e => {
+          const set = {};
+          if (!e.added) set['date-added'] = req.now;
+          if (!e.modified) set['date-modified'] = req.now;
+          if (Object.keys(set).length) sets[e.key] = set;
+        });
+        // Uploaded three at a time; filed one at a time (as names in a
+        // folder are chosen from what's there).
+        const queue = jobs.slice(), filedAs = new Map();
+        let done = 0, filing = Promise.resolve();
+        const fileOne = (id, fields) => { const f = filing.then(() => filePdf(bibMeta, id, fields, 'Papers')); filing = f.catch(() => {}); return f; };
+        const progress = () => { try { if (req.onProgress) req.onProgress(done, jobs.length); } catch (e) { /* the page's */ } };
+        progress();
+        await Promise.all(Array.from({ length: Math.min(3, jobs.length) }, async () => {
+          while (queue.length) {
+            const j = queue.shift();
+            // (One failed: the others stop too, as it all goes to the trash.)
+            try { await uploadOne(j); } catch (e) { queue.length = 0; throw e; }
+          }
+        }));
+        async function uploadOne(j) {
+          const name = j.x.file.name || norm(j.x.path).split('/').pop();
+          const type = j.x.file.type || (/\.pdf$/i.test(name) ? 'application/pdf' : 'application/octet-stream');
+          const boundary = 'liblande' + Math.random().toString(36).slice(2);
+          const blob = new Blob(['--' + boundary + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' + JSON.stringify({ name, parents: [made.folderId], mimeType: type }) +
+            '\r\n--' + boundary + '\r\nContent-Type: ' + type + '\r\n\r\n', j.x.file, '\r\n--' + boundary + '--'], { type: 'multipart/related; boundary=' + boundary });
+          const up = await json('files?uploadType=multipart&fields=id', { method: 'POST', headers: { 'Content-Type': blob.type }, body: blob }, UPLOAD);
+          const filed = await fileOne(up.id, j.e.fields);
+          filedAs.set(j, filed.relPath);
+          done++;
+          progress();
+        }
+        // (In the order the .bib lists them.)
+        jobs.forEach(j => {
+          const set = sets[j.e.key] || (sets[j.e.key] = {});
+          set.file = '';
+          const n = Object.keys(set).filter(k => /^bdsk-file-/.test(k)).length + 1;
+          set['bdsk-file-' + n] = bdskValue(filedAs.get(j));
+        });
+        const out = await run('importApply', text, sets);
+        await B.writeFile(made.folderId, made.name + '.bib', out.text, 'text/plain');
+        await F.useLibrary({ bibId: made.bibId, papersId: made.papersId });
+        return Object.assign(made, { entries: plan.entries.length, files: jobs.length, missing });
+      } catch (e) {
+        try { await patch(made.folderId, { trashed: true }); } catch (err) { /* left */ }
+        throw e;
+      }
     };
     // Publications copied from the library in use to another one: their
     // entries as they are (the same cite keys), with today's dates, and

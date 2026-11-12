@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-11-11.08';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-11-12.01';
 // On GitHub Pages, every part of the app must be from the same version: a
 // part kept from an older one (the offline copy, served when the network
 // was slow) lacks what this page needs. Then the kept copies go, and the
@@ -714,6 +714,116 @@ if (RELOADING) {
     s.hidden = !(kind === 'status' && msg);
     s.textContent = kind === 'status' ? msg : '';
   };
+  // The first setup's three ways in: a BibDesk .bib (links, or Google's
+  // picker), a Zotero export, or an empty library.
+  function setWay(way) {
+    $('#setupWays').querySelectorAll('[data-way]').forEach(b => b.setAttribute('aria-checked', String(b.dataset.way === way)));
+    $('#linkFields').hidden = $('#setupGo').hidden = way !== 'bib';
+    $('#newLibRow').hidden = way !== 'new';
+    $('#zotRow').hidden = way !== 'zotero';
+    setupMsg('', 'status');
+    const first = { bib: '#bibLink', new: '#newLibName' }[way];
+    if (first && !$(first).closest('[hidden]')) $(first).focus();
+  }
+  $('#setupWays').addEventListener('click', ev => {
+    const b = ev.target.closest('[data-way]');
+    if (b) setWay(b.dataset.way);
+  });
+  // With limited access: the .bib, the papers folder and the folders in
+  // it, chosen in Google's picker, which gives them to LibLande. (The
+  // choices go in the link boxes, hidden, as IDs.)
+  const PICKED = { bibParent: '' };
+  function pickMode(on) { $('#linkInputs').hidden = on; $('#pickSteps').hidden = !on; }
+  const limitedPicks = () => !$('#pickSteps').hidden;
+  const picked = (what, text, ok) => {
+    const g = $('#pickSteps').querySelector('[data-got="' + what + '"]');
+    g.textContent = text || '';
+    g.classList.toggle('ok', !!ok);
+  };
+  function resetPicks() { ['bib', 'papers', 'folders'].forEach(w => picked(w, '')); PICKED.bibParent = ''; }
+  $('#pickSteps').addEventListener('click', async ev => {
+    const b = ev.target.closest('[data-pick]');
+    if (!b || b.disabled) return;
+    const what = b.dataset.pick;
+    const papersId = $('#papersLink').value.trim() || (!$('#setHead').hidden && status && status.papersId) || '';
+    if (what === 'folders' && !papersId) { setupMsg('Choose your papers folder first.', 'error'); return; }
+    b.disabled = true;
+    setupMsg('', 'error');
+    try {
+      const opts = what === 'bib' ? { what: 'bib', title: 'Choose your .bib file' }
+        : what === 'papers' ? { what: 'folder', parent: PICKED.bibParent || undefined, title: 'Choose your papers folder' }
+          : { what: 'folders', parent: papersId, settle: false, title: 'Select every folder, then Select' };
+      const res = await callServer('pickFiles', opts);
+      const d = res.docs[0];
+      if (!d) {
+        if (res.missing.length) setupMsg('Google hasn\u2019t given LibLande \u201c' + res.missing[0].name + '\u201d yet. Choose it again in a moment.', 'error');
+        return;
+      }
+      if (what === 'bib') {
+        if (!/\.bib$/i.test(d.name)) { setupMsg('\u201c' + d.name + '\u201d isn\u2019t a .bib file.', 'error'); return; }
+        $('#bibLink').value = d.id;
+        PICKED.bibParent = d.parentId || '';
+        picked('bib', d.name, true);
+      } else if (what === 'papers') {
+        $('#papersLink').value = d.id;
+        picked('papers', d.name, true);
+        picked('folders', '');
+      } else picked('folders', res.docs.length.toLocaleString() + ' folder' + (res.docs.length === 1 ? '' : 's'), true);
+    } catch (err) {
+      setupMsg(errText(err), 'error');
+    } finally {
+      b.disabled = false;
+    }
+  });
+  // From Zotero: its BibTeX export (a folder with a .bib and its files, or
+  // the .bib alone), read here, then copied into a new library in Drive.
+  const ZOT = { text: '', files: [] };
+  function zotReset() {
+    ZOT.text = ''; ZOT.files = [];
+    $('#zotWhat').hidden = $('#zotNameRow').hidden = true;
+    $('#zotName').value = '';
+  }
+  $('#zotBtn').addEventListener('click', () => { const r = $('#zotRow'); r.hidden = !r.hidden; });
+  $('#zotPick').addEventListener('click', () => $('#zotInput').click());
+  $('#zotBibPick').addEventListener('click', () => $('#zotBibInput').click());
+  const zotTake = async list => {
+    const path = f => f.webkitRelativePath || f.name;
+    // (Not the Finder's hidden files.)
+    const all = Array.from(list || []).filter(f => !/(^|\/)\./.test(path(f)));
+    zotReset();
+    const bibs = all.filter(f => /\.bib$/i.test(f.name)).sort((a, b) => path(a).split('/').length - path(b).split('/').length);
+    if (!bibs.length) { setupMsg('There\u2019s no .bib file there. In Zotero, export to BibTeX.', 'error'); return; }
+    const bib = bibs[0], dir = path(bib).split('/').slice(0, -1).join('/');
+    try { ZOT.text = await bib.text(); } catch (e) { setupMsg('LibLande couldn\u2019t read ' + bib.name + '.', 'error'); return; }
+    // (Paths from the .bib's folder, as its links have them.)
+    ZOT.files = all.filter(f => !/\.bib$/i.test(f.name)).map(f => ({ path: dir && path(f).indexOf(dir + '/') === 0 ? path(f).slice(dir.length + 1) : path(f), file: f }));
+    const n = (ZOT.text.match(/@(?!comment\b|string\b|preamble\b)\w+\s*\{/gi) || []).length;
+    if (!n) { zotReset(); setupMsg(bib.name + ' has no publications in it.', 'error'); return; }
+    setupMsg('', 'error');
+    $('#zotWhat').textContent = bib.name + ': ' + n.toLocaleString() + ' publication' + (n === 1 ? '' : 's') +
+      (ZOT.files.length ? ', ' + ZOT.files.length.toLocaleString() + ' file' + (ZOT.files.length === 1 ? '' : 's') : '');
+    $('#zotWhat').classList.add('ok');
+    $('#zotWhat').hidden = $('#zotNameRow').hidden = false;
+    const base = bib.name.replace(/\.bib$/i, '').trim();
+    $('#zotName').value = /^exported items$/i.test(base) || !base ? 'Zotero' : base;
+    $('#zotName').focus();
+  };
+  ['#zotInput', '#zotBibInput'].forEach(s => $(s).addEventListener('change', ev => { const f = ev.target.files; zotTake(f).finally(() => { ev.target.value = ''; }); }));
+  const zotImport = () => {
+    const name = $('#zotName').value.trim();
+    if (!ZOT.text) return;
+    if (!name) { setupMsg('Give the library a name.', 'error'); $('#zotName').focus(); return; }
+    const req = {
+      name, bibText: ZOT.text, files: ZOT.files, now: bibdeskTime(),
+      onProgress: (d, t) => { if (t) setupMsg('Copying files into your Google Drive: ' + d.toLocaleString() + ' of ' + t.toLocaleString() + '.', 'status'); },
+    };
+    otherLibrary('importLibrary', [req], 'Making \u201c' + name + '\u201d in your Google Drive.', false, undefined, st => {
+      const m = st.imported && st.imported.missing;
+      return m ? ' (' + m.toLocaleString() + ' linked file' + (m === 1 ? ' wasn\u2019t' : 's weren\u2019t') + ' in the export)' : '';
+    });
+  };
+  $('#zotGo').addEventListener('click', zotImport);
+  $('#zotName').addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); zotImport(); } });
   // Setup (first time): the links and Build my library. Settings (once set
   // up): changes take effect only on Save; Cancel (or Esc) leaves things as
   // they were. New links rebuild the library.
@@ -731,6 +841,25 @@ if (RELOADING) {
     $('#setupEdit').hidden = !configured;
     $('#linkFields').hidden = configured;
     $('#bibLink').value = $('#papersLink').value = '';
+    // (The first setup: from a .bib, from Zotero or from nothing. Settings:
+    // new libraries, either way, under Library.)
+    $('#setupWays').hidden = configured;
+    $('#newLibBtn').hidden = $('#zotBtn').hidden = !configured;
+    if (configured) { $('#newLibRow').hidden = $('#zotRow').hidden = true; $('#setupGo').hidden = false; }
+    else setWay('bib');
+    resetPicks();
+    zotReset();
+    // (On Pages: this device's access to Drive. Limited: Google's picker
+    // in place of links. In Settings, limited can be made full; the other
+    // way is chosen at a first sign-in.)
+    pickMode(false);
+    if (window.LIBLANDE_PAGES) callServer('getAccess').then(a => {
+      pickMode(a.access === 'limited');
+      if (!configured) return;
+      $('#accessRow').hidden = false;
+      $('#curAccess').textContent = a.access === 'limited' ? 'Limited: the files you\u2019ve given LibLande' : 'Full';
+      $('#accessFull').hidden = a.access !== 'limited';
+    }).catch(() => {});
     if (configured) {
       // The theme previews as you choose; Save keeps it, Cancel puts it back.
       STYLE_WAS = store.get('style', 'liblande');
@@ -749,13 +878,6 @@ if (RELOADING) {
       renderLibOthers(st);
       $('#curPapers').textContent = st.papersName || '';
       $('#changeLinks').hidden = false;
-      // (On Pages: this device's access to Drive, full or limited. Limited
-      // can be made full here; the other way is chosen at a first sign-in.)
-      if (window.LIBLANDE_PAGES) callServer('getAccess').then(a => {
-        $('#accessRow').hidden = false;
-        $('#curAccess').textContent = a.access === 'limited' ? 'Limited: the files you\u2019ve given LibLande' : 'Full';
-        $('#accessFull').hidden = a.access !== 'limited';
-      }).catch(() => {});
     }
     if (!configured) $('#linkFields').after($('#setLibs'));
     setupMsg(st && st.problem, 'error');
@@ -821,11 +943,11 @@ if (RELOADING) {
   // it, as for new links, and opens it.
   // (From the sidebar, quiet: what's happening in a message at the foot.)
   let switching = false;
-  const otherLibrary = async (call, args, what, quiet, target) => {
+  const otherLibrary = async (call, args, what, quiet, target, note) => {
     if (switching) return;
     switching = true;
     const say = (m, kind) => (quiet ? (m ? toast(m, kind === 'error' ? 7000 : 0) : null) : setupMsg(m, kind));
-    const btns = ['#setSave', '#setClose', '#setupGo', '#newLibGo'].map(s => $(s)).concat([...$('#libOthers').querySelectorAll('button')]);
+    const btns = ['#setSave', '#setClose', '#setupGo', '#newLibGo', '#zotGo', '#zotPick', '#zotBibPick'].map(s => $(s)).concat([...$('#libOthers').querySelectorAll('button')]);
     btns.forEach(b => { if (b) b.disabled = true; });
     const msg = what + ' LibLande builds it, which can take a minute or two for a large library.';
     say(msg, 'status');
@@ -845,7 +967,9 @@ if (RELOADING) {
       $('#setup').hidden = true;
       $('#settingsBtn').hidden = false; $('#addBtn').hidden = false;
       $('#newLibRow').hidden = true; $('#newLibName').value = '';
-      toast('Now using ' + (status.bibName || 'the library').replace(/\.bib$/i, '') + ': ' + ENTRIES.length.toLocaleString() + ' publication' + (ENTRIES.length === 1 ? '' : 's'), 3500);
+      $('#zotRow').hidden = true; zotReset();
+      const more = note ? note(status) : '';
+      toast('Now using ' + (status.bibName || 'the library').replace(/\.bib$/i, '') + ': ' + ENTRIES.length.toLocaleString() + ' publication' + (ENTRIES.length === 1 ? '' : 's') + more, more ? 8000 : 3500);
     } catch (err) {
       say((quiet ? 'Couldn\u2019t switch: ' : '') + errText(err), 'error');
     } finally {
@@ -904,7 +1028,7 @@ if (RELOADING) {
   const saveSettingsPage = async () => {
     const save = $('#setSave'), close = $('#setClose');
     const bibLink = $('#bibLink').value.trim(), papersLink = $('#papersLink').value.trim();
-    if (!$('#linkFields').hidden && !bibLink && papersLink) { setupMsg('Paste the link to your .bib file too (even if it\u2019s the same one).', 'error'); return; }
+    if (!$('#linkFields').hidden && !bibLink && papersLink) { setupMsg(limitedPicks() ? 'Choose your .bib file too (even if it\u2019s the same one).' : 'Paste the link to your .bib file too (even if it\u2019s the same one).', 'error'); return; }
     save.disabled = close.disabled = true;
     setupMsg('', 'error');
     const notes = [];
@@ -940,7 +1064,8 @@ if (RELOADING) {
     const go = $('#setupGo'), cancel = { disabled: false };
     if (go.disabled) return;
     const bibLink = $('#bibLink').value.trim(), papersLink = $('#papersLink').value.trim();
-    if (!bibLink) { setupMsg('Paste the link to your .bib file first.', 'error'); return; }
+    if (!bibLink) { setupMsg(limitedPicks() ? 'Choose your .bib file first.' : 'Paste the link to your .bib file first.', 'error'); return; }
+    if (limitedPicks() && !papersLink) { setupMsg('Choose your papers folder too.', 'error'); return; }
     go.disabled = cancel.disabled = true;
     setupMsg('Reading your .bib file and finding your papers. A large library takes a minute or two.', 'status');
     try {

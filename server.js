@@ -17,7 +17,7 @@
   window.LIBLANDE_PAGES = true;
   // (Which version each part of the app is from: index.html checks they
   // match. build.py fills it in.)
-  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-11-11.08';
+  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-11-12.01';
   const CLIENT_ID = '789682218462-98mjugngb46ttd01ucp9dcj71ufspjgn.apps.googleusercontent.com';
   // Google Drive, in one of two ways (docs/drive-file-plan.md):
   // full: all of Drive (your .bib, papers and LibLande folder wherever
@@ -246,7 +246,7 @@
     if (what !== 'bib' && what !== 'folder') pb.enableFeature(P.Feature.MULTISELECT_ENABLED).setMaxItems(5000);
     return new Promise(ok => {
       pb.setCallback(d => {
-        if (d.action === P.Action.PICKED) ok((d.docs || []).map(x => ({ id: x.id, name: x.name, mimeType: x.mimeType })));
+        if (d.action === P.Action.PICKED) ok((d.docs || []).map(x => ({ id: x.id, name: x.name, mimeType: x.mimeType, parentId: x.parentId || '' })));
         else if (d.action === P.Action.CANCEL) ok([]);
       });
       pb.build().setVisible(true);
@@ -320,7 +320,9 @@
     if (!r.ok) {
       let msg = '';
       try { msg = (await r.json()).error.message; } catch (e) { /* none */ }
-      throw new Error('Google Drive answered ' + r.status + (msg ? ': ' + msg : ''));
+      const err = new Error('Google Drive answered ' + r.status + (msg ? ': ' + msg : ''));
+      err.status = r.status;
+      throw err;
     }
     return r;
   }
@@ -453,6 +455,13 @@
       const made = await edits.createLibrary({ name });
       lastBuilt = null; window.LIBLANDE_BUILT = null;
       return Object.assign(await SERVER.getStatus(), { created: made });
+    },
+    // A new library from a Zotero export (or another .bib): its PDFs
+    // uploaded and filed, its entries linked to them (edits.js).
+    async importLibrary(req) {
+      const made = await edits.importLibrary(req);
+      lastBuilt = null; window.LIBLANDE_BUILT = null;
+      return Object.assign(await SERVER.getStatus(), { imported: made });
     },
     copyToLibrary(req) { return edits.copyToLibrary(req); },
     async forgetLibrary(bibId) { await edits.forgetLibrary({ bibId }); return SERVER.getStatus(); },

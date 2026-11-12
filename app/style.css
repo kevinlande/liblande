@@ -570,6 +570,20 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .set-newlib-go input { flex: 1; min-width: 0; }
 .set-links { display: grid; gap: 8px; }
 .set-links[hidden] { display: none; }
+/* The first setup: start from a .bib, from Zotero, or from nothing. */
+.seg.setup-ways { margin: 14px 0 2px; }
+.seg.setup-ways button { padding: 8px 6px; font-size: 13.5px; }
+/* Limited access: Google's picker, in three steps, in place of links. */
+.set-picks { display: grid; gap: 8px; margin-top: 12px; }
+.set-picks[hidden] { display: none; }
+.set-pick { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.set-step { flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); font-size: 12.5px; font-weight: 600; }
+.set-pick .btn { flex: none; }
+.set-got { min-width: 0; color: var(--muted); font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.set-got.ok::before { content: "\2713  "; color: var(--accent); }
+.set-picks .hint { margin: -2px 0 4px 32px; }
+.set-newlib-go .linkish { align-self: center; font-size: 13.5px; }
+.setup:not(.head-mode) .in-settings { display: none; }
 .fields-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0 12px; }
 .fld { grid-column: 1 / -1; display: grid; gap: 4px; min-width: 0; align-content: start; }
 .fld.short { grid-column: span 1; }
