@@ -19,7 +19,7 @@
  */
 (function (root) {
   'use strict';
-  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).builder = '2026-11-12.03';
+  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).builder = '2026-11-12.04';
   const FOLDER = 'application/vnd.google-apps.folder';
   const DATA_FOLDER = 'LibLande', LIBRARY_FILE = 'library.json.gz', INDEX_FILE = 'file-index.json',
     SETTINGS_FILE = 'settings.json', INBOX_FOLDER = 'Inbox', INBOX_FILE = 'LibLande inbox.bib';
@@ -53,7 +53,7 @@
     const one = j => buildLibrary_(j.text, j.ids, Object.assign({ base64Decode: b64ToBytes }, j.opts)).data;
     const data = one(job.main), extra = job.inbox ? one(job.inbox) : null;
     const out = { entries: data.entries.length, groups: data.groups || [] };
-    if (data.entries.some(e => (e.files || []).some(f => f.x))) return Object.assign(out, { data, extra });
+    if (job.keep || data.entries.some(e => (e.files || []).some(f => f.x))) return Object.assign(out, { data, extra });
     if (extra) mergeInbox(data, extra);
     out.entries = data.entries.length;
     out.gz = await gzip(JSON.stringify(data));
@@ -285,6 +285,21 @@
       if (bib.parents) away.delete(bib.parents[0]);
       return away;
     }
+    // With limited access: the folders under the papers folder that
+    // LibLande can't see but knows are there (a PDF in one was found by its
+    // name), as paths from the .bib's folder. (BibDesk made them after
+    // setup: they're to be given to LibLande, and never made a second
+    // time. One merely named in the .bib may not exist: not counted.)
+    function unseenFolders(data, index, prefix) {
+      const out = new Set();
+      data.entries.forEach(e => (e.files || []).forEach(f => {
+        const dir = String(f.p || '').split('/').slice(0, -1).join('/');
+        if (!f.id || !dir || dir.split('/').indexOf('..') >= 0 || index.folders[dir]) return;
+        if (prefix && dir.indexOf(prefix + '/') !== 0) return;
+        out.add(dir);
+      }));
+      return Array.from(out).sort();
+    }
     // Linked files not found by path, matched by name to those.
     function resolveLoose(data, loose) {
       let n = 0;
@@ -453,6 +468,10 @@
       mark('read .bib');
       const job = { main: { text: bibText, ids: index.files, opts: { built: Date.parse(bib.modifiedTime), source: bib.name, papersPrefix: prefix } } };
       if (inboxText != null) job.inbox = { text: inboxText, ids: inboxPaths, opts: { built: 0, source: INBOX_FILE, papersPrefix: '' } };
+      // (Limited access: the library's parts always back, for the folders
+      // LibLande can't see.)
+      const limited = !!(io.limited && io.limited());
+      if (limited) job.keep = true;
       const out = await parse(job);
       mark('parsed');
       if (!out.entries && bibText.indexOf('@') >= 0) throw new Error('LibLande couldn\u2019t read any publications in ' + bib.name + '.');
@@ -472,6 +491,7 @@
             mark('looked up ' + found.looked + ' new file' + (found.looked === 1 ? '' : 's') + ' (' + found.found + ' found)');
           }
         }
+        if (limited) out.data.unseen = unseenFolders(out.data, index, prefix);
         if (out.extra) mergeInbox(out.data, out.extra);
         out.entries = out.data.entries.length;
         out.gz = await gzip(JSON.stringify(out.data));

@@ -19,7 +19,7 @@
  */
 (function (root) {
   'use strict';
-  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).edits = '2026-11-12.03';
+  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).edits = '2026-11-12.04';
   const FOLDER = 'application/vnd.google-apps.folder';
   const UPLOAD = 'https://www.googleapis.com/upload/drive/v3/';
   const READING_FILE = 'reading-list.json',
@@ -482,14 +482,20 @@
     /* -------------------------------------------- PDFs */
     // Move an uploaded PDF into the papers folder under the name AutoFile
     // would give it (as Code.gs's filePdf_). Returns {relPath, info, undo}.
-    async function filePdf(bibMeta, uploadId, fields, prefix) {
+    // avoid: folders the .bib names that LibLande can't see (paths from
+    // the .bib's folder; limited access), never made again.
+    async function filePdf(bibMeta, uploadId, fields, prefix, avoid) {
       const segs = String(prefix || 'Papers').split('/').filter(Boolean);
       if (segs.some(s => s === '..' || s === '.')) throw new Error('LibLande can only file PDFs in a folder inside the one that holds your .bib file.');
       let rootId = bibMeta.parents && bibMeta.parents[0];
       if (!rootId) throw new Error('LibLande can’t see the folder that holds your .bib file.');
       for (const s of segs) rootId = (await subFolder(rootId, s, true)).id;
       const name = autoFileName_(fields);
-      const folder = await authorFolder(rootId, name.folder);
+      const blocked = (avoid || []).some(p => {
+        const parts = String(p).split('/'), last = parts.pop();
+        return parts.join('/') === segs.join('/') && folderKey(last) === folderKey(name.folder);
+      });
+      const folder = await authorFolder(rootId, name.folder, blocked);
       const taken = {};
       (await B.listAll(q(folder.id) + ' in parents and trashed = false', 'name')).forEach(f => { taken[f.name.normalize('NFC')] = true; });
       const file = await meta(uploadId, 'id,name,parents');
@@ -515,13 +521,25 @@
     }
     // The author folder, reusing one whose name differs only in accents or
     // punctuation (BibDesk sometimes wrote "Ogmen.H" for "Öǧmen.H").
-    async function authorFolder(parentId, name) {
+    // (Folder names compared without accents or punctuation: BibDesk
+    // sometimes wrote "Ogmen.H" for a name with accents.)
+    const folderKey = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9.-]/g, '').toLowerCase();
+    // The author folder, reusing one whose name differs only in accents or
+    // punctuation. blocked: one with that name is there but LibLande can't
+    // see it (limited access, a folder BibDesk made later): not made a
+    // second time; it says so, and which (e.unseenFolder).
+    async function authorFolder(parentId, name, blocked) {
       const exact = await B.named(parentId, name, 'id,name', true);
       if (exact) return exact;
-      const key = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9.-]/g, '').toLowerCase();
-      const want = key(name);
-      const hit = (await B.listAll(q(parentId) + " in parents and mimeType = '" + FOLDER + "' and trashed = false", 'id,name')).find(f => key(f.name) === want);
-      return hit || subFolder(parentId, name, true);
+      const want = folderKey(name);
+      const hit = (await B.listAll(q(parentId) + " in parents and mimeType = '" + FOLDER + "' and trashed = false", 'id,name')).find(f => folderKey(f.name) === want);
+      if (hit) return hit;
+      if (blocked) {
+        const e = new Error('Your papers folder has a folder \u201c' + name + '\u201d that LibLande hasn\u2019t been given yet (BibDesk made it later). Add papers, choose that folder, then try again.');
+        e.unseenFolder = name;
+        throw e;
+      }
+      return subFolder(parentId, name, true);
     }
     const bdskValue = relPath => bytesToB64(bdskFileBytes_(relPath));
 
@@ -613,7 +631,7 @@
         if (await run('hasKey', text, req.key)) throw new Error('Your library already has a publication with the cite key ' + req.key + '.');
         const fields = texSafe(Object.assign({}, req.fields));
         fields['date-added'] = fields['date-modified'] = req.now;
-        filed = req.uploadId ? await filePdf(m, req.uploadId, fields, req.prefix) : null;
+        filed = req.uploadId ? await filePdf(m, req.uploadId, fields, req.prefix, req.avoid) : null;
         try {
           if (filed) fields['bdsk-file-1'] = bdskValue(filed.relPath);
           return Object.assign(await run('addToMain', text, req.type, req.key, fields), { undo: filed ? filed.undo : null });
@@ -634,7 +652,7 @@
       const out = await changeFile(await mainBibId(), async (text, m) => {
         const pre = await run('attachPrepare', text, req);
         nums = pre.nums;
-        filed = await filePdf(m, req.uploadId, pre.fields, req.prefix);
+        filed = await filePdf(m, req.uploadId, pre.fields, req.prefix, req.avoid);
         try {
           return Object.assign(await run('attachEdit', text, req, pre.n, bdskValue(filed.relPath)), { undo: filed.undo });
         } catch (e) {

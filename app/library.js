@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-12.03';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-12.04';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -930,7 +930,7 @@ async function runAttach(e, file, replace) {
     const old = replace && e.files && e.files[0];
     const now = bibdeskTime();
     const res = await callServer('attachPdf', {
-      key: e.k, uploadId: up.id, replace: !!replace, replaceId: old && old.id ? old.id : null,
+      key: e.k, uploadId: up.id, replace: !!replace, replaceId: old && old.id ? old.id : null, avoid: unseenFolders(),
       expectHash: e.h || null, prefix: papersPrefix(), modified: now, backupName: fileTime(),
     });
     e.h = res.hash;
@@ -941,7 +941,7 @@ async function runAttach(e, file, replace) {
     showDone(e.f.title || e.k, 'PDF filed as ' + res.file.p);
     afterWrite();
   } catch (err) {
-    toast('Couldn\u2019t attach the PDF: ' + errText(err), 6000);
+    toast('Couldn\u2019t attach the PDF: ' + errText(err), err && err.unseenFolder ? 12000 : 6000, err && err.unseenFolder ? { label: 'Add papers', run: addPapers } : null);
   }
 }
 

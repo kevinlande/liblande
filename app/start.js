@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-11-12.03';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-11-12.04';
 // On GitHub Pages, every part of the app must be from the same version: a
 // part kept from an older one (the offline copy, served when the network
 // was slow) lacks what this page needs. Then the kept copies go, and the
@@ -292,39 +292,47 @@ function renderLibOthers(st) {
 // With limited access (Pages): the PDFs the library links that LibLande
 // hasn't been given yet, and giving it them in Google's picker. (Inbox
 // entries aside.)
-let ACCESS = 'full', OFFERED_ADD = false;
+// And the folders the .bib names that LibLande can't see (BibDesk made
+// them after setup): asked for first, and never made a second time.
+let ACCESS = 'full', TO_ADD = null;
 const notAdded = () => ENTRIES.reduce((n, e) => n + (e.ib ? 0 : (e.files || []).filter(f => f.x).length), 0);
+const unseenFolders = () => (DATA && DATA.unseen) || [];
 const pdfsText = n => n.toLocaleString() + ' PDF' + (n === 1 ? '' : 's');
+const foldersText = n => n.toLocaleString() + ' new folder' + (n === 1 ? '' : 's');
+const toAddText = (n, f) => [n ? pdfsText(n) : '', f ? foldersText(f) : ''].filter(Boolean).join(' and ');
 function renderAddPapers() {
-  const n = notAdded();
+  const n = notAdded(), f = unseenFolders().length;
   $('#addPapersRow').hidden = ACCESS !== 'limited';
-  $('#curNotAdded').textContent = n ? pdfsText(n) + ' not added yet' : 'All added';
+  $('#curNotAdded').textContent = n || f ? toAddText(n, f) + ' to add' : 'All added';
 }
 async function addPapers() {
   const before = notAdded();
   try {
-    const r = await callServer('addPapers');
-    if (!r.added) return;
-    toast('Adding ' + pdfsText(r.added) + ' to your library\u2026', 0);
+    const r = await callServer('addPapers', { folders: unseenFolders() });
+    if (!r.added && !r.folders) return;
+    toast('Adding ' + toAddText(r.added, r.folders) + ' to your library\u2026', 0);
     status = await callServer('getStatus');
     if (status.building) await waitForBuild();
     if (status.stamp !== loadedStamp) await update(true);
-    const left = notAdded(), linked = Math.max(0, before - left);
-    toast(pdfsText(linked) + ' linked' + (left ? '; ' + pdfsText(left) + ' still to add' : ''), 8000, left ? [{ label: 'Add more', run: addPapers }] : null);
+    const left = notAdded(), f = unseenFolders().length, linked = Math.max(0, before - left);
+    toast(pdfsText(linked) + ' linked' + (left || f ? '; ' + toAddText(left, f) + ' still to add' : ''), 8000, left || f ? [{ label: 'Add more', run: addPapers }] : null);
     renderAddPapers();
   } catch (err) {
     toast('Couldn\u2019t add the PDFs: ' + errText(err), 6000);
   }
 }
-// Once a session, when the library opens: how many are still to add.
-// (True if it said so.)
+// With limited access: what's still to add, said when the library first
+// opens in a session, and again whenever an update brings more (new
+// papers filed in BibDesk). (True if it said so.)
 async function offerAddPapers() {
-  if (!window.LIBLANDE_PAGES || OFFERED_ADD) return false;
-  try { ACCESS = (await callServer('getAccess')).access; } catch (e) { return false; }
-  const n = notAdded();
-  if (ACCESS !== 'limited' || !n) return false;
-  OFFERED_ADD = true;
-  toast(pdfsText(n) + ' your library links ' + (n === 1 ? 'isn\u2019t' : 'aren\u2019t') + ' in LibLande yet', 15000, [{ label: 'Add them', run: addPapers }]);
+  if (!window.LIBLANDE_PAGES || !ENTRIES.length) return false;
+  const first = TO_ADD === null;
+  if (first) { try { ACCESS = (await callServer('getAccess')).access; } catch (e) { return false; } }
+  if (ACCESS !== 'limited') return false;
+  const n = notAdded(), f = unseenFolders().length, more = !first && n + f > TO_ADD;
+  TO_ADD = n + f;
+  if (!(n + f) || !(first || more)) return false;
+  toast((first ? '' : 'New in your library: ') + toAddText(n, f) + ' to give LibLande, from your Google Drive', 15000, [{ label: 'Add them', run: addPapers }]);
   return true;
 }
 
@@ -447,6 +455,8 @@ async function update(quiet) {
   cache.put(lib);
   fetchAheadSoon();
   if (!quiet) toast('Library updated: ' + d.source + ' as of ' + builtText(d), 3000);
+  // (New papers that LibLande isn't given yet: said so, after that.)
+  if (TO_ADD !== null) offerAddPapers();
 }
 
 if (RELOADING) {

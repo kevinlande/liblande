@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-12.03';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-12.04';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -959,7 +959,7 @@ async function saveAdd() {
     toast('Adding ' + name + '\u2026', 0, null, true);
     // (Its cite key made in its turn, after any added before it.)
     const now = bibdeskTime();
-    const res = await inTurn(() => { key = makeCiteKey(vals); return callServer('addToMain', { type, key, fields: vals, uploadId: upload && upload.id, prefix: papersPrefix(), now, backupName: fileTime() }); });
+    const res = await inTurn(() => { key = makeCiteKey(vals); return callServer('addToMain', { type, key, fields: vals, uploadId: upload && upload.id, prefix: papersPrefix(), avoid: unseenFolders(), now, backupName: fileTime() }); });
     const e = newEntry(type, key, vals, now, false);
     e.h = res.hash;
     if (res && res.queued) e.offline = true;
@@ -983,7 +983,8 @@ async function saveAdd() {
     // (A book: its chapters already in the library, offered to link.)
     if (isBook(e)) setTimeout(() => lcOfferFor(e), 1200);
   } catch (err) {
-    toast('Couldn\u2019t add ' + name + ': ' + errText(err), 12000, { label: 'Try again', run: () => reopenAdd(snap, errText(err)) });
+    // (A folder LibLande isn't given yet: Add papers first.)
+    toast('Couldn\u2019t add ' + name + ': ' + errText(err), 12000, (err && err.unseenFolder ? [{ label: 'Add papers', run: addPapers }] : []).concat([{ label: 'Try again', run: () => reopenAdd(snap, errText(err)) }]));
   }
 }
 // Add opened again as it was left, with why it didn't add.

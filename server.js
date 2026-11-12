@@ -17,7 +17,7 @@
   window.LIBLANDE_PAGES = true;
   // (Which version each part of the app is from: index.html checks they
   // match. build.py fills it in.)
-  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-11-12.03';
+  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-11-12.04';
   const CLIENT_ID = '789682218462-98mjugngb46ttd01ucp9dcj71ufspjgn.apps.googleusercontent.com';
   // Google Drive, in one of two ways (docs/drive-file-plan.md):
   // full: all of Drive (your .bib, papers and LibLande folder wherever
@@ -426,15 +426,25 @@
     // With limited access: PDFs given to LibLande in Google's picker, then
     // the papers folder listed again (a build) so they're linked. The page
     // waits for the build, as for any other.
-    async addPapers() {
+    // opts.folders: folders the .bib names that LibLande can't see (from
+    // the build), asked for first.
+    async addPapers(opts) {
+      const want = (opts && opts.folders) || [];
+      let folders = [];
+      if (want.length) {
+        const s = await builder.settings();
+        const names = want.map(p => String(p).split('/').pop());
+        folders = await pick({ what: 'folders', parent: (s && s.papersId) || undefined,
+          title: 'Select ' + (names.length === 1 ? 'the folder ' + names[0] : 'the new folders (' + names.slice(0, 3).join(', ') + (names.length > 3 ? ', \u2026' : '') + ')') + ', then Select' });
+      }
       const docs = await pick({ what: 'pdfs', title: 'Select your PDFs, then Select' });
-      if (!docs.length) return { added: 0 };
+      if (!docs.length && !folders.length) return { added: 0, folders: 0 };
       // (A moment for Google to pass them on; one not passed on yet is
       // found at the next listing.)
       await new Promise(r => setTimeout(r, 3000));
       if (buildRun) await buildRun;
       startBuild(await builder.look({ force: true }), { force: true });
-      return { added: docs.length };
+      return { added: docs.length, folders: folders.length };
     },
     async getPrefs() { prefsMemo = null; return loadPrefs(null); },
     // New settings, from the links pasted in Settings (as Code.gs's
@@ -501,7 +511,11 @@
     },
     async forgetLibrary(bibId) { await edits.forgetLibrary({ bibId }); return SERVER.getStatus(); },
     async switchLibrary(bibId, papersId) {
-      await edits.useLibrary({ bibId, papersId });
+      try { await edits.useLibrary({ bibId, papersId }); } catch (e) {
+        // (Limited access: a library whose .bib LibLande wasn't given.)
+        if (access === 'limited' && (e.status === 404 || e.status === 403)) throw new Error('LibLande hasn\u2019t been given that library\u2019s .bib. Add it with Add an existing library, in Settings \u203a Library.');
+        throw e;
+      }
       lastBuilt = null; window.LIBLANDE_BUILT = null;
       return SERVER.getStatus();
     },
