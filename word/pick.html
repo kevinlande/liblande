@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LibLande</title>
+<style>
+body { margin: 0; font: 13px/1.45 -apple-system, system-ui, sans-serif; color: #1b2321; }
+p { margin: 16px; }
+</style>
+</head>
+<body>
+<p id="say">Opening Google&#x2019;s file picker&#x2026;</p>
+<script>
+// LibLande for Google Docs: this document handed to the add-on in Google's
+// picker (the add-on has only the files it's given, and needs this one
+// itself to copy it). Held in the add-on's dialog (gdocs/addon/Pick.html),
+// which gives the add-on's token and closes when it's done.
+(function () {
+  'use strict';
+  var KEY = 'AIzaSyCJ4i0w4SpEo6DS9Y9OjMUWgPYzeUIIg7g', APP_ID = '789682218462';
+  var doc = (/[?&]doc=([\w-]+)/.exec(location.search) || [])[1] || '';
+  var say = function (t) { document.getElementById('say').textContent = t; };
+  var parentOk = function (o) { return /^https:\/\/[a-z0-9-]+-script\.googleusercontent\.com$/.test(o); };
+  var send = function (m) { window.parent.postMessage(m, '*'); };
+  if (!doc || KEY.indexOf('__') === 0) { say('Google’s picker isn’t set up here.'); return; }
+  var token = null, ready = false;
+  var go = function () {
+    if (!token || !ready) return;
+    var P = google.picker;
+    var view = new P.DocsView(P.ViewId.DOCUMENTS).setMode(P.DocsViewMode.LIST).setFileIds(doc);
+    new P.PickerBuilder()
+      .addView(view)
+      .setOAuthToken(token)
+      .setDeveloperKey(KEY)
+      .setAppId(APP_ID)
+      .setOrigin('https://docs.google.com')
+      .setTitle('Select this document, then Select')
+      .setCallback(function (d) {
+        if (d.action === P.Action.PICKED) { say('Done.'); send({ llPicked: true }); }
+        else if (d.action === P.Action.CANCEL) send({ llPicked: false });
+      })
+      .build().setVisible(true);
+    say('');
+  };
+  window.addEventListener('message', function (ev) {
+    if (ev.source !== window.parent || !parentOk(ev.origin)) return;
+    var m = ev.data || {};
+    if (m.llToken) { token = m.llToken; go(); }
+  });
+  send({ llWant: 'token' });
+  var s = document.createElement('script');
+  s.src = 'https://apis.google.com/js/api.js';
+  s.onload = function () { gapi.load('picker', { callback: function () { ready = true; go(); } }); };
+  s.onerror = function () { say('Google’s picker didn’t load. Are you online?'); };
+  document.head.appendChild(s);
+})();
+</script>
+</body>
+</html>

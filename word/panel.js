@@ -292,8 +292,9 @@
   //    References list; prog says how far it got (done, step, bibl,
   //    keepBib) and takes each made (prog.got({id: citation}));
   //  plain(): every citation and the list made ordinary text: {n, list};
-  //  plainCopy(): a copy so; answers what to say, and the copy's address
-  //    to open (url) if it isn't opened already;
+  //  plainCopy(note): a copy so (note(text) says how it's going); answers
+  //    what to say, and the copy's address to open (url) if it isn't
+  //    opened already;
   //  watch(cb): cb(tag, where) as the selection moves: tag the citation's
   //    ("LL:<id>", "LL:refs") or '', where {text, para, at} for a selection
   //    in no citation (or null).
@@ -401,8 +402,21 @@
       plain: () => bridge('makePlain'),
       // (A copy in the same folder, its citations made ordinary text; a link
       // to open it, since Safari blocks a tab opened from the sidebar.)
-      async plainCopy() {
-        const c = await bridge('plainCopy');
+      // (Drive lets the add-on copy only a document it's been given: the
+      // first time, handed to it in Google's picker, in a dialog; the copy
+      // made once it has been, for up to 3 minutes.)
+      async plainCopy(note) {
+        let c = await bridge('plainCopy');
+        if (c.needFile) {
+          await bridge('pickDoc');
+          note('Select this document in the window that opened, then Select.');
+          let ok = false;
+          for (let i = 0; i < 90 && !ok; i++) { await new Promise(r => setTimeout(r, 2000)); ok = await bridge('canCopy'); }
+          if (!ok) throw new Error('LibLande wasn\u2019t given this document');
+          note('Making the copy\u2026');
+          c = await bridge('plainCopy');
+          if (c.needFile) throw new Error('LibLande wasn\u2019t given this document');
+        }
         return {
           url: c.url,
           said: 'Plain copy made: \u201c' + c.name + '\u201d, beside this one in Drive. This document stays linked.',
@@ -1361,9 +1375,14 @@
     try {
       if (!D) throw new Error('there\u2019s no document.');
       try { await refreshDocument(); } catch (e) { throw new Error('while bringing the citations up to date: ' + wordError(e)); }
-      said = await D.plainCopy();
+      said = await D.plainCopy(text => {
+        $('plainSaid').textContent = text;
+        $('plainOpenRow').hidden = true;
+        $('plainDone').hidden = false;
+      });
     } catch (e) {
       b.disabled = false;
+      $('plainDone').hidden = true;
       showErr('refsErr', 'Couldn\u2019t make the copy (' + ((e && e.message) || e) + ')');
       return;
     }
