@@ -285,6 +285,12 @@
   //    ({id, typed});
   //  show(row): a linked citation (row.id), or typed text (row.typed),
   //    selected;
+  //  zoteroCodes(): Zotero's citations' codes ("... ZOTERO_ITEM CSL_CITATION
+  //    {json}", and its bibliography's, "... ZOTERO_BIBL ...");
+  //  convertZotero(M, prog): those LibLande has every work of made its
+  //    citations (zoteroCite), and if all were, Zotero's bibliography the
+  //    References list; prog says how far it got (done, step, bibl,
+  //    keepBib) and takes each made (prog.got({id: citation}));
   //  plain(): every citation and the list made ordinary text: {n, list};
   //  plainCopy(): a copy so; answers what to say, and the copy's address
   //    to open (url) if it isn't opened already;
@@ -372,6 +378,26 @@
       linkAt: (id, t, para) => bridge('linkHere', id, t.at, t.text, para),
       unlink: list => bridge('removeCites', list.map(u => ({ id: u.id, typed: u.typed }))),
       show: row => row.missing ? bridge('selectText', row.typed) : bridge('selectCite', row.id),
+      // (Docs: Zotero's citations are links to zotero.org/google-docs/?<key>,
+      // their codes in named ranges "Z_F<key>000...", as gdocs/addon reads.)
+      zoteroCodes: async () => (await bridge('zoteroFields')).map(z => 'ADDIN ZOTERO_' + z.code),
+      async convertZotero(M, prog) {
+        const zs = await bridge('zoteroFields'), items = zs.filter(z => !z.bibl);
+        const made = {}, jobs = [];
+        items.forEach(z => { const r = zoteroCite(z.code, M); if (!r.cite) return; const id = newId(); made[id] = r.cite; jobs.push({ key: z.key, id }); });
+        prog.keepBib = jobs.length < items.length;
+        const texts = renderAll(Object.assign({}, presentCites(), made), S.byKey).texts;
+        jobs.forEach(j => { j.text = texts[j.id]; });
+        prog.step = 'putting LibLande\u2019s citations in their place';
+        const r = await bridge('zoteroConvert', jobs, !prog.keepBib);
+        const got = {};
+        r.done.forEach(id => { got[id] = made[id]; });
+        prog.got(got);
+        prog.done = r.done.length;
+        prog.bibl = r.bibl;
+        // (Zotero's bibliography kept, as some citations are still its own.)
+        if (!r.bibl && zs.some(z => z.bibl)) prog.keepBib = true;
+      },
       plain: () => bridge('makePlain'),
       // (A copy in the same folder, its citations made ordinary text; a link
       // to open it, since Safari blocks a tab opened from the sidebar.)
@@ -617,6 +643,69 @@
         }
         await ctx.sync();
       }),
+      zoteroCodes: () => Word.run(async ctx => {
+        const fields = ctx.document.body.fields;
+        fields.load('items/code');
+        await ctx.sync();
+        return fields.items.map(f => f.code || '');
+      }),
+      // (Zotero's citations made LibLande's: see swapFields.)
+      async convertZotero(M, prog) {
+        const zCount = async ctx => { const f = ctx.document.body.fields; f.load('items/code'); await ctx.sync(); return f.items.filter(x => /ZOTERO_ITEM/.test(x.code || '')); };
+        await Word.run(async ctx => {
+          let left = await zCount(ctx);
+          prog.keepBib = left.some(f => !zoteroCite(f.code, M).cite);
+          // (A field whose paragraph gave nothing to swap, as one spanning
+          // paragraphs: passed over.)
+          const skip = new Set();
+          // (A paragraph at a time, from the end back, until none is left
+          // that can be converted.)
+          for (let guard = 0; guard < 500; guard++) {
+            const f = left.slice().reverse().find(x => zoteroCite(x.code, M).cite && !skip.has(x.code));
+            if (!f) break;
+            prog.step = 'finding the citation\u2019s paragraph';
+            const para = f.result.paragraphs.getFirst();
+            const ox = para.getOoxml();
+            await ctx.sync();
+            const made = {};
+            const out = swapFields(ox.value, M, made);
+            if (!out.xml) { skip.add(f.code); continue; }
+            prog.step = 'putting the paragraph back';
+            // (Word can add an empty paragraph after one replaced this way:
+            // counted before and after, and taken out.)
+            const countParas = async () => { const ps = ctx.document.body.paragraphs; ps.load('items/text'); await ctx.sync(); return ps.items.length; };
+            const n0 = await countParas();
+            const placed = para.insertOoxml(out.xml, 'Replace');
+            await ctx.sync();
+            if ((await countParas()) > n0) {
+              const extra = placed.paragraphs.getLast().getNextOrNullObject();
+              extra.load('text');
+              await ctx.sync();
+              if (!extra.isNullObject && !extra.text.trim()) { extra.delete(); await ctx.sync(); }
+            }
+            prog.got(made);
+            const now = await zCount(ctx);
+            if (now.length >= left.length) throw new Error('Word put the paragraph back with Zotero\u2019s field still in it.');
+            prog.done += left.length - now.length;
+            left = now;
+          }
+          if (!prog.keepBib) {
+            prog.step = 'replacing Zotero\u2019s bibliography';
+            const all = ctx.document.body.fields;
+            all.load('items/code');
+            await ctx.sync();
+            const bib = all.items.find(x => /ZOTERO_BIBL/.test(x.code || ''));
+            if (bib) {
+              const anchor = bib.result.paragraphs.getFirst().insertParagraph('', 'Before');
+              bib.delete();
+              const cc = anchor.getRange('Whole').insertContentControl();
+              cc.tag = 'LL:refs'; cc.title = 'LibLande References'; cc.appearance = 'BoundingBox';
+              await ctx.sync();
+              prog.bibl = true;
+            }
+          }
+        });
+      },
       plain: () => Word.run(async ctx => {
         let n = 0, list = false;
         const ccs = ctx.document.contentControls;
@@ -978,15 +1067,10 @@
     };
   }
   async function readZotero() {
-    if (!S.inWord) return;
+    if (!D) return;
     let codes = [];
     try {
-      await Word.run(async ctx => {
-        const fields = ctx.document.body.fields;
-        fields.load('items/code');
-        await ctx.sync();
-        codes = fields.items.map(f => f.code || '');
-      });
+      codes = await D.zoteroCodes();
     } catch (e) {
       $('zCard').hidden = false;
       $('zCount').textContent = 'Zotero\u2019s citations couldn\u2019t be read here: ' + wordError(e);
@@ -1070,67 +1154,17 @@
     const b = $('zConvert');
     b.disabled = true;
     const M = zoteroMatcher();
-    let done = 0, step = 'reading Zotero\u2019s citations', bibl = false, keepBib = false;
-    const zCount = async ctx => { const f = ctx.document.body.fields; f.load('items/code'); await ctx.sync(); return f.items.filter(x => /ZOTERO_ITEM/.test(x.code || '')); };
+    const prog = {
+      done: 0, step: 'reading Zotero\u2019s citations', bibl: false, keepBib: false,
+      got: made => { Object.assign(S.cites, made); if (S.present) S.present.push(...Object.keys(made)); },
+    };
     try {
-      await Word.run(async ctx => {
-        let left = await zCount(ctx);
-        keepBib = left.some(f => !zoteroCite(f.code, M).cite);
-        // (A field whose paragraph gave nothing to swap, as one spanning
-        // paragraphs: passed over.)
-        const skip = new Set();
-        // (A paragraph at a time, from the end back, until none is left
-        // that can be converted.)
-        for (let guard = 0; guard < 500; guard++) {
-          const f = left.slice().reverse().find(x => zoteroCite(x.code, M).cite && !skip.has(x.code));
-          if (!f) break;
-          step = 'finding the citation\u2019s paragraph';
-          const para = f.result.paragraphs.getFirst();
-          const ox = para.getOoxml();
-          await ctx.sync();
-          const made = {};
-          const out = swapFields(ox.value, M, made);
-          if (!out.xml) { skip.add(f.code); continue; }
-          step = 'putting the paragraph back';
-          // (Word can add an empty paragraph after one replaced this way:
-          // counted before and after, and taken out.)
-          const countParas = async () => { const ps = ctx.document.body.paragraphs; ps.load('items/text'); await ctx.sync(); return ps.items.length; };
-          const n0 = await countParas();
-          const placed = para.insertOoxml(out.xml, 'Replace');
-          await ctx.sync();
-          if ((await countParas()) > n0) {
-            const extra = placed.paragraphs.getLast().getNextOrNullObject();
-            extra.load('text');
-            await ctx.sync();
-            if (!extra.isNullObject && !extra.text.trim()) { extra.delete(); await ctx.sync(); }
-          }
-          Object.assign(S.cites, made);
-          if (S.present) S.present.push(...Object.keys(made));
-          const now = await zCount(ctx);
-          if (now.length >= left.length) throw new Error('Word put the paragraph back with Zotero\u2019s field still in it.');
-          done += left.length - now.length;
-          left = now;
-        }
-        if (!keepBib) {
-          step = 'replacing Zotero\u2019s bibliography';
-          const all = ctx.document.body.fields;
-          all.load('items/code');
-          await ctx.sync();
-          const bib = all.items.find(x => /ZOTERO_BIBL/.test(x.code || ''));
-          if (bib) {
-            const anchor = bib.result.paragraphs.getFirst().insertParagraph('', 'Before');
-            bib.delete();
-            const cc = anchor.getRange('Whole').insertContentControl();
-            cc.tag = 'LL:refs'; cc.title = 'LibLande References'; cc.appearance = 'BoundingBox';
-            await ctx.sync();
-            bibl = true;
-          }
-        }
-      });
+      if (!D) throw new Error('there\u2019s no document.');
+      await D.convertZotero(M, prog);
     } catch (e) {
       await saveSettings();
-      const m = (e && (e.message || e.code)) || String(e);
-      showErr('refsErr', (done ? 'Converted ' + done + ', then stopped' : 'Couldn\u2019t convert them') + ' (while ' + step + '): ' + m + (done ? ' \u2318Z undoes it.' : ''));
+      const m = (e && (e.message || e.code)) || String(e), done = prog.done;
+      showErr('refsErr', (done ? 'Converted ' + done + ', then stopped' : 'Couldn\u2019t convert them') + ' (while ' + prog.step + '): ' + m + (done && S.inWord ? ' \u2318Z undoes it.' : ''));
       b.disabled = false;
       try { await refreshDocument(true); } catch (x) { /* Refresh will */ }
       readZotero();
@@ -1140,6 +1174,7 @@
     b.disabled = false;
     try { await refreshDocument(true); } catch (e) { /* Refresh will */ }
     readZotero();
+    const { done, bibl, keepBib } = prog;
     showErr('refsErr', 'Converted ' + done + ' citation' + (done === 1 ? '' : 's') + (bibl ? ' and the bibliography' : keepBib ? '; the bibliography stays Zotero\u2019s, as some citations do' : '') + '.');
     $('refsErr').classList.add('ok');
   }
