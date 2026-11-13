@@ -4,7 +4,7 @@
 // It's also loaded on its own by the Word add-in (word/index.html), which
 // supplies what it uses from the rest: ENTRIES, esc, safeUrl, norm, cmpStr.
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/apa.js'] = '2026-11-13.06';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/apa.js'] = '2026-11-13.07';
 // Sentence case for APA titles. A capitalized word is lowered unless it
 // looks like a name: braced in the .bib ({Darwin}), an acronym or
 // mixed-case word (DNA, fMRI), an adjective like "Bayesian", or a word the

@@ -116,6 +116,10 @@
   .btn { border: 1px solid var(--line); background: var(--field); border-radius: 8px; padding: 7px 12px; font-weight: 500; cursor: pointer; }
   .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
   .btn.grow { flex: 1; }
+  a.btn { text-align: center; text-decoration: none; color: inherit; }
+  a.btn.primary { color: var(--accent-ink); }
+  #plainDone { margin-top: 8px; }
+  #plainDone .note { color: var(--accent); margin: 0 0 8px; }
   .btn:disabled { opacity: .55; cursor: default; }
   .btn kbd { font: 11px -apple-system, system-ui; opacity: .75; margin-left: 6px; }
   .card { border: 1px solid var(--line); border-radius: 9px; padding: 10px 12px; margin-bottom: 10px; }
@@ -291,6 +295,7 @@
         <h4>Make plain</h4>
         <p class="note">Every citation and the References list as ordinary text.</p>
         <div class="btns" style="flex-direction:column"><button class="btn grow" id="plainCopy" type="button">Make a plain copy&#x2026;</button><button class="btn grow" id="plainAskBtn" type="button">Convert to plain text&#x2026;</button></div>
+        <div class="done" id="plainDone" hidden><p class="note" id="plainSaid"></p><div class="btns" id="plainOpenRow" hidden><a class="btn primary grow" id="plainOpen" target="_blank" rel="noopener">Open the copy</a></div></div>
         <div class="ask" id="plainAsk" hidden><p>Convert all citations and References to plain text?</p><div class="btns"><button class="btn primary grow" id="plainYes" type="button">Convert</button><button class="btn grow" id="plainNo" type="button">Cancel</button></div></div>
       </div>
     </div></div>
@@ -338,10 +343,10 @@ const NP_OA = 'https://api.openalex.org';
 const npFetch = (u, o) => fetch(u, o);
 const npDoi = d => String(d || '').trim().replace(/^https?:\/\/(dx\.)?doi\.org\//i, '').replace(/^doi:\s*/i, '').toLowerCase();
 </script>
-<script src="../app/apa.js?v=2026-11-13.06"></script>
-<script src="../app/csl.js?v=2026-11-13.06"></script>
-<script src="../app/marks.js?v=2026-11-13.06"></script>
-<script src="../app/titlesearch.js?v=2026-11-13.06"></script>
-<script src="../lookup.js?v=2026-11-13.06"></script>
-<script src="engine.js?v=2026-11-13.06"></script>
-<script src="panel.js?v=2026-11-13.06"></script>
+<script src="../app/apa.js?v=2026-11-13.07"></script>
+<script src="../app/csl.js?v=2026-11-13.07"></script>
+<script src="../app/marks.js?v=2026-11-13.07"></script>
+<script src="../app/titlesearch.js?v=2026-11-13.07"></script>
+<script src="../lookup.js?v=2026-11-13.07"></script>
+<script src="engine.js?v=2026-11-13.07"></script>
+<script src="panel.js?v=2026-11-13.07"></script>

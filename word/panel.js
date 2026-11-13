@@ -1319,6 +1319,7 @@
   }
   async function plainCopy() {
     hideErr('refsErr');
+    $('plainDone').hidden = true;
     const b = $('plainCopy');
     b.disabled = true;
     let said;
@@ -1332,13 +1333,12 @@
       return;
     }
     b.disabled = false;
-    showErr('refsErr', said.said + ' ');
-    if (said.url) {
-      const a = document.createElement('a');
-      a.href = said.url; a.target = '_blank'; a.rel = 'noopener'; a.textContent = 'Open it';
-      $('refsErr').append(a);
-    }
-    $('refsErr').classList.add('ok');
+    // (Said in the card, under its buttons; in Docs, with a button to open
+    // the copy.)
+    $('plainSaid').textContent = said.said;
+    $('plainOpenRow').hidden = !said.url;
+    if (said.url) $('plainOpen').href = said.url;
+    $('plainDone').hidden = false;
   }
 
   /* ---- Notes: your notes and the PDF's highlights, for a work */
