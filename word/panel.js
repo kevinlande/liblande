@@ -1526,7 +1526,26 @@
     if (!fl) return;
     let r;
     try { r = await marksOf(fl); } catch (err) {
-      if (NOTE.open === k) $('nHl').innerHTML = '<p class="note">Couldn\u2019t read the PDF: ' + esc((err && err.message) || err) + '</p>';
+      if (NOTE.open !== k) return;
+      // (In Docs: a PDF the add-on hasn't been given, handed to it in
+      // Google's picker, then read.)
+      if (HOST === 'gdocs' && /\b404\b/.test((err && err.message) || '')) {
+        $('nHl').innerHTML = '<p class="note">LibLande hasn\u2019t been given this PDF here yet.</p><div class="btns"><button type="button" class="btn grow" id="nGive">Give LibLande this PDF\u2026</button></div>';
+        $('nGive').addEventListener('click', async () => {
+          const b = $('nGive');
+          b.disabled = true;
+          try {
+            await bridge('pickFile', fl.id, 'this PDF');
+            b.textContent = 'Select it in the window that opened\u2026';
+            let ok = false;
+            for (let i = 0; i < 90 && !ok && NOTE.open === k; i++) { await new Promise(res => setTimeout(res, 2000)); ok = await bridge('canReach', fl.id); }
+            if (ok && NOTE.open === k) openNotes(k);
+            else if (NOTE.open === k) { b.disabled = false; b.textContent = 'Give LibLande this PDF\u2026'; }
+          } catch (e) { b.disabled = false; b.textContent = 'Give LibLande this PDF\u2026'; }
+        });
+        return;
+      }
+      $('nHl').innerHTML = '<p class="note">Couldn\u2019t read the PDF: ' + esc((err && err.message) || err) + '</p>';
       return;
     }
     if (NOTE.open !== k) return;
