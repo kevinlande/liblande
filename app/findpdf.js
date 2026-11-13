@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/findpdf.js'] = '2026-11-13.01';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/findpdf.js'] = '2026-11-13.02';
 /* ------------------------------------------------------------ find a PDF */
 // For a publication: its free copy, found through OpenAlex (which carries
 // Unpaywall's open-access data, and needs no email), or the article

@@ -269,6 +269,8 @@
   //    list rewritten if what it says changed (or force). Answers {hasRefs};
   //  insert(id, text): a citation at the selection (never inside another),
   //    the cursor after it;
+  //  quote(id, passage, text): a passage in quotation marks there, then
+  //    its citation;
   //  goAfter(id): the cursor after a citation;
   //  remove(id, restore): a citation taken out (restore: text in its place);
   //  insertRefs(refsOf): the References list made at the cursor (refsOf()
@@ -340,6 +342,7 @@
         return bridge('applyTexts', out.texts, plain(out.refs), !!force, NO_REFS);
       },
       insert: (id, text) => bridge('insertCite', id, text),
+      quote: (id, passage, text) => bridge('quoteCite', id, passage, text),
       goAfter: id => bridge('goAfter', id),
       remove: (id, restore) => bridge('removeCite', id, restore || ''),
       insertRefs: refsOf => bridge('insertRefs', plain(refsOf()), NO_REFS),
@@ -434,6 +437,19 @@
         cc.tag = 'LL:' + id;
         cc.title = 'LibLande';
         cc.appearance = 'BoundingBox';
+        await ctx.sync();
+        cc.getRange('After').select();
+        await ctx.sync();
+      }),
+      quote: (id, passage, text) => Word.run(async ctx => {
+        const sel = ctx.document.getSelection();
+        const inside = sel.parentContentControlOrNullObject;
+        inside.load('tag');
+        await ctx.sync();
+        const at = !inside.isNullObject && /^LL:/.test(inside.tag) ? inside.getRange('After') : sel;
+        const q = at.insertText(passage, 'Replace');
+        const cc = q.insertText(text, 'After').insertContentControl();
+        cc.tag = 'LL:' + id; cc.title = 'LibLande'; cc.appearance = 'BoundingBox';
         await ctx.sync();
         cc.getRange('After').select();
         await ctx.sync();
@@ -1408,19 +1424,8 @@
     try {
       await styleReady();
       const cite = renderAll(Object.assign({}, presentCites(), { [id]: c })).texts[id];
-      await Word.run(async ctx => {
-        const sel = ctx.document.getSelection();
-        const inside = sel.parentContentControlOrNullObject;
-        inside.load('tag');
-        await ctx.sync();
-        const at = !inside.isNullObject && /^LL:/.test(inside.tag) ? inside.getRange('After') : sel;
-        const q = at.insertText('\u201c' + m.text.trim() + '\u201d ', 'Replace');
-        const cc = q.insertText(cite, 'After').insertContentControl();
-        cc.tag = 'LL:' + id; cc.title = 'LibLande'; cc.appearance = 'BoundingBox';
-        await ctx.sync();
-        cc.getRange('After').select();
-        await ctx.sync();
-      });
+      if (!D) throw new Error('there\u2019s no document to put it in.');
+      await D.quote(id, '\u201c' + m.text.trim() + '\u201d ', cite);
     } catch (e) { alertNotes('Couldn\u2019t quote it: ' + wordError(e)); return; }
     S.cites[id] = c;
     if (S.present) S.present.push(id);
@@ -2155,8 +2160,8 @@
     if (S.inWord) D = wordDoc();
     else if (HOST === 'gdocs') {
       D = docsDoc();
-      // (Not yet in Docs: Notes, the plain copy, signing out.)
-      $('tNotes').hidden = $('mOut').hidden = true;
+      // (Not yet in Docs: the plain copy, signing out.)
+      $('mOut').hidden = true;
       try { await signIn(); } catch (e) { /* the sign-in screen says why */ }
     }
     if (D) { try { D.watch(onDocSelection); } catch (e) { /* editing by cursor then unavailable */ } }
@@ -2189,5 +2194,5 @@
     });
   } else start();
   // (For testing in a browser.)
-  window.LLPanel = { S, useLibrary, search, toggle, paintChosen, view, zoteroCite, zoteroMatcher, swapFields, enterEdit, leaveEdit, currentCite, renderAll, styleEngine, LINK, paintLink, paintRefs, unwrapControls, openNotes, readMarks, paintLists, addGroupTab, listKeys, noticeSelection };
+  window.LLPanel = { S, useLibrary, search, toggle, paintChosen, view, zoteroCite, zoteroMatcher, swapFields, enterEdit, leaveEdit, currentCite, renderAll, styleEngine, LINK, paintLink, paintRefs, unwrapControls, openNotes, readMarks, quoteMark, paintLists, addGroupTab, listKeys, noticeSelection };
 })();
