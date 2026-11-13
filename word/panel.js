@@ -285,6 +285,8 @@
   //    ({id, typed});
   //  show(row): a linked citation (row.id), or typed text (row.typed),
   //    selected;
+  //  plain(): every citation and the list made ordinary text: {n, list};
+  //  plainCopy(): a copy so, opened; answers what to say;
   //  watch(cb): cb(tag, where) as the selection moves: tag the citation's
   //    ("LL:<id>", "LL:refs") or '', where {text, para, at} for a selection
   //    in no citation (or null).
@@ -369,6 +371,14 @@
       linkAt: (id, t, para) => bridge('linkHere', id, t.at, t.text, para),
       unlink: list => bridge('removeCites', list.map(u => ({ id: u.id, typed: u.typed }))),
       show: row => row.missing ? bridge('selectText', row.typed) : bridge('selectCite', row.id),
+      plain: () => bridge('makePlain'),
+      // (A copy in the same folder, its citations made ordinary text; opened
+      // in a new tab.)
+      async plainCopy() {
+        const c = await bridge('plainCopy');
+        window.open(c.url, '_blank');
+        return 'Plain copy made: \u201c' + c.name + '\u201d, beside this one in Drive. This document stays linked.';
+      },
       // (Docs says nothing when the cursor moves: asked every 1.5 s while
       // the panel is showing, one ask at a time; told on a change.)
       watch(cb) {
@@ -604,6 +614,40 @@
         }
         await ctx.sync();
       }),
+      plain: () => Word.run(async ctx => {
+        let n = 0, list = false;
+        const ccs = ctx.document.contentControls;
+        ccs.load('items/tag');
+        await ctx.sync();
+        ccs.items.filter(c => /^LL:/.test(c.tag || '')).forEach(c => { if (c.tag === 'LL:refs') list = true; else n++; c.delete(true); });
+        await ctx.sync();
+        return { n, list };
+      }),
+      // (The document as Word has it, its LibLande controls taken out, opened
+      // as a new document for you to save.)
+      async plainCopy() {
+        let step = '';
+        try {
+          step = 'reading the document';
+          const [blob, JSZip] = await Promise.all([documentBytes(), loadJSZip()]);
+          step = 'making the copy';
+          const zip = await JSZip.loadAsync(blob);
+          for (const name of Object.keys(zip.files).filter(n => /^word\/(document|header\d*|footer\d*|footnotes|endnotes)\.xml$/.test(n))) {
+            const out = unwrapControls(await zip.file(name).async('string'));
+            if (out.n) zip.file(name, out.xml);
+          }
+          // (Nor LibLande's place in it: its panel and its settings, which
+          // would have Word look for the add-in where the copy is opened.)
+          Object.keys(zip.files).filter(n => /^word\/webextensions\//.test(n)).forEach(n => zip.remove(n));
+          const types = zip.file('[Content_Types].xml'), rels = zip.file('_rels/.rels');
+          if (types) zip.file('[Content_Types].xml', (await types.async('string')).replace(/<Override [^>]*PartName="\/word\/webextensions\/[^"]*"[^>]*\/>/g, ''));
+          if (rels) zip.file('_rels/.rels', (await rels.async('string')).replace(/<Relationship [^>]*Target="[^"]*webextensions\/[^"]*"[^>]*\/>/g, ''));
+          const b64 = await zip.generateAsync({ type: 'base64', compression: 'DEFLATE' });
+          step = 'opening the copy';
+          await Word.run(async ctx => { ctx.application.createDocument(b64).open(); await ctx.sync(); });
+        } catch (e) { throw new Error('while ' + step + ': ' + wordError(e)); }
+        return 'Plain copy opened in a new window; save it with \u2318S. This document stays linked.';
+      },
       watch(cb) {
         Office.context.document.addHandlerAsync(Office.EventType.DocumentSelectionChanged, () => {
           clearTimeout(selTimer);
@@ -1220,13 +1264,8 @@
     $('plainAsk').hidden = true;
     let n = 0, list = false;
     try {
-      await Word.run(async ctx => {
-        const ccs = ctx.document.contentControls;
-        ccs.load('items/tag');
-        await ctx.sync();
-        ccs.items.filter(c => /^LL:/.test(c.tag || '')).forEach(c => { if (c.tag === 'LL:refs') list = true; else n++; c.delete(true); });
-        await ctx.sync();
-      });
+      if (!D) throw new Error('there\u2019s no document.');
+      ({ n, list } = await D.plain());
     } catch (e) { showErr('refsErr', 'Couldn\u2019t convert them: ' + wordError(e)); return; }
     S.present = [];
     S.hasRefs = false;
@@ -1279,33 +1318,18 @@
     hideErr('refsErr');
     const b = $('plainCopy');
     b.disabled = true;
-    let step = 'bringing the citations up to date';
+    let said;
     try {
-      await refreshDocument();
-      step = 'reading the document';
-      const [blob, JSZip] = await Promise.all([documentBytes(), loadJSZip()]);
-      step = 'making the copy';
-      const zip = await JSZip.loadAsync(blob);
-      for (const name of Object.keys(zip.files).filter(n => /^word\/(document|header\d*|footer\d*|footnotes|endnotes)\.xml$/.test(n))) {
-        const out = unwrapControls(await zip.file(name).async('string'));
-        if (out.n) zip.file(name, out.xml);
-      }
-      // (Nor LibLande's place in it: its panel and its settings, which
-      // would have Word look for the add-in where the copy is opened.)
-      Object.keys(zip.files).filter(n => /^word\/webextensions\//.test(n)).forEach(n => zip.remove(n));
-      const types = zip.file('[Content_Types].xml'), rels = zip.file('_rels/.rels');
-      if (types) zip.file('[Content_Types].xml', (await types.async('string')).replace(/<Override [^>]*PartName="\/word\/webextensions\/[^"]*"[^>]*\/>/g, ''));
-      if (rels) zip.file('_rels/.rels', (await rels.async('string')).replace(/<Relationship [^>]*Target="[^"]*webextensions\/[^"]*"[^>]*\/>/g, ''));
-      const b64 = await zip.generateAsync({ type: 'base64', compression: 'DEFLATE' });
-      step = 'opening the copy';
-      await Word.run(async ctx => { ctx.application.createDocument(b64).open(); await ctx.sync(); });
+      if (!D) throw new Error('there\u2019s no document.');
+      try { await refreshDocument(); } catch (e) { throw new Error('while bringing the citations up to date: ' + wordError(e)); }
+      said = await D.plainCopy();
     } catch (e) {
       b.disabled = false;
-      showErr('refsErr', 'Couldn\u2019t make the copy (while ' + step + '): ' + wordError(e));
+      showErr('refsErr', 'Couldn\u2019t make the copy (' + ((e && e.message) || e) + ')');
       return;
     }
     b.disabled = false;
-    showErr('refsErr', 'Plain copy opened in a new window; save it with \u2318S. This document stays linked.');
+    showErr('refsErr', said);
     $('refsErr').classList.add('ok');
   }
 
@@ -1977,7 +2001,7 @@
     const works = new Set(Object.values(cites).flatMap(c => c.items.map(it => it.k))).size;
     $('refCount').textContent = n + ' citation' + (n === 1 ? '' : 's') + ' \u00b7 ' + works + ' work' + (works === 1 ? '' : 's');
     $('refsBtn').textContent = S.hasRefs ? 'Go to list' : 'Insert References here';
-    $('plainCard').hidden = !S.inWord || (!n && !S.hasRefs);
+    $('plainCard').hidden = !D || (!n && !S.hasRefs);
   }
 
   /* ---- errors, the header, views */
@@ -2204,8 +2228,9 @@
     if (S.inWord) D = wordDoc();
     else if (HOST === 'gdocs') {
       D = docsDoc();
-      // (Not yet in Docs: the plain copy, signing out.)
+      // (Not in Docs: signing out. Converting can't be undone there.)
       $('mOut').hidden = true;
+      $('plainAsk').querySelector('p').textContent = 'Convert all citations and References to plain text? This can\u2019t be undone.';
       try { await signIn(); } catch (e) { /* the sign-in screen says why */ }
     }
     if (D) { try { D.watch(onDocSelection); } catch (e) { /* editing by cursor then unavailable */ } }
