@@ -373,10 +373,11 @@
       show: row => row.missing ? bridge('selectText', row.typed) : bridge('selectCite', row.id),
       plain: () => bridge('makePlain'),
       // (A copy in the same folder, its citations made ordinary text; opened
-      // in a new tab.)
-      async plainCopy() {
-        const c = await bridge('plainCopy');
-        window.open(c.url, '_blank');
+      // in the tab opened for it at the click, which a pop-up blocker allows.)
+      async plainCopy(tab) {
+        let c;
+        try { c = await bridge('plainCopy'); } catch (e) { if (tab) tab.close(); throw e; }
+        if (tab) tab.location.href = c.url; else window.open(c.url, '_blank');
         return 'Plain copy made: \u201c' + c.name + '\u201d, beside this one in Drive. This document stays linked.';
       },
       // (Docs says nothing when the cursor moves: asked every 1.5 s while
@@ -1318,12 +1319,16 @@
     hideErr('refsErr');
     const b = $('plainCopy');
     b.disabled = true;
+    // (In Docs, the copy's tab opened now, at the click: opened once the
+    // copy's made, a pop-up blocker stops it.)
+    const tab = HOST === 'gdocs' ? window.open('', '_blank') : null;
     let said;
     try {
       if (!D) throw new Error('there\u2019s no document.');
       try { await refreshDocument(); } catch (e) { throw new Error('while bringing the citations up to date: ' + wordError(e)); }
-      said = await D.plainCopy();
+      said = await D.plainCopy(tab);
     } catch (e) {
+      if (tab && !tab.closed) tab.close();
       b.disabled = false;
       showErr('refsErr', 'Couldn\u2019t make the copy (' + ((e && e.message) || e) + ')');
       return;
