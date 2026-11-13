@@ -6,6 +6,9 @@
 // ("liblande": {cites: {id: citation}, style}); the References list is the
 // one tagged "LL:refs". Their text comes from engine.js (APA) or citeproc-js
 // (another style), for the whole document at once.
+// The same panel is LibLande for Google Docs: opened with "?host=gdocs" in
+// the add-on's sidebar (gdocs/addon), which passes its calls on to Apps
+// Script; there citations are named ranges (D, docsDoc).
 'use strict';
 (() => {
   const CLIENT_ID = '789682218462-98mjugngb46ttd01ucp9dcj71ufspjgn.apps.googleusercontent.com';
@@ -15,6 +18,11 @@
   const API = 'https://www.googleapis.com/drive/v3/';
   const LIBLANDE = 'https://kevinlande.github.io/liblande/';
   const $ = id => document.getElementById(id);
+  // Word, or Google Docs (in the add-on's sidebar).
+  const HOST = /[?&]host=gdocs\b/.test(location.search) ? 'gdocs' : 'word';
+  // (Kept apart from Word's: in Docs, what's kept here comes only from the
+  // add-on.)
+  const KEEP = HOST === 'gdocs' ? 'llg' : 'llw';
   // (This panel's version, as its own script was asked for: "panel.js?v=...".)
   const VERSION = (/[?&]v=([^&]+)/.exec(((document.currentScript || {}).src) || '') || [])[1] || '';
   const S = {
@@ -28,8 +36,8 @@
 
   /* ---- storage: the token, and the library kept in this panel */
   const store = {
-    get(k, d) { try { const v = localStorage.getItem('llw.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
-    set(k, v) { try { if (v == null) localStorage.removeItem('llw.' + k); else localStorage.setItem('llw.' + k, JSON.stringify(v)); } catch (e) { /* none */ } },
+    get(k, d) { try { const v = localStorage.getItem(KEEP + '.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+    set(k, v) { try { if (v == null) localStorage.removeItem(KEEP + '.' + k); else localStorage.setItem(KEEP + '.' + k, JSON.stringify(v)); } catch (e) { /* none */ } },
   };
   const idb = {
     // (One connection, given up if another panel's older one holds up the
@@ -38,7 +46,7 @@
     open() {
       if (this.db) return this.db;
       this.db = new Promise((ok, no) => {
-        const r = indexedDB.open('llw', 2);
+        const r = indexedDB.open(KEEP, 2);
         const late = setTimeout(() => no(new Error('blocked')), 4000);
         r.onupgradeneeded = () => { ['lib', 'marks'].forEach(n => { if (!r.result.objectStoreNames.contains(n)) r.result.createObjectStore(n); }); };
         r.onsuccess = () => { clearTimeout(late); const db = r.result; db.onversionchange = () => { db.close(); this.db = null; }; ok(db); };
@@ -59,7 +67,8 @@
   // (A panel signed in before there was a choice had full access, though
   // its token may have gone: a remembered email says so. One never signed
   // in asks.)
-  let access = store.get('access', token || store.get('email', null) ? 'full' : null);
+  // (In Docs, the add-on's own access: all of Drive.)
+  let access = HOST === 'gdocs' ? 'full' : store.get('access', token || store.get('email', null) ? 'full' : null);
   if (access === 'full' && !store.get('access', null)) store.set('access', access);
   const tokenOk = () => token && token.exp > Date.now();
   let gisReady = null;
@@ -72,6 +81,11 @@
     }));
   }
   async function signIn(prompt) {
+    // (In Docs: the add-on's token, from its sidebar; not kept.)
+    if (HOST === 'gdocs') {
+      token = { value: await bridge('token'), exp: Date.now() + 45 * 60000 };
+      return token;
+    }
     if (!access) throw Object.assign(new Error(''), { choose: true });
     await loadGis();
     return new Promise((ok, no) => {
@@ -293,6 +307,58 @@
     paintResults();
   }
   const NO_REFS = '(No works cited yet.)';
+
+  // Google Docs': the add-on's sidebar holds this page, and passes its
+  // calls on to Apps Script (gdocs/addon/Code.js), which reads and changes
+  // the document. Citations are named ranges "LL:<id>", the list "LL:refs".
+  const BRIDGE = { n: 0, waiting: new Map() };
+  function bridge(fn, ...args) {
+    return new Promise((ok, no) => {
+      if (window.parent === window) { no(new Error('LibLande for Google Docs runs in its sidebar.')); return; }
+      const id = ++BRIDGE.n;
+      BRIDGE.waiting.set(id, { ok, no });
+      window.parent.postMessage({ llCall: id, fn, args }, '*');
+    });
+  }
+  // (Answers only from the sidebar holding this page: Apps Script's; or
+  // the test page, _test/gdocs-bridge.html.)
+  if (HOST === 'gdocs') window.addEventListener('message', ev => {
+    if (ev.source !== window.parent || !/^(https:\/\/[a-z0-9-]+-script\.googleusercontent\.com|http:\/\/localhost:\d+)$/.test(ev.origin)) return;
+    const m = ev.data || {}, w = BRIDGE.waiting.get(m.llReply);
+    if (!w) return;
+    BRIDGE.waiting.delete(m.llReply);
+    if (m.ok) w.ok(m.value); else w.no(new Error(m.value));
+  });
+  function docsDoc() {
+    const plain = refs => refs.map(r => ({ text: r.text, parts: r.parts.map(x => ({ t: x.t, i: !!x.i })) }));
+    let last = '';
+    return {
+      readState: () => bridge('readState'),
+      saveState: v => bridge('saveState', v),
+      async refresh(render, force) {
+        const out = render(await bridge('citeIds'));
+        return bridge('applyTexts', out.texts, plain(out.refs), !!force, NO_REFS);
+      },
+      insert: (id, text) => bridge('insertCite', id, text),
+      goAfter: id => bridge('goAfter', id),
+      remove: (id, restore) => bridge('removeCite', id, restore || ''),
+      insertRefs: refsOf => bridge('insertRefs', plain(refsOf()), NO_REFS),
+      // (Docs says nothing when the cursor moves: asked every 1.5 s while
+      // the panel is showing, one ask at a time; told on a change.)
+      watch(cb) {
+        const tick = async () => {
+          if (!document.hidden) {
+            try {
+              const c = await bridge('cursor'), k = JSON.stringify(c);
+              if (k !== last) { last = k; cb(c.tag, c.where); }
+            } catch (e) { /* asked again */ }
+          }
+          setTimeout(tick, 1500);
+        };
+        tick();
+      },
+    };
+  }
 
   // Word's: content controls tagged "LL:<id>" (and "LL:refs"), the
   // settings in the document's own.
@@ -1862,7 +1928,7 @@
     const works = new Set(Object.values(cites).flatMap(c => c.items.map(it => it.k))).size;
     $('refCount').textContent = n + ' citation' + (n === 1 ? '' : 's') + ' \u00b7 ' + works + ' work' + (works === 1 ? '' : 's');
     $('refsBtn').textContent = S.hasRefs ? 'Go to list' : 'Insert References here';
-    $('plainCard').hidden = !n && !S.hasRefs;
+    $('plainCard').hidden = !S.inWord || (!n && !S.hasRefs);
   }
 
   /* ---- errors, the header, views */
@@ -2087,6 +2153,12 @@
   async function start() {
     wire();
     if (S.inWord) D = wordDoc();
+    else if (HOST === 'gdocs') {
+      D = docsDoc();
+      // (Not yet in Docs: Notes, the plain copy, signing out.)
+      $('tNotes').hidden = $('mOut').hidden = true;
+      try { await signIn(); } catch (e) { /* the sign-in screen says why */ }
+    }
     if (D) { try { D.watch(onDocSelection); } catch (e) { /* editing by cursor then unavailable */ } }
     paintOffline();
     paintAccount();

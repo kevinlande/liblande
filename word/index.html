@@ -317,7 +317,11 @@
   <div class="body"><div class="empty" id="loadingText">Loading&#x2026;</div></div>
 </div>
 
-<script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+<script>
+// Office's script for Word only: in Google Docs (?host=gdocs, the add-on's
+// sidebar) it isn't wanted, and inside a frame it blanks the page.
+if (!/[?&]host=gdocs\b/.test(location.search)) document.write('<script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"><\/script>');
+</script>
 <script>
 // What app/apa.js uses from the rest of LibLande, here on its own.
 var ENTRIES = [];
@@ -334,10 +338,10 @@ const NP_OA = 'https://api.openalex.org';
 const npFetch = (u, o) => fetch(u, o);
 const npDoi = d => String(d || '').trim().replace(/^https?:\/\/(dx\.)?doi\.org\//i, '').replace(/^doi:\s*/i, '').toLowerCase();
 </script>
-<script src="../app/apa.js?v=2026-11-12.16"></script>
-<script src="../app/csl.js?v=2026-11-12.16"></script>
-<script src="../app/marks.js?v=2026-11-12.16"></script>
-<script src="../app/titlesearch.js?v=2026-11-12.16"></script>
-<script src="../lookup.js?v=2026-11-12.16"></script>
-<script src="engine.js?v=2026-11-12.16"></script>
-<script src="panel.js?v=2026-11-12.16"></script>
+<script src="../app/apa.js?v=2026-11-12.17"></script>
+<script src="../app/csl.js?v=2026-11-12.17"></script>
+<script src="../app/marks.js?v=2026-11-12.17"></script>
+<script src="../app/titlesearch.js?v=2026-11-12.17"></script>
+<script src="../lookup.js?v=2026-11-12.17"></script>
+<script src="engine.js?v=2026-11-12.17"></script>
+<script src="panel.js?v=2026-11-12.17"></script>
