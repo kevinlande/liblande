@@ -2,10 +2,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LibLande</title>
+<script>
+// (In Google Docs, always light, as Docs is.)
+if (/[?&]host=gdocs\b/.test(location.search)) document.documentElement.classList.add('gdocs');
+</script>
 <style>
   :root { --bg:#fff; --panel:#f6f8f7; --text:#1b2321; --muted:#56635f; --faint:#66726e; --line:#d5ddd9; --row:#eef2f0; --accent:#1f6b5c; --accent-ink:#fff; --soft:#dcebe6; --warn:#8a4b00; --warn-soft:#fbefdc; --field:#fff; --focus:#2a7de1; color-scheme: light; }
   @media (prefers-color-scheme: dark) {
-    :root { --bg:#1f2322; --panel:#262b2a; --text:#e2e8e5; --muted:#a9b5b1; --faint:#95a29e; --line:#3a4341; --row:#2c3331; --accent:#5fb39e; --accent-ink:#0f1a17; --soft:#24433b; --warn:#f0b866; --warn-soft:#3b2e1a; --field:#191d1c; --focus:#6aa8ff; color-scheme: dark; }
+    :root:not(.gdocs) { --bg:#1f2322; --panel:#262b2a; --text:#e2e8e5; --muted:#a9b5b1; --faint:#95a29e; --line:#3a4341; --row:#2c3331; --accent:#5fb39e; --accent-ink:#0f1a17; --soft:#24433b; --warn:#f0b866; --warn-soft:#3b2e1a; --field:#191d1c; --focus:#6aa8ff; color-scheme: dark; }
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; }
@@ -343,10 +347,10 @@ const NP_OA = 'https://api.openalex.org';
 const npFetch = (u, o) => fetch(u, o);
 const npDoi = d => String(d || '').trim().replace(/^https?:\/\/(dx\.)?doi\.org\//i, '').replace(/^doi:\s*/i, '').toLowerCase();
 </script>
-<script src="../app/apa.js?v=2026-11-13.09"></script>
-<script src="../app/csl.js?v=2026-11-13.09"></script>
-<script src="../app/marks.js?v=2026-11-13.09"></script>
-<script src="../app/titlesearch.js?v=2026-11-13.09"></script>
-<script src="../lookup.js?v=2026-11-13.09"></script>
-<script src="engine.js?v=2026-11-13.09"></script>
-<script src="panel.js?v=2026-11-13.09"></script>
+<script src="../app/apa.js?v=2026-11-13.10"></script>
+<script src="../app/csl.js?v=2026-11-13.10"></script>
+<script src="../app/marks.js?v=2026-11-13.10"></script>
+<script src="../app/titlesearch.js?v=2026-11-13.10"></script>
+<script src="../lookup.js?v=2026-11-13.10"></script>
+<script src="engine.js?v=2026-11-13.10"></script>
+<script src="panel.js?v=2026-11-13.10"></script>
