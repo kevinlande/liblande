@@ -275,6 +275,16 @@
   //  remove(id, restore): a citation taken out (restore: text in its place);
   //  insertRefs(refsOf): the References list made at the cursor (refsOf()
   //    gives it), or gone to if there is one: 'made' or 'went';
+  //  scanTyped(look): citations typed by hand: look(text, i) finds those in
+  //    paragraph i's text; answers those not in a citation already;
+  //  linkTyped(todo, made): each made a citation (made(t) gives its id);
+  //    answers the ids that couldn't be;
+  //  linkAt(id, t, para): the one typed citation t selected (in the
+  //    paragraph whose text is para) made a citation;
+  //  unlink(list): citations made of typed ones put back as typed
+  //    ({id, typed});
+  //  show(row): a linked citation (row.id), or typed text (row.typed),
+  //    selected;
   //  watch(cb): cb(tag, where) as the selection moves: tag the citation's
   //    ("LL:<id>", "LL:refs") or '', where {text, para, at} for a selection
   //    in no citation (or null).
@@ -346,6 +356,19 @@
       goAfter: id => bridge('goAfter', id),
       remove: (id, restore) => bridge('removeCite', id, restore || ''),
       insertRefs: refsOf => bridge('insertRefs', plain(refsOf()), NO_REFS),
+      // (Docs: each paragraph's text and where its citations are; those
+      // typed in a citation already passed over.)
+      scanTyped: async look => {
+        const ps = await bridge('paraTexts'), found = [];
+        ps.forEach((p, pi) => look(p.text, pi).forEach(t => {
+          if (!p.taken.some(([a, b]) => t.at < b && a < t.at + t.text.length)) found.push(t);
+        }));
+        return found;
+      },
+      linkTyped: (todo, made) => bridge('linkSpans', todo.map(t => ({ para: t.para, at: t.at, text: t.text, id: made(t) }))),
+      linkAt: (id, t, para) => bridge('linkHere', id, t.at, t.text, para),
+      unlink: list => bridge('removeCites', list.map(u => ({ id: u.id, typed: u.typed }))),
+      show: row => row.missing ? bridge('selectText', row.typed) : bridge('selectCite', row.id),
       // (Docs says nothing when the cursor moves: asked every 1.5 s while
       // the panel is showing, one ask at a time; told on a change.)
       watch(cb) {
@@ -485,6 +508,101 @@
         await ctx.sync();
         await writeRefs(ctx, cc, refsOf());
         return 'made';
+      }),
+      scanTyped: async look => {
+        let found = [];
+        await Word.run(async ctx => {
+          const paras = ctx.document.body.paragraphs;
+          paras.load('items/text');
+          const fields = ctx.document.body.fields;
+          fields.load('items/code');
+          await ctx.sync();
+          const zr = fields.items.filter(f => /ZOTERO/.test(f.code || '')).map(f => { const r = f.result; r.load('text'); return r; });
+          await ctx.sync();
+          const zText = zr.map(r => r.text || '');
+          paras.items.forEach((p, pi) => {
+            look(p.text, pi).forEach(t => { if (!zText.some(z => z.includes(t.text))) found.push(t); });
+          });
+          // (Those already inside a citation of LibLande's: passed over.)
+          const ranges = found.map(t => { const rs = paras.items[t.para].search(t.text, { matchCase: true }); rs.load('items'); return rs; });
+          await ctx.sync();
+          const parents = ranges.map(rs => rs.items.map(r => { const c = r.parentContentControlOrNullObject; c.load('tag'); return c; }));
+          await ctx.sync();
+          found = found.filter((t, i) => parents[i].some(c => c.isNullObject || !/^LL:/.test(c.tag || '')));
+        });
+        return found;
+      },
+      linkTyped: async (todo, made) => {
+        await Word.run(async ctx => {
+          const paras = ctx.document.body.paragraphs;
+          paras.load('items');
+          await ctx.sync();
+          // (Each text once a paragraph; every place it's typed there, linked.)
+          const seen = new Set(), jobs = [];
+          todo.forEach(t => {
+            const key = t.para + '\u0001' + t.text;
+            if (seen.has(key)) return;
+            seen.add(key);
+            const rs = paras.items[t.para].search(t.text, { matchCase: true });
+            rs.load('items');
+            jobs.push({ t, rs });
+          });
+          await ctx.sync();
+          const parents = jobs.map(j => j.rs.items.map(r => { const c = r.parentContentControlOrNullObject; c.load('tag'); return c; }));
+          await ctx.sync();
+          jobs.forEach((j, ji) => j.rs.items.forEach((r, ri) => {
+            const c = parents[ji][ri];
+            if (!c.isNullObject && /^LL:/.test(c.tag || '')) return;
+            const id = made(j.t);
+            const cc = r.insertContentControl();
+            cc.tag = 'LL:' + id; cc.title = 'LibLande'; cc.appearance = 'BoundingBox';
+          }));
+          await ctx.sync();
+        });
+        return [];
+      },
+      linkAt: (id, t, paraText) => Word.run(async ctx => {
+        const c = { t, para: paraText };
+        const para = ctx.document.getSelection().paragraphs.getFirst();
+        para.load('text');
+        const found = para.search(c.t.text, { matchCase: true });
+        found.load('items');
+        await ctx.sync();
+        if (para.text !== c.para) throw new Error('the paragraph changed; select the citation again.');
+        // (Which of the paragraph's copies of it: the one at that place.)
+        let nth = 0;
+        for (let at = c.para.indexOf(c.t.text); at >= 0 && at < c.t.at; at = c.para.indexOf(c.t.text, at + 1)) nth++;
+        const r = found.items[nth];
+        if (!r) throw new Error('it isn\u2019t where it was; select it again.');
+        const inside = r.parentContentControlOrNullObject;
+        inside.load('tag');
+        await ctx.sync();
+        if (!inside.isNullObject && /^LL:/.test(inside.tag || '')) throw new Error('it\u2019s already a LibLande citation.');
+        const cc = r.insertContentControl();
+        cc.tag = 'LL:' + id; cc.title = 'LibLande'; cc.appearance = 'BoundingBox';
+        await ctx.sync();
+        cc.getRange('After').select();
+        await ctx.sync();
+      }),
+      unlink: list => Word.run(async ctx => {
+        const jobs = list.map(u => { const ccs = ctx.document.contentControls.getByTag('LL:' + u.id); ccs.load('items'); return { u, ccs }; });
+        await ctx.sync();
+        jobs.forEach(j => j.ccs.items.forEach(cc => { cc.insertText(j.u.typed, 'Replace'); cc.delete(true); }));
+        await ctx.sync();
+      }),
+      show: row => Word.run(async ctx => {
+        if (row.missing) {
+          const rs = ctx.document.body.search(row.typed, { matchCase: true });
+          rs.load('items');
+          await ctx.sync();
+          if (rs.items.length) rs.items[0].select();
+        } else {
+          const ccs = ctx.document.contentControls.getByTag('LL:' + row.id);
+          ccs.load('items');
+          await ctx.sync();
+          if (ccs.items.length) ccs.items[0].select();
+        }
+        await ctx.sync();
       }),
       watch(cb) {
         Office.context.document.addHandlerAsync(Office.EventType.DocumentSelectionChanged, () => {
@@ -692,28 +810,8 @@
     });
     const id = newId();
     try {
-      await Word.run(async ctx => {
-        const para = ctx.document.getSelection().paragraphs.getFirst();
-        para.load('text');
-        const found = para.search(c.t.text, { matchCase: true });
-        found.load('items');
-        await ctx.sync();
-        if (para.text !== c.para) throw new Error('the paragraph changed; select the citation again.');
-        // (Which of the paragraph's copies of it: the one at that place.)
-        let nth = 0;
-        for (let at = c.para.indexOf(c.t.text); at >= 0 && at < c.t.at; at = c.para.indexOf(c.t.text, at + 1)) nth++;
-        const r = found.items[nth];
-        if (!r) throw new Error('it isn\u2019t where it was; select it again.');
-        const inside = r.parentContentControlOrNullObject;
-        inside.load('tag');
-        await ctx.sync();
-        if (!inside.isNullObject && /^LL:/.test(inside.tag || '')) throw new Error('it\u2019s already a LibLande citation.');
-        const cc = r.insertContentControl();
-        cc.tag = 'LL:' + id; cc.title = 'LibLande'; cc.appearance = 'BoundingBox';
-        await ctx.sync();
-        cc.getRange('After').select();
-        await ctx.sync();
-      });
+      if (!D) throw new Error('there\u2019s no document.');
+      await D.linkAt(id, c.t, c.para);
     } catch (e) { showSelErr('Couldn\u2019t link it: ' + wordError(e)); return; }
     S.cites[id] = { items, form: c.t.form, own: true };
     if (S.present) S.present.push(id);
@@ -1009,37 +1107,17 @@
   let authorSet = null;
   const authors = () => authorSet || (authorSet = new Set(S.entries.flatMap(e => (e.a || []).concat(e.e || []).map(n => norm(String(n[0] || '').replace(/[{}\\]/g, ''))))));
   async function scanTyped() {
-    if (!S.inWord || !S.entries.length) return;
-    let found = [];
-    await Word.run(async ctx => {
-      const paras = ctx.document.body.paragraphs;
-      paras.load('items/text');
-      const fields = ctx.document.body.fields;
-      fields.load('items/code');
-      await ctx.sync();
-      const zr = fields.items.filter(f => /ZOTERO/.test(f.code || '')).map(f => { const r = f.result; r.load('text'); return r; });
-      await ctx.sync();
-      const zText = zr.map(r => r.text || '');
-      paras.items.forEach((p, pi) => {
-        LLWord.findTyped(p.text || '').forEach(t => {
-          if (zText.some(z => z.includes(t.text))) return;
-          t.para = pi;
-          t.parts.forEach(pt => { pt.match = LLWord.matchTyped(pt, S.entries); });
-          t.ok = t.parts.every(pt => pt.match.every(m => m.pick));
-          // ("the Brexit vote (2016)": in a sentence, with no such author
-          // in the library, not taken for a citation.)
-          if (t.form === 'narr' && !t.ok && !authors().has(norm(t.parts[0].names[0]))) return;
-          found.push(t);
-        });
-      });
-      // (Those already inside a citation of LibLande's: passed over.)
-      const ranges = found.map(t => { const rs = paras.items[t.para].search(t.text, { matchCase: true }); rs.load('items'); return rs; });
-      await ctx.sync();
-      const parents = ranges.map(rs => rs.items.map(r => { const c = r.parentContentControlOrNullObject; c.load('tag'); return c; }));
-      await ctx.sync();
-      found = found.filter((t, i) => parents[i].some(c => c.isNullObject || !/^LL:/.test(c.tag || '')));
+    if (!D || !S.entries.length) return;
+    // (A paragraph's typed citations, matched to the library. "the Brexit
+    // vote (2016)": in a sentence, with no such author in the library, not
+    // taken for a citation.)
+    const look = (text, pi) => LLWord.findTyped(text || '').filter(t => {
+      t.para = pi;
+      t.parts.forEach(pt => { pt.match = LLWord.matchTyped(pt, S.entries); });
+      t.ok = t.parts.every(pt => pt.match.every(m => m.pick));
+      return !(t.form === 'narr' && !t.ok && !authors().has(norm(t.parts[0].names[0])));
     });
-    LINK.found = found;
+    LINK.found = await D.scanTyped(look);
     paintLink();
   }
   function paintLink() {
@@ -1069,53 +1147,37 @@
     hideErr('refsErr');
     $('lGo').disabled = true;
     const rows = [], undo = [];
+    // (Each one linked: its works, a row for each, and how to undo it.)
+    const made = t => {
+      const id = newId(), items = [];
+      t.parts.forEach(pt => pt.match.forEach((m, yi) => {
+        const it = { k: m.pick.k, page: yi === pt.match.length - 1 ? pt.page : '' };
+        if (yi === 0 && pt.pre) it.pre = pt.pre;
+        rows.push({ id, idx: items.length, typed: pt.years.length > 1 ? pt.text + ' (' + pt.years[yi].y + pt.years[yi].letter + ')' : pt.text, k: m.pick.k, sure: m.sure, cands: m.cands });
+        items.push(it);
+      }));
+      S.cites[id] = { items, form: t.form, own: true };
+      if (S.present) S.present.push(id);
+      undo.push({ id, typed: t.text });
+      return id;
+    };
+    let failed = [];
     try {
-      await Word.run(async ctx => {
-        const paras = ctx.document.body.paragraphs;
-        paras.load('items');
-        await ctx.sync();
-        const todo = LINK.found.filter(t => t.ok);
-        // (Each text once a paragraph; every place it's typed there, linked.)
-        const seen = new Set(), jobs = [];
-        todo.forEach(t => {
-          const key = t.para + '\u0001' + t.text;
-          if (seen.has(key)) return;
-          seen.add(key);
-          const rs = paras.items[t.para].search(t.text, { matchCase: true });
-          rs.load('items');
-          jobs.push({ t, rs });
-        });
-        await ctx.sync();
-        const parents = jobs.map(j => j.rs.items.map(r => { const c = r.parentContentControlOrNullObject; c.load('tag'); return c; }));
-        await ctx.sync();
-        jobs.forEach((j, ji) => j.rs.items.forEach((r, ri) => {
-          const c = parents[ji][ri];
-          if (!c.isNullObject && /^LL:/.test(c.tag || '')) return;
-          const id = newId(), t = j.t;
-          const items = [];
-          t.parts.forEach(pt => pt.match.forEach((m, yi) => {
-            const it = { k: m.pick.k, page: yi === pt.match.length - 1 ? pt.page : '' };
-            if (yi === 0 && pt.pre) it.pre = pt.pre;
-            rows.push({ id, idx: items.length, typed: pt.years.length > 1 ? pt.text + ' (' + pt.years[yi].y + pt.years[yi].letter + ')' : pt.text, k: m.pick.k, sure: m.sure, cands: m.cands });
-            items.push(it);
-          }));
-          S.cites[id] = { items, form: t.form, own: true };
-          const cc = r.insertContentControl();
-          cc.tag = 'LL:' + id; cc.title = 'LibLande'; cc.appearance = 'BoundingBox';
-          if (S.present) S.present.push(id);
-          undo.push({ id, typed: t.text });
-        }));
-        await ctx.sync();
-      });
+      if (!D) throw new Error('there\u2019s no document.');
+      failed = await D.linkTyped(LINK.found.filter(t => t.ok), made) || [];
     } catch (e) {
       $('lGo').disabled = false;
       await saveSettings();
       showErr('refsErr', 'Couldn\u2019t link them: ' + wordError(e));
       return;
     }
+    // (Those that couldn't be linked, as the document had changed: let go.)
+    const gone = new Set(failed);
+    gone.forEach(id => { delete S.cites[id]; });
+    if (S.present) S.present = S.present.filter(id => !gone.has(id));
     await saveSettings();
-    LINK.rows = rows.concat(LINK.found.filter(t => !t.ok).map(t => ({ typed: t.text, missing: true })));
-    LINK.undo = undo;
+    LINK.rows = rows.filter(r => !gone.has(r.id)).concat(LINK.found.filter(t => !t.ok).map(t => ({ typed: t.text, missing: true })));
+    LINK.undo = undo.filter(u => !gone.has(u.id));
     LINK.open = -1;
     $('lGo').disabled = false;
     try { await refreshDocument(); } catch (e) { /* Refresh will */ }
@@ -1134,12 +1196,7 @@
   async function undoLinks() {
     hideErr('refsErr');
     try {
-      await Word.run(async ctx => {
-        const jobs = LINK.undo.map(u => { const ccs = ctx.document.contentControls.getByTag('LL:' + u.id); ccs.load('items'); return { u, ccs }; });
-        await ctx.sync();
-        jobs.forEach(j => j.ccs.items.forEach(cc => { cc.insertText(j.u.typed, 'Replace'); cc.delete(true); }));
-        await ctx.sync();
-      });
+      if (D) await D.unlink(LINK.undo);
     } catch (e) { showErr('refsErr', 'Couldn\u2019t undo it: ' + wordError(e)); return; }
     const gone = new Set(LINK.undo.map(u => u.id));
     if (S.present) S.present = S.present.filter(id => !gone.has(id));
@@ -1150,20 +1207,7 @@
   // A row's citation selected in the document (one not found: its text).
   async function showLinkRow(row) {
     try {
-      await Word.run(async ctx => {
-        if (row.missing) {
-          const rs = ctx.document.body.search(row.typed, { matchCase: true });
-          rs.load('items');
-          await ctx.sync();
-          if (rs.items.length) rs.items[0].select();
-        } else {
-          const ccs = ctx.document.contentControls.getByTag('LL:' + row.id);
-          ccs.load('items');
-          await ctx.sync();
-          if (ccs.items.length) ccs.items[0].select();
-        }
-        await ctx.sync();
-      });
+      if (D) await D.show(row);
     } catch (e) { /* only a convenience */ }
   }
 
