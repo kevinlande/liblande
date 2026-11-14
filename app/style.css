@@ -138,7 +138,7 @@
 :root[data-glass] .v-tabs { background: linear-gradient(to bottom, color-mix(in srgb, var(--panel) 80%, transparent), color-mix(in srgb, var(--panel) 55%, transparent)); }
 /* (The light rim along a glass top edge only on what floats: on the bars
    at the top of the screen it drew a thin line under the status bar.) */
-:root[data-glass] .v-palette, :root[data-glass] .vp-show, :root[data-glass] .menu-list, :root[data-glass] .quote-bar, :root[data-glass] .v-tone {
+:root[data-glass] .v-palette, :root[data-glass] .vp-show, :root[data-glass] .menu-list, :root[data-glass] .quote-bar, :root[data-glass] .ref-card, :root[data-glass] .v-tone {
   background: color-mix(in srgb, var(--panel) 62%, transparent);
   -webkit-backdrop-filter: saturate(190%) blur(26px); backdrop-filter: saturate(190%) blur(26px);
   border-color: var(--glass-edge); box-shadow: inset 0 1px 0 var(--glass-rim), inset 0 0 0 .5px var(--glass-rim), var(--shadow);
@@ -1036,6 +1036,9 @@ body:has(#sheet:not([hidden])) .pick-bar { visibility: hidden; }
   .toolbar .tb-reader-pair .tb-btn.tb-reader-more { display: none; }
   .tb-reader .ct { cursor: pointer; transition: transform .1s, box-shadow .1s; }
   .tb-reader .ct:hover { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
+  /* (In the reader, its count lists them too.) */
+  .v-half-r .ct { border: 0; margin: 0; cursor: pointer; transition: box-shadow .1s; }
+  .v-half-r .ct:hover, .v-half-r .ct[aria-expanded="true"] { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
   #tabs .tab.pinned { height: 30px; border: 1px solid var(--line); border-radius: 0 9px 9px 0; padding: 0 14px 0 12px; margin-right: 6px; }
   #tabs .tab.pinned[aria-selected="false"] { background: color-mix(in srgb, var(--accent-soft) 50%, transparent); color: var(--text); }
   /* (The switch sliding between its halves, going to and from the reader:
@@ -2023,6 +2026,8 @@ a.ms-ib { text-decoration: none; }
 .v-side-tabs button { flex: 1; min-width: 0; border: 0; background: none; padding: 5px 2px; border-radius: 7px; color: var(--muted); display: grid; place-items: center; }
 .v-side-tabs button:hover { color: var(--text); }
 .v-side-tabs button[aria-selected="true"] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+/* (Three groups: getting around the paper; your marks and notes; about it.) */
+.v-side-sep { flex: none; align-self: center; width: 1px; height: 16px; margin: 0 3px; background: var(--line); }
 .v-side-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
 .v-side-note { margin: 0; padding: 14px; font-size: 13px; line-height: 1.45; color: var(--muted); }
 /* Citation: the paper's entry, to read and copy. */
@@ -2759,6 +2764,50 @@ a.ms-ib { text-decoration: none; }
 .quote-note:hover { background: var(--side-hover); }
 .quote-note .i { width: 16px; height: 16px; color: var(--accent); }
 .quote-note[hidden] { display: none; }
+/* The Quote bar's Add to library, for a reference selected (see
+   related.js), and the card with what was found. */
+.quote-add { display: inline-flex; align-items: center; gap: 6px; border: 0; border-left: 1px solid var(--line); border-radius: 0 7px 7px 0; background: none; color: inherit; font: inherit; padding: 6px 10px; cursor: pointer; }
+.quote-add:hover { background: var(--side-hover); }
+.quote-add .i { width: 16px; height: 16px; color: var(--accent); }
+.quote-add[hidden] { display: none; }
+.quote-note:has(+ .quote-add:not([hidden])) { border-radius: 0; }
+@media (pointer: coarse) { .quote-note, .quote-add { padding: 9px 12px; } }
+.ref-card { position: fixed; z-index: 63; width: min(340px, calc(100vw - 16px)); padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .22); font: 13px/1.4 var(--ui); color: var(--text); }
+.ref-card p { margin: 0; }
+.ref-k { font-size: 11px; font-weight: 600; color: var(--faint); text-transform: uppercase; letter-spacing: .04em; }
+.ref-t { margin-top: 4px !important; font-weight: 600; }
+.ref-m { margin-top: 2px !important; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.ref-wait, .ref-none { color: var(--muted); }
+.ref-row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+
+/* The reader's sidebar: Cited here and Related (see related.js). */
+.rel { padding: 10px 8px 24px; font-size: 13px; line-height: 1.35; }
+.rel-seg { display: flex; margin: 0 4px 8px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.rel-seg button { flex: 1; min-width: 0; border: 0; background: none; color: var(--muted); font: 500 12.5px var(--ui); padding: 5px 4px; cursor: pointer; white-space: nowrap; }
+.rel-seg button + button { border-left: 1px solid var(--line); }
+.rel-seg button[aria-selected="true"] { background: var(--accent-soft); color: var(--text); font-weight: 600; }
+.rel-seg button:disabled { opacity: .5; cursor: default; }
+.rel-n { color: var(--muted); font-weight: 500; font-variant-numeric: tabular-nums; }
+.rel-sum { margin: 0 8px 4px; color: var(--muted); font-size: 12px; }
+.rel-sec { margin: 12px 8px 2px; font-size: 11px; font-weight: 600; color: var(--faint); text-transform: uppercase; letter-spacing: .04em; }
+.rel-list .v-side-note { padding: 6px 8px; }
+/* (This page's list, faded into the next as pages turn.) */
+.rel-list { transition: opacity .16s ease; }
+.rel-list.rel-fade { opacity: 0; }
+@media (prefers-reduced-motion: reduce) { .rel-list { transition: none; } }
+.rel-it { display: flex; align-items: flex-start; gap: 8px; padding: 7px 8px; border-radius: 8px; }
+.rel-it:hover { background: var(--side-hover); }
+.rel-t { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.rel-title { display: block; padding: 0; border: 0; background: none; font: 600 13px/1.3 var(--ui); color: var(--text); text-align: left; text-decoration: none; overflow-wrap: anywhere; }
+button.rel-title, a.rel-title { cursor: pointer; }
+a.rel-title:hover, button.rel-title:hover { text-decoration: underline; }
+.rel-m { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.rel-why { color: var(--accent); font-size: 11.5px; margin-top: 1px; }
+.rel-have { flex: none; margin-top: 1px; padding: 1px 7px; border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); border-radius: 999px; color: var(--accent); font-size: 11px; white-space: nowrap; }
+.rel-add { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border: 0; border-radius: 7px; background: var(--accent); color: var(--accent-ink); cursor: pointer; }
+.rel-add .i { width: 15px; height: 15px; }
+.rel .link-btn { border: 0; padding: 0; background: none; color: var(--accent); font: inherit; text-decoration: underline; cursor: pointer; }
 
 /* Settings › Word: the steps, each folder with Copy. */
 .word-steps { margin: 6px 0 0; padding-left: 20px; font-size: 13px; color: var(--muted); display: grid; gap: 8px; }

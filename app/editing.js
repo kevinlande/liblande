@@ -1,8 +1,8 @@
 ﻿// LibLande: adding and editing, BibTeX pasted in, selecting several, updates, cite keys, versions, export, the keyboard.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
+// index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-13.12';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-14.01';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -243,7 +243,7 @@ function sheetBusy(on) {
 // (A panel opened from a manuscript's report, Add say, goes back to the
 // report when it closes, saved or not.)
 function closeSheet() {
-  const back = sheet && sheet.msBack, np = sheet && sheet.npBack, info = sheet && sheet.infoBack;
+  const back = sheet && sheet.msBack, np = sheet && sheet.npBack, info = sheet && sheet.infoBack, rel = sheet && sheet.relBack;
   // (Add's "Scanning text\u2026" and the like go with it.)
   if (sheet && sheet.mode === 'add' && $('#toast').classList.contains('busy')) $('#toast').classList.remove('show');
   $('#sheet').hidden = true;
@@ -255,6 +255,8 @@ function closeSheet() {
   // (Edit from the reader's Info: Info shows what was saved.)
   // (A moment later: Edit closes its panel just before the change is applied.)
   if (info) setTimeout(() => { if (SIDE.tab === 'info' && !$('#vSide').hidden) showInfo(); }, 0);
+  // (Add from the reader's Related: the list again, what was added marked.)
+  if (rel) setTimeout(() => { if (SIDE.tab === 'related' && !$('#vSide').hidden && !$('#viewer').hidden) showRelated(); }, 0);
 }
 
 // Edit, from the reader: the panel in the reader's sidebar, in place of

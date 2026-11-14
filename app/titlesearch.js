@@ -3,9 +3,9 @@
 // make a new one's cite key: pages/word/index.html gives it what it uses
 // from the rest. Its page wiring is only for LibLande's Add.)
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
+// index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/titlesearch.js'] = '2026-11-13.12';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/titlesearch.js'] = '2026-11-14.01';
 /* ------------------------------------------------------------ title search */
 // A title (with an author or a year, if you like) typed in Add's lookup
 // box, instead of a DOI: candidates from Crossref (articles, chapters, and
@@ -85,27 +85,31 @@ async function tsCrossref(q, signal) {
   });
 }
 async function tsOpenAlex(q, signal) {
-  const types = { article: 'article', 'book-chapter': 'incollection', book: 'book', preprint: 'unpublished', dissertation: 'phdthesis', report: 'techreport', review: 'article', letter: 'article', editorial: 'article' };
   // (Title and author as filters; commas would end them.)
   const p = tsParse(q), flt = [p.title && 'title.search:' + p.title, p.author && 'raw_author_name.search:' + p.author].filter(Boolean).map(f => f.replace(/,/g, ' '));
   const r = await npFetch(NP_OA + '/works?per_page=12' + (p.free ? '&search=' + encodeURIComponent(p.free) : '') + (flt.length ? '&filter=' + encodeURIComponent(flt.join(',')) : '') +
-    '&select=id,doi,display_name,publication_year,type,authorships,primary_location,biblio', { signal });
+    '&select=' + TS_OA_SELECT, { signal });
   if (!r.ok) throw new Error('OpenAlex answered ' + r.status);
-  return ((await r.json()).results || []).filter(w => w.display_name).map(w => {
-    const src = (w.primary_location || {}).source || {};
-    let type = types[w.type] || 'misc';
-    if (type === 'article' && src.type === 'repository') type = 'unpublished';
-    if (type === 'article' && src.type === 'conference') type = 'inproceedings';
-    const people = (w.authorships || []).map(a => tsPerson((a.author || {}).display_name)).filter(Boolean);
-    const venue = tsClean(src.display_name || ''), b = w.biblio || {};
-    const f = { title: tsClean(w.display_name), author: people.join(' and '), year: w.publication_year ? String(w.publication_year) : '',
-      url: (w.primary_location || {}).landing_page_url || '' };
-    if (type === 'article') Object.assign(f, { journal: venue, volume: b.volume || '', number: b.issue || '', pages: [b.first_page, b.last_page].filter(Boolean).join('--') });
-    else if (type === 'incollection' || type === 'inproceedings') f.booktitle = venue;
-    else if (type === 'book') f.publisher = (src.host_organization_name || '');
-    else if (type === 'unpublished' && venue) f.note = venue;
-    return { src: 'OpenAlex', doi: npDoi(w.doi), title: f.title, review: type === 'article' && tsReview(w.display_name), people, year: f.year, venue, type, fields: f };
-  });
+  return ((await r.json()).results || []).filter(w => w.display_name).map(tsOaWork);
+}
+// One of OpenAlex's works, as a candidate. (Also for the reader's Related:
+// see related.js.)
+const TS_OA_SELECT = 'id,doi,display_name,publication_year,type,authorships,primary_location,biblio';
+function tsOaWork(w) {
+  const types = { article: 'article', 'book-chapter': 'incollection', book: 'book', preprint: 'unpublished', dissertation: 'phdthesis', report: 'techreport', review: 'article', letter: 'article', editorial: 'article' };
+  const src = (w.primary_location || {}).source || {};
+  let type = types[w.type] || 'misc';
+  if (type === 'article' && src.type === 'repository') type = 'unpublished';
+  if (type === 'article' && src.type === 'conference') type = 'inproceedings';
+  const people = (w.authorships || []).map(a => tsPerson((a.author || {}).display_name)).filter(Boolean);
+  const venue = tsClean(src.display_name || ''), b = w.biblio || {};
+  const f = { title: tsClean(w.display_name), author: people.join(' and '), year: w.publication_year ? String(w.publication_year) : '',
+    url: (w.primary_location || {}).landing_page_url || '' };
+  if (type === 'article') Object.assign(f, { journal: venue, volume: b.volume || '', number: b.issue || '', pages: [b.first_page, b.last_page].filter(Boolean).join('--') });
+  else if (type === 'incollection' || type === 'inproceedings') f.booktitle = venue;
+  else if (type === 'book') f.publisher = (src.host_organization_name || '');
+  else if (type === 'unpublished' && venue) f.note = venue;
+  return { src: 'OpenAlex', id: w.id || '', doi: npDoi(w.doi), title: f.title, review: type === 'article' && tsReview(w.display_name), people, year: f.year, venue, type, fields: f };
 }
 // (Open Library: a work, with its edition that best matches.)
 async function tsOpenLibrary(q, signal) {

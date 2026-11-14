@@ -1,8 +1,8 @@
 ﻿// LibLande: A PDF's marks as text (which text a highlight covers, the kinds of mark), and notes' Markdown as HTML. Shared with LibLande for Word (pages/word), which loads this file on its own.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
+// index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/marks.js'] = '2026-11-13.12';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/marks.js'] = '2026-11-14.01';
 /* ---- a PDF's marks */
 // A note is a highlight drawn this faint (see reader.js).
 const NOTE_OPACITY = 0.03;

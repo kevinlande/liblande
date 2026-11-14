@@ -1,8 +1,8 @@
 ﻿// LibLande: the PDF reader: pages, marks, tools, saving, the sidebar.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
+// index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-13.12';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-14.01';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -520,6 +520,8 @@ function ensureViewer(lib, VL) {
   // (The blurry copies around where you are.)
   bus.on('pagerendered', () => softSoon());
   bus.on('pagechanging', () => softSoon());
+  // (Related, for this page: the page's words, as you turn to it.)
+  bus.on('pagechanging', () => { if (sideOpen() && SIDE.tab === 'related') relPageSoon(); });
   bus.on('pagesloaded', () => softSoon(400));
   bus.on('annotationlayerrendered', e => { sectionLines(e.pageNumber); decorateLines(); });
   bus.on('annotationeditoruimanager', e => { V.ui = e.uiManager; watchChanges(V.ui); });
@@ -1302,11 +1304,14 @@ $('#readerBtn').addEventListener('click', ev => {
 // one picked is gone to. The list stays while the pointer is over
 // it, and goes once it leaves both, or on a tap elsewhere or Esc.
 const RB = { t: 0, hide: 0, long: false, x: 0, y: 0 };
-function closeOpenMenu() { RB.hov = false; clearTimeout(RB.hide); const m = $('#openMenu'); if (m) m.remove(); $('#readerMore').setAttribute('aria-expanded', 'false'); }
+function closeOpenMenu() { RB.hov = false; clearTimeout(RB.hide); const m = $('#openMenu'); if (m) m.remove(); $('#readerMore').setAttribute('aria-expanded', 'false'); $('#vReaderCt').setAttribute('aria-expanded', 'false'); }
+// (Under the library's Reader button; or, in the reader, under the count
+// on the Reader half of its switch.)
+const openMenuAt = () => $('#viewer').hidden ? $('#readerBtn') : $('#vReaderCt');
 function openPapersMenu(focus) {
   closeOpenMenu();
-  const btn = $('#readerBtn');
-  if (!PTABS.list.length || btn.hidden || !$('#viewer').hidden) return;
+  const btn = openMenuAt();
+  if (!PTABS.list.length || ($('#viewer').hidden ? btn.hidden : !btn.textContent || !btn.offsetWidth)) return;
   const m = document.createElement('div');
   m.className = 'menu-list pdf-menu link-menu recent-menu open-menu';
   m.id = 'openMenu';
@@ -1322,7 +1327,7 @@ function openPapersMenu(focus) {
       `<button type="button" class="op-x" data-op-x="${i}" aria-label="Close ${esc(title)}" title="Close it">${ICON.x}</button></div>`;
   }).join('');
   document.body.appendChild(m);
-  $('#readerMore').setAttribute('aria-expanded', 'true');
+  ($('#viewer').hidden ? $('#readerMore') : btn).setAttribute('aria-expanded', 'true');
   opThumbs(m);
   const r = btn.getBoundingClientRect();
   m.style.left = Math.max(8, Math.min(window.innerWidth - m.offsetWidth - 8, r.left)) + 'px';
@@ -1356,7 +1361,9 @@ coarseMQ.addEventListener('change', readerMoreShown);
 async function closeFromList(i) {
   const t = PTABS.list[i];
   if (!t) return;
-  if (V.doc && V.file && V.file.id === t.fileId) {
+  // (In the reader: as its tab's \u00d7 does.)
+  if (!$('#viewer').hidden) await closePaperTab(i);
+  else if (V.doc && V.file && V.file.id === t.fileId) {
     if (!keptNote(await saveNow())) return;
     noteClosed(t.key, t.fileId);
     unloadDoc();
@@ -1364,7 +1371,7 @@ async function closeFromList(i) {
     PTABS.active = PTABS.list.length ? Math.max(0, Math.min(i, PTABS.list.length - 1)) : -1;
     renderPaperTabs();
   } else await closePaperTab(i);
-  if (PTABS.list.length) openPapersMenu(); else { closeOpenMenu(); $('#readerBtn').focus(); }
+  if (PTABS.list.length) openPapersMenu(); else { closeOpenMenu(); openMenuAt().focus(); }
 }
 // (Pictures from Drive, as the details' thumbnails, kept with them.)
 const opThumb = id => `<span class="op-thumb" data-op-thumb="${esc(id)}">${THUMBS.get(id) ? `<img src="${esc(THUMBS.get(id))}" alt="">` : ICON.doc}</span>`;
@@ -1390,6 +1397,25 @@ $('#readerMore').addEventListener('click', ev => {
   // (From the keyboard, into the list.)
   openPapersMenu(ev.detail === 0);
 });
+// In the reader, the count on the Reader half of its switch: the same,
+// rested on or clicked (tapped, on a touch screen); Down from it goes in.
+$('#vReaderCt').addEventListener('click', () => {
+  clearTimeout(RB.t);
+  if ($('#openMenu') && RB.hov) { RB.hov = false; return; }
+  if ($('#openMenu')) { closeOpenMenu(); return; }
+  openPapersMenu();
+});
+$('#vReaderCt').addEventListener('keydown', ev => { if (ev.key === 'ArrowDown' || ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); openPapersMenu(true); } });
+$('#vReaderCt').addEventListener('pointerenter', ev => {
+  if (ev.pointerType !== 'mouse') return;
+  clearTimeout(RB.hide);
+  if (!$('#openMenu')) { clearTimeout(RB.t); RB.t = setTimeout(() => { openPapersMenu(); RB.hov = true; }, 350); }
+});
+$('#vReaderCt').addEventListener('pointerleave', ev => {
+  if (ev.pointerType !== 'mouse') return;
+  clearTimeout(RB.t);
+  RB.hide = setTimeout(closeOpenMenu, 250);
+});
 // (Resting on the button or its \u25be, the same.)
 [$('#readerBtn'), $('#readerMore')].forEach(b => b.addEventListener('pointerenter', ev => {
   if (ev.pointerType !== 'mouse') return;
@@ -1413,13 +1439,13 @@ $('#readerBtn').addEventListener('pointermove', ev => { if (ev.pointerType !== '
 // (Held: not the browser's own menu for it.)
 $('#readerBtn').addEventListener('contextmenu', ev => { if (RB.long || $('#openMenu')) ev.preventDefault(); });
 $('#readerBtn').addEventListener('keydown', ev => { if (ev.key === 'ArrowDown') { ev.preventDefault(); openPapersMenu(true); } });
-document.addEventListener('pointerdown', ev => { if ($('#openMenu') && !ev.target.closest('#openMenu, #readerBtn, #readerMore')) closeOpenMenu(); }, true);
+document.addEventListener('pointerdown', ev => { if ($('#openMenu') && !ev.target.closest('#openMenu, #readerBtn, #readerMore, #vReaderCt')) closeOpenMenu(); }, true);
 document.addEventListener('keydown', ev => {
   if (ev.key !== 'Escape' || !$('#openMenu')) return;
   ev.stopPropagation();
   const back = ev.target.closest && ev.target.closest('#openMenu');
   closeOpenMenu();
-  if (back) $('#readerBtn').focus();
+  if (back) openMenuAt().focus();
 }, true);
 window.addEventListener('resize', closeOpenMenu);
 $('#vTitleX').addEventListener('click', () => { if (PTABS.list.length) closePaperTab(PTABS.active >= 0 ? PTABS.active : 0); });
@@ -4366,8 +4392,12 @@ async function showQuote() {
     QUOTE.el.className = 'quote-bar';
     QUOTE.el.innerHTML = `<button type="button" class="quote-go" title="Copy the passage as a quotation, with its citation (${esc(keyHint('quote'))})">${ICON.quote}<span>Quote</span></button>` +
       `<label class="quote-pg"><span>p.</span><input type="text" inputmode="numeric" autocomplete="off" aria-label="Page" readonly></label>` +
-      `<button type="button" class="quote-note" title="Quote in your notes, and highlight">${NOTE_ICON}<span>Add to notes</span></button>`;
+      `<button type="button" class="quote-note" title="Quote in your notes, and highlight">${NOTE_ICON}<span>Add to notes</span></button>` +
+      // (A reference selected, in the paper's bibliography say: looked up,
+      // to add to the library. See related.js.)
+      `<button type="button" class="quote-add" title="Look this reference up, to add it to your library" hidden>${ICON.plus}<span>Add to library</span></button>`;
     QUOTE.el.querySelector('.quote-go').addEventListener('click', quoteCopy);
+    QUOTE.el.querySelector('.quote-add').addEventListener('click', () => { if (QUOTE.sel) refFind(QUOTE.sel); });
     QUOTE.el.querySelector('.quote-note').addEventListener('click', rnAddQuote);
     // (Pressing in the bar keeps the selection.) The page box can be
     // written in only once pressed: otherwise the iPad's Scribble takes a
@@ -4385,6 +4415,7 @@ async function showQuote() {
   }
   QUOTE.sel = sel;
   QUOTE.el.querySelector('.quote-note').hidden = !gs || !BYKEY.get(V.entry.k);
+  QUOTE.el.querySelector('.quote-add').hidden = !gs || $('#addBtn').hidden || !refLike(sel.text, sel.from);
   // (Another passage chosen: the last copy's tidying up is called off.)
   const go = QUOTE.el.querySelector('.quote-go');
   if (go.classList.contains('done') && QUOTE.copied !== sel.text) { clearTimeout(QUOTE.doneT); go.classList.remove('done'); go.innerHTML = ICON.quote + '<span>Quote</span>'; }
@@ -5108,6 +5139,7 @@ function showSideTab(tab) {
     return;
   }
   if (tab === 'info') { showInfo(); return; }
+  if (tab === 'related') { showRelated(); return; }
   if (!V.doc) { $('#vSideBody').innerHTML = `<p class="v-side-note">Opening\u2026</p>`; return; }
   if (tab === 'pages') showThumbs();
   else if (tab === 'marks') showMarks();
@@ -5177,7 +5209,8 @@ $('#vSideBtn').addEventListener('click', () => toggleSide());
   const clamp = w => Math.round(Math.max(160, Math.min(w, Math.max(160, Math.min(480, window.innerWidth * 0.5)))));
   const set = w => { viewer.style.setProperty('--side-w', clamp(w) + 'px'); return clamp(w); };
   // (Notes keep a width of their own: wider, to write in.)
-  const key = () => SIDE.tab === 'notes' ? 'notesSideW' : 'sideW', usual = () => SIDE.tab === 'notes' ? 380 : SIDE_W;
+  // (Notes and Related wider, each its own width.)
+  const key = () => SIDE.tab === 'notes' ? 'notesSideW' : SIDE.tab === 'related' ? 'relSideW' : 'sideW', usual = () => SIDE.tab === 'notes' ? 380 : SIDE.tab === 'related' ? 320 : SIDE_W;
   const done = w => { store.set(key(), w); refit(); placePalette(); railSoon(); thumbsResized(); };
   set(store.get(key(), usual()));
   SIDE.width = () => {

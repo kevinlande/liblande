@@ -1,8 +1,8 @@
 ﻿// LibLande: an outline made from the printed Contents of a scanned or unmarked book.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
+// index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/contents.js'] = '2026-11-13.12';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/contents.js'] = '2026-11-14.01';
 /* ---- an outline from the printed Contents */
 // For a PDF with no outline of its own: its Contents page (in the first 25
 // pages, perhaps running over several) read line by line: each entry, its

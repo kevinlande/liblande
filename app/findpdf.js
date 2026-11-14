@@ -1,8 +1,8 @@
 ﻿// LibLande: Find a PDF: a publication's free copy, or the article through your library's proxy, opened in a new tab.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, tour, start.)
+// index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/findpdf.js'] = '2026-11-13.12';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/findpdf.js'] = '2026-11-14.01';
 /* ------------------------------------------------------------ find a PDF */
 // For a publication: its free copy, found through OpenAlex (which carries
 // Unpaywall's open-access data, and needs no email), or the article
