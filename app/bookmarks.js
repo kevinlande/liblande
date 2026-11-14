@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/bookmarks.js'] = '2026-11-14.01';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/bookmarks.js'] = '2026-11-14.02';
 /* ---- bookmarked pages */
 // Tap a page's top right corner twice to bookmark it (or press B for the
 // current page). Bookmarks are saved into the PDF with your markup, as ordinary PDF

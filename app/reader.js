@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-14.01';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-14.02';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -1553,6 +1553,14 @@ $('#vScroll').addEventListener('pointerup', () => {
   if (box && document.activeElement !== box) box.focus({ preventScroll: true });
 });
 function setTool(tool) {
+  // The sticky note, with a passage selected (or just before the toolbar
+  // was pressed): a sticky on those words, highlighted. The tool stays as
+  // it was.
+  if (tool === 'comment' && V.tool === 'read') {
+    const sel = quoteSelection() || (QUOTE.palSel && Date.now() - QUOTE.palSel.at < 1500 ? QUOTE.palSel.sel : null);
+    QUOTE.palSel = null;
+    if (sel) { stickyOn(sel); return; }
+  }
   if (tool !== 'read') hideQuote();
   if (tool === 'read') fingerMode(false);
   if (tool === 'markup') tool = markupTool();
@@ -1915,7 +1923,12 @@ function placePalette() {
 }
 // (Menus are placed to be seen whole: placeMenu.)
 // (What pressed a tool: a finger, the Pencil or the mouse; see FINGER.)
-$('#vPalette').addEventListener('pointerdown', ev => { FINGER.by = ev.pointerType; }, true);
+$('#vPalette').addEventListener('pointerdown', ev => {
+  FINGER.by = ev.pointerType;
+  // (The passage selected, in case pressing the toolbar loses it.)
+  const sel = V.tool === 'read' ? quoteSelection() : null;
+  QUOTE.palSel = sel ? { sel, at: Date.now() } : null;
+}, true);
 $('#vPalette').addEventListener('click', ev => {
   const t = ev.target.closest('button[data-tool]');
   // Pressing the tool in use again puts it down (back to reading).
@@ -2915,6 +2928,13 @@ function openComment(ed, isNew, anchor) {
   if (isNew || !text) commentEdit();
   else commentView(text);
 }
+// A new mark left without its comment, gone again. (One made while
+// reading, as a sticky on a passage, isn't removed that way: PDF.js's
+// layer is off then. So, as Remove does.)
+function dropMark(ed) {
+  ed.remove();
+  if (ed.div && ed.div.isConnected && V.ui) { try { V.ui.setSelected(ed); V.ui.delete(); } catch (err) { /* left */ } }
+}
 function closeComment(save) {
   const box = $('#vComment'), ed = box._ed, isNew = box.dataset.new === '1';
   box.hidden = true;
@@ -2929,9 +2949,9 @@ function closeComment(save) {
     V.dirty = true;
     saveUI();
     autoChanged();
-    if (isNew && !text) ed.remove();
+    if (isNew && !text) dropMark(ed);
   } else if (isNew && !commentText(ed)) {
-    ed.remove();
+    dropMark(ed);
   }
   refreshAllPins();
 }
@@ -3643,7 +3663,7 @@ function readMarkAt(x, y) {
     if (el.hidden || getComputedStyle(el).display === 'none') continue;
     const r = el.getBoundingClientRect();
     if (!r.width && !r.height) continue;
-    if (x >= r.left - 4 && x <= r.right + 4 && y >= r.top - 4 && y <= r.bottom + 4) return { page, id: el.dataset.annotationId || null };
+    if (x >= r.left - 4 && x <= r.right + 4 && y >= r.top - 4 && y <= r.bottom + 4) return { page, el, id: el.dataset.annotationId || null };
   }
   return null;
 }
@@ -3693,6 +3713,8 @@ async function pickUpMark(hit, x, y, back, bar) {
     const hit = readMarkAt(d.x, d.y);
     if (!hit) return;
     getSelection().removeAllRanges();
+    // (With Related open, its card for the highlight's words: see related.js.)
+    relPassageMark(hit);
     pickUpMark(hit, d.x, d.y);
   }, true);
 })();
@@ -4371,6 +4393,64 @@ toneMoreShown();
 document.addEventListener('pointerdown', ev => { if ($('#vTone') && !ev.target.closest('#vTone, #vDarkBtn, #vToneMore')) closeTone(); }, true);
 document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && $('#vTone')) { ev.stopPropagation(); closeTone(); } }, true);
 function hideQuote() { if (QUOTE.el) QUOTE.el.hidden = true; QUOTE.sel = null; }
+// A passage highlighted (in a colour, or the highlighter's): the mark made,
+// or null. PDF.js highlights a selection only in its highlighting mode, so
+// that mode first, and back to reading after. (Add to notes, the Quote
+// bar's colours, and a sticky on a passage.)
+function markRange(range, colour) {
+  const ui = V.ui, T = V.lib && V.lib.AnnotationEditorType;
+  if (!ui || !T || !V.viewer || !V.bus || typeof ui.highlightSelection !== 'function') return Promise.resolve(null);
+  const el = range.startContainer.nodeType === 3 ? range.startContainer.parentElement : range.startContainer;
+  const page = el && el.closest && el.closest('.page'), idx = page ? +page.dataset.pageNumber - 1 : -1;
+  const box = range.getClientRects()[0] || range.getBoundingClientRect();
+  return new Promise(res => {
+    const run = () => {
+      try {
+        if (colour) V.bus.dispatch('switchannotationeditorparams', { source: null, type: V.lib.AnnotationEditorParamsType.HIGHLIGHT_COLOR, value: colour });
+        const sel = getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+        V.newHighlight = true;
+        ui.highlightSelection('main_toolbar');
+      } catch (err) { res(null); return; }
+      // (The new one: PDF.js selects it as it's made. Else the highlight
+      // over the passage's first line: not one not there before, as the
+      // page's others are made afresh as the mode changes.)
+      const made = ui.firstSelectedEditor || null;
+      // (Back to reading.)
+      setTimeout(() => { if (V.tool === 'read' && V.viewer && V.doc) { try { V.viewer.annotationEditorMode = { mode: T.NONE }; } catch (err) { /* later */ } } }, 300);
+      // (The new one: on the passage's page, not there before.)
+      const over = e => {
+        if (!e.div || e.deleted || !e.div.classList.contains('highlightEditor')) return false;
+        const r = e.div.getBoundingClientRect(), cx = box.left + box.width / 2, cy = box.top + box.height / 2;
+        return cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom;
+      };
+      let n = 0;
+      const look = () => {
+        const ed = made && !made.deleted ? made : idx >= 0 ? Array.from(ui.getEditors(idx)).reverse().find(over) : null;
+        if (ed || ++n > 30) res(ed || null); else setTimeout(look, 50);
+      };
+      look();
+    };
+    if (V.viewer.annotationEditorMode !== T.HIGHLIGHT) {
+      V.bus.on('annotationeditormodechanged', () => setTimeout(run, 0), { once: true });
+      try { V.viewer.annotationEditorMode = { mode: T.HIGHLIGHT }; } catch (err) { res(null); }
+    } else run();
+  });
+}
+// A sticky note on a passage: highlighted, and its comment box open, as a
+// highlight made with the sticky tool (left empty, it goes again).
+async function stickyOn(sel) {
+  if (!gs) return;
+  hideQuote();
+  const ed = await markRange(sel.range, MARK.hlColor);
+  const s = getSelection();
+  if (s) s.removeAllRanges();
+  if (!ed) { toast('Couldn\u2019t put a note there.', 3000); return; }
+  COMMENT_MARKS.add(ed);
+  // (Once back to reading: see markRange.)
+  setTimeout(() => openComment(ed, true), 350);
+}
 function quoteDismiss() {
   if (QUOTE.el && QUOTE.el.contains(document.activeElement)) document.activeElement.blur();
   hideQuote();
@@ -4392,6 +4472,8 @@ async function showQuote() {
     QUOTE.el.className = 'quote-bar';
     QUOTE.el.innerHTML = `<button type="button" class="quote-go" title="Copy the passage as a quotation, with its citation (${esc(keyHint('quote'))})">${ICON.quote}<span>Quote</span></button>` +
       `<label class="quote-pg"><span>p.</span><input type="text" inputmode="numeric" autocomplete="off" aria-label="Page" readonly></label>` +
+      // (Highlight it, in one of the highlighter's colours.)
+      `<span class="quote-hl" role="group" aria-label="Highlight">` + HL_COLORS.map(([n, c]) => `<button type="button" data-qhl="${c}" title="Highlight: ${n}" aria-label="Highlight ${n.toLowerCase()}" style="--sw:${c}"></button>`).join('') + `</span>` +
       `<button type="button" class="quote-note" title="Quote in your notes, and highlight">${NOTE_ICON}<span>Add to notes</span></button>` +
       // (A reference selected, in the paper's bibliography say: looked up,
       // to add to the library. See related.js.)
@@ -4399,6 +4481,13 @@ async function showQuote() {
     QUOTE.el.querySelector('.quote-go').addEventListener('click', quoteCopy);
     QUOTE.el.querySelector('.quote-add').addEventListener('click', () => { if (QUOTE.sel) refFind(QUOTE.sel); });
     QUOTE.el.querySelector('.quote-note').addEventListener('click', rnAddQuote);
+    QUOTE.el.querySelector('.quote-hl').addEventListener('click', ev => {
+      const b = ev.target.closest('[data-qhl]'), sel = QUOTE.sel;
+      if (!b || !sel) return;
+      MARK.hlColor = b.dataset.qhl; store.set('hlColor', MARK.hlColor); updateCursors();
+      hideQuote();
+      markRange(sel.range, MARK.hlColor).then(() => { const s = getSelection(); if (s) s.removeAllRanges(); });
+    });
     // (Pressing in the bar keeps the selection.) The page box can be
     // written in only once pressed: otherwise the iPad's Scribble takes a
     // Pencil passing near it for handwriting.
@@ -4415,6 +4504,8 @@ async function showQuote() {
   }
   QUOTE.sel = sel;
   QUOTE.el.querySelector('.quote-note').hidden = !gs || !BYKEY.get(V.entry.k);
+  QUOTE.el.querySelector('.quote-hl').hidden = !gs || !V.ui;
+  QUOTE.el.querySelectorAll('[data-qhl]').forEach(b => b.classList.toggle('on', b.dataset.qhl === MARK.hlColor));
   QUOTE.el.querySelector('.quote-add').hidden = !gs || $('#addBtn').hidden || !refLike(sel.text, sel.from);
   // (Another passage chosen: the last copy's tidying up is called off.)
   const go = QUOTE.el.querySelector('.quote-go');
@@ -4439,6 +4530,8 @@ async function showQuote() {
   if (top + h > innerHeight - 8) top = Math.max(8, yTop - h - 6);
   QUOTE.el.style.top = top + 'px';
   QUOTE.el.style.left = Math.max(8, Math.min(innerWidth - w - 8, x - w / 2)) + 'px';
+  // (With Related open, its card for the passage: see related.js.)
+  relPassage(sel.text, 'Highlight');
   return sel;
 }
 // A passage quoted: "the passage" (Lee, 2026, p. 4), its citation in your
@@ -5127,6 +5220,7 @@ function showSideTab(tab) {
   }
   // (Your notes kept as you leave them.)
   if (SIDE.tab === 'notes' && tab !== 'notes' && RN.where === 'side') { rnFlush(); RN.ed = null; }
+  relPassageClose();
   SIDE.tab = tab;
   store.set('readerTab', tab);
   document.querySelectorAll('#vSide [data-vtab]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.vtab === tab)));
@@ -5502,8 +5596,10 @@ async function showMarks() {
       `<i style="background:${c.css}"></i>${esc(c.name)} <span>${c.n}</span></button>`).join('') + `</div>` : '';
   const shown = SIDE.colour ? SIDE.marks.filter(m => (markColour(m) || {}).key === SIDE.colour) : SIDE.marks;
   const worded = shown.filter(m => m.text || m.note).length;
-  let h = unsaved + chips + (worded ? `<div class="v-marks-acts"><button type="button" class="btn" data-marks-copy title="Every highlight and note, by page, with the reference">${ICON.copy}<span>Copy summary</span></button>` + AI_BTN +
-    (gs ? `<button type="button" class="btn" data-marks-notes title="Added to the publication\u2019s Notes">${ICON.pencil}<span>All to notes</span></button>` : '') + `</div>` : '') + `<div class="v-marks">`, last = 0;
+  // (One bar split in three, short words, so it fits a narrow sidebar;
+  // the titles say the rest.)
+  let h = unsaved + chips + (worded ? `<div class="v-marks-acts" role="group" aria-label="The annotations"><button type="button" data-marks-copy aria-label="Copy summary" title="Copy a summary: every highlight and note, by page, with the reference">${ICON.copy}<span>Summary</span></button>` + AI_BTN +
+    (gs ? `<button type="button" data-marks-notes aria-label="All to notes" title="Add them all to the publication\u2019s Notes">${ICON.pencil}<span>To notes</span></button>` : '') + `</div>` : '') + `<div class="v-marks">`, last = 0;
   // (A mark of words, as a highlight or underline: Copy and Quote at its
   // top right.)
   SIDE.shown = shown;
@@ -5562,7 +5658,7 @@ function marksSummary(withRef) {
 // is sent anywhere by LibLande: it's copied, for you to paste. (A scan
 // without text says so; a very long PDF is cut short, and says where.)
 const AI_MAX = 600000;
-const AI_BTN = `<button type="button" class="btn" data-ai-copy title="Copy a prompt for Claude: this paper, with your highlights">${ICON.ai}<span>Copy for AI</span></button>`;
+const AI_BTN = `<button type="button" data-ai-copy aria-label="Copy for AI" title="Copy a prompt for Claude: this paper, with your highlights">${ICON.ai}<span>For AI</span></button>`;
 async function aiPrompt(entry, doc, marks, pp) {
   const labels = await doc.getPageLabels().catch(() => null), useL = labels && labels.some((l, i) => l !== String(i + 1));
   const name = n => (pp && pp.get(n)) || (useL && labels[n - 1]) || String(n);

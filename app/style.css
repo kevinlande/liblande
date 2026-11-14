@@ -138,7 +138,7 @@
 :root[data-glass] .v-tabs { background: linear-gradient(to bottom, color-mix(in srgb, var(--panel) 80%, transparent), color-mix(in srgb, var(--panel) 55%, transparent)); }
 /* (The light rim along a glass top edge only on what floats: on the bars
    at the top of the screen it drew a thin line under the status bar.) */
-:root[data-glass] .v-palette, :root[data-glass] .vp-show, :root[data-glass] .menu-list, :root[data-glass] .quote-bar, :root[data-glass] .ref-card, :root[data-glass] .v-tone {
+:root[data-glass] .v-palette, :root[data-glass] .vp-show, :root[data-glass] .menu-list, :root[data-glass] .quote-bar, :root[data-glass] .ref-card, :root[data-glass] .rel-card, :root[data-glass] .v-tone {
   background: color-mix(in srgb, var(--panel) 62%, transparent);
   -webkit-backdrop-filter: saturate(190%) blur(26px); backdrop-filter: saturate(190%) blur(26px);
   border-color: var(--glass-edge); box-shadow: inset 0 1px 0 var(--glass-rim), inset 0 0 0 .5px var(--glass-rim), var(--shadow);
@@ -1817,6 +1817,15 @@ body.is-offline .fileicon:not(.saved), body.is-offline .pdf:not(.saved) { opacit
 .quote-bar.unsure .quote-pg input { border-color: #b8860b; }
 .quote-bar.unsure .quote-pg::after { content: '?'; color: #b8860b; font-weight: 700; }
 @media (pointer: coarse) { .quote-pg input { font-size: 16px; } .quote-go { padding: 9px 12px; } }
+/* The Quote bar's colours: the passage highlighted in one. */
+.quote-hl { display: inline-flex; align-items: center; gap: 2px; padding: 0 6px; border-left: 1px solid var(--line); }
+.quote-hl[hidden] { display: none; }
+.quote-hl button { width: 24px; height: 28px; padding: 0; border: 0; border-radius: 6px; background: none; cursor: pointer; display: grid; place-items: center; }
+.quote-hl button::before { content: ''; width: 15px; height: 15px; border-radius: 50%; background: var(--sw); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .18); transition: transform .1s; }
+.quote-hl button:hover { background: var(--side-hover); }
+.quote-hl button:hover::before { transform: scale(1.15); }
+.quote-hl button.on::before { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .18), 0 0 0 2px var(--panel), 0 0 0 3.5px var(--accent); }
+@media (pointer: coarse) { .quote-hl button { width: 32px; height: 36px; } .quote-hl button::before { width: 18px; height: 18px; } }
 .ms-group { display: grid; gap: 4px; margin: 4px 0 8px; }
 .ms-gh { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin: 4px 0 2px; }
 .ms-gh .i { width: 14px; height: 14px; }
@@ -2087,6 +2096,19 @@ a.ms-ib { text-decoration: none; }
 .v-thumb-n { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .v-thumb.current .v-thumb-n { color: var(--accent); font-weight: 600; }
 .v-marks { padding: 2px 0 24px; }
+/* The annotations' Summary | For AI | To notes: one bar split in equal
+   parts, as Related's Cited here | Related, so it fits a narrow sidebar. */
+.v-marks-acts { display: flex; margin: 6px 10px 2px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.v-marks-acts button { flex: 1 1 0; min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 30px; padding: 4px 6px;
+  border: 0; background: none; color: var(--text); font: 500 12.5px var(--ui); cursor: pointer; }
+.v-marks-acts button + button { border-left: 1px solid var(--line); }
+.v-marks-acts button:hover { background: var(--accent-soft); }
+.v-marks-acts button .i { flex: none; width: 14px; height: 14px; color: var(--muted); }
+.v-marks-acts button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (pointer: coarse) { .v-marks-acts button { min-height: 36px; } }
+/* (Narrow, as the sidebar's usual 200px: the words without the icons.) */
+.v-marks-acts { container-type: inline-size; }
+@container (max-width: 250px) { .v-marks-acts button { padding: 4px 3px; } .v-marks-acts button .i { display: none; } }
 .v-marks-page { padding: 12px 12px 4px; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--faint); }
 /* A mark's Copy and Quote, at its top right. */
 /* A QR code of references, and what can be done with it. */
@@ -2807,6 +2829,23 @@ a.rel-title:hover, button.rel-title:hover { text-decoration: underline; }
 .rel-have { flex: none; margin-top: 1px; padding: 1px 7px; border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); border-radius: 999px; color: var(--accent); font-size: 11px; white-space: nowrap; }
 .rel-add { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border: 0; border-radius: 7px; background: var(--accent); color: var(--accent-ink); cursor: pointer; }
 .rel-add .i { width: 15px; height: 15px; }
+/* A passage's Related: a card over the sidebar's list, the list dimmed
+   behind it (see relPassage). */
+.rel-card { position: absolute; z-index: 6; left: 8px; right: 8px; max-height: calc(100% - 96px); overflow: auto; overscroll-behavior: contain;
+  padding: 10px 4px 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); box-shadow: 0 12px 32px rgba(0, 0, 0, .24);
+  font-size: 13px; line-height: 1.35; animation: relp-in .14s ease-out; }
+@keyframes relp-in { from { opacity: 0; transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) { .rel-card { animation: none; } }
+.rel-card[hidden] { display: none; }
+.relp-hd { display: flex; align-items: flex-start; gap: 8px; padding: 0 6px 2px 8px; }
+.relp-q { flex: 1; margin: 0; padding-left: 8px; border-left: 3px solid var(--accent); color: var(--muted); font: italic 12.5px/1.4 Georgia, 'Times New Roman', serif;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.relp-x { flex: none; display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--faint); cursor: pointer; }
+.relp-x:hover { color: var(--text); background: var(--side-hover); }
+.relp-x .i { width: 14px; height: 14px; }
+.rel-card .rel-sec { margin-top: 10px; }
+.rel-card .v-side-note { padding: 4px 8px; }
+.v-side.relp-on #vSideBody { opacity: .35; filter: saturate(.6); transition: opacity .14s; }
 .rel .link-btn { border: 0; padding: 0; background: none; color: var(--accent); font: inherit; text-decoration: underline; cursor: pointer; }
 
 /* Settings › Word: the steps, each folder with Copy. */

@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/notes.js'] = '2026-11-14.01';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/notes.js'] = '2026-11-14.02';
 /* ------------------------------------------------------------ notes */
 // The details pane shows Details or Notes (a switch at its top, or Alt-N;
 // the choice kept). Notes has your notes, in a box you type in, formatted
@@ -823,28 +823,7 @@ function rnAddPassage(text, pg) {
   RN.ed.dispatchEvent(new Event('input'));
   rnKeep();
 }
-function rnHighlight(range) {
-  const ui = V.ui, T = V.lib && V.lib.AnnotationEditorType;
-  if (!ui || !T || !V.viewer || typeof ui.highlightSelection !== 'function') return;
-  const run = () => {
-    try {
-      const sel = getSelection();
-      sel.removeAllRanges();
-      sel.addRange(range);
-      V.newHighlight = true;
-      ui.highlightSelection('main_toolbar');
-    } catch (err) { /* the quotation's still added */ }
-    // (Back to reading.)
-    setTimeout(() => { if (V.tool === 'read' && V.viewer && V.doc) { try { V.viewer.annotationEditorMode = { mode: T.NONE }; } catch (err) { /* later */ } } }, 300);
-  };
-  // PDF.js highlights a selection only in its highlighting mode (and its
-  // own way there is its full viewer's, not this one's): so, that mode
-  // first, and back after.
-  if (V.viewer.annotationEditorMode !== T.HIGHLIGHT) {
-    V.bus.on('annotationeditormodechanged', () => setTimeout(run, 0), { once: true });
-    try { V.viewer.annotationEditorMode = { mode: T.HIGHLIGHT }; } catch (err) { /* not ready */ }
-  } else run();
-}
+function rnHighlight(range) { markRange(range); }
 // A page tag: to that page of the paper (as printed: the journal's page
 // numbers, as the Quote bar works them out), with Back to where you were.
 async function rnGo(label) {

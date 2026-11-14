@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/related.js'] = '2026-11-14.01';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/related.js'] = '2026-11-14.02';
 /* ------------------------------------------------------------ a reference selected */
 // Words selected in a paper that look like a reference (a year, or a DOI,
 // with a name as "Fodor, J." or the like, pages or a journal's volume;
@@ -365,3 +365,140 @@ $('#vSideBody').addEventListener('click', ev => {
   const open = ev.target.closest('.rel-title') && ev.target.closest('[data-rel-open]');
   if (open && BYKEY.get(open.dataset.relOpen)) relOpen(BYKEY.get(open.dataset.relOpen));
 });
+
+/* ------------------------------------------------------------ a passage's Related */
+// With the Related tab open, a passage selected (or a highlight clicked)
+// brings a card over the list, about that passage: the works it cites
+// ("Fodor 2007", matched to the paper's references, or else your library),
+// your publications most like its words, and OpenAlex's search for its
+// key terms. The list behind is left as it was; Esc, the x, or a press
+// anywhere else puts the card away.
+const RELP = { el: null, text: '', seq: 0, shut: '' };
+// Its author-year citations: [{ fam, year }] ("Fodor 2007", "Fodor
+// (2007)", "Green and Quilty-Dunn 2021", "Smith et al., 2019"). Only those
+// found among the references or in the library are shown, so a capital
+// word before a year ("In 2007") does no harm.
+function relCites(text) {
+  const out = [], seen = new Set();
+  const re = /([A-Z][\p{L}\u2019'\-]+)(?:(?:,\s*|\s+(?:and|&)\s+)[A-Z][\p{L}\u2019'\-]+)*(?:\s+et\s+al\.?)?,?\s*\(?((?:1[5-9]|20)\d\d)[a-z]?\b/gu;
+  for (const m of String(text || '').matchAll(re)) {
+    const k = norm(m[1]) + '|' + m[2];
+    if (!seen.has(k)) { seen.add(k); out.push({ fam: norm(m[1]), year: m[2] }); }
+  }
+  return out;
+}
+const relFam = s => norm(String(s || '').replace(/[{}]/g, '')).replace(/\s+/g, ' ').trim();
+function relCitedIn(text, st) {
+  const rows = [], keys = new Set();
+  relCites(text).forEach(({ fam, year }) => {
+    const r = (st.refs || []).find(c => c.year === year && relFam(tsFamily(c.people[0])).split(' ').pop() === fam);
+    const e = r ? null : ENTRIES.find(x => x.f.year === year && x.a && x.a[0] && relFam(x.a[0][0]).split(' ').pop() === fam);
+    const k = r ? 'r:' + (r.doi || r.title) : e ? 'e:' + e.k : '';
+    if (!k || keys.has(k)) return;
+    keys.add(k);
+    rows.push(r ? relRow(relId(r)) : relRow({ e, people: [], title: '' }, '', false));
+  });
+  return rows.join('');
+}
+// The passage's words, weighed as the library weighs them; its key terms
+// (the rarest in your library) to search OpenAlex with.
+function relPassageWords(text) {
+  const m = new Map();
+  kwsWords(String(text).replace(/\([^)]*\d{4}[^)]*\)/g, ' ')).forEach(w => m.set(w, (m.get(w) || 0) + 1));
+  return m;
+}
+function relTerms(m, idx) {
+  return [...m.keys()].filter(w => w.length > 3).sort((a, b) => (idx.df.get(a) || 0) - (idx.df.get(b) || 0) || m.get(b) - m.get(a)).slice(0, 5);
+}
+// (again: a highlight clicked again after its card was put away; else a
+// selection's card, put away, stays away while it's the same passage,
+// though the Quote bar comes back after a scroll.)
+async function relPassage(text, colour, again) {
+  const e = infoEntry();
+  text = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!e || !sideOpen() || SIDE.tab !== 'related') return;
+  if (text === RELP.text && RELP.el && !RELP.el.hidden) return;
+  if (text === RELP.shut && !again) return;
+  const idx = kwsIndex(), m = relPassageWords(text);
+  // (A word or two selected is enough to go by; a highlight, any.)
+  if (m.size < (again ? 1 : 2)) return;
+  const my = ++RELP.seq, st = relState(e);
+  RELP.text = text;
+  if (!RELP.el) {
+    RELP.el = document.createElement('div');
+    RELP.el.className = 'rel-card';
+    RELP.el.setAttribute('role', 'dialog');
+    RELP.el.setAttribute('aria-label', 'Related to the passage');
+    RELP.el.addEventListener('click', ev => {
+      if (ev.target.closest('[data-relp-x]')) { relPassageClose(); return; }
+      const add = ev.target.closest('[data-rel-add]');
+      if (add && REL_IDS.get(add.dataset.relAdd)) { relPassageClose(); relAddFrom(REL_IDS.get(add.dataset.relAdd)); return; }
+      const open = ev.target.closest('.rel-title') && ev.target.closest('[data-rel-open]');
+      if (open && BYKEY.get(open.dataset.relOpen)) { relPassageClose(); relOpen(BYKEY.get(open.dataset.relOpen)); }
+    });
+    $('#vSide').appendChild(RELP.el);
+  }
+  const mine = relLike(kwsVector(m, idx), e, idx, 4)
+    .map(({ e: x, s }) => relRow({ e: x, people: [], title: '' }, s > 0.2 ? 'Very alike' : 'Alike', true)).join('');
+  const draw = (cited, recs) => {
+    if (my !== RELP.seq || !RELP.el) return;
+    RELP.el.innerHTML = `<div class="relp-hd"><p class="relp-q" style="border-left-color:${esc(colour || 'var(--accent)')}">\u201c${esc(text.length > 160 ? text.slice(0, 160).replace(/\s+\S*$/, '') + '\u2026' : text)}\u201d</p>` +
+      `<button type="button" class="relp-x" data-relp-x aria-label="Close" title="Close (Esc)">${ICON.x}</button></div>` +
+      (cited ? `<p class="rel-sec">Cited in it</p>${cited}` : '') +
+      `<p class="rel-sec">In your library</p>${mine || '<p class="v-side-note">Nothing in your library is much like it.</p>'}` +
+      `<p class="rel-sec">Not in your library</p>${recs}`;
+  };
+  const wait = `<p class="v-side-note">${navigator.onLine ? 'Asking OpenAlex\u2026' : 'Online only: you\u2019re offline.'}</p>`;
+  draw(relCitedIn(text, st), wait);
+  RELP.el.hidden = false;
+  RELP.el.style.top = ($('#vSideBody').offsetTop + 6) + 'px';
+  RELP.el.scrollTop = 0;
+  $('#vSide').classList.add('relp-on');
+  // (The references, if not asked for yet; then the citations again.)
+  if (!st.refs && !st.busy) relFetch(e, st).then(() => { if (my === RELP.seq) draw(relCitedIn(text, st), RELP.recs || wait); });
+  RELP.recs = null;
+  if (!navigator.onLine) return;
+  let recs;
+  try {
+    const terms = relTerms(m, idx), own = plainTitle(e.f.title);
+    const j = await npOa('/works', { search: terms.join(' '), per_page: '15', select: TS_OA_SELECT });
+    const list = (j.results || []).filter(w => w.display_name).map(tsOaWork).filter(c => !tsHave(c) && plainTitle(c.title) !== own).slice(0, 4);
+    recs = list.length ? list.map(c => relRow(relId(c))).join('') : `<p class="v-side-note">None found that aren\u2019t in your library.</p>`;
+  } catch (err) { recs = `<p class="v-side-note">Couldn\u2019t ask just now: ${esc(errText(err))}.</p>`; }
+  if (my !== RELP.seq) return;
+  RELP.recs = recs;
+  draw(relCitedIn(text, st), recs);
+}
+function relPassageClose() {
+  RELP.seq++;
+  if (RELP.text) RELP.shut = RELP.text;
+  RELP.text = '';
+  if (RELP.el) RELP.el.hidden = true;
+  $('#vSide').classList.remove('relp-on');
+}
+// A highlight clicked: its words and colour, and its note's words too.
+// (One saved in the PDF: as the PDF has them, as the Annotations tab
+// reads them. One made since: the words under it.)
+async function relPassageMark(hit) {
+  if (!hit || !hit.el || SIDE.tab !== 'related' || !sideOpen() || !V.doc) return;
+  const n = +hit.page.dataset.pageNumber, r = hit.el.getBoundingClientRect();
+  let text = '', colour = '';
+  if (hit.id) {
+    try {
+      const page = await V.doc.getPage(n), a = (await page.getAnnotations()).find(x => x.id === hit.id);
+      if (a) {
+        if (a.quadPoints && a.quadPoints.length) text = textInQuads((await page.getTextContent()).items, a.quadPoints);
+        text = [text, a.contentsObj && a.contentsObj.str].filter(Boolean).join(' ');
+        if (a.color && a.color.length >= 3) colour = `rgb(${a.color[0]},${a.color[1]},${a.color[2]})`;
+      }
+    } catch (err) { /* the words under it, then */ }
+  }
+  if (!text.trim()) {
+    text = regionText(r);
+    const svg = drawnSvg(hit.page, r, '.canvasWrapper svg.highlight'), f = svg && (svg.getAttribute('fill') || (svg.querySelector('[fill]') ? svg.querySelector('[fill]').getAttribute('fill') : ''));
+    if (f && f !== 'none') colour = f;
+  }
+  relPassage(text, colour, true);
+}
+document.addEventListener('pointerdown', ev => { if (RELP.el && !RELP.el.hidden && !ev.target.closest('.rel-card, .quote-bar')) relPassageClose(); }, true);
+document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && RELP.el && !RELP.el.hidden) { ev.stopPropagation(); relPassageClose(); } }, true);
