@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-11-14.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-11-14.05';
 // On GitHub Pages, every part of the app must be from the same version: a
 // part kept from an older one (the offline copy, served when the network
 // was slow) lacks what this page needs. Then the kept copies go, and the
@@ -275,10 +275,10 @@ function sendPrefs(changes, done) {
   r.savePrefs(changes);
 }
 const errText = err => ((err && err.message) || String(err)).replace(/^(Exception|Error): /, '');
-let status = null, statusReq = null, STYLE_WAS = null;
+let status = null, statusReq = null;
 let showSetup = () => {};
 let switchLibraryTo = () => {}, openNewLibrary = () => {};
-// Settings' other libraries: Switch to each, or × to take it off the list.
+// Settings' other libraries: Switch to each, or x to take it off the list.
 function renderLibOthers(st) {
   // (In Settings, the open one first, ticked.)
   const cur = st.configured && st.bibName ? `<div class="set-lib cur">${ICON.check}<b>${esc(st.bibName.replace(/\.bib$/i, ''))}</b><em>open</em></div>` : '';
@@ -583,7 +583,7 @@ if (RELOADING) {
       const x = gs && !e.ib && state.group === 'toread' && RL.get(e.k);
       if (!x) return {};
       return {
-        right: x.list === 'next' ? { id: 'later', label: 'Later', icon: 'plus' } : { id: 'next', label: 'Up next', icon: 'plus' },
+        right: x.list === 'next' ? { id: 'later', label: 'Later', icon: 'later' } : { id: 'next', label: 'Up next', icon: 'next' },
         left: { id: 'done', label: 'Done', icon: 'check' },
       };
     };
@@ -945,8 +945,6 @@ if (RELOADING) {
       $('#adoptRow').hidden = a.access !== 'limited';
     }).catch(() => {});
     if (configured) {
-      // The theme previews as you choose; Save keeps it, Cancel puts it back.
-      STYLE_WAS = store.get('style', 'liblande');
       renderThemePicks();
       $('#glassBox').checked = !!glassNow();
       $('#coversBox').checked = coversOn();
@@ -963,10 +961,11 @@ if (RELOADING) {
     $('#setup').scrollTop = 0;
     if (!configured) $('#bibLink').focus();
   };
+  // (Every setting takes effect as it's changed. Esc closes; Done, which
+  // reads the links first if a new .bib or folder was given, is submit.)
   const closeSettings = () => {
     if ($('#setSave').disabled) return;
     proxiesTidy();
-    if (STYLE_WAS != null) { applyStyle(STYLE_WAS); STYLE_WAS = null; }
     $('#setup').hidden = true;
   };
   // (Glass: as soon as it's switched, and on your other devices too.)
@@ -1049,7 +1048,7 @@ if (RELOADING) {
     }
   });
   $('#setClose').addEventListener('click', closeSettings);
-  // A library taken off the list: ×, then × again to be sure (its folder
+  // A library taken off the list: x, then x again to be sure (its folder
   // and files stay in Google Drive).
   $('#libOthers').addEventListener('click', async ev => {
     const x = ev.target.closest('[data-lib-forget]');
@@ -1095,7 +1094,6 @@ if (RELOADING) {
       setLibraries(status);
       if (!quiet) setupMsg('', 'status');
       // (A theme only tried out goes back, as with Cancel.)
-      if (STYLE_WAS != null) { applyStyle(STYLE_WAS); STYLE_WAS = null; }
       $('#setup').hidden = true;
       $('#settingsBtn').hidden = false; $('#addBtn').hidden = false;
       $('#newLibRow').hidden = true; $('#newLibName').value = '';
@@ -1176,10 +1174,10 @@ if (RELOADING) {
         store.set('style', look);
         sendPrefs({ style: look });
       }
-      STYLE_WAS = null;
       setupMsg('', 'status');
+      proxiesTidy();
       $('#setup').hidden = true;
-      toast('Settings saved', 2000);
+      if (notes.length) toast('Settings saved', 2000);
     } catch (err) {
       setupMsg(errText(err), 'error');
     } finally {

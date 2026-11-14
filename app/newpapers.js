@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/newpapers.js'] = '2026-11-14.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/newpapers.js'] = '2026-11-14.05';
 /* ------------------------------------------------------------ new papers */
 // Found with OpenAlex (citations, authors, journals) and Semantic Scholar
 // (papers like your examples), asked from this page: no key, and no email
@@ -12,7 +12,7 @@
 // what was found is kept on this device.
 const NP_JOURNALS = [
   ['The Philosophical Review', '0031-8108'], ['Mind & Language', '0268-1064'], ['The British Journal for the Philosophy of Science', '0007-0882'],
-  ['The Journal of Philosophy', '0022-362X'], ['Philosophy and Phenomenological Research', '0031-8205'], ['Noûs', '0029-4624'],
+  ['The Journal of Philosophy', '0022-362X'], ['Philosophy and Phenomenological Research', '0031-8205'], ['No\u00fbs', '0029-4624'],
   ['Journal of Experimental Psychology: General', '0096-3445'], ['Journal of Vision', '1534-7362'],
 ];
 const NP_KINDS = [['cites', 'Citing you'], ['authors', 'Authors'], ['like', 'Similar'], ['journals', 'Journals']];
@@ -77,7 +77,7 @@ function npMe() {
 
 async function npOa(path, params) {
   const r = await npFetch(NP_OA + path + '?' + new URLSearchParams(params));
-  if (!r.ok) throw new Error('OpenAlex didn’t answer (' + r.status + ')');
+  if (!r.ok) throw new Error('OpenAlex didn\u2019t answer (' + r.status + ')');
   return r.json();
 }
 // OpenAlex's works for DOIs, 50 at a time (a DOI with , or | can't be
@@ -112,7 +112,7 @@ async function npSuggestAuthors(n, have) {
     const sur = norm(c.a[0]).split(/\s+/).pop();
     (w.authorships || []).forEach(au => {
       const nm = au.author && au.author.id && au.author.display_name;
-      if (!nm || !norm(nm).split(/[\s‐-]+/).includes(sur)) return;
+      if (!nm || !norm(nm).split(/[\s\u2010-]+/).includes(sur)) return;
       const v = votes.get(c) || new Map(), id = au.author.id.split('/').pop();
       v.set(id, { id, name: nm, n: ((v.get(id) || {}).n || 0) + 1 });
       votes.set(c, v);
@@ -167,12 +167,14 @@ async function npToggleAbstract(item, x) {
   if (open) NP_OPEN.add(x.id); else NP_OPEN.delete(x.id);
   btn.setAttribute('aria-expanded', String(open));
   box.hidden = !open;
-  if (!open || NP_ABS.has(x.id)) { if (open) box.textContent = NP_ABS.get(x.id) || 'No abstract.'; return; }
+  // (The abstract, and a link to its page.)
+  const fill = t => { box.textContent = t; if (x.url) box.insertAdjacentHTML('beforeend', ` <a href="${esc(x.url)}" target="_blank" rel="noopener">Its page \u2197</a>`); };
+  if (!open || NP_ABS.has(x.id)) { if (open) fill(NP_ABS.get(x.id) || 'No abstract.'); return; }
   box.textContent = 'Getting the abstract\u2026';
   box.classList.add('np-abs-wait');
   try {
     const text = await npAbstract(x);
-    box.textContent = text || 'No abstract.';
+    fill(text || 'No abstract.');
   } catch (err) {
     box.textContent = 'Couldn\u2019t get the abstract: ' + errText(err);
     NP_OPEN.delete(x.id);
@@ -234,7 +236,7 @@ function npCheck() {
       const r = await npFetch(NP_S2 + '?fields=title,externalIds,authors,venue,publicationDate,year&limit=40', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ positivePaperIds: ex.map(e => 'DOI:' + npDoi(e.f.doi)) }),
       });
-      if (!r.ok) throw new Error('Semantic Scholar didn’t answer (' + r.status + ')');
+      if (!r.ok) throw new Error('Semantic Scholar didn\u2019t answer (' + r.status + ')');
       const what = npSources().find(s => s[0] === npPick(cfg, 'like'));
       return ((await r.json()).recommendedPapers || []).map(p => {
         const doi = npDoi(p.externalIds && p.externalIds.DOI);
@@ -287,7 +289,7 @@ const npToolCount = () => { const n = gs ? npUnseen() : 0; return n ? '<span cla
 function openNewPapers() {
   // (What's new since last time is marked, then counts as seen.)
   sheet = { mode: 'newpapers', fresh: new Set(npVisible().filter(x => !NP.seen[x.id]).map(x => x.id)) };
-  showSheet('<div id="npBody"></div>', 'Done');
+  showSheet('<h2>New papers</h2><div id="npBody"></div>', 'Done');
   $('#sheetCancel').hidden = true;
   npRender();
   const now = Date.now();
@@ -319,15 +321,13 @@ function npRender() {
   if (tab === 'journals') list.forEach(x => { if (x.venue) jn.set(x.venue, (jn.get(x.venue) || 0) + 1); });
   if (NP.journal && !jn.has(NP.journal)) NP.journal = '';
   const shown = tab === 'journals' && NP.journal ? list.filter(x => x.venue === NP.journal) : list;
-  const touch = matchMedia('(pointer: coarse)').matches;
   box.innerHTML = `<div class="np-pull" aria-hidden="true">${ICON.refresh}</div>` +
-    `<div class="np-head"><h2>New papers</h2>` +
+    `<div class="np-head">` + `<span class="np-status">${NP.busy ? 'Checking\u2026' : (NP.checked ? 'Checked ' + msAgo(NP.checked) : 'Not checked yet')}</span>` +
     `<button type="button" class="tb-btn${NP.busy ? ' spinning' : ''}" data-np-check${NP.busy ? ' disabled' : ''} title="Check for new papers now" aria-label="Check for new papers now">${ICON.refresh}</button>` +
     `<button type="button" class="tb-btn" data-np-follow title="Choose what to follow" aria-label="Choose what to follow">${ICON.sliders}</button></div>` +
-    `<p class="sheet-note np-status">${NP.busy ? 'Checking\u2026' : (NP.checked ? 'Checked ' + msAgo(NP.checked) : 'Not checked yet') + (touch ? ' \u00b7 pull down to check again' : '')}</p>` +
     (errs.length ? `<p class="np-err">${errs.map(([k, m]) => esc((NP_KINDS.find(x => x[0] === k) || [k, k])[1] + ': ' + m)).join('<br>')}</p>` : '') +
-    `<div class="np-tabs" role="tablist">` + [['top', 'Top 15', Math.min(15, all.length)], ['all', 'All', all.length]].concat(NP_KINDS.map(([k, l]) => [k, l, of(k).length])).map(([k, l, n]) =>
-      `<button type="button" role="tab" class="np-tab" data-np-tab="${k}" aria-selected="${tab === k}">${l}<span class="ct">${n}</span></button>`).join('') + `</div>` +
+    `<div class="np-tabs" role="tablist">` + [['top', 'Top', 0], ['all', 'All', all.length]].concat(NP_KINDS.map(([k, l]) => [k, l, of(k).length])).map(([k, l, n]) =>
+      `<button type="button" role="tab" class="np-tab" data-np-tab="${k}" aria-selected="${tab === k}">${l}${n ? `<span class="ct">${n}</span>` : ''}</button>`).join('') + `</div>` +
     (tab === 'journals' ? `<div class="np-jrow">` +
       (jn.size > 1 ? `<button type="button" class="tb-btn" data-np-step="-1" aria-label="Previous journal" title="The journal before">${ICON.chev}</button>` : '') +
       `<div class="np-tabs np-journals">` + (jn.size > 1 ? npJournalList(jn, list.length) : [...jn].map(([v, n]) => [v, v, n])).map(([v, l, n]) =>
@@ -336,17 +336,17 @@ function npRender() {
       `<button type="button" class="tb-btn np-jadd${NP.jAdd ? ' on' : ''}" data-np-jadd aria-expanded="${NP.jAdd}" aria-label="Follow another journal" title="Follow another journal">${ICON.plus}</button></div>` +
       (NP.jAdd ? `<div class="npf-find np-jfind"><input type="search" data-npf-find="journals" placeholder="Follow a journal: type its name" autocomplete="off" autocapitalize="off" spellcheck="false"><div class="npf-hits" data-npf-hits="journals"></div></div>` : '') : '') +
     (shown.length ? `<div class="np-list">` + shown.map(x => { const cites = x.why.some(w => w.k === 'cites'); return '' +
-      `<div class="np-item${sheet.fresh.has(x.id) ? ' fresh' : ''}${cites ? ' cites' : ''}" data-np="${esc(x.id)}">` +
-      (cites ? `<div class="np-badge">${ICON.quote}Cites you</div>` : '') +
+      // (As Related's rows: the title (a tap shows the abstract), who, where
+      // and when, why it's here; then + to add it, the bookmark for the
+      // reading list, x to dismiss.)
+      `<div class="np-item${sheet.fresh.has(x.id) ? ' fresh' : ''}${cites ? ' cites' : ''}" data-np="${esc(x.id)}"><div class="np-main">` +
+      `<button type="button" class="np-title" data-np-abs aria-expanded="${NP_OPEN.has(x.id)}" title="Show or hide its abstract">${ICON.chev}<span>${esc(x.title)}</span></button>` +
+      `<div class="np-meta">${esc(npAuthors(x.authors))}${x.venue ? ' \u00b7 <i>' + esc(x.venue) + '</i>' : ''}${x.date ? ' \u00b7 ' + esc(dateText(x.date)) : ''}</div>` +
       `<div class="np-why">${x.why.map(w => esc(w.t)).join(' \u00b7 ')}</div>` +
-      `<a class="np-title" href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.title)}</a>` +
-      `<div class="np-meta">${esc(npAuthors(x.authors))}${x.venue ? ' · <i>' + esc(x.venue) + '</i>' : ''}${x.date ? ' · ' + esc(dateText(x.date)) : ''}</div>` +
-      // (Its abstract, opened and closed in place.)
-      `<button type="button" class="np-abs-btn" data-np-abs aria-expanded="${NP_OPEN.has(x.id)}">${ICON.chev}<span>Abstract</span></button>` +
-      `<div class="np-abs"${NP_OPEN.has(x.id) ? '' : ' hidden'}>${NP_OPEN.has(x.id) ? esc(NP_ABS.get(x.id) || 'No abstract.') : ''}</div>` +
-      `<div class="np-acts">${x.doi && gs ? `<button type="button" class="btn" data-np-add>${ICON.plus}<span>Add…</span></button><button type="button" class="btn" data-np-rl>${ICON.bookmark}<span>Reading list…</span></button>` : ''}` +
-      `<button type="button" class="btn np-gone" data-np-gone>${ICON.x}<span>Dismiss</span></button></div></div>`; }).join('') + `</div>`
-      : `<p class="ms-dim np-none">${NP.busy ? 'Looking…' : NP.checked ? 'Nothing new. Checked again tomorrow.' : 'LibLande looks for new papers once a day.'}</p>`);
+      `<div class="np-abs"${NP_OPEN.has(x.id) ? '' : ' hidden'}>${NP_OPEN.has(x.id) ? esc(NP_ABS.get(x.id) || 'No abstract.') : ''}${x.url ? ` <a href="${esc(x.url)}" target="_blank" rel="noopener">Its page \u2197</a>` : ''}</div></div>` +
+      `<div class="np-acts">${x.doi && gs ? `<button type="button" class="np-add" data-np-add title="Add to your library" aria-label="Add \u201c${esc(x.title)}\u201d to your library">${ICON.plus}</button><button type="button" class="np-q" data-np-rl title="Add, and put it on your reading list" aria-label="Add \u201c${esc(x.title)}\u201d and put it on your reading list">${ICON.bookmark}</button>` : ''}` +
+      `<button type="button" class="np-q" data-np-gone title="Dismiss" aria-label="Dismiss \u201c${esc(x.title)}\u201d">${ICON.x}</button></div></div>`; }).join('') + `</div>`
+      : `<p class="ms-dim np-none">${NP.busy ? 'Looking\u2026' : NP.checked ? 'Nothing new. Checked again tomorrow.' : 'LibLande looks for new papers once a day.'}</p>`);
 }
 // (The journal chosen, scrolled into view in its row.)
 function npShowJournal() {
@@ -371,7 +371,8 @@ $('#sheetBody').addEventListener('click', ev => {
   // A journal chosen from the search: followed, and looked in at once.
   const pick = ev.target.closest('[data-npf-pick]');
   if (pick) {
-    const r = sheet.hits[+pick.dataset.npfPick.split(':')[1]], c = npCfg();
+    const r = ((sheet.hits || {}).journals || [])[+pick.dataset.npfPick.split(':')[1]], c = npCfg();
+    if (!r) return;
     if (!c.journals.some(x => x.issn === r.issn_l)) { c.journals.push({ name: r.display_name, issn: r.issn_l }); c.on.journals = true; c.at = Date.now(); npSave(true); }
     NP.jAdd = false; NP.journal = r.display_name;
     toast('Following ' + r.display_name, 2500);
@@ -401,6 +402,7 @@ $('#sheetBody').addEventListener('click', ev => {
     npSave(true);
     item.classList.add('going');
     setTimeout(() => { npRender(); renderGroups(); }, 180);
+    toast('Dismissed', 6000, { label: 'Undo', run: () => { delete NP.gone[id]; npSave(true); npRender(); renderGroups(); } });
   }
 });
 
@@ -448,7 +450,7 @@ $('#sheetBody').addEventListener('click', ev => {
 function openFollow() {
   const c = npCfg();
   sheet = { mode: 'npfollow', cfg: JSON.parse(JSON.stringify(Object.assign({}, c, { authors: c.authors || [], mine: npPick(c, 'mine'), like: npPick(c, 'like') }))) };
-  showSheet('<div id="npfBody"></div>', 'Save');
+  showSheet('<h2>What to follow</h2><div id="npfBody"></div>', 'Save');
   sheet.npBack = true;
   npfRender();
 }
@@ -459,21 +461,21 @@ function npfRender() {
   const mine = npList(c.mine), withDoi = mine.filter(e => npDoi(e.f.doi)).length;
   const sw = k => `<span class="switch"><input type="checkbox" role="switch" data-npf-on="${k}"${c.on[k] ? ' checked' : ''}><span aria-hidden="true"></span></span>`;
   const chip = (kind, i, label, title) => `<span class="np-chip" title="${esc(title || label)}">${esc(label)}<button type="button" data-npf-del="${kind}:${i}" aria-label="Stop following ${esc(label)}">${ICON.x}</button></span>`;
-  box.innerHTML = `<h2>What to follow</h2>` +
+  box.innerHTML = '' +
     `<p class="sheet-note">LibLande asks OpenAlex and Semantic Scholar from this device. They see the DOIs, names and journals it asks about, never your email or your .bib file.</p>` +
     `<section class="npf-sec"><div class="npf-head"><span class="set-name">Papers that cite yours</span>${sw('cites')}</div>` +
     `<label class="npf-row">Your papers <select data-npf-sel="mine"><option value="">None chosen</option>${opts(c.mine)}</select></label>` +
     `<p class="hint">${mine.length ? mine.length + ' publication' + (mine.length === 1 ? '' : 's') + (withDoi < mine.length ? ', ' + withDoi + ' with a DOI (only those can be followed)' : '') : 'Choose the list or saved search that has your own papers.'}</p></section>` +
     `<section class="npf-sec"><div class="npf-head"><span class="set-name">Authors you follow</span>${sw('authors')}</div>` +
     `<div class="np-chips">${c.authors.map((a, i) => chip('authors', i, a.name)).join('') || '<span class="hint">None yet.</span>'}</div>` +
-    `<div class="npf-find"><input type="search" data-npf-find="authors" placeholder="Add an author…" autocomplete="off" autocapitalize="off" spellcheck="false"><div class="npf-hits" data-npf-hits="authors"></div></div>` +
+    `<div class="npf-find"><input type="search" data-npf-find="authors" placeholder="Add an author\u2026" autocomplete="off" autocapitalize="off" spellcheck="false"><div class="npf-hits" data-npf-hits="authors"></div></div>` +
     `<button type="button" class="linkish" data-npf-suggest>Suggest more from your library</button></section>` +
     `<section class="npf-sec"><div class="npf-head"><span class="set-name">Papers like these</span>${sw('like')}</div>` +
     `<label class="npf-row">Examples <select data-npf-sel="like">${opts(c.like)}</select></label>` +
     `<p class="hint">Semantic Scholar suggests new papers like those (up to 25 with DOIs).</p></section>` +
     `<section class="npf-sec"><div class="npf-head"><span class="set-name">New in your journals</span>${sw('journals')}</div>` +
     `<div class="np-chips">${c.journals.map((j, i) => chip('journals', i, j.name, j.name + ' (' + j.issn + ')')).join('') || '<span class="hint">None yet.</span>'}</div>` +
-    `<div class="npf-find"><input type="search" data-npf-find="journals" placeholder="Add a journal…" autocomplete="off" autocapitalize="off" spellcheck="false"><div class="npf-hits" data-npf-hits="journals"></div></div></section>`;
+    `<div class="npf-find"><input type="search" data-npf-find="journals" placeholder="Add a journal\u2026" autocomplete="off" autocapitalize="off" spellcheck="false"><div class="npf-hits" data-npf-hits="journals"></div></div></section>`;
 }
 async function npfSearch(kind, q) {
   const hits = $(`[data-npf-hits="${kind}"]`);
@@ -485,10 +487,11 @@ async function npfSearch(kind, q) {
       : await npOa('/sources', { search: q, select: 'id,display_name,issn_l,works_count,type', 'per-page': 6 });
     if (!sheet || !/^(npfollow|newpapers)$/.test(sheet.mode) || !hits.isConnected) return;
     const rows = d.results.filter(r => kind === 'authors' || r.issn_l);
-    sheet.hits = rows;
+    // (Each search's own results: picking from the other's list takes the right one.)
+    sheet.hits = Object.assign(sheet.hits && !Array.isArray(sheet.hits) ? sheet.hits : {}, { [kind]: rows });
     hits.innerHTML = rows.length ? rows.map((r, i) => `<button type="button" data-npf-pick="${kind}:${i}"><b>${esc(r.display_name)}</b><span>${esc(kind === 'authors'
-      ? [((r.last_known_institutions || [])[0] || {}).display_name, r.works_count + ' works'].filter(Boolean).join(' · ')
-      : [r.issn_l, r.works_count + ' works'].join(' · '))}</span></button>`).join('') : '<p class="hint">Nothing found.</p>';
+      ? [((r.last_known_institutions || [])[0] || {}).display_name, r.works_count + ' works'].filter(Boolean).join(' \u00b7 ')
+      : [r.issn_l, r.works_count + ' works'].join(' \u00b7 '))}</span></button>`).join('') : '<p class="hint">Nothing found.</p>';
   } catch (err) { if (hits.isConnected) hits.innerHTML = `<p class="hint">${esc(errText(err))}</p>`; }
 }
 let npfTimer = 0;
@@ -509,7 +512,8 @@ $('#sheetBody').addEventListener('click', async ev => {
   const c = sheet.cfg, del = ev.target.closest('[data-npf-del]'), pick = ev.target.closest('[data-npf-pick]');
   if (del) { const [k, i] = del.dataset.npfDel.split(':'); c[k].splice(+i, 1); npfRender(); return; }
   if (pick) {
-    const [k, i] = pick.dataset.npfPick.split(':'), r = sheet.hits[+i];
+    const [k, i] = pick.dataset.npfPick.split(':'), r = (sheet.hits || {})[k] && sheet.hits[k][+i];
+    if (!r) return;
     if (k === 'authors' && !c.authors.some(a => a.id === r.id.split('/').pop())) c.authors.push({ id: r.id.split('/').pop(), name: r.display_name });
     if (k === 'journals' && !c.journals.some(j => j.issn === r.issn_l)) c.journals.push({ name: r.display_name, issn: r.issn_l });
     npfRender();
@@ -517,7 +521,7 @@ $('#sheetBody').addEventListener('click', async ev => {
   }
   const sug = ev.target.closest('[data-npf-suggest]');
   if (sug) {
-    sug.disabled = true; sug.textContent = 'Looking…';
+    sug.disabled = true; sug.textContent = 'Looking\u2026';
     try {
       const more = await npSuggestAuthors(6, c.authors);
       if (sheet && sheet.cfg === c) { c.authors.push(...more); npfRender(); if (!more.length) sheetMsg('No more to suggest.'); }

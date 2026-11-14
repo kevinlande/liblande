@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/outline.js'] = '2026-11-14.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/outline.js'] = '2026-11-14.05';
 /* -------------------------------------------------------- outline editor */
 // In the sidebar's Outline tab: Edit the outline (the PDF's own, or the one
 // made from its printed Contents), or Make one afresh: from the Contents
@@ -294,7 +294,7 @@ function bodySize(rows) {
 // heads). Levels from the numbering ("2.1" under "2"), unnumbered ones
 // with numbered ones like them in type; otherwise by type, the largest the
 // top level. (A heading over two lines is one entry.)
-const HEAD_NUM = /^(\d{1,2}(?:\.\d{1,2}){0,3})\.?(?:\s*[|:.)]\s*|\s+)(?=[A-Za-z‘“'"])/;
+const HEAD_NUM = /^(\d{1,2}(?:\.\d{1,2}){0,3})\.?(?:\s*[|:.)]\s*|\s+)(?=[A-Za-z\u2018\u201c'"])/;
 async function headingOutline(doc, onPage) {
   const all = [], pages = [], whole = new Map();
   for (let n = 1; n <= doc.numPages; n++) {

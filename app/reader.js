@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-14.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-14.05';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -1077,7 +1077,7 @@ function tabsMenu(side) {
     const title = t.blank ? 'New tab' : x ? e.f.title || x.f.n : t.key;
     return `<div class="op-row"><button type="button" role="menuitem" data-tm="${i}"><span class="rc-title">${esc(title)}</span>` +
       (e ? `<span class="rc-sub">${esc(e.authorsShort || '')}${e.f.year ? ' \u00b7 ' + esc(e.f.year) : ''}</span>` : '') + '</button>' +
-      `<button type="button" class="op-x" data-tm-x="${i}" aria-label="Close ${esc(title)}" title="Close it">${ICON.x}</button></div>`;
+      `<button type="button" class="op-x" data-tm-x="${i}" aria-label="Close ${esc(title)}" title="Close">${ICON.x}</button></div>`;
   }).join('');
   document.body.appendChild(m);
   const r = btn.getBoundingClientRect();
@@ -1219,7 +1219,7 @@ function renderStart() {
   const pageOf = id => (POS[id] && POS[id].page ? 'p. ' + POS[id].page : '');
   // Closed lately on this device.
   const recent = RECENT.closed.filter(([k, id]) => !open.has(id) && BYKEY.get(k) && fileOf(BYKEY.get(k), id)).slice(0, 6)
-    .map(([k, id, t]) => card(BYKEY.get(k), fileOf(BYKEY.get(k), id), [pageOf(id), ago(t)].filter(Boolean).join(' · ')));
+    .map(([k, id, t]) => card(BYKEY.get(k), fileOf(BYKEY.get(k), id), [pageOf(id), ago(t)].filter(Boolean).join(' \u00b7 ')));
   // Read lately on another device.
   let files = null;
   const where = id => {
@@ -1228,7 +1228,7 @@ function renderStart() {
   };
   const others = SYNC.position ? Object.entries(POS).filter(([id, x]) => x.dev !== DEVICE && x.page && !open.has(id) && where(id))
     .sort((a, b) => b[1].at - a[1].at).slice(0, 6)
-    .map(([id, x]) => { const w = where(id); return card(w.e, w.f, 'p. ' + x.page + ' · ' + ago(Math.round(x.at / 1000)), x.name ? `<span class="vs-dev">${esc(x.name)}</span>` : '', x.page); }) : [];
+    .map(([id, x]) => { const w = where(id); return card(w.e, w.f, 'p. ' + x.page + ' \u00b7 ' + ago(Math.round(x.at / 1000)), x.name ? `<span class="vs-dev">${esc(x.name)}</span>` : '', x.page); }) : [];
   // The reading list: up next, then later.
   const rl = readingOrder().map(x => ({ x, e: BYKEY.get(x.key) })).filter(({ e }) => e && readablePdfs(e).length).slice(0, 6)
     .map(({ x, e }) => card(e, readablePdfs(e)[0], '', `<span class="vs-tag">${x.list === 'next' ? 'Up next' : 'Later'}</span>`));
@@ -1286,7 +1286,7 @@ $('#vTabs').addEventListener('click', ev => {
 $('#readerBtn').addEventListener('click', ev => {
   // (Not after a long press, which listed them.)
   if (RB.long) { RB.long = false; return; }
-  // (Wider than a phone, its count lists the open papers, as the \u25be does
+  // (Wider than a phone, its count lists the open papers, as the v does
   // on a phone.)
   if (ev.target.closest('#readerCt') && !phoneMQ.matches && PTABS.list.length) {
     clearTimeout(RB.t);
@@ -1300,7 +1300,7 @@ $('#readerBtn').addEventListener('click', ev => {
 });
 // The papers open, listed under the button, each with a picture of its
 // first page: on a computer when the pointer rests on it, on a touch
-// screen when it's held or with the \u25be beside it; or the down arrow;
+// screen when it's held or with the v beside it; or the down arrow;
 // one picked is gone to. The list stays while the pointer is over
 // it, and goes once it leaves both, or on a tap elsewhere or Esc.
 const RB = { t: 0, hide: 0, long: false, x: 0, y: 0 };
@@ -1324,7 +1324,7 @@ function openPapersMenu(focus) {
     const title = e.f.title || x.f.n;
     return `<div class="op-row"><button type="button" role="menuitem" data-op="${i}"${i === PTABS.active ? ' aria-current="true"' : ''}>${opThumb(t.fileId)}` +
       `<span class="op-text"><span class="rc-title">${esc(title)}</span>${sub ? `<span class="rc-sub">${esc(sub)}</span>` : ''}</span></button>` +
-      `<button type="button" class="op-x" data-op-x="${i}" aria-label="Close ${esc(title)}" title="Close it">${ICON.x}</button></div>`;
+      `<button type="button" class="op-x" data-op-x="${i}" aria-label="Close ${esc(title)}" title="Close">${ICON.x}</button></div>`;
   }).join('');
   document.body.appendChild(m);
   ($('#viewer').hidden ? $('#readerMore') : btn).setAttribute('aria-expanded', 'true');
@@ -1349,7 +1349,7 @@ function openPapersMenu(focus) {
   });
   if (focus) { const first = m.querySelector('[aria-current]') || m.querySelector('[data-op]'); if (first) first.focus(); }
 }
-// (The \u25be only on a touch screen: with a mouse or trackpad, resting
+// (The v only on a touch screen: with a mouse or trackpad, resting
 // the pointer on the button lists them.)
 // (On every screen: hovering isn't the only way to the list. See the little
 // arrows in style.css.)
@@ -1361,7 +1361,7 @@ coarseMQ.addEventListener('change', readerMoreShown);
 async function closeFromList(i) {
   const t = PTABS.list[i];
   if (!t) return;
-  // (In the reader: as its tab's \u00d7 does.)
+  // (In the reader: as its tab's x does.)
   if (!$('#viewer').hidden) await closePaperTab(i);
   else if (V.doc && V.file && V.file.id === t.fileId) {
     if (!keptNote(await saveNow())) return;
@@ -1416,7 +1416,7 @@ $('#vReaderCt').addEventListener('pointerleave', ev => {
   clearTimeout(RB.t);
   RB.hide = setTimeout(closeOpenMenu, 250);
 });
-// (Resting on the button or its \u25be, the same.)
+// (Resting on the button or its v, the same.)
 [$('#readerBtn'), $('#readerMore')].forEach(b => b.addEventListener('pointerenter', ev => {
   if (ev.pointerType !== 'mouse') return;
   clearTimeout(RB.hide);
@@ -2891,8 +2891,19 @@ function commentView(text) {
   const box = $('#vComment');
   box.dataset.mode = 'view';
   $('#vCommentView').textContent = text;
-  $('#vCommentDelete').hidden = false;
+  commentTrash();
 }
+// The one trash: the comment; or, where it's on a mark that can go too,
+// a choice of which.
+function commentTrash() {
+  const box = $('#vComment'), has = !!(box._ed && commentText(box._ed)) && box.dataset.new !== '1';
+  const del = $('#vCommentDelete');
+  del.hidden = !has && !box._canRemove;
+  const t = has ? (box._canRemove ? 'Delete\u2026' : 'Delete comment') : 'Delete ' + (box._what || 'highlight');
+  del.title = t; del.setAttribute('aria-label', t);
+  commentWhichClose();
+}
+function commentWhichClose() { const m = $('#vCommentWhich'); if (m) m.remove(); }
 function commentEdit() {
   const box = $('#vComment'), ta = $('#vCommentText');
   box.dataset.mode = 'edit';
@@ -2908,15 +2919,15 @@ function openComment(ed, isNew, anchor) {
   box._ed = ed;
   const text = commentText(ed);
   ta.value = text;
-  $('#vCommentDelete').hidden = isNew || !text;
   const what = ed.div && ed.div.classList.contains('inkEditor') ? 'drawing' : ed.div && ed.div.classList.contains('freeTextEditor') ? 'text box' : isNoteEd(ed) ? 'note' : 'highlight';
   // (A note's box says Note; a mark's, Comment.)
   box.querySelector('.v-comment-title').textContent = what === 'note' ? 'Note' : 'Comment';
   box.setAttribute('aria-label', what === 'note' ? 'Note' : 'Comment');
-  $('#vCommentRemove').title = 'Delete ' + what;
-  $('#vCommentRemove').setAttribute('aria-label', 'Delete ' + what);
-  // (A note that's only a comment goes with its comment.)
-  $('#vCommentRemove').hidden = isNew || COMMENT_MARKS.has(ed) || isNoteEd(ed);
+  // (Its mark, deletable from here too, unless it's a note that's only a
+  // comment: that goes with its comment.)
+  box._what = what;
+  box._canRemove = !isNew && !COMMENT_MARKS.has(ed) && !isNoteEd(ed);
+  commentTrash();
   // Next to the mark, kept on screen.
   const r = anchor || (ed.div && ed.div.isConnected ? ed.div.getBoundingClientRect() : { left: 80, bottom: 120, top: 100 });
   const w = Math.min(320, window.innerWidth - 24), h = 190;
@@ -2966,7 +2977,7 @@ $('#vCommentSave').addEventListener('click', () => {
   autoChanged();
   refreshAllPins();
   box.dataset.new = '';
-  $('#vCommentRemove').hidden = COMMENT_MARKS.has(ed);
+  box._canRemove = !COMMENT_MARKS.has(ed) && !isNoteEd(ed);
   commentView(text);
 });
 // Cancelled: back to the comment as it was (or, if there was none, closed).
@@ -3005,14 +3016,27 @@ function deleteMark(ed) {
   markDrawing();
   refreshAllPins();
 }
-$('#vCommentDelete').addEventListener('click', () => {
+function commentDeleteText() {
   const ed = $('#vComment')._ed;
   if (ed && COMMENT_MARKS.has(ed)) { deleteMark(ed); return; }
   $('#vCommentText').value = '';
   $('#vComment').dataset.mode = 'edit';
   closeComment(true);
+}
+$('#vCommentDelete').addEventListener('click', ev => {
+  const box = $('#vComment'), has = !!(box._ed && commentText(box._ed));
+  if (!has) { deleteMark(box._ed); return; }
+  if (!box._canRemove) { commentDeleteText(); return; }
+  // (Both: which, in a small menu under it.)
+  if ($('#vCommentWhich')) { commentWhichClose(); return; }
+  const m = document.createElement('div');
+  m.id = 'vCommentWhich';
+  m.className = 'menu-list v-comment-which';
+  m.setAttribute('role', 'menu');
+  m.innerHTML = `<button type="button" role="menuitem" data-cw="text">Delete this comment</button><button type="button" role="menuitem" class="danger" data-cw="mark">Delete the ${esc(box._what || 'highlight')} too</button>`;
+  m.addEventListener('click', e2 => { const b = e2.target.closest('[data-cw]'); if (!b) return; commentWhichClose(); if (b.dataset.cw === 'text') commentDeleteText(); else deleteMark(box._ed); });
+  ev.currentTarget.closest('.v-comment-bar').after(m);
 });
-$('#vCommentRemove').addEventListener('click', () => deleteMark($('#vComment')._ed));
 $('#vCommentText').addEventListener('keydown', ev => {
   if (ev.key === 'Enter' && (ev.metaKey || ev.ctrlKey)) { ev.preventDefault(); closeComment(true); }
   else if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); closeComment(false); }
@@ -4123,14 +4147,14 @@ document.addEventListener('selectionchange', ev => {
 // range lined up with the PDF (a cover page skipped), or the number printed
 // at the top or foot of the page. A guess is marked, and can be changed.
 const QUOTE = { el: null, sel: null, timer: 0, run: 0, down: new Set() };
-const LIGATURES = { 'ﬀ': 'ff', 'ﬁ': 'fi', 'ﬂ': 'fl', 'ﬃ': 'ffi', 'ﬄ': 'ffl', 'ﬅ': 'st', 'ﬆ': 'st' };
+const LIGATURES = { '\ufb00': 'ff', '\ufb01': 'fi', '\ufb02': 'fl', '\ufb03': 'ffi', '\ufb04': 'ffl', '\ufb05': 'st', '\ufb06': 'st' };
 function quoteText(raw) {
-  let t = String(raw).replace(/­/g, '').replace(/[ﬀ-ﬆ]/g, c => LIGATURES[c])
-    .replace(/(\p{L})[-‐]\s*\n\s*(\p{Ll})/gu, '$1$2')
+  let t = String(raw).replace(/\u00ad/g, '').replace(/[\ufb00-\ufb06]/g, c => LIGATURES[c])
+    .replace(/(\p{L})[-\u2010]\s*\n\s*(\p{Ll})/gu, '$1$2')
     .replace(/\s+/g, ' ').trim();
   // (Quotation marks in the passage become single ones.)
   let open = false;
-  t = t.replace(/[“”"]/g, c => c === '“' ? '‘' : c === '”' ? '’' : ((open = !open) ? '‘' : '’'));
+  t = t.replace(/[\u201c\u201d"]/g, c => c === '\u201c' ? '\u2018' : c === '\u201d' ? '\u2019' : ((open = !open) ? '\u2018' : '\u2019'));
   return t;
 }
 // Italic and bold, from the passage's own fonts: each span of a page's
@@ -4186,13 +4210,13 @@ async function quoteLetters(range) {
   // marks inside made single.
   let L = [];
   out.forEach(x => {
-    if (x.c === '­') return;
+    if (x.c === '\u00ad') return;
     const lig = LIGATURES[x.c];
     if (lig) [...lig].forEach(c => L.push({ c, s: x.s })); else L.push(x);
   });
   const joined = [];
   for (let i = 0; i < L.length; i++) {
-    if (/[-‐]/.test(L[i].c) && i > 0 && /\p{L}/u.test(L[i - 1].c)) {
+    if (/[-\u2010]/.test(L[i].c) && i > 0 && /\p{L}/u.test(L[i - 1].c)) {
       let j = i + 1;
       while (j < L.length && /[ \t]/.test(L[j].c)) j++;
       if (j < L.length && L[j].c === '\n') {
@@ -4220,7 +4244,7 @@ async function quoteLetters(range) {
   while (L.length && L[0].c === ' ') L.shift();
   while (L.length && L[L.length - 1].c === ' ') L.pop();
   let open = false;
-  L.forEach(x => { if (x.c === '“') x.c = '‘'; else if (x.c === '”') x.c = '’'; else if (x.c === '"') x.c = (open = !open) ? '‘' : '’'; });
+  L.forEach(x => { if (x.c === '\u201c') x.c = '\u2018'; else if (x.c === '\u201d') x.c = '\u2019'; else if (x.c === '"') x.c = (open = !open) ? '\u2018' : '\u2019'; });
   return L;
 }
 // Letters to HTML: runs of the same style in <i>, <b>.
@@ -4247,7 +4271,7 @@ async function printedPage(n) {
   if (V.pageLabels === undefined) V.pageLabels = await doc.getPageLabels().catch(() => null);
   const L = V.pageLabels;
   if (L && L.some((l, i) => l !== String(i + 1)) && /^(\d+|[ivxlcdm]+)$/i.test(L[n - 1] || '')) out = { page: L[n - 1], sure: true };
-  const m = /^(\d+)\s*[-–—]+\s*(\d+)$/.exec(((V.entry && V.entry.f.pages) || '').trim());
+  const m = /^(\d+)\s*[-\u2013\u2014]+\s*(\d+)$/.exec(((V.entry && V.entry.f.pages) || '').trim());
   const start = m ? +m[1] : 0, count = m ? +m[2] - start + 1 : 0, N = doc.numPages;
   if (!out && m && N === count) out = { page: String(start + n - 1), sure: true };
   if (!out && m && N === count + 1 && n > 1) out = { page: String(start + n - 2), sure: true };
@@ -4281,7 +4305,7 @@ function quoteSelection() {
 // (blue light cut, 0 to 100), with any of them. A layer over the page
 // only: the PDF isn't changed. Kept for this device. The moon: a tap
 // switches between the last two tones; resting the pointer on it (on a
-// touch screen, holding it or its \u25be) shows the choices.
+// touch screen, holding it or its v) shows the choices.
 const TONES = [['light', 'Light', '#ffffff'], ['sepia', 'Sepia', '#f4e6c8'], ['dark', 'Dark', '#111111'], ['darksepia', 'Dark sepia', '#1b1610']];
 const TONE = { now: store.get('pageTone', store.get('darkPages', false) ? 'dark' : 'light'), prev: store.get('pageTonePrev', null), warm: +store.get('pageWarm', 0) || 0, t: 0, hide: 0, long: false };
 const isDarkTone = t => t === 'dark' || t === 'darksepia';
@@ -4334,7 +4358,7 @@ function openTone() {
   p.addEventListener('pointerenter', () => clearTimeout(TONE.hide));
   p.addEventListener('pointerleave', ev => { if (ev.pointerType === 'mouse') TONE.hide = setTimeout(closeTone, 300); });
 }
-// (Resting on the moon or its \u25be, the same.)
+// (Resting on the moon or its v, the same.)
 [$('#vDarkBtn'), $('#vToneMore')].forEach(b => b.addEventListener('pointerenter', ev => {
   if (ev.pointerType !== 'mouse') return;
   clearTimeout(TONE.hide);
@@ -4470,7 +4494,7 @@ async function showQuote() {
     });
     QUOTE.el.querySelector('input').addEventListener('blur', ev => { ev.target.readOnly = true; });
     QUOTE.el.querySelector('input').addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); quoteCopy(); } });
-    // (Wide enough for what's typed: 327–345, say.)
+    // (Wide enough for what's typed: 327-345, say.)
     QUOTE.el.querySelector('input').addEventListener('input', ev => { ev.target.size = Math.max(3, ev.target.value.length + 1); });
     document.body.appendChild(QUOTE.el);
   }
@@ -4481,12 +4505,12 @@ async function showQuote() {
   // (Another passage chosen: the last copy's tidying up is called off.)
   const go = QUOTE.el.querySelector('.quote-go');
   if (go.classList.contains('done') && QUOTE.copied !== sel.text) { clearTimeout(QUOTE.doneT); go.classList.remove('done'); go.innerHTML = ICON.quote + '<span>Quote</span>'; }
-  const page = p2 && p2.page !== p1.page ? p1.page + '–' + p2.page : p1.page, sure = p1.sure && (!p2 || p2.sure);
+  const page = p2 && p2.page !== p1.page ? p1.page + '\u2013' + p2.page : p1.page, sure = p1.sure && (!p2 || p2.sure);
   const inp = QUOTE.el.querySelector('input');
   inp.value = page;
   inp.size = Math.max(3, page.length + 1);
   QUOTE.el.classList.toggle('unsure', !sure);
-  QUOTE.el.querySelector('.quote-pg').title = sure ? 'The journal’s page (click to change it)' : 'Guessed page: check it';
+  QUOTE.el.querySelector('.quote-pg').title = sure ? 'The journal\u2019s page (click to change it)' : 'Guessed page: check it';
   QUOTE.el.hidden = false;
   // Where the selecting ended: the point lifted from (a drag's end), else
   // the end of the selection (made with the keys, say). Just below it, so
@@ -4512,11 +4536,11 @@ async function showQuote() {
 // colour where it's pasted (formatted text came into Word with a colour of
 // its own: invisible on a dark page).
 function quoteWith(passage, pg) {
-  pg = String(pg || '').trim().replace(/-+/g, '–');
+  pg = String(pg || '').trim().replace(/-+/g, '\u2013');
   // (In your citation style, the page its way: see cite.js.)
   const cite = citeInText(V.entry, pg).text;
   const block = passage.split(/\s+/).length >= 40;
-  return { cite, block, text: block ? passage + ' ' + cite : '“' + passage.replace(/[.,;:]+$/, '') + '” ' + cite };
+  return { cite, block, text: block ? passage + ' ' + cite : '\u201c' + passage.replace(/[.,;:]+$/, '') + '\u201d ' + cite };
 }
 function quoteCopy() {
   const s = QUOTE.sel;
@@ -4527,7 +4551,7 @@ function quoteCopy() {
   if (s.letters) {
     const L = s.letters.slice();
     if (!block) while (L.length && /[.,;:]/.test(L[L.length - 1].c)) L.pop();
-    html = block ? '<p style="margin:0 0 0 0.5in">' + lettersHTML(L) + ' ' + esc(cite) + '</p>' : '“' + lettersHTML(L) + '” ' + esc(cite);
+    html = block ? '<p style="margin:0 0 0 0.5in">' + lettersHTML(L) + ' ' + esc(cite) + '</p>' : '\u201c' + lettersHTML(L) + '\u201d ' + esc(cite);
   }
   QUOTE.copied = s.text;
   copy(text, block ? 'Copied the block quotation, with its citation' : 'Copied the quotation, with its citation', html);
@@ -5800,7 +5824,7 @@ function spot() {
 // After going back, the button offers a return to where you'd jumped to.
 let FWD = null;
 // The place in this paper on another device, offered by the same pill
-// ({page, name, turns}): gone with its \u00d7, once taken, or after three
+// ({page, name, turns}): gone with its x, once taken, or after three
 // pages turned.
 let AWAY = null;
 function pushBack(from) {
@@ -6727,12 +6751,12 @@ function showReady(note, name, label, go, anchor) {
 async function prepareShare(file, clean, mail, anchor) {
   if (!clean && recentPdfs.has(file.id)) { openIn(recentPdfs.get(file.id), file.n, null, null, mail); return; }
   const t0 = performance.now(), prog = shareProgress(anchor);
-  if (prog.none) toast(recentPdfs.has(file.id) ? 'Making a clean copy…' : 'Getting the PDF from Google Drive…', 0);
+  if (prog.none) toast(recentPdfs.has(file.id) ? 'Making a clean copy\u2026' : 'Getting the PDF from Google Drive\u2026', 0);
   try {
     let bytes = await getPdfBytes(file, f => prog.set(clean ? f * 0.5 : f)), name = file.n, note = '';
     if (clean) {
       if (CLEAN.src !== bytes) {
-        if (prog.none) toast('Making a clean copy…', 0);
+        if (prog.none) toast('Making a clean copy\u2026', 0);
         prog.creep();
         CLEAN.made = await cleanPdf(bytes);
         CLEAN.src = bytes;
@@ -6751,7 +6775,7 @@ async function prepareShare(file, clean, mail, anchor) {
     if (performance.now() - t0 < (window.LIBLANDE_SHARE_WAIT == null ? 800 : window.LIBLANDE_SHARE_WAIT)) openIn(bytes, name, null, null, mail, ready); else ready();
   } catch (err) {
     prog.done();
-    toast((clean ? 'Couldn’t make a clean copy: ' : 'Couldn’t get the PDF: ') + errText(err), 6000);
+    toast((clean ? 'Couldn\u2019t make a clean copy: ' : 'Couldn\u2019t get the PDF: ') + errText(err), 6000);
   }
 }
 $('#readyClose').addEventListener('click', () => { $('#readyBar').hidden = true; });

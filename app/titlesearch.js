@@ -5,7 +5,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/titlesearch.js'] = '2026-11-14.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/titlesearch.js'] = '2026-11-14.05';
 /* ------------------------------------------------------------ title search */
 // A title (with an author or a year, if you like) typed in Add's lookup
 // box, instead of a DOI: candidates from Crossref (articles, chapters, and
@@ -276,8 +276,8 @@ function tsChoose(c) {
   Object.keys(c.fields).forEach(n => { if (c.fields[n]) f[n] = c.fields[n]; });
   renderAddFields(f);
   $('#doiLookup').value = '';
-  sheetMsg(c.have ? 'Already in your library: \u201c' + (c.have.f.title || c.have.k) + '\u201d. You can still add it.'
-    : 'Filled in from ' + c.src + '. Check the details, then add it.', !!c.have);
+  addHave(c.have);
+  sheetMsg('Filled in from ' + c.src + '.');
 }
 
 // In the box: searched on a pause in typing (or Return, in fillFromBox);
@@ -360,19 +360,19 @@ function photoDoi(text) {
 // that's names).
 const PHOTO_HEAD = /^(abstract|introduction|keywords?|categories|contents|references|bibliography|summary|preface|foreword|acknowledg\w*|chapter\s+\w+|part\s+\w+|article|original article|research article|open access|review)$/i;
 function photoNames(text) {
-  const t = String(text).replace(/[\d*†‡§¹²³⁴⁵⁶⁷⁸⁹|]+/g, ' ').replace(/^[^\p{L}]+|[^\p{L}.]+$/gu, '').trim();
+  const t = String(text).replace(/[\d*\u2020\u2021\u00a7\u00b9\u00b2\u00b3\u2074\u2075\u2076\u2077\u2078\u2079|]+/g, ' ').replace(/^[^\p{L}]+|[^\p{L}.]+$/gu, '').trim();
   const names = t.split(/\s*(?:,|;|\band\b|&)\s*/).map(x => x.trim()).filter(Boolean);
   // (The first a whole name; the others capitalized words, as one can be
   // cut short where a letter couldn't be read.)
-  return names.length && /^(\p{Lu}[\p{L}.'’-]*\s+){1,3}\p{Lu}[\p{L}'’-]+$/u.test(names[0]) &&
-    names.every(n => /^\p{Lu}[\p{L}.'’-]*(\s+\p{Lu}[\p{L}.'’-]*){0,3}$/u.test(n)) ? names : null;
+  return names.length && /^(\p{Lu}[\p{L}.'\u2019-]*\s+){1,3}\p{Lu}[\p{L}'\u2019-]+$/u.test(names[0]) &&
+    names.every(n => /^\p{Lu}[\p{L}.'\u2019-]*(\s+\p{Lu}[\p{L}.'\u2019-]*){0,3}$/u.test(n)) ? names : null;
 }
 function photoQuery(lines) {
   const words = s => (s.match(/\p{L}{2,}/gu) || []);
   // (Not a smudge read as letters: a line has a real word in it.)
   const fit = lines.filter(l => words(l.text).some(w => w.length >= 4) && l.conf >= 45 &&
     !PHOTO_HEAD.test(words(l.text).join(' ')) &&
-    !/\b(doi|https?|www\.|vol\.?|issn|isbn|journal|received|accepted|copyright)\b|©/i.test(l.text));
+    !/\b(doi|https?|www\.|vol\.?|issn|isbn|journal|received|accepted|copyright)\b|\u00a9/i.test(l.text));
   if (!fit.length) return '';
   const top = Math.max(...fit.map(l => l.h));
   const at = fit.findIndex(l => l.h === top);
@@ -382,7 +382,7 @@ function photoQuery(lines) {
   while (first > 0 && big(fit[first - 1]) && near(fit[first - 1], fit[first]) && last - first < 3) first--;
   while (last + 1 < fit.length && big(fit[last + 1]) && near(fit[last], fit[last + 1]) && last - first < 3) last++;
   const title = fit.slice(first, last + 1);
-  const t = title.map(l => l.text).join(' ').replace(/-\s+(?=\p{Ll})/gu, '').replace(/[^\p{L}\p{N}'’:,&\s-]/gu, ' ');
+  const t = title.map(l => l.text).join(' ').replace(/-\s+(?=\p{Ll})/gu, '').replace(/[^\p{L}\p{N}'\u2019:,&\s-]/gu, ' ');
   // The authors: a line of names just under the title (or the next one,
   // past a subtitle or affiliation).
   let who = '';
@@ -405,10 +405,10 @@ function photoAsks(lines, q) {
     if (last && prev && Math.abs(l.h - prev.h) <= prev.h * 0.25 && l.y - prev.y1 < prev.h * 1.6 && last.lines.length < 3) last.lines.push(l);
     else runs.push({ lines: [l] });
   });
-  const said = r => r.lines.map(l => l.text).join(' ').replace(/[^\p{L}\p{N}'’:,&\s-]/gu, ' ').replace(/\s+/g, ' ').trim();
+  const said = r => r.lines.map(l => l.text).join(' ').replace(/[^\p{L}\p{N}'\u2019:,&\s-]/gu, ' ').replace(/\s+/g, ' ').trim();
   const big = runs.map(r => ({ text: said(r), h: Math.max(...r.lines.map(l => l.h)) }))
     .filter(r => words(r.text).length >= 4 && !PHOTO_HEAD.test(r.text)).sort((a, b) => b.h - a.h).slice(0, 3).map(r => r.text.split(' ').slice(0, 24).join(' '));
-  const opening = ok.map(l => l.text).join(' ').replace(/[^\p{L}\p{N}'’:,&\s-]/gu, ' ').replace(/\s+/g, ' ').trim().split(' ').slice(0, 40).join(' ');
+  const opening = ok.map(l => l.text).join(' ').replace(/[^\p{L}\p{N}'\u2019:,&\s-]/gu, ' ').replace(/\s+/g, ' ').trim().split(' ').slice(0, 40).join(' ');
   return [...new Set([q, ...big, opening].filter(x => x && tsIsQuery(x)))].slice(0, 4);
 }
 // What the sources find for each, scored by how much of its title is in

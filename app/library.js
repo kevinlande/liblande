@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-14.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-14.05';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -154,9 +154,9 @@ function renderThemePicks() {
 }
 $('#themePicks').addEventListener('click', ev => {
   const b = ev.target.closest('[data-style-set]');
-  if (b) applyStyle(b.dataset.styleSet);
+  if (b) { applyStyle(b.dataset.styleSet); store.set('style', b.dataset.styleSet); sendPrefs({ style: b.dataset.styleSet }); }
 });
-// Auto, Light or Dark: at the foot of the sidebar, and in Settings ›
+// Auto, Light or Dark: at the foot of the sidebar, and in Settings >
 // Appearance (applyTheme marks both). From Settings, the page isn't opened
 // again (see below) until Settings closes.
 let themeReload = false;
@@ -366,7 +366,7 @@ function waited(x, short) {
 const staleRL = x => Date.now() - x.added > 56 * 86400000;
 function rlTag(e) {
   const x = RL.get(e.k);
-  return (x && x.list === 'next' ? '<span class="rl-tag next">Up next</span>' : '') + (x ? progressTag(e) : '');
+  return (x && x.list === 'next' ? '<span class="rl-tag next">Up next</span>' : '') + (x ? progressTag(e, true) : '');
 }
 // How far into each paper you've read: the pages read (each long enough
 // on screen: see noteProgress), as a share of its pages ({key: {p, at,
@@ -618,7 +618,7 @@ document.addEventListener('visibilitychange', () => {
 });
 const progressText = e => { const x = PROGRESS[e.k]; return !x || !x.p ? '' : x.p >= 100 ? 'read through' : x.p + '% read'; };
 // The badge: pressed, the count starts again (with Undo).
-const progressTag = e => progressText(e) ? `<button type="button" class="rl-prog" data-prog-reset="${esc(e.k)}" style="--p:${PROGRESS[e.k].p}%" title="How far you\u2019ve read: press to start the count again">${progressText(e)}</button>` : '';
+const progressTag = (e, still) => progressText(e) ? still ? `<span class="rl-prog" style="--p:${PROGRESS[e.k].p}%">${progressText(e)}</span>` : `<button type="button" class="rl-prog" data-prog-reset="${esc(e.k)}" style="--p:${PROGRESS[e.k].p}%" title="How far you\u2019ve read: press to start the count again">${progressText(e)}</button>` : '';
 function progressReset(k) {
   const was = PROGRESS[k];
   if (!was || !was.p) return;
@@ -649,7 +649,9 @@ function readingLocal(req) {
     d.seeded = true;
   } else if (req.op === 'add') {
     const x = find(req.key);
-    if (x) x.list = req.list || x.list; else d.items.push({ key: req.key, list: req.list || 'next', added: now });
+    if (x) x.list = req.list || x.list; else d.items.push({ key: req.key, list: req.list || 'next', added: req.added || now });
+    // (Done undone: off the list of those read.)
+    if (req.undone) d.done = d.done.filter(y => y.key !== req.key);
   } else if (req.op === 'move') {
     const x = find(req.key);
     if (x) x.list = req.list;
@@ -666,14 +668,15 @@ function rlOp(req, message) {
   if (message) toast(message, 2200);
   RL_QUEUE.ops.push(req);
   scheduleReadingSave();
-  if (req.op === 'done') markRead(req.key);
+  if (req.op === 'done') RL_READING.set(req.key, markRead(req.key));
 }
 // Done with a paper on the list: it's marked Read too (its read field, as
 // BibDesk has it), unless it already is.
+const RL_READING = new Map();
 function markRead(key) {
   const e = BYKEY.get(key);
-  if (!e || e.f.read === '1') return;
-  writeEdit(e, { read: '1' }, [], []).then(() => { if (state.selKey === e.k) renderDetail(); if (V.entry && V.entry.k === e.k) syncReaderRL(); })
+  if (!e || e.f.read === '1') return Promise.resolve();
+  return writeEdit(e, { read: '1' }, [], []).then(() => { if (state.selKey === e.k) renderDetail(); if (V.entry && V.entry.k === e.k) syncReaderRL(); })
     .catch(err => toast('Couldn\u2019t mark it as read: ' + errText(err), 5000));
 }
 function scheduleReadingSave(now) {
@@ -708,8 +711,20 @@ function rlMove(key, list) {
   const note = list === 'next' && upNextCount() >= UP_NEXT ? 'Up next now has more than ' + UP_NEXT + ': worth moving one to Later' : null;
   return rlOp({ op: 'move', key, list }, note);
 }
-const rlDone = key => rlOp({ op: 'done', key }, 'Marked as read and taken off your list');
-const rlRemove = key => rlOp({ op: 'remove', key }, 'Taken off your reading list');
+// (Each with Undo: back on the list where it was, from when it was added,
+// and, for Done, not marked Read if it wasn't.)
+function rlOff(key, op, msg) {
+  const x = READING.items.find(y => y.key === key), e = BYKEY.get(key), wasRead = e ? rawOf(e, 'read').trim() : '';
+  rlOp({ op, key });
+  toast(msg, 6000, x && { label: 'Undo', run: () => {
+    rlOp({ op: 'add', key, list: x.list, added: x.added, undone: op === 'done' });
+    const now = BYKEY.get(key);
+    if (op === 'done' && wasRead !== '1') Promise.resolve(RL_READING.get(key)).then(() => { const e2 = BYKEY.get(key); return e2 && writeEdit(e2, { read: wasRead }, [], []); })
+      .then(() => { if (state.selKey === key) renderDetail(); }).catch(err => toast('Back on the list, but still marked Read: ' + errText(err), 5000));
+  } });
+}
+const rlDone = key => rlOff(key, 'done', 'Marked as read and taken off your list');
+const rlRemove = key => rlOff(key, 'remove', 'Taken off your reading list');
 
 // The reading-list line on a publication's page.
 function readingHTML(e) {
@@ -719,13 +734,14 @@ function readingHTML(e) {
   if (!x) return `<div class="rl-bar" hidden></div>`;
   // (How long it's been on the list, and how far through it you are.)
   const how = waited(x) === 'since today' ? 'Today' : waited(x);
-  return `<div class="rl-bar on"><span class="rl-where${staleRL(x) ? ' stale' : ''}" title="On your reading list ${how === 'Today' ? 'since today' : 'for ' + how}">${ICON.bookmark}${how}${progressText(e) ? ' \u00b7 ' + progressTag(e) : ''}</span>` +
-    // (Icons, their names as tips: Up next, Later, Done, and off the list.)
-    `<div class="rl-acts"><div class="seg rl-seg" role="radiogroup" aria-label="Reading list">${rlBtn('next', 'Up next', 'radio', x.list === 'next')}${rlBtn('later', 'Later', 'radio', x.list !== 'next')}</div>` +
-    `${rlBtn('done', 'Done: mark it read, and take it off the list', 'btn')}${rlBtn('remove', 'Take it off the reading list', 'btn')}</div></div>`;
+  return `<div class="rl-bar on"><span class="rl-where${staleRL(x) ? ' stale' : ''}">${ICON.bookmark}${how === 'Today' ? 'Added today' : 'On your list ' + how}${progressText(e) ? ' \u00b7 ' + progressTag(e) : ''}</span>` +
+    // (In words, as the iPad shows no tips: Up next | Later, Done; and a
+    // quiet x to take it off the list.)
+    `<div class="rl-acts"><div class="seg rl-seg" role="radiogroup" aria-label="Reading list">${rlBtn('next', 'Up next', x.list === 'next')}${rlBtn('later', 'Later', x.list !== 'next')}</div>` +
+    `<button type="button" class="btn rl-done" data-rl="done" title="Done: mark it read, and take it off the list"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span>Done</span></button>` +
+    `<button type="button" class="rl-x" data-rl="remove" title="Take it off the reading list" aria-label="Take it off the reading list">${ICON.x}</button></div></div>`;
 }
-const rlBtn = (act, name, kind, on) => `<button type="button" ${kind === 'radio' ? `role="radio" aria-checked="${on}"` : 'class="btn rl-ic"'} data-rl="${act}" title="${name}" aria-label="${name}">` +
-  `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${RL_ICONS[{ next: 'next', later: 'later', done: 'check', remove: 'minus' }[act]]}</svg></button>`;
+const rlBtn = (act, name, on) => `<button type="button" role="radio" aria-checked="${on}" data-rl="${act}">${name}</button>`;
 function readingClick(e, act) {
   if (act === 'add') rlAdd(e.k);
   else if (act === 'next' || act === 'later') rlMove(e.k, act);
@@ -818,7 +834,7 @@ function syncReaderRL() {
     : item('add', 'plus', 'Add to reading list') + '<hr>' +
       (read ? item('unread', 'circle', 'Mark as unread') : suggest(item('read', 'check', 'Mark as read').replace('</button>', kbd + '</button>')));
 }
-// The menu's icons: a bookmark with + or −, a circled check, a circle.
+// The menu's icons: a bookmark with + or \u2212, a circled check, a circle.
 const RL_ICONS = {
   plus: '<path class="bm" d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1z"/><path class="mark" d="M12 7.5v6M9 10.5h6"/>',
   minus: '<path class="bm" d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1z"/><path class="mark" d="M9 10.5h6"/>',
@@ -1228,7 +1244,7 @@ function findChapters() {
   }
   for (const list of CHAPTERS.values()) list.sort((a, b) => firstPage(a) - firstPage(b) || (parseInt(a.f.chapter, 10) || 0) - (parseInt(b.f.chapter, 10) || 0) || cmpStr(a.f.title || '', b.f.title || ''));
 }
-// The books whose chapters are shown under them (each opened with its ▸;
+// The books whose chapters are shown under them (each opened with its >;
 // remembered on this device).
 const OPEN_BOOKS = new Set(store.get('openBooks', []));
 function toggleBook(k) {
@@ -1238,7 +1254,7 @@ function toggleBook(k) {
 }
 
 // The list with each version just under its main one (when both are in
-// it); NESTED: the versions shown so. And under a book opened with its ▸,
+// it); NESTED: the versions shown so. And under a book opened with its >,
 // its chapters, in the book's order: each chapter also keeps its own place
 // in the list (under its author, say), so it's there twice;
 // CHAPTER_ROWS: the places of the copies under books.
@@ -1653,7 +1669,7 @@ function renderTabs() {
   // are open, and a tap lists them (phoneLists).
   if (phoneMQ.matches) {
     const n = TABS.length + 1;
-    lib.innerHTML = listIcon(state.group) + `<span class="nm">${esc(state.group === 'toread' ? 'Queue' : groupName(state.group))}</span><span class="ct"></span>` +
+    lib.innerHTML = listIcon(state.group) + `<span class="nm">${esc(state.group === 'toread' ? 'Reading list' : groupName(state.group))}</span><span class="ct"></span>` +
       (n > 1 ? `<span class="tab-n" aria-hidden="true">${n}</span>` : '') + ICON.chev;
     lib.setAttribute('aria-selected', 'true');
     lib.setAttribute('aria-haspopup', 'menu');
@@ -1665,8 +1681,8 @@ function renderTabs() {
   }
   lib.querySelector('.ct').textContent = count('all');
   const box = $('#tabScroll'), keep = box.scrollLeft;
-  // On a phone the reading list's tab is just "Queue", to save room.
-  const short = id => (id === 'toread' && phoneMQ.matches ? 'Queue' : groupName(id));
+  // On a phone the reading list's tab is "Reading", to save room.
+  const short = id => (id === 'toread' && phoneMQ.matches ? 'Reading' : groupName(id));
   box.innerHTML = TABS.map(id => `<button type="button" class="tab" role="tab" data-tab="${esc(id)}" aria-selected="${on(id)}" title="${esc(groupName(id))}">` +
     (id === 'toread' ? ICON.bookmark : '') + `<span class="nm">${esc(short(id))}</span><span class="ct">${count(id)}</span>` +
     (tabCloseable(id) ? `<span class="tab-x" data-close="${esc(id)}" role="button" aria-label="Close ${esc(groupName(id))}" title="Close">${ICON.x}</span>` : '') +
@@ -1748,7 +1764,7 @@ function fitToolbar() {
 // a group's.
 const listIcon = id => id === 'all' ? ICON.lib : id === 'toread' ? ICON.bookmark : id === 'recent' ? ICON.history : ICON.folder;
 // On a phone, the list button's menu: the library, each open list (with
-// its \u00d7, if it can be closed), and Recently viewed.
+// its x, if it can be closed), and Recently viewed.
 function phoneLists() {
   const was = $('#tabsMenu');
   closeTabsMenu();
@@ -1756,7 +1772,7 @@ function phoneLists() {
   const ids = ['all'].concat(TABS), btn = $('#tabs .tab.pinned');
   const row = id => `<div class="op-row"><button type="button" role="menuitem" class="mi" data-tl="${esc(id)}"${state.group === id ? ' aria-current="true"' : ''}>${listIcon(id)}` +
     `<span class="lm-nm">${esc(groupName(id))}</span><span class="lm-ct">${(groupItems(id) || []).length.toLocaleString()}</span></button>` +
-    (id !== 'recent' && tabCloseable(id) ? `<button type="button" class="op-x" data-tl-x="${esc(id)}" aria-label="Close ${esc(groupName(id))}" title="Close it">${ICON.x}</button>` : '') + `</div>`;
+    (id !== 'recent' && tabCloseable(id) ? `<button type="button" class="op-x" data-tl-x="${esc(id)}" aria-label="Close ${esc(groupName(id))}" title="Close">${ICON.x}</button>` : '') + `</div>`;
   const m = document.createElement('div');
   m.className = 'menu-list pdf-menu link-menu recent-menu lists-menu';
   m.id = 'tabsMenu';
@@ -2474,7 +2490,7 @@ function lengthCell(e) {
   if (fl && (LEN.now === fl.id || LEN.queue.some(x => x.id === fl.id))) return `<span class="c-x c-len" title="Counting its pages\u2026"><i class="len-wait" aria-label="Counting its pages"></i></span>`;
   return `<span class="c-x c-len"></span>`;
 }
-// A book with chapters: its ▸ (to show them under it) and how many; a
+// A book with chapters: its > (to show them under it) and how many; a
 // chapter shown under its book: "in this book".
 function bookBits(e, i) {
   if (CHAPTER_ROWS.has(i)) return { before: '', after: `<span class="in-book">in this book</span>` };
@@ -2657,7 +2673,7 @@ const CITE_FIELDS = {
 const citeFields = t => (CITE_FIELDS[{ inbook: 'incollection', inproceedings: 'incollection', conference: 'incollection', proceedings: 'book', mastersthesis: 'phdthesis' }[t] || t] || CITE_FIELDS.misc).concat(['month', 'year']);
 const CITE_LABELS = { number: 'No.', volume: 'Vol.', address: 'Place', month: 'Month', howpublished: 'Published' };
 function venueHTML(e) {
-  // Close to APA: Journal, 11(1): 91\u2013101 (Jan 1999). Each piece is
+  // Close to APA: Journal, 11(1): 91-101 (Jan 1999). Each piece is
   // labelled underneath; the punctuation is plain text between them. With
   // a library that can be changed, a click on a piece edits it, and the +
   // adds one.
@@ -2723,7 +2739,7 @@ function tidyMonth(v) {
 }
 const join2 = (a, b, sep) => (a && b ? a + sep + b : a || b);
 // Editing a piece of the citation in place: the field as it is in the .bib
-// (so 91--101, not 91\u2013101). Return or leaving the box saves; Esc cancels.
+// (so 91--101, not 91-101). Return or leaving the box saves; Esc cancels.
 // The title, changed in place: a box as big as it, in its type; Return
 // or a click elsewhere saves it (with Undo), Esc leaves it as it was.
 function editTitle(h1) {
@@ -2929,6 +2945,11 @@ new ResizeObserver(() => {
   else fitSelActs();
 }).observe(detailEl);
 function renderDetail() {
+  // (Your notes being written here: not drawn again under you as they're
+  // saved; once you leave the box.)
+  const nvBox = detailEl.querySelector('[data-nv-box]');
+  if (nvBox && nvBox.contains(document.activeElement) && state.selKey === NOTES.boxFor) { NOTES.redraw = true; return; }
+  NOTES.redraw = false;
   if (state.picking && state.picked.size && !phoneMQ.matches) {
     detailEl.innerHTML = selectionHTML();
     detailEl.dataset.wide = detailWide() ? '1' : '';
@@ -3050,7 +3071,7 @@ function renderDetail() {
     ? `<button type="button" class="thumb" data-read="${j}" title="Read ${esc(fl.n)}">${j === first && cover ? coverBox(cover) : thumbBox(fl.id)}<span class="thumb-name">${esc(fl.n)}</span></button>`
     : '').join('') : '';
   if (!hasPdf && cover && wide) thumbs = `<div class="thumb cover-only">${coverBox(cover)}</div>`;
-  // Beside the details, several PDFs as a carousel: one at a time, ‹ › to
+  // Beside the details, several PDFs as a carousel: one at a time, \u2039 > to
   // go round (or a swipe, or the arrow keys), dots and "2 of 3" on a strip
   // along the picture's foot. (In a narrow pane they're small rows.)
   const pdfs = hasPdf ? e.files.map((fl, j) => [fl, j]).filter(([fl]) => fl.id) : [];
@@ -3071,7 +3092,7 @@ function renderDetail() {
       `. <button type="button" class="dup-no" data-notdup title="Stop showing ${twins.length === 1 ? 'these two' : 'these'} as possible duplicates">Not the same</button></span></div>`;
   }
   const missing = (e.files || []).filter(x => x.x);
-  if (missing.length) notices += `<div class="warn">The linked file ${esc(missing[0].p)} wasn\u2019t found in your papers folder on Google Drive.</div>`;
+  if (missing.length) notices += `<div class="dup-note warn"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17v.5"/></svg><span>The linked file ${esc(missing[0].p)} wasn\u2019t found in your papers folder on Google Drive.</span></div>`;
 
   const meta = [];
   // Rating and Read: set here with a click (a click on the current rating

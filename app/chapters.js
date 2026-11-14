@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/chapters.js'] = '2026-11-14.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/chapters.js'] = '2026-11-14.05';
 /* ------------------------------------------------------------ link chapters */
 // A chapter is linked to its book by its crossref field (see findChapters).
 // Chapters added before that are linked here, after you've looked:
@@ -31,7 +31,7 @@ function lcMost(values, key) {
   for (const list of n.values()) if (!best || list.length > best.length) best = list;
   return best ? best[0] : '';
 }
-// Suggestions dismissed (\u00d7): a chapter and the book it was matched to
+// Suggestions dismissed (x): a chapter and the book it was matched to
 // ("c:chapter>book"), or a book to add for chapters with that book title
 // ("g:title"). Kept with your preferences too, so every device knows.
 const LC_NO = new Set(store.get('lcNo', []));
@@ -639,7 +639,7 @@ async function chSuggest(book) {
 }
 // A book's chapters as rows (in the details, and in Add a chapter): each
 // with its authors and pages, and + to add it; one already in the library
-// marked so (\u2713), to go to.
+// marked so (v), to go to.
 function chRows(list, attr) {
   const who = c => parseNamesLite(c.author || '').map(([l]) => l).slice(0, 3).join(', ');
   return list.map((c, i) => `<li${c.have ? ' class="have"' : ''}><button type="button" ${attr}="${i}" title="${c.have ? 'Already in your library: go to it' : 'Add this chapter, filled in'}">` +

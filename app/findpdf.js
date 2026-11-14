@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/findpdf.js'] = '2026-11-14.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/findpdf.js'] = '2026-11-14.05';
 /* ------------------------------------------------------------ find a PDF */
 // For a publication: its free copy, found through OpenAlex (which carries
 // Unpaywall's open-access data, and needs no email), or the article
@@ -175,10 +175,11 @@ $('#proxyList').addEventListener('input', ev => {
 $('#proxyList').addEventListener('click', ev => {
   const row = ev.target.closest('[data-proxy]');
   if (!row || !ev.target.closest('[data-proxy-del]')) return;
-  PROXIES.list.splice(+row.dataset.proxy, 1);
+  const i = +row.dataset.proxy, [gone] = PROXIES.list.splice(i, 1);
   proxiesSave();
   renderProxies();
   renderDetail();
+  toast('Proxy removed', 6000, { label: 'Undo', run: () => { PROXIES.list.splice(i, 0, gone); proxiesSave(); renderProxies(); renderDetail(); } });
 });
 // (Proxies with no address aren't kept when Settings closes.)
 function proxiesTidy() {

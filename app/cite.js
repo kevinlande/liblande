@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/cite.js'] = '2026-11-14.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/cite.js'] = '2026-11-14.05';
 /* ------------------------------------------------------------ citation styles */
 // Your citation style, chosen in Settings > Citing, kept with your account:
 // APA by default, which LibLande formats itself (apaCitation, apaInText:
@@ -210,7 +210,7 @@ function citeOnceHTML() {
   const ids = ['apa', CITE.id, ...CITE.recent.map(x => x.id)].filter((v, i, a) => a.indexOf(v) === i).slice(0, 6);
   return `<hr class="mi-sep"><button type="button" class="mi cite-more" data-cite-more aria-expanded="false">${ICON.chev}<span>Style: <b data-cite-label>${esc(citeShort())}</b></span></button>` +
     `<div class="cite-once" hidden>` + ids.map(id => `<button type="button" class="mi" data-cite-once-id="${esc(id)}" aria-pressed="${id === CITE.id}">${ICON.check}<span>${esc(citeTitle(id))}</span></button>`).join('') +
-    `<button type="button" class="mi" data-cite-settings><span>More styles…</span></button></div>`;
+    `<button type="button" class="mi" data-cite-settings><span>More styles\u2026</span></button></div>`;
 }
 document.addEventListener('click', ev => {
   const more = ev.target.closest('[data-cite-more]');
@@ -228,7 +228,7 @@ document.addEventListener('click', ev => {
     d.dataset.citeOnce = id;
     d.querySelectorAll('[data-cite-label]').forEach(el => { el.textContent = citeShort(id); });
     d.querySelectorAll('[data-cite-once-id]').forEach(b => b.setAttribute('aria-pressed', String(b === once)));
-    if (id !== 'apa') citeLoad(id).catch(err => toast('Couldn’t download ' + citeTitle(id) + ': ' + errText(err), 6000));
+    if (id !== 'apa') citeLoad(id).catch(err => toast('Couldn\u2019t download ' + citeTitle(id) + ': ' + errText(err), 6000));
     return;
   }
   if (ev.target.closest('[data-cite-settings]')) {

@@ -19,7 +19,7 @@
  */
 (function (root) {
   'use strict';
-  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).edits = '2026-11-14.04';
+  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).edits = '2026-11-14.05';
   const READING_FILE = 'reading-list.json',
     INBOX_FOLDER = 'Inbox', INBOX_FILE = 'LibLande inbox.bib', BACKUP_FOLDER = 'Backups';
   const READING_GROUP = '★ Reading List';
@@ -326,7 +326,8 @@
     } else if (req.op === 'add') {
       const x = find(req.key);
       if (x) x.list = req.list || x.list;
-      else d.items.push({ key: req.key, list: req.list || 'next', added: now });
+      else d.items.push({ key: req.key, list: req.list || 'next', added: req.added || now });
+      if (req.undone) d.done = (d.done || []).filter(y => y.key !== req.key);
     } else if (req.op === 'move') {
       const x = find(req.key);
       if (x) x.list = req.list;

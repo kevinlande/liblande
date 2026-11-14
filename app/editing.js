@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-14.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-14.05';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -191,6 +191,30 @@ function addDetailKeyword(e, v, input) {
 }
 const starButtons = r => [1, 2, 3, 4, 5].map(i => `<button type="button" data-star="${i}" aria-label="${i} star${i > 1 ? 's' : ''}">${i <= r ? '\u2605' : '\u2606'}</button>`).join('');
 
+// Every sheet's title and buttons in a bar at its top (Cancel as an x at
+// the left, the title, then Save or Done), as on an iPad or a Mac: in view
+// without scrolling, and above the keyboard. Edit, Add and the others
+// that draw their own (sheetHead) keep theirs; for the rest, the sheet's
+// own Cancel and Save are moved into one, with its first heading.
+function sheetButtonsHome() {
+  const bar = $('#sheetForm > .setup-actions');
+  [$('#sheetCancel'), $('#sheetSave')].forEach(b => { if (b.parentElement !== bar) bar.append(b); });
+}
+function sheetTitleBar() {
+  const body = $('#sheetBody');
+  if (body.querySelector(':scope > .sheet-head')) return;
+  const head = document.createElement('div');
+  head.className = 'sheet-head sheet-head-auto';
+  const h = body.querySelector(':scope > h2') || body.querySelector(':scope > :first-child > h2') || document.createElement('h2');
+  head.append($('#sheetCancel'), h, $('#sheetSave'));
+  body.prepend(head);
+  $('#sheet').classList.add('head-mode');
+}
+function sheetBodyHTML(html) {
+  sheetButtonsHome();
+  $('#sheetBody').innerHTML = html;
+  sheetTitleBar();
+}
 function showSheet(html, saveLabel) {
   // (Never busy to start with, whatever the last one was left as.)
   sheetBusy(false);
@@ -198,7 +222,7 @@ function showSheet(html, saveLabel) {
   // screen.)
   $('#sheet').classList.remove('head-mode', 'compact', 'join-sheet');
   $('#sheet').classList.add('pop');
-  $('#sheetBody').innerHTML = html;
+  sheetBodyHTML(html);
   $('#sheetSave').textContent = saveLabel;
   $('#sheetSave').hidden = false;
   $('#sheetCancel').hidden = false;
@@ -209,6 +233,19 @@ function showSheet(html, saveLabel) {
   closeDrawer();
   const first = $('#sheetBody').querySelector('input[type="text"], textarea');
   if (first && !coarseMQ.matches) first.focus();
+}
+// Add: a work found that's already in the library, said above the form
+// until another is looked up (not in a toast, gone before you reach Add).
+function addHave(have) {
+  const old = $('#addHave');
+  if (old) old.remove();
+  if (!have) return;
+  const n = document.createElement('div');
+  n.id = 'addHave';
+  n.className = 'dup-note';
+  n.innerHTML = `${ICON.dups}<span>Already in your library: \u201c${esc(have.f.title || have.k)}\u201d. You can still add it.</span>`;
+  const row = $('#doiLookup') && ($('#doiLookup').closest('.doi-row') || $('#doiLookup').parentElement);
+  if (row) row.after(n);
 }
 function sheetMsg(msg, isError) {
   const e = $('#sheetError'), s = $('#sheetStatus');
@@ -244,7 +281,7 @@ function sheetBusy(on) {
 // report when it closes, saved or not.)
 function closeSheet() {
   const back = sheet && sheet.msBack, np = sheet && sheet.npBack, info = sheet && sheet.infoBack, rel = sheet && sheet.relBack;
-  // (Add's "Scanning text\u2026" and the like go with it.)
+  // (Add's "Scanning text..." and the like go with it.)
   if (sheet && sheet.mode === 'add' && $('#toast').classList.contains('busy')) $('#toast').classList.remove('show');
   $('#sheet').hidden = true;
   undockSheet();
@@ -375,7 +412,7 @@ async function lookupIntoEdit() {
 function openAdd(pdf) {
   sheet = { mode: 'add', pdf: null };
   const h = sheetHead('Add a publication', 'Add to library') +
-    `<div class="fld"><label for="doiLookup">From a title, DOI or BibTeX</label><div class="doi-row">` +
+    `<div class="fld"><label for="doiLookup">Find</label><div class="doi-row">` +
     `<input id="doiLookup" type="text" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Title, DOI, ISBN, arXiv ID or BibTeX" aria-controls="tsList">` +
     `<button type="button" class="btn" id="doiGo">Fill in</button>` +
     (navigator.clipboard && navigator.clipboard.readText ? `<button type="button" class="btn" id="bibPaste" title="Fill in from the DOI or BibTeX entry you copied">Paste</button>` : '') +
@@ -385,7 +422,7 @@ function openAdd(pdf) {
     `</div><div class="ts-list" id="tsList" hidden></div></div>` +
     `<div class="fld"><label for="addType">Type</label><select id="addType">${TYPE_CHOICES.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></div>` +
     `<div class="fields-grid" id="addFields"></div>` + keywordEditor([]) +
-    `<div class="fld"><label for="addPdf">PDF <span class="opt">(optional)</span></label><div class="add-pdf-row"><input type="file" id="addPdf" accept="application/pdf,.pdf">` +
+    `<div class="fld"><label for="addPdf">PDF <span class="opt">(optional)</span></label><div class="add-pdf-row"><input type="file" id="addPdf" accept="application/pdf,.pdf" hidden><label class="btn add-pdf-pick" for="addPdf" tabindex="0" role="button"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3.5h7l4 4V20a.5.5 0 0 1-.5.5h-11A.5.5 0 0 1 6 20V4"/><path d="M14 3.5v4h4"/></svg><span>Choose PDF\u2026</span></label>` +
     // (Its free copy, or the article through your library: see findpdf.js.)
     `<details class="menu" id="addFind"><summary class="btn" title="Its free copy, or the article through your library">${FIND_ICON}<span>Find PDF</span>${ICON.chev}</summary><div class="menu-list" role="menu" id="addFindList"></div></details></div>` +
     `<p class="add-pdf-name" id="addPdfName" hidden></p></div>` +
@@ -394,12 +431,13 @@ function openAdd(pdf) {
   $('#sheet').classList.add('head-mode', 'compact', 'pop');
   renderAddFields({});
   // (A PDF chosen here is read for its DOI or ISBN too, as one dropped is.)
+  $('#sheetBody .add-pdf-pick').addEventListener('keydown', ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); $('#addPdf').click(); } });
   $('#addPdf').addEventListener('change', ev => { const f = ev.target.files[0]; if (f && sheet && f !== sheet.pdf) setAddPdf(f); });
   if (pdf) setAddPdf(pdf);
 }
 // Adding from a paper's web page: a link to LibLande ending
 // "#add=<DOI, arXiv ID, ISBN, or 'title: ... author: ...'>&from=<the page>",
-// as the bookmark and the Safari extension (Settings › Adding from the web)
+// as the bookmark and the Safari extension (Settings > Adding from the web)
 // open, opens Add filled in: from Crossref (as a DOI typed would be), or
 // the title search's matches to choose from; then Find PDF opened. Kept
 // for the page's session until the library's open (and a sign-in, if one
@@ -459,7 +497,7 @@ async function addFromLink() {
   let p = null;
   try { p = JSON.parse(sessionStorage.getItem(ADD_LINK_KEY) || 'null'); sessionStorage.removeItem(ADD_LINK_KEY); } catch (err) { p = null; }
   if (!p || !p.q) return;
-  if (!gs || $('#addBtn').hidden) { toast('Sign in to LibLande to add “' + p.q.replace(/^title:\s*/, '').replace(/\s+author:.*$/, '') + '”.', 8000); return; }
+  if (!gs || $('#addBtn').hidden) { toast('Sign in to LibLande to add \u201c' + p.q.replace(/^title:\s*/, '').replace(/\s+author:.*$/, '') + '\u201d.', 8000); return; }
   if (sheet) closeSheet();
   openAdd();
   let host = '';
@@ -474,7 +512,7 @@ async function addFromLink() {
   const find = $('#addFind');
   if (find) find.open = true;
 }
-// Settings › Adding from the web: the bookmark (dragged to the bar, or its
+// Settings > Adding from the web: the bookmark (dragged to the bar, or its
 // code copied), and the description for Safari's Describe Extension, both
 // opening this LibLande's address.
 function webAddBase() { return location.origin + location.pathname; }
@@ -488,18 +526,18 @@ function webAddBookmark() {
   return 'javascript:' + encodeURIComponent(js);
 }
 function webAddDescription() {
-  return 'Add a toolbar button called "Add to LibLande". When clicked, read the current page’s citation details from its meta tags: ' +
+  return 'Add a toolbar button called "Add to LibLande". When clicked, read the current page\u2019s citation details from its meta tags: ' +
     'the DOI (citation_doi, dc.identifier, prism.doi, or failing those the first doi.org link on the page), the arXiv ID (citation_arxiv_id), ' +
     'the title (citation_title) and the first author (the first citation_author). Then open a new tab at ' + webAddBase() + '#add= followed by, URL-encoded: ' +
-    'the DOI if there is one; otherwise "arXiv:" and the arXiv ID; otherwise "title: " and the title, then " author: " and the first author’s surname. ' +
-    'Then add &from= and the URL-encoded address of the page. If the page has no title meta tag, use the page’s own title.';
+    'the DOI if there is one; otherwise "arXiv:" and the arXiv ID; otherwise "title: " and the title, then " author: " and the first author\u2019s surname. ' +
+    'Then add &from= and the URL-encoded address of the page. If the page has no title meta tag, use the page\u2019s own title.';
 }
 if ($('#webBm')) {
   $('#webBm').href = webAddBookmark();
   $('#webBm').addEventListener('click', ev => { ev.preventDefault(); toast('Drag it to your bookmarks bar.', 4000); });
-  const copy = (text, what) => navigator.clipboard.writeText(text).then(() => toast(what, 6000), () => toast('Couldn’t copy it.', 4000));
-  $('#webExtCopy').addEventListener('click', () => copy(webAddDescription(), 'Copied. In Safari, open the address bar’s menu, choose Describe Extension, and paste it in.'));
-  $('#webBmCopy').addEventListener('click', () => copy(decodeURIComponent(webAddBookmark()), 'Copied. Bookmark any page, name it “Add to LibLande”, then edit it and paste this in place of its address.'));
+  const copy = (text, what) => navigator.clipboard.writeText(text).then(() => toast(what, 6000), () => toast('Couldn\u2019t copy it.', 4000));
+  $('#webExtCopy').addEventListener('click', () => copy(webAddDescription(), 'Copied. In Safari, open the address bar\u2019s menu, choose Describe Extension, and paste it in.'));
+  $('#webBmCopy').addEventListener('click', () => copy(decodeURIComponent(webAddBookmark()), 'Copied. Bookmark any page, name it \u201cAdd to LibLande\u201d, then edit it and paste this in place of its address.'));
 }
 function renderAddFields(values) {
   const type = $('#addType').value;
@@ -601,9 +639,9 @@ function fillFromBibtex(text) {
   $('#doiLookup').value = '';
   const extra = Object.keys(sheet.extra);
   const have = f.doi && ENTRIES.find(x => (x.f.doi || '').toLowerCase() === f.doi.toLowerCase());
-  sheetMsg(have ? 'Already in your library: \u201c' + (have.f.title || have.k) + '\u201d. You can still add it.'
-    : 'Filled in from the BibTeX' + (p.more ? ' (its first entry)' : '') + '.' +
-      (extra.length ? ' Also kept, without a box here: ' + extra.join(', ') + '.' : '') + ' Check the details, then add it.', !!have);
+  addHave(have);
+  sheetMsg('Filled in from the BibTeX' + (p.more ? ' (its first entry)' : '') + '.' +
+      (extra.length ? ' Also kept, without a box here: ' + extra.join(', ') + '.' : ''));
 }
 // The box: a BibTeX entry, a DOI to look up, or a title to search for
 // (see titlesearch.js); Return again on the same title goes into the list.
@@ -620,7 +658,7 @@ function fillFromBox() {
 }
 // Paste: what was copied, read straight from the clipboard. (Safari,
 // and a web app added to the Dock, asks first with a Paste bubble, and
-// may refuse: then the box is ready for \u2318V, which always works.)
+// may refuse: then the box is ready for Cmd-V, which always works.)
 // (Or what was read already, from +'s menu: the clipboard has to be
 // asked at the tap itself.)
 async function pasteIntoForm(read) {
@@ -639,6 +677,7 @@ async function pasteIntoForm(read) {
 }
 
 async function lookupIntoForm() {
+  addHave(null);
   if (sheet) sheet.extra = {};
   const doi = $('#doiLookup').value.trim();
   if (!doi) { sheetMsg('Type a title, or paste a DOI or ISBN, first.', true); return; }
@@ -651,8 +690,8 @@ async function lookupIntoForm() {
     const digits = v => String(v || '').replace(/[^\dXx]/g, '').toUpperCase();
     const have = (r.fields.doi && ENTRIES.find(x => (x.f.doi || '').toLowerCase() === r.fields.doi.toLowerCase())) ||
       (r.fields.isbn && ENTRIES.find(x => String(x.f.isbn || '').split(/[,;\s]+/).map(digits).includes(r.fields.isbn)));
-    sheetMsg(have ? 'Already in your library: \u201c' + (have.f.title || have.k) + '\u201d. You can still add it.'
-      : 'Filled in from ' + (r.source || 'Crossref') + '. Check the details, then add it.', !!have);
+    addHave(have);
+    sheetMsg('Filled in from ' + (r.source || 'Crossref') + '.');
     return true;
   } catch (err) {
     sheetMsg(errText(err), true);
@@ -1040,7 +1079,7 @@ $('#sheetBody').addEventListener('keydown', ev => {
 });
 // A BibTeX entry pasted into the DOI box fills in the form at once (with
 // its line breaks, which a one-line box would drop).
-// (And \u2318V in Add, outside a box: into the DOI box, as if pasted
+// (And Cmd-V in Add, outside a box: into the DOI box, as if pasted
 // there.)
 document.addEventListener('paste', ev => {
   if (!sheet || sheet.mode !== 'add' || $('#sheet').hidden) return;
@@ -1147,10 +1186,10 @@ function addHold(btn, shown) {
 addHold($('#addBtn'));
 // With a mouse or trackpad, the menu comes when the pointer rests on +,
 // and goes once it has left both (as the open papers' list does); or Down
-// on + from the keyboard. On a touch screen (an iPad or iPhone), a \u25be
+// on + from the keyboard. On a touch screen (an iPad or iPhone), a v
 // beside + as well as holding it, as the open papers' button has.
 const AH = { t: 0, hide: 0 };
-// (Resting on + or its \u25be, the same.)
+// (Resting on + or its v, the same.)
 [$('#addBtn'), $('#addMore')].forEach(b => b.addEventListener('pointerenter', ev => {
   if (ev.pointerType !== 'mouse') return;
   clearTimeout(AH.hide);
@@ -1400,7 +1439,7 @@ function selectionHTML() {
 // backup.
 function openBulk() {
   const list = pickedEntries().filter(e => !e.ib), n = list.length;
-  if (!n) { toast('Publications in your inbox can’t be changed together. Move them into your library first.', 4000); return; }
+  if (!n) { toast('Publications in your inbox can\u2019t be changed together. Move them into your library first.', 4000); return; }
   const kws = new Map();
   list.forEach(e => e.kw.forEach(k => kws.set(k, (kws.get(k) || 0) + 1)));
   const rg = readingGroup(), groups = GROUPS.filter(g => g !== rg);
@@ -1443,7 +1482,7 @@ async function saveBulk() {
   sheetBusy(true);
   const t0 = Date.now();
   let step = '';
-  const tell = () => { if (step && sheet === s) sheetMsg(step + '… (' + Math.round((Date.now() - t0) / 1000) + ' s)'); };
+  const tell = () => { if (step && sheet === s) sheetMsg(step + '\u2026 (' + Math.round((Date.now() - t0) / 1000) + ' s)'); };
   const clock = setInterval(tell, 1000);
   try {
     const now = bibdeskTime();
@@ -1478,9 +1517,10 @@ async function saveBulk() {
 }
 function bulkReading() {
   const list = pickedEntries().filter(e => !RL.has(e.k));
-  if (!list.length) { toast('They’re all on your reading list already', 2500); return; }
-  list.forEach(e => rlOp({ op: 'add', key: e.k, list: 'later' }));
-  toast('Added ' + list.length + ' to your reading list, in Later', 3000);
+  if (!list.length) { toast('They\u2019re all on your reading list already', 2500); return; }
+  let next = 0;
+  list.forEach(e => { const l = upNextCount() < UP_NEXT ? 'next' : 'later'; if (l === 'next') next++; rlOp({ op: 'add', key: e.k, list: l }); });
+  toast('Added ' + list.length + ' to your reading list' + (next === list.length ? ', in Up next' : next ? ': ' + next + ' in Up next, ' + (list.length - next) + ' in Later' : ', in Later'), 3000);
 }
 
 /* ------------------------------------------------------------ forthcoming: updates */
@@ -1623,7 +1663,7 @@ async function checkForthcoming() {
       : `<p class="sheet-note">Crossref has nothing new on any of them yet.</p>`) +
     (none.length ? `<details class="fu-none"><summary>No update yet (${none.length})</summary>${none.map(e => `<p>${esc(e.f.title || e.k)}</p>`).join('')}</details>` : '') +
     (failed.length ? `<p class="sheet-note">Crossref couldn\u2019t be asked about ${failed.length}. Try again later.</p>` : ''),
-    found.length ? 'Save' : 'Close');
+    found.length ? 'Save' : 'Done');
   if (!found.length) $('#sheetCancel').hidden = true;
 }
 async function saveForth() {
@@ -1757,7 +1797,7 @@ async function renameCore(e, newKey) {
 
 /* ------------------------------------------------------------ versions: joining */
 /* ------------------------------------------------------------ chapters */
-// A chapter added from its book (Add chapter\u2026 in the book's details): the
+// A chapter added from its book (Add chapter... in the book's details): the
 // chapter's type, the book's title, editors (or, for a book by one author,
 // its author), publisher, place, year, ISBN and series filled in, and the
 // link to the book (crossref) made when it's added. You give the title,
@@ -1901,7 +1941,7 @@ function origOffer(main, later) {
 // dragged with a finger): a chapter dropped on a book becomes a chapter of
 // it (crossref, as Link chapters does); anything else, a version of it
 // (related). Either way the other is offered after, with Undo; with the
-// mouse, Option (\u2325) held as it's dropped swaps them.
+// mouse, Option (Alt-) held as it's dropped swaps them.
 const chapterOnBook = (target, moved) => (moved.t === 'incollection' || moved.t === 'inbook') && isBook(target);
 const dropMeans = (target, moved, alt) => (chapterOnBook(target, moved) && !alt ? 'chapter' : 'version');
 function relateByDrag(target, moved, alt) {
@@ -2486,7 +2526,7 @@ async function openQr(list) {
   if (!list.length) { toast('Select a publication first', 1800); return; }
   const n = list.length, what = n === 1 ? '\u201c' + shortTitle(list[0].f.title || list[0].k) + '\u201d' : n + ' references';
   sheet = { mode: 'qr' };
-  showSheet(`<h2>QR code</h2><p class="sheet-note">Making it\u2026</p>`, 'Close');
+  showSheet(`<h2>QR code</h2><p class="sheet-note">Making it\u2026</p>`, 'Done');
   $('#sheetCancel').hidden = true;
   const s = sheet;
   try {
@@ -2494,19 +2534,19 @@ async function openQr(list) {
     if (sheet !== s) return;
     const c = qrCanvas(qrcode, link);
     if (!c) {
-      $('#sheetBody').innerHTML = `<h2>QR code</h2><p class="sheet-note">${n} references are too many for one QR code (it holds about 2,900 characters, some 10 to 15 references). Select fewer, and make one for each part.</p>`;
+      sheetBodyHTML(`<h2>QR code</h2><p class="sheet-note">${n} references are too many for one QR code (it holds about 2,900 characters, some 10 to 15 references). Select fewer, and make one for each part.</p>`);
       return;
     }
     s.link = link; s.canvas = c; s.name = n === 1 ? list[0].k : n + ' references';
-    $('#sheetBody').innerHTML = `<h2>QR code</h2><p class="sheet-note">Scan with a phone\u2019s camera to see the ${n === 1 ? 'citation' : 'citations'}.</p>` +
+    sheetBodyHTML(`<h2>QR code</h2><p class="sheet-note">Scan with a phone\u2019s camera to see the ${n === 1 ? 'citation' : 'citations'}.</p>` +
       `<div class="qr-box"></div><div class="qr-acts"><button type="button" class="btn" data-qr-copy>${ICON.copy}<span>Copy link</span></button>` +
       `<button type="button" class="btn" data-qr-save>${ICON.download}<span>Save image</span></button>` +
-      `<a class="btn" href="${esc(link)}" target="_blank" rel="noopener">${ICON.drive}<span>Open the page</span></a></div>`;
+      `<a class="btn" href="${esc(link)}" target="_blank" rel="noopener">${ICON.drive}<span>Open the page</span></a></div>`);
     $('#sheetBody .qr-box').appendChild(c);
     c.setAttribute('role', 'img');
     c.setAttribute('aria-label', 'QR code for ' + what);
   } catch (err) {
-    if (sheet === s) $('#sheetBody').innerHTML = `<h2>QR code</h2><p class="setup-error">${esc(errText(err))}</p>`;
+    if (sheet === s) sheetBodyHTML(`<h2>QR code</h2><p class="setup-error">${esc(errText(err))}</p>`);
   }
 }
 $('#sheetBody').addEventListener('click', ev => {
@@ -2531,9 +2571,9 @@ const KEY_ACTS = [
   { id: 'copyKey', scope: 'lib', def: 'Alt+KeyK', label: 'Copy cite key' },
   { id: 'edit', scope: 'lib', def: 'Alt+KeyE', label: 'Edit the publication' },
   { id: 'notesView', scope: 'both', def: 'Alt+KeyN', label: 'Notes: in the details pane, or beside the paper' },
-  { id: 'notesPop', scope: 'both', def: 'Alt+Shift+KeyN', label: 'Notes, large (pop out)' },
+  { id: 'notesPop', scope: 'both', def: 'Alt+Shift+KeyN', label: 'Pop out your notes' },
   { id: 'quote', scope: 'pdf', def: 'Alt+KeyC', label: 'Copy the selected passage as a quotation, with its citation' },
-  { id: 'closeTab', scope: 'pdf', def: 'Alt+KeyW', label: 'Close the paper’s tab' },
+  { id: 'closeTab', scope: 'pdf', def: 'Alt+KeyW', label: 'Close the paper\u2019s tab' },
   { id: 'done', scope: 'pdf', def: 'Alt+KeyD', label: 'Done: mark read' },
   { id: 'share', scope: 'pdf', def: 'Alt+KeyM', label: 'Share with citation' },
   { id: 'shareClean', scope: 'pdf', def: 'Alt+Shift+KeyM', label: 'Share a clean copy (no annotations)' },
@@ -2544,7 +2584,7 @@ const KEY_ACTS = [
   { id: 'pen', scope: 'pdf', def: 'KeyP', label: 'Pen' },
   { id: 'eraser', scope: 'pdf', def: 'KeyE', label: 'Eraser' },
   { id: 'text', scope: 'pdf', def: 'KeyT', label: 'Text box' },
-  { id: 'comment', scope: 'pdf', def: 'KeyN', label: 'Sticky note' },
+  { id: 'comment', scope: 'pdf', def: 'KeyN', label: 'Comment' },
   { id: 'select', scope: 'pdf', def: 'KeyV', label: 'Select marks' },
   { id: 'bookmark', scope: 'pdf', def: 'KeyB', label: 'Bookmark the page' },
 ];
@@ -2555,12 +2595,12 @@ const keyIs = (ev, id) => comboOf(ev) === keyOf(id);
 // (In the library, or the reader: a shortcut for both is in each.)
 const inScope = (a, scope) => a.scope === scope || a.scope === 'both';
 const scopesMeet = (a, b) => a.scope === 'both' || b.scope === 'both' || a.scope === b.scope;
-const KEY_NAMES = { Minus: '−', Equal: '=', Comma: ',', Period: '.', Slash: '/', Semicolon: ';', Quote: '\'', BracketLeft: '[', BracketRight: ']',
-  Backslash: '\\', Backquote: '`', Space: 'Space', ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→' };
+const KEY_NAMES = { Minus: '\u2212', Equal: '=', Comma: ',', Period: '.', Slash: '/', Semicolon: ';', Quote: '\'', BracketLeft: '[', BracketRight: ']',
+  Backslash: '\\', Backquote: '`', Space: 'Space', ArrowUp: '\u2191', ArrowDown: '\u2193', ArrowLeft: '\u2190', ArrowRight: '\u2192' };
 function keyLabel(combo) {
   const parts = combo.split('+'), code = parts.pop();
   const key = /^Key[A-Z]$/.test(code) ? code.slice(3) : /^Digit\d$/.test(code) ? code.slice(5) : KEY_NAMES[code] || code;
-  return parts.map(p => ({ Ctrl: '⌃', Alt: '⌥', Shift: '⇧', Meta: '⌘' })[p]).join('') + key;
+  return parts.map(p => ({ Ctrl: '\u2303', Alt: '\u2325', Shift: '\u21e7', Meta: '\u2318' })[p]).join('') + key;
 }
 const keyHint = id => keyLabel(keyOf(id));
 function keysSave() {
@@ -2574,9 +2614,9 @@ function keysMerge(prefs) {
 }
 // The ones that stay as they are.
 const KEYS_FIXED = {
-  lib: [['Return', 'Read the PDF'], ['↑ ↓', 'Previous or next publication'], ['Letters', 'Jump in the sorted column'],
-    ['/ or ⌘F', 'Search'], ['⌘-click, ⇧-click', 'Select several publications'], ['⌘A', 'Select all shown'], ['Esc', 'Stop selecting, or close a window'], ['?', 'This list']],
-  pdf: [['⌘F', 'Search in the paper'], ['⌘S', 'Save the marks now'], ['+ −', 'Zoom in or out'], ['Esc', 'Drop the tool, or close the paper']],
+  lib: [['Return', 'Read the PDF'], ['\u2191 \u2193', 'Previous or next publication'], ['Letters', 'Jump in the sorted column'],
+    ['/ or \u2318F', 'Search'], ['\u2318-click, \u21e7-click', 'Select several publications'], ['\u2318A', 'Select all shown'], ['Esc', 'Stop selecting, or close a window'], ['?', 'This list']],
+  pdf: [['\u2318F', 'Search in the paper'], ['\u2318S', 'Save the marks now'], ['+ \u2212', 'Zoom in or out'], ['Esc', 'Drop the tool, or close the paper']],
 };
 function openShortcuts() {
   sheet = { mode: 'help' };
@@ -2587,7 +2627,7 @@ function openShortcuts() {
   showSheet(`<h2>Keyboard shortcuts</h2><p class="sheet-note">Click a shortcut in a box to change it, then press the keys you want. With several publications selected, the copy shortcuts copy all of them.</p>` +
     `<h3 class="keys-h">In the library</h3><table class="keys"><tbody>${rows('lib')}</tbody></table>` +
     `<h3 class="keys-h">Reading a paper</h3><table class="keys"><tbody>${rows('pdf')}</tbody></table>` +
-    (Object.keys(KEYS.mine).length ? `<p><button type="button" class="btn" data-keys-reset>Back to the usual shortcuts</button></p>` : ''), 'Close');
+    (Object.keys(KEYS.mine).length ? `<p><button type="button" class="btn" data-keys-reset>Back to the usual shortcuts</button></p>` : ''), 'Done');
   $('#sheetCancel').hidden = true;
 }
 $('#sheetBody').addEventListener('click', ev => {
@@ -2598,7 +2638,7 @@ $('#sheetBody').addEventListener('click', ev => {
   $('#sheetBody').querySelectorAll('.key-set.listening').forEach(x => { x.classList.remove('listening'); x.innerHTML = `<kbd>${esc(keyHint(x.dataset.keyId))}</kbd>`; });
   KEYS.listen = b.dataset.keyId;
   b.classList.add('listening');
-  b.innerHTML = '<kbd>Press keys…</kbd>';
+  b.innerHTML = '<kbd>Press keys\u2026</kbd>';
   sheetMsg('');
 });
 // While waiting for the new keys: Esc gives up; a combination already in
@@ -2612,11 +2652,11 @@ document.addEventListener('keydown', ev => {
   if (ev.key === 'Escape') { KEYS.listen = null; openShortcuts(); return; }
   const combo = comboOf(ev);
   let why = '';
-  if (ev.metaKey) why = '⌘ shortcuts belong to the browser. Try ⌥ or ⌃ instead.';
-  else if (inScope(a, 'lib') && !ev.altKey && !ev.ctrlKey) why = 'In the library, letters on their own jump through the list, so add ⌥ or ⌃.';
+  if (ev.metaKey) why = '\u2318 shortcuts belong to the browser. Try \u2325 or \u2303 instead.';
+  else if (inScope(a, 'lib') && !ev.altKey && !ev.ctrlKey) why = 'In the library, letters on their own jump through the list, so add \u2325 or \u2303.';
   else {
     const other = KEY_ACTS.find(x => x.id !== id && scopesMeet(x, a) && keyOf(x.id) === combo);
-    if (other) why = keyLabel(combo) + ' is already for “' + other.label + '”.';
+    if (other) why = keyLabel(combo) + ' is already for \u201c' + other.label + '\u201d.';
     const fixed = (a.scope === 'both' ? ['lib', 'pdf'] : [a.scope]).some(s => KEYS_FIXED[s].some(([k]) => k === keyLabel(combo))) || ['Escape', 'Enter', 'Tab'].includes(ev.code) || /^Arrow/.test(ev.code);
     if (!why && fixed) why = keyLabel(combo) + ' is already taken.';
   }

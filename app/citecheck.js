@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/citecheck.js'] = '2026-11-14.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/citecheck.js'] = '2026-11-14.05';
 /* ------------------------------------------------------------ manuscript check */
 // A manuscript's citations checked: a Google Doc, or a Word file from Google
 // Drive or this device, read (never changed). Each APA author-date citation
@@ -651,7 +651,7 @@ function openMsFix(rep) {
   showSheet(`<h2>Fix the References</h2>` +
     `<p class="sheet-note">Changes “${esc(rep.name)}” into your style (${esc(citeTitle())}). Unrecognised references and in-text citations are left alone. Untick any to keep as written. To undo, use the document’s version history (File › Version history).</p>` +
     (fixes.length ? part('add', 'Missing from the References') + part('update', 'Out of date') + part('restyle', 'Not in ' + citeShort() + '\u2019s form') + part('remove', 'Never cited')
-      : `<p class="ms-dim">Nothing in the References for LibLande to change.</p>`), fixes.length ? 'Make the changes' : 'Close');
+      : `<p class="ms-dim">Nothing in the References for LibLande to change.</p>`), fixes.length ? 'Make the changes' : 'Done');
 }
 $('#sheetBody').addEventListener('change', ev => {
   const c = ev.target.closest('[data-msf]');

@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-11-14.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-11-14.05';
 /* -------------------------------------------------------------- features */
 // What LibLande does, by area: each feature, what it's for, where to find
 // it, its icon (see featIcon), and other words it's found by (as "tag"
@@ -34,7 +34,7 @@ const FEATURES = [
     ['Several libraries', 'Add an existing library (a BibDesk .bib or a Zotero export) or make a new one, switch between them, and drag publications onto another to copy them with their PDFs.', 'Libraries in the sidebar; + beside it; Settings \u203a Library', 'ICON:lib', 'library switch copy add'],
     ['Select several', 'Give several publications keywords and groups at once, add them to your reading list, join versions, share them, or copy their citations; their PDFs show beside them.', 'Select in the toolbar, or \u2318-click and \u21e7-click', '#selectBtn', 'multiple batch bulk'],
     ['Share', 'The selected publications as a .bib and an .rtf of citations, with their PDFs as they are, clean, or none; to Google Drive, this device, or another app (Mail, Messages, AirDrop), with the references in the message.', 'Select several, then Share', 'path:M12 3v12M8 11l4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2', 'export bibtex rtf zip share airdrop mail'],
-    ['Reading list', 'Papers to read: up next, later, or done; one list for each library. Each shows how far you\u2019ve read (tap the figure to start counting again).', 'The Reading list tab; the bookmark in the details or the reader', '#vRL', 'queue to read progress'],
+    ['Reading list', 'Papers to read: up next, later, or done; one list for each library. Each shows how far you\u2019ve read (in the details, tap the figure to start counting again). Done and taking one off can be undone.', 'The Reading list tab; the bookmark in the details or the reader', '#vRL', 'queue to read progress'],
     ['Possible duplicates', 'Publications that look like the same one, to join as versions of one or mark as different.', 'Possible duplicates in the sidebar', 'ICON:dups', 'duplicate merge versions'],
   ] },
   { area: 'Adding and editing', items: [
@@ -64,8 +64,8 @@ const FEATURES = [
   { area: 'Marking up', items: [
     ['Highlight', 'Drag over the words; lines join into one block within the column. Drag from a highlight to lengthen it. Choose its colour. Hold the highlighter for freehand. Or select a passage and choose a colour beside it.', 'The highlighter (H) in the markup toolbar; the colours beside a passage you select', '#vpMarkup', 'annotate mark color'],
     ['Underline and strike through', 'Real underlines and strike-throughs, as other apps show them.', 'The underline button (U); hold it for strike-through', '#vpLines', 'annotate'],
-    ['Pen, text boxes and sticky notes', 'Draw, write on the page, or pin a sticky note to it. With a passage selected, the sticky note goes on those words, highlighted.', 'Pen (P), Text box (T) and Sticky note (N) in the markup toolbar', '#vPalette [data-tool="pen"]', 'draw ink text box sticky note pin'],
-    ['Comments', 'A comment on any highlight, shown when you click or tap it.', 'Click or tap a highlight', '#vPalette [data-tool="comment"]', 'annotation'],
+    ['Pen and text boxes', 'Draw, write on the page,.', 'Pen (P) and Text box (T) in the markup toolbar', '#vPalette [data-tool="pen"]', 'draw ink text box sticky note comment pin'],
+    ['Comments', 'A comment on any highlight, shown when you click or tap it; or pinned to a spot on the page. With a passage selected, Comment (N) puts one on those words, highlighted.', 'Click or tap a highlight; Comment (N) in the markup toolbar', '#vPalette [data-tool="comment"]', 'annotation'],
     ['Eraser', 'Rub out marks, or just part of a highlight.', 'The eraser (E) in the markup toolbar', '#vPalette [data-tool="eraser"]', 'delete remove'],
     ['Undo and redo', 'Step back and forward through your changes.', 'The arrows in the markup toolbar', '#vpUndo'],
     ['Copy a region', 'Drag a box to copy its text or a picture of it, or share it.', 'Select marks (V) in the markup toolbar', '#vPalette [data-tool="select"]', 'screenshot snapshot figure'],
@@ -73,7 +73,7 @@ const FEATURES = [
     ['Annotations', 'Every highlight and note in a paper, by colour: go to one; Summary copies them with the citation, For AI as a prompt for Claude, To notes adds them to your notes. Copy and Quote sit at each highlight\u2019s top right.', 'Annotations, in the reader\u2019s sidebar', '#vSide [data-vtab="marks"]', 'highlights marks export'],
   ] },
   { area: 'Notes', items: [
-    ['Notes', 'Your notes on a publication, formatted as you type and kept in the .bib as Markdown, with the PDF\u2019s highlights by page. Beside the paper as you read; Add to notes quotes a selected passage with its page, and p. 331 in your notes goes to that page. Pop out (\u2325\u21e7N) for a large editor.', 'Details \u203a Notes; the reader\u2019s Notes tab (\u2325N)', '#vNotesBtn', 'annote markdown writing'],
+    ['Notes', 'Your notes on a publication, formatted as you type and kept in the .bib as Markdown, with the PDF\u2019s highlights by page. Beside the paper as you read; Add to notes quotes a selected passage with its page, and p. 331 in your notes goes to that page. The same formatting buttons in the details, beside the paper and popped out (\u2325\u21e7N), and saved as you type.', 'Details \u203a Notes; the reader\u2019s Notes tab (\u2325N)', '#vNotesBtn', 'annote markdown writing'],
   ] },
   { area: 'Pages and outlines', items: [
     ['Outline', 'The paper\u2019s table of contents, to jump to a chapter. Edit it, or make one from the printed Contents or the headings; saved into the PDF.', 'Outline, in the reader\u2019s sidebar', '#vSide [data-vtab="outline"]', 'table of contents toc chapters'],
@@ -92,7 +92,7 @@ const FEATURES = [
     ['Copy for AI', 'A prompt for Claude: outline this paper, weighing your highlights and notes, with its text and citation. Copied, not sent.', 'The reader\u2019s Annotations tab \u203a For AI; Copy \u203a For AI in the details', 'ICON:ai', 'claude summary ai'],
   ] },
   { area: 'Keeping up', items: [
-    ['New papers', 'New work citing yours, by authors you follow, like papers you choose, and in your journals; checked daily, with a Top 15. Follow some authors or journals first.', 'Tools \u203a New papers', 'ICON:bell', 'alerts follow recommendations'],
+    ['New papers', 'New work citing yours, by authors you follow, like papers you choose, and in your journals; checked daily, the best first. + adds one, the bookmark adds it to your reading list, \u00d7 dismisses it (with Undo); tap a title for its abstract. Follow some authors or journals first.', 'Tools \u203a New papers', 'ICON:bell', 'alerts follow recommendations'],
     ['Forthcoming', 'Papers listed as forthcoming, checked for whether they\u2019ve been published since.', 'Forthcoming in the sidebar', 'ICON:forth', 'in press'],
     ['Tidy keywords', 'Merge spellings of the same keyword, deal with one-offs, and add likely missing ones. Nothing changes until you apply.', 'Tools \u203a Tidy keywords', 'ICON:tag', 'tags clean up merge'],
   ] },
@@ -124,7 +124,7 @@ function openFeatures() {
     `<div class="feat-top"><input type="search" class="feat-find" id="featFind" placeholder="Find a feature (${n})" aria-label="Find a feature" autocomplete="off"><button type="button" class="btn primary" data-tour-start>Take the tour</button></div>` +
     FEATURES.map(a => `<section class="feat-area"><h3>${esc(a.area)}</h3><ul>` + a.items.map(([name, what, where, icon, words]) =>
       `<li data-words="${esc(words || '')}"><span class="feat-ic" aria-hidden="true">${featIcon(icon)}</span><div><b>${esc(name)}</b> <span class="feat-what">${esc(what)}</span>${where ? `<span class="feat-where">${esc(where)}</span>` : ''}</div></li>`).join('') + `</ul></section>`).join('') +
-    `<p class="feat-none" hidden>No feature matches.</p>`, 'Close');
+    `<p class="feat-none" hidden>No feature matches.</p>`, 'Done');
   $('#sheetCancel').hidden = true;
 }
 $('#sheetBody').addEventListener('input', ev => {
@@ -192,12 +192,12 @@ const TOUR_STEPS = [
     if (!state.selKey) { const r = $('#rows .row'); if (r) r.click(); await tourWait(400); }
   } },
   { lib: true, sel: '#groups', title: 'Your groups', text: 'Your library and its groups: saved searches, static groups, keywords and types; drag to reorder. Libraries switches between libraries; Tools has Cite Check, New papers and Tidy keywords.', before: async () => { showLibSide(); await tourWait(300); } },
-  { lib: true, sel: '#settingsBtn', title: 'Settings', text: 'Library, Appearance, Citing, Sync and Extensions. Library adds, makes and switches libraries, adds papers with limited access, and signs this device out; LibLande in Word installs from Extensions. Help, this tour and Features are at the foot of the sidebar.', before: async () => { showLibSide(); await tourWait(200); }, after: () => closeSidebarIfOverlay() },
+  { lib: true, sel: '#settingsBtn', title: 'Settings', text: 'Library, Appearance, Citing, Sync and Extensions; each change takes effect at once, and Done closes. Library adds, makes and switches libraries, adds papers with limited access, and signs this device out; LibLande in Word installs from Extensions. Help, this tour and Features are at the foot of the sidebar.', before: async () => { showLibSide(); await tourWait(200); }, after: () => closeSidebarIfOverlay() },
   { lib: true, sel: '#tabs', title: 'Tabs and the reading list', text: 'Groups you open stay as tabs. The Reading list holds papers to read next, later, or done.', before: async () => { closeSidebarIfOverlay(); await tourWait(350); } },
   { lib: true, sel: '#selectBtn', title: 'Select several', text: 'Give several publications keywords and groups at once, add them to your reading list, or share them with their PDFs.' },
   { lib: true, sel: '#refreshBtn', title: 'Saving and syncing', text: 'Changes go into your .bib on Google Drive. Check for changes picks up BibDesk\u2019s and your other devices\u2019; a cloud shows what\u2019s waiting while you\u2019re offline.' },
   { sel: '#vTop', title: 'Reading a paper', text: 'Papers open in tabs; + opens a new one, at a start page of papers closed lately, read on your other devices, or on your reading list. Library goes back and keeps them open; Reader, in the library, returns to them. The count beside Reader lists them.', before: async () => (await toReader()) ? null : 'skip-reader' },
-  { sel: '#vPalette', title: 'Marking up', text: 'Highlight (H), underline or strike through (U), draw (P), text box (T), sticky note (N), eraser (E). Hold a tool with a small triangle for its second kind. All saved into the PDF.' },
+  { sel: '#vPalette', title: 'Marking up', text: 'Highlight (H), underline or strike through (U), draw (P), text box (T), comment (N), eraser (E). Hold a tool with a small triangle for its second kind. All saved into the PDF.' },
   { sel: '#vSide', title: 'Annotations', text: 'Every highlight and note in the paper, by colour: go to one. Summary copies them with the citation, For AI as a prompt for Claude, To notes adds them to your notes.', before: () => readerSide('marks') },
   { sel: '#vSide', title: 'Your notes', text: 'Your notes on the paper, beside it (\u2325N), the same as in its details.', before: () => readerSide('notes') },
   { sel: '#vSide', title: 'Quote and cite', text: 'Select a passage: Quote (\u2325C) copies it with its page and citation; a colour highlights it; Add to notes quotes it in your notes. The Citation tab copies the paper\u2019s citation.', before: () => readerSide('info') },

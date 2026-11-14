@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/notes.js'] = '2026-11-14.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/notes.js'] = '2026-11-14.05';
 /* ------------------------------------------------------------ notes */
 // The details pane shows Details or Notes (a switch at its top, or Alt-N;
 // the choice kept). Notes has your notes, in a box you type in, formatted
@@ -376,12 +376,15 @@ function notesSegFit() {
   if (seg.offsetTop > first.offsetTop + 4 || k.scrollWidth > k.clientWidth + 1 || (ck && ck.scrollWidth > ck.clientWidth + 1)) seg.classList.add('tight');
 }
 if (window.ResizeObserver) new ResizeObserver(() => requestAnimationFrame(notesSegFit)).observe(detailEl);
+const NVT = (k, title, icon) => `<button type="button" data-nvt="${k}" title="${esc(title)}" aria-label="${esc(title)}">${icon}</button>`;
+const NVI = d => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
 function notesViewHTML(e) {
   const pdf = readablePdfs(e).length;
-  return `<section class="d-sec nv"><h3 class="nv-h">Your notes` + (gs ? `<button type="button" class="nv-pop" data-nv-pop title="Notes, large, with formatting buttons (${esc(keyHint('notesPop'))})">${POP_ICON}<span>Pop out</span></button>` : '') + `</h3>` +
+  return `<section class="d-sec nv"><h3 class="nv-h">Your notes` + (gs ? `<button type="button" class="nv-pop" data-nv-pop title="Pop out (${esc(keyHint('notesPop'))})">${POP_ICON}<span>Pop out</span></button>` : '') + `</h3>` +
+    (gs ? `<div class="rn-tools nv-tools">` + NV_TOP(NVT, '<span class="rn-sep"></span>') + NV_LISTS(NVT, NVI) + `<span class="rn-state nv-state" aria-live="polite" data-ok>Saved</span></div>` : '') +
     `<div class="nv-wrap"><div class="nv-box notes-rich" data-nv-box role="textbox" aria-multiline="true" aria-label="Your notes" data-placeholder="${gs ? 'Write your notes\u2026' : 'No notes.'}" style="height:${NOTES.h}px"></div>` +
     (gs ? `<span class="nv-grip" data-nv-grip title="Drag to make the box taller or shorter"></span>` : '') + `</div>` +
-    (gs ? `<p class="nv-hint">Saved when you leave the box</p>` : '') + `</section>` +
+    `</section>` +
     `<section class="d-sec nv-pdf"><h3 class="nv-h">From the PDF` + (pdf ? `<button type="button" class="nv-pop" data-nv-reader>Open in the reader \u2192</button>` : '') + `</h3>` +
     `<div data-nv-marks>${pdf ? '<p class="nv-none">Reading the PDF\u2019s highlights\u2026</p>' : '<p class="nv-none">No PDF here, so no highlights to show.</p>'}</div>` +
     (pdf ? `<div class="nv-foot" data-nv-foot hidden><button type="button" class="btn" data-nv-copyall>${ICON.copy}<span>Copy all, with the citation</span></button>` +
@@ -392,12 +395,38 @@ function notesViewHTML(e) {
 function notesMount(e) {
   const box = detailEl.querySelector('[data-nv-box]');
   if (!box) return;
-  noteEditor(box, notesOf(e));
+  const st = detailEl.querySelector('.nv-state');
+  NOTES.boxFor = e.k;
+  let timer = 0;
+  const save = () => { clearTimeout(timer); if (st) rnState(st, 'Saving\u2026'); return notesSave(e.k, htmlToMd(box), true).then(ok => { if (st && st.isConnected) rnState(st, ok ? 'Saved' : 'Not saved'); }); };
+  // (Saved a moment after you stop typing, and as you leave the box.)
+  noteEditor(box, notesOf(e), () => { if (st) rnState(st, 'Edited'); clearTimeout(timer); timer = setTimeout(save, 2000); });
   box.addEventListener('blur', ev => {
     // (Not when it's popping out: that editor takes over.)
     if (ev.relatedTarget && ev.relatedTarget.closest && ev.relatedTarget.closest('[data-nv-pop]')) return;
-    notesSave(e.k, htmlToMd(box));
+    // (Nor to a button of its own toolbar.)
+    if (ev.relatedTarget && ev.relatedTarget.closest && ev.relatedTarget.closest('[data-nvt]')) return;
+    save();
+    // (What was put off while typing: drawn now.)
+    if (NOTES.redraw) setTimeout(() => { if (NOTES.redraw && !box.contains(document.activeElement)) renderDetail(); }, 0);
   });
+  const tools = detailEl.querySelector('.nv-tools');
+  if (tools) {
+    // (Its buttons keep the caret where it was.)
+    let range = null;
+    const keep = () => { const s = getSelection(); if (s.rangeCount && box.contains(s.anchorNode)) range = s.getRangeAt(0).cloneRange(); };
+    document.addEventListener('selectionchange', keep);
+    tools.addEventListener('pointerdown', ev => { if (ev.target.closest('[data-nvt]')) ev.preventDefault(); });
+    tools.addEventListener('mousedown', ev => { if (ev.target.closest('[data-nvt]')) ev.preventDefault(); });
+    tools.addEventListener('click', ev => {
+      const b = ev.target.closest('[data-nvt]');
+      if (!b) return;
+      if (!box.isConnected) { document.removeEventListener('selectionchange', keep); return; }
+      if (document.activeElement !== box) box.focus();
+      if (range) { const s = getSelection(); s.removeAllRanges(); s.addRange(range); }
+      nvCommand(box, b.dataset.nvt);
+    });
+  }
   const grip = detailEl.querySelector('[data-nv-grip]');
   if (grip) {
     // (Followed over the whole window while dragging, so a finger or the
@@ -456,7 +485,7 @@ detailEl.addEventListener('click', ev => {
   const r = readablePdfs(e)[0] && NOTES.marks.get(readablePdfs(e)[0].id);
   const tag = ev.target.closest('[data-nv-box] .pl[data-pg]');
   if (tag && !gs) { nvOpenAtLabel(e, tag.dataset.pg); return; }
-  if (tag && (ev.metaKey || ev.ctrlKey || ev.detail === 0)) { nvOpenAtLabel(e, tag.dataset.pg); return; }
+  if (tag && (ev.metaKey || ev.ctrlKey || ev.detail === 0 || coarseMQ.matches)) { nvOpenAtLabel(e, tag.dataset.pg); return; }
   const go = ev.target.closest('[data-nv-open]');
   if (go) { nvOpenAt(e, +go.dataset.nvOpen); return; }
   const cp = ev.target.closest('[data-nv-copy]');
@@ -480,12 +509,7 @@ function openNotesPop(e) {
     `<div class="np-head"><h2>${esc(e.f.title || e.k)}<small>${esc([who.replace(/[{}]/g, ''), year].filter(Boolean).join(' ') + ' \u00b7 ' + e.k)}</small></h2>` +
     `<span class="np-state" aria-live="polite">Saved</span><button type="button" class="btn primary" data-np-close>Done</button></div>` +
     `<div class="np-tools">` +
-    b('undo', 'Undo (\u2318Z)', UNDO_ICON) + b('redo', 'Redo (\u21e7\u2318Z)', REDO_ICON) + '<span class="np-sep"></span>' +
-    b('h', 'Heading', '<b>H</b>') + b('bold', 'Bold (\u2318B)', '<b>B</b>') + b('italic', 'Italic (\u2318I)', '<i>I</i>') + '<span class="np-sep"></span>' +
-    b('ul', 'Bulleted list', I('<path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/>')) +
-    b('ol', 'Numbered list', I('<path d="M10 6h10M10 12h10M10 18h10M4 5h1.5v4M4 9h3M4 14.5c0-1 2.5-1.5 2.5 0S4 17 4 18h3"/>')) +
-    b('quote', 'Quotation', I('<path d="M5 17c2.5-.4 4-2.2 4-5V7H5v5h3"/><path d="M14 17c2.5-.4 4-2.2 4-5V7h-4v5h3"/>')) +
-    b('link', 'Link (\u2318K)', I('<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>')) + '<span class="np-sep"></span>' +
+    NV_TOP(b, '<span class="np-sep"></span>') + NV_LISTS(b, I) + '<span class="np-sep"></span>' +
     `<button type="button" class="np-wide" data-np="cite" title="Cite another publication: its in-text citation, in your style">${I('<path d="M4 6h16M4 12h10M4 18h6"/>')}<span>Cite\u2026</span></button>` +
     `<div class="np-cite" hidden><input type="search" placeholder="A title or author in your library" aria-label="Find a publication to cite" autocomplete="off" spellcheck="false"><div class="np-cite-list"></div></div>` +
     `</div><div class="np-body"><div class="np-edit notes-rich" role="textbox" aria-multiline="true" aria-label="Your notes" data-placeholder="Write your notes\u2026"></div>` +
@@ -608,19 +632,33 @@ const RN_MOVE = {
   side: ['Move your notes beside the page', '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M10 4.5v15"/><path d="M5.5 9h2.5M5.5 12h2.5" opacity=".6"/></svg>'],
   bottom: ['Move your notes below the page', '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 13h17"/><path d="M7 16.3h10" opacity=".6"/></svg>'],
 };
+// The notes' toolbar, the same in the reader, the pop-out and the library:
+// Undo, Redo | Heading, Bold, Italic | lists, Quotation, Link.
+const NV_TOP = (b, sep) => b('undo', 'Undo (\u2318Z)', UNDO_ICON) + b('redo', 'Redo (\u21e7\u2318Z)', REDO_ICON) + sep +
+  b('bold', 'Bold (\u2318B)', '<b>B</b>') + b('italic', 'Italic (\u2318I)', '<i>I</i>') + b('h', 'Heading', '<b>H</b>') + sep;
+const NV_LISTS = (b, I) => b('quote', 'Quotation', I('<path d="M5 17c2.5-.4 4-2.2 4-5V7H5v5h3"/><path d="M14 17c2.5-.4 4-2.2 4-5V7h-4v5h3"/>')) +
+  b('ul', 'Bulleted list', I('<path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/>')) +
+  b('ol', 'Numbered list', I('<path d="M10 6h10M10 12h10M10 18h10M4 5h1.5v4M4 9h3M4 14.5c0-1 2.5-1.5 2.5 0S4 17 4 18h3"/>')) +
+  b('link', 'Link (\u2318K)', I('<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>'));
+// (One command, for any of the three editors.)
+function nvCommand(ed, k) {
+  if (k === 'h') nvToggleBlock(ed, 'h3');
+  else if (k === 'quote') nvToggleBlock(ed, 'blockquote');
+  else if (k === 'ul') nvExec('insertUnorderedList');
+  else if (k === 'ol') nvExec('insertOrderedList');
+  else if (k === 'link') nvLink(ed);
+  else nvExec(k);
+  ed.dispatchEvent(new Event('input'));
+}
 function rnHTML(e, where) {
   const b = (k, title, icon) => `<button type="button" data-rn="${k}" title="${esc(title)}" aria-label="${esc(title)}">${icon}</button>`;
   const I = d => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
   return `<div class="rn">` + (gs ? `<div class="rn-tools">` +
-    b('undo', 'Undo (\u2318Z)', UNDO_ICON) + b('redo', 'Redo (\u21e7\u2318Z)', REDO_ICON) + '<span class="rn-sep"></span>' +
-    b('h', 'Heading', '<b>H</b>') + b('bold', 'Bold (\u2318B)', '<b>B</b>') + b('italic', 'Italic (\u2318I)', '<i>I</i>') + '<span class="rn-sep"></span>' +
-    b('ul', 'Bulleted list', I('<path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/>')) +
-    b('quote', 'Quotation', I('<path d="M5 17c2.5-.4 4-2.2 4-5V7H5v5h3"/><path d="M14 17c2.5-.4 4-2.2 4-5V7h-4v5h3"/>')) +
-    b('link', 'Link (\u2318K)', I('<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>')) +
+    NV_TOP(b, '<span class="rn-sep"></span>') + NV_LISTS(b, I) +
     // (At the right, after Saved: where the notes go, not how they look.)
     `<span class="rn-state" aria-live="polite" data-ok>Saved</span>` +
     (handheld() ? '' : b('move', RN_MOVE[where === 'bottom' ? 'side' : 'bottom'][0], RN_MOVE[where === 'bottom' ? 'side' : 'bottom'][1]) +
-      b('pop', 'Notes, large, with Cite (' + keyHint('notesPop') + ')', POP_ICON)) +
+      b('pop', 'Pop out (' + keyHint('notesPop') + ')', POP_ICON)) +
     (handheld() ? `<button type="button" class="rn-done" data-rn="done">Done</button>` : '') + `</div>` : '') +
     `<div class="rn-edit notes-rich" role="textbox" aria-multiline="true" aria-label="Your notes" data-placeholder="${gs ? 'Write your notes\u2026' : 'No notes.'}"></div>` +
     `<div class="rn-marks" hidden></div>` +
@@ -681,12 +719,7 @@ function rnClick(ev) {
     if (k === 'done') { closeReaderNotes(); return; }
     if (k === 'move') { rnMove(RN.where === 'bottom' ? 'side' : 'bottom'); return; }
     rnBack();
-    if (k === 'h') nvToggleBlock(ed, 'h3');
-    else if (k === 'quote') nvToggleBlock(ed, 'blockquote');
-    else if (k === 'ul') nvExec('insertUnorderedList');
-    else if (k === 'link') nvLink(ed);
-    else nvExec(k);
-    ed.dispatchEvent(new Event('input'));
+    nvCommand(ed, k);
     return;
   }
   const tag = ev.target.closest('.rn-edit .pl[data-pg]');
@@ -822,6 +855,12 @@ function rnAddPassage(text, pg) {
   nvQuote(RN.ed, q);
   RN.ed.dispatchEvent(new Event('input'));
   rnKeep();
+  // (The new quotation in view, lit for a moment; on a touch screen the
+  // keyboard not brought up over the paper.)
+  const sel = getSelection(), at = sel && sel.anchorNode, el = at && (at.nodeType === 3 ? at.parentElement : at);
+  const bq = (el && el.closest && el.closest('blockquote')) || [...RN.ed.querySelectorAll('blockquote')].pop();
+  if (coarseMQ.matches) RN.ed.blur();
+  if (bq) { bq.scrollIntoView({ block: 'nearest' }); bq.classList.add('rn-new'); setTimeout(() => bq.classList.remove('rn-new'), 1400); }
 }
 function rnHighlight(range) { markRange(range); }
 // A page tag: to that page of the paper (as printed: the journal's page
