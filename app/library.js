@@ -2,11 +2,13 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-14.03';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-14.04';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
 const APP_VERSION = ((document.getElementById('version') || {}).textContent || '').replace('Version ', '');
+// (In Settings from the start, before the library has loaded.)
+if (document.getElementById('curVersion')) document.getElementById('curVersion').textContent = APP_VERSION;
 const app = $('#app'), listEl = $('#list'), rowsEl = $('#rows'), detailEl = $('#detail');
 const phoneMQ = matchMedia('(max-width: 699px)');
 const tabletMQ = matchMedia('(max-width: 1099px)');
@@ -31,6 +33,8 @@ const ICON = {
   up: '<svg class="i" viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg>',
   down: '<svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>',
   copy: '<svg class="i" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>',
+  // (Possible duplicates: two pages, one too many.)
+  dups: '<svg class="i" viewBox="0 0 24 24"><rect x="3.5" y="6" width="8" height="11" rx="1.2"/><rect x="12.5" y="6" width="8" height="11" rx="1.2"/><path d="M10.5 2.5l3 3M13.5 2.5l-3 3"/></svg>',
   link: '<svg class="i" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>',
   forth: '<svg class="i" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4M12 13v3l2 1"/></svg>',
   versions: '<svg class="i" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M4 16V6a2 2 0 0 1 2-2h10"/></svg>',
@@ -173,7 +177,6 @@ function onThemeSet(ev) {
   }
   sendPrefs({ theme: b.dataset.themeSet });
 }
-$('#themeSeg').addEventListener('click', onThemeSet);
 $('#themeSegSet').addEventListener('click', onThemeSet);
 new MutationObserver(() => {
   if (!themeReload || !$('#setup').hidden || V.dirty || V.bmDirty || V.drawing || V.saving) return;
@@ -287,10 +290,12 @@ function init(data, again) {
 
   const nFiles = ENTRIES.reduce((n, e) => n + (e.files ? e.files.length : 0), 0);
   const nIds = ENTRIES.reduce((n, e) => n + (e.files ? e.files.filter(f => f.id).length : 0), 0);
-  $('#sideFoot').innerHTML = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${nFiles.toLocaleString()} linked files<br>` +
-    (nIds ? `${nIds.toLocaleString()} open directly in Google Drive` : 'Files open through Google Drive search') +
-    `<br>${esc(data.source)} as of ${esc(builtText(data))}` +
-    `<br>LibLande version ${esc(APP_VERSION)}`;
+  // (The sidebar's foot: the counts. Where the files open from, the copy
+  // read and the version: in Settings, This library.)
+  const withPdf = ENTRIES.filter(e => e.files && e.files.length).length;
+  $('#sideFoot').textContent = `${ENTRIES.length.toLocaleString()} publications \u00b7 ${withPdf.toLocaleString()} with PDFs`;
+  $('#curOpens').textContent = `${nFiles.toLocaleString()} linked: ` + (!nIds ? 'opened via Drive search' : nIds === nFiles ? 'all open directly in Drive' : `${nIds.toLocaleString()} open directly, the rest via Drive search`);
+  $('#curAsOf').textContent = builtText(data);
 
   if (!groupItems(state.group)) state.group = 'all';
   sweepCovers();
@@ -1361,7 +1366,7 @@ function librariesHTML() {
   const sub = `<div class="lib-sub${LIBS.phase === 'folding' ? ' folded' : LIBS.phase === 'loading' ? ' lib-wait' : ''}">` +
     (RECENT.seen.length || state.group === 'recent' ? grpBtn('recent', 'Recently viewed', groupItems('recent').length, ICON.history) : '') +
     (inboxCount || state.group === 'inbox' ? grpBtn('inbox', 'Inbox', inboxCount, ICON.inbox) : '') +
-    (DUPS.size || state.group === 'dups' ? grpBtn('dups', 'Possible duplicates', DUPS.size, ICON.copy) : '') +
+    (DUPS.size || state.group === 'dups' ? grpBtn('dups', 'Possible duplicates', DUPS.size, ICON.dups) : '') +
     ((n => (n || state.group === 'forth' ? grpBtn('forth', 'Forthcoming', n, ICON.forth) : ''))(ENTRIES.filter(isForthcoming).length)) + `</div>`;
   return `<div class="sec${secFold('libs')}" data-sec="libs"><div class="sec-row">${secHead('libs', 'Libraries')}` +
     `<button type="button" class="sec-add" data-new-lib title="New library" aria-label="New library"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button></div>` +
@@ -1456,7 +1461,7 @@ function renderGroups() {
   let h = (libs || `<div class="sec${secFold('lib')}" data-sec="lib">${secHead('lib', 'Library')}${grpBtn('all', 'Library', ENTRIES.length, ICON.lib)}` +
     (RECENT.seen.length || state.group === 'recent' ? grpBtn('recent', 'Recently viewed', groupItems('recent').length, ICON.history) : '') +
     (inboxCount || state.group === 'inbox' ? grpBtn('inbox', 'Inbox', inboxCount, ICON.inbox) : '') +
-    (DUPS.size || state.group === 'dups' ? grpBtn('dups', 'Possible duplicates', DUPS.size, ICON.copy) : '') +
+    (DUPS.size || state.group === 'dups' ? grpBtn('dups', 'Possible duplicates', DUPS.size, ICON.dups) : '') +
     ((n => (n || state.group === 'forth' ? grpBtn('forth', 'Forthcoming', n, ICON.forth) : ''))(ENTRIES.filter(isForthcoming).length)) +
     `</div>`) +
     // (Tools: not lists, so no count.)
@@ -2982,11 +2987,11 @@ function renderDetail() {
     `<div class="menu-list" role="menu">${items}</div></details>`;
   if (readable.length === 1) {
     const [fl, j] = readable[0];
-    btns.push(`<button type="button" class="btn primary act-read" data-read="${j}" title="${esc(fl.p)}">${ICON.read}<span>View</span></button>`);
+    btns.push(`<button type="button" class="btn primary act-read" data-read="${j}" title="${esc(fl.p)}">${ICON.read}<span>Read</span></button>`);
     btns.push(menu('', `${ICON.share}<span class="share-word">Share</span>`, 'Share a copy to another app',
       items(j)));
   } else if (readable.length > 1) {
-    btns.push(menu('act-read', `${ICON.read}<span>View</span>`, 'Choose a PDF to view',
+    btns.push(menu('act-read', `${ICON.read}<span>Read</span>`, 'Choose a PDF to read',
       readable.map(([fl, j]) => `<button type="button" role="menuitem" data-read="${j}" title="${esc(fl.p)}"><span class="fname">${fname(fl)}</span></button>`).join('')));
     btns.push(menu('', `${ICON.share}<span class="share-word">Share</span>`, 'Share a copy to another app',
       readable.map(([fl, j]) => `<div class="menu-head">${fname(fl)}</div>` +
@@ -3061,7 +3066,7 @@ function renderDetail() {
   let notices = '';
   const twins = DUPS.get(e.k);
   if (twins) {
-    notices += `<div class="dup-note">${ICON.copy}<span>Possibly the same as ` + twins.map(x =>
+    notices += `<div class="dup-note">${ICON.dups}<span>Possibly the same as ` + twins.map(x =>
       `<button type="button" data-twin="${esc(x.k)}">${esc(x.authorsShort || x.k)}${x.f.year ? ' (' + esc(x.f.year) + ')' : ''}${x.ib ? ' in your inbox' : ''}</button>`).join(', ') +
       `. <button type="button" class="dup-no" data-notdup title="Stop showing ${twins.length === 1 ? 'these two' : 'these'} as possible duplicates">Not the same</button></span></div>`;
   }
@@ -3074,7 +3079,7 @@ function renderDetail() {
   if (gs) {
     meta.push(`<span class="stars q-stars" role="group" aria-label="Rating">` + [1, 2, 3, 4, 5].map(i =>
       `<button type="button" data-qstar="${i}" aria-label="${i} star${i > 1 ? 's' : ''}" title="${i === e.rating ? 'Clear the rating' : 'Rate ' + i + ' of 5'}">${i <= e.rating ? '\u2605' : '\u2606'}</button>`).join('') + `</span>`);
-    meta.push(`<label class="q-read"><input type="checkbox" data-qread${f.read === '1' ? ' checked' : ''}> Read</label>`);
+    meta.push(`<label class="q-read"><input type="checkbox" data-qread${f.read === '1' ? ' checked' : ''}> Have read</label>`);
   } else {
     if (e.rating) meta.push(`<span class="stars" title="Rating ${e.rating} of 5">${'\u2605'.repeat(e.rating)}${'\u2606'.repeat(Math.max(0, 5 - e.rating))}</span>`);
     if (f.read === '1') meta.push(`<span class="pill">Read</span>`);

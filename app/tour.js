@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-11-14.03';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-11-14.04';
 /* -------------------------------------------------------------- features */
 // What LibLande does, by area: each feature, what it's for, where to find
 // it, its icon (see featIcon), and other words it's found by (as "tag"
@@ -35,7 +35,7 @@ const FEATURES = [
     ['Select several', 'Give several publications keywords and groups at once, add them to your reading list, join versions, share them, or copy their citations; their PDFs show beside them.', 'Select in the toolbar, or \u2318-click and \u21e7-click', '#selectBtn', 'multiple batch bulk'],
     ['Share', 'The selected publications as a .bib and an .rtf of citations, with their PDFs as they are, clean, or none; to Google Drive, this device, or another app (Mail, Messages, AirDrop), with the references in the message.', 'Select several, then Share', 'path:M12 3v12M8 11l4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2', 'export bibtex rtf zip share airdrop mail'],
     ['Reading list', 'Papers to read: up next, later, or done; one list for each library. Each shows how far you\u2019ve read (tap the figure to start counting again).', 'The Reading list tab; the bookmark in the details or the reader', '#vRL', 'queue to read progress'],
-    ['Possible duplicates', 'Publications that look like the same one, to join as versions of one or mark as different.', 'Possible duplicates in the sidebar', 'ICON:copy', 'duplicate merge versions'],
+    ['Possible duplicates', 'Publications that look like the same one, to join as versions of one or mark as different.', 'Possible duplicates in the sidebar', 'ICON:dups', 'duplicate merge versions'],
   ] },
   { area: 'Adding and editing', items: [
     ['Add a publication', 'Search by title and author, or give a DOI, ISBN or arXiv ID, or paste BibTeX; or take a photo of a paper\u2019s first page or a book\u2019s cover, its DOI or ISBN looked up.', '+ in the toolbar; on an iPad or iPhone, hold + to paste or take a photo', '#addBtn', 'import new doi isbn arxiv photo camera bibtex'],
@@ -97,7 +97,7 @@ const FEATURES = [
     ['Tidy keywords', 'Merge spellings of the same keyword, deal with one-offs, and add likely missing ones. Nothing changes until you apply.', 'Tools \u203a Tidy keywords', 'ICON:tag', 'tags clean up merge'],
   ] },
   { area: 'Appearance', items: [
-    ['Light or dark', 'Light, dark, or as the device is.', 'Settings \u203a Appearance, or the foot of the sidebar', 'path:M12 3.5a8.5 8.5 0 1 0 0 17zM12 3.5a8.5 8.5 0 0 1 0 17', 'dark mode theme'],
+    ['Light or dark', 'Light, dark, or as the device is.', 'Settings \u203a Appearance', 'path:M12 3.5a8.5 8.5 0 1 0 0 17zM12 3.5a8.5 8.5 0 0 1 0 17', 'dark mode theme'],
     ['Themes and glass', 'Four themes (LibLande, Apple, Graphite, Sepia), each solid or glass: translucent bars, sidebar, menus and panels. Kept with your account.', 'Settings \u203a Appearance', 'ICON:copy', 'theme colours translucent'],
     ['Book covers', 'Covers for your books, from Open Library.', 'Settings \u203a Library', 'path:M6 3.5h11a1.5 1.5 0 0 1 1.5 1.5v14a1.5 1.5 0 0 1-1.5 1.5H6zM6 3.5v17M9.5 8h6M9.5 11h4'],
     ['Keyboard shortcuts', 'Shortcuts for most things, and you can change them.', 'Keyboard shortcuts at the foot of the sidebar, or ?', 'path:M3.5 7h17v10h-17zM7 10.5h.01M10 10.5h.01M13 10.5h.01M16 10.5h.01M8 14h8', 'keys hotkeys'],
