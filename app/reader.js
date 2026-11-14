@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-14.02';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-14.03';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -3451,83 +3451,59 @@ const EDIT_ICONS = {
   comment: ['Comment', '<path d="M5 4.5h14A1.5 1.5 0 0 1 20.5 6v9a1.5 1.5 0 0 1-1.5 1.5h-7l-4.5 3.5v-3.5H5A1.5 1.5 0 0 1 3.5 15V6A1.5 1.5 0 0 1 5 4.5z"/><path d="M8 9h8M8 12h5"/>'],
   deleteButton: ['Delete', '<path d="M4 7h16M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13M10 11v6M14 11v6"/>'],
 };
-// Drawings (and so underlines and strike-throughs) and text boxes: PDF.js
-// gives them the system colour well, which on the iPad opens a full colour
-// picker over the page (or nothing); they get LibLande's few colours
-// instead, as a list like the highlights' (the list for the pen and text).
+// A mark's colours, on its toolbar as on the Quote bar: three (and the
+// mark's own, if it's another), a tap on one to change it. Highlights
+// get the highlighter's colours; drawings, underlines, strike-throughs and
+// text boxes the pen's. (PDF.js's own: a list that opens, for highlights;
+// the system colour well for the others, which on the iPad opens a full
+// colour picker over the page, or nothing.)
+const SW_HL = HL_COLORS.slice(0, 3), SW_PEN = PEN_COLORS.slice(0, 3);
 function colourList(tb) {
-  const input = tb.querySelector('input.basicColorPicker, .colorPicker:not(.ll-colours)');
-  if (!input || tb.querySelector('.ll-colours')) return;
+  if (tb.querySelector('.ll-sws')) return;
+  const pickers = [...tb.querySelectorAll('input.basicColorPicker, .colorPicker')];
   const div = tb.closest('.annotationEditorLayer > [id]'), ed = div && V.ui && V.ui.getEditor(div.id);
-  if (!ed) return;
-  const text = div.classList.contains('freeTextEditor'), line = lineKindOfEd(ed);
-  // (A highlight keeps PDF.js's list of highlight colours.)
-  if (input.matches('.colorPicker') && !line) return;
-  const now = input.matches('input') ? input.value : ed.color || '#000000';
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'colorPicker ll-colours';
-  btn.title = 'Change colour';
-  btn.setAttribute('aria-label', 'Change colour');
-  btn.setAttribute('aria-haspopup', 'true');
-  btn.setAttribute('aria-expanded', 'false');
-  const swatch = document.createElement('span');
-  swatch.className = 'swatch';
-  swatch.style.backgroundColor = now;
-  const dd = document.createElement('div');
-  dd.className = 'dropdown hidden';
-  dd.setAttribute('role', 'listbox');
-  for (const [name, c] of PEN_COLORS) {
-    const o = document.createElement('button');
-    o.type = 'button';
-    o.setAttribute('role', 'option');
-    o.dataset.color = c;
-    o.title = name;
-    o.setAttribute('aria-label', name);
-    o.setAttribute('aria-selected', String(c.toLowerCase() === String(now).toLowerCase()));
-    const sw = document.createElement('span');
-    sw.className = 'swatch';
-    sw.style.backgroundColor = c;
-    o.append(sw);
-    dd.append(o);
-  }
-  btn.append(swatch, dd);
-  input.before(btn);
-  input.hidden = true;
-  input.style.display = 'none';
-  const close = () => { dd.classList.add('hidden'); btn.setAttribute('aria-expanded', 'false'); };
-  btn.addEventListener('click', ev => {
+  if (!pickers.length || !ed) return;
+  const text = div.classList.contains('freeTextEditor'), line = lineKindOfEd(ed), hl = div.classList.contains('highlightEditor') && !line;
+  const first = pickers[0], now = String((first.matches('input') ? first.value : ed.color) || '').toLowerCase().slice(0, 7);
+  const all = hl ? HL_COLORS : PEN_COLORS, list = (hl ? SW_HL : SW_PEN).slice();
+  // (Its own colour, if not one of the three.)
+  const own = all.find(([, c]) => c.toLowerCase() === now);
+  if (own && !list.includes(own)) list.push(own);
+  else if (!own && /^#[0-9a-f]{6}$/.test(now)) list.push(['This colour', now]);
+  const g = document.createElement('span');
+  g.className = 'll-sws';
+  g.setAttribute('role', 'group');
+  g.setAttribute('aria-label', 'Colour');
+  g.innerHTML = list.map(([name, c]) => `<button type="button" data-color="${c}" title="${name}" aria-label="${name}" aria-pressed="${c.toLowerCase() === now}" style="--sw:${c}"></button>`).join('');
+  first.before(g);
+  pickers.forEach(x => { x.hidden = true; x.style.display = 'none'; });
+  g.addEventListener('click', ev => {
     ev.stopPropagation();
     const o = ev.target.closest('[data-color]');
-    if (o) {
-      const P = V.lib.AnnotationEditorParamsType;
-      if (line) {
-        // PDF.js gives a highlight a new colour at the usual highlight
-        // opacity, which would make an underline a highlight: for this
-        // change (and its Undo and Redo) the opacity it uses is the line's.
-        // (PDF.js 6 takes the opacity with the colour; 5 took its default.)
-        if (typeof ed._updateColorAndOpacity === 'function') ed._updateColorAndOpacity(o.dataset.color, LINE_OPACITY[line], P.HIGHLIGHT_COLOR);
-        else {
-          const HE = ed.constructor, was = HE._defaultOpacity;
-          HE._defaultOpacity = LINE_OPACITY[line];
-          try { ed.updateParams(P.HIGHLIGHT_COLOR, o.dataset.color); } finally { HE._defaultOpacity = was; }
-        }
-        decorateLine(ed);
-      } else {
-        ed.updateParams(text ? P.FREETEXT_COLOR : P.INK_COLOR, o.dataset.color);
+    if (!o) return;
+    const c = o.dataset.color, P = V.lib.AnnotationEditorParamsType;
+    if (line) {
+      // PDF.js gives a highlight a new colour at the usual highlight
+      // opacity, which would make an underline a highlight: for this
+      // change (and its Undo and Redo) the opacity it uses is the line's.
+      // (PDF.js 6 takes the opacity with the colour; 5 took its default.)
+      if (typeof ed._updateColorAndOpacity === 'function') ed._updateColorAndOpacity(c, LINE_OPACITY[line], P.HIGHLIGHT_COLOR);
+      else {
+        const HE = ed.constructor, was = HE._defaultOpacity;
+        HE._defaultOpacity = LINE_OPACITY[line];
+        try { ed.updateParams(P.HIGHLIGHT_COLOR, c); } finally { HE._defaultOpacity = was; }
       }
-      swatch.style.backgroundColor = o.dataset.color;
-      dd.querySelectorAll('[data-color]').forEach(x => x.setAttribute('aria-selected', String(x === o)));
-      markDrawing();
-      close();
-      return;
+      decorateLine(ed);
+    } else if (hl) {
+      // (A note stays a note: its own faint opacity kept.)
+      if (isNoteEd(ed) && typeof ed._updateColorAndOpacity === 'function') ed._updateColorAndOpacity(c, NOTE_OPACITY, P.HIGHLIGHT_COLOR);
+      else ed.updateParams(P.HIGHLIGHT_COLOR, c);
+    } else {
+      ed.updateParams(text ? P.FREETEXT_COLOR : P.INK_COLOR, c);
     }
-    const open = dd.classList.contains('hidden');
-    dd.classList.toggle('hidden', !open);
-    btn.setAttribute('aria-expanded', String(open));
+    g.querySelectorAll('[data-color]').forEach(x => x.setAttribute('aria-pressed', String(x === o)));
+    markDrawing();
   });
-  // (Any press outside the list closes it.)
-  window.addEventListener('pointerdown', ev => { if (!btn.contains(ev.target)) close(); }, true);
 }
 function iconEditToolbar(root) {
   root.querySelectorAll('.editToolbar').forEach(colourList);
@@ -3537,7 +3513,8 @@ function iconEditToolbar(root) {
   for (const [cls, [name, svg]] of Object.entries(EDIT_ICONS)) {
     root.querySelectorAll('.editToolbar button.' + cls + ':not(.has-icon)').forEach(b => {
       b.classList.add('has-icon');
-      b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + svg + '</svg>';
+      // (Labelled, as on the Quote bar; Delete just its icon.)
+      b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + svg + '</svg>' + (cls === 'comment' ? '<span>' + name + '</span>' : '');
       if (!b.getAttribute('aria-label')) b.setAttribute('aria-label', name);
       if (!b.title) b.title = name;
     });
@@ -3552,22 +3529,25 @@ function markQuoteButtons(tb) {
   if (!div || tb.querySelector('.ll-mq') || !div.classList.contains('highlightEditor') || div.classList.contains('free')) return;
   const row = tb.querySelector('.buttons') || tb;
   const del = row.querySelector('button.delete, .deleteButton');
-  const make = (cls, label, svg) => {
+  // (Quote first, as on the Quote bar; then the colours; then Add to
+  // notes before Comment and Delete.)
+  const make = (cls, label, svg, word, before) => {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'll-mq ' + cls + ' has-icon';
     b.title = label;
     b.setAttribute('aria-label', label);
-    b.innerHTML = svg;
-    row.insertBefore(b, del && del.parentElement === row ? del : null);
+    b.innerHTML = svg + '<span>' + word + '</span>';
+    const at = before || row.querySelector('button.comment') || del;
+    row.insertBefore(b, at && at.parentElement === row ? at : null);
     return b;
   };
   // (Its words read now: Safari copies only at once, on the tap itself,
   // not after waiting for the page's text.)
   const words = { w: null };
   markWords(div.id).then(w => { words.w = w; }, () => {});
-  make('ll-mq-quote', 'Quote: copy the words as a quotation, with the citation', QUOTE_SVG).addEventListener('click', ev => { ev.stopPropagation(); markQuote(div.id, 'copy', words.w); });
-  if (gs && V.entry && BYKEY.get(V.entry.k)) make('ll-mq-note', 'Add to notes, as a quotation with its page', NOTE_SVG).addEventListener('click', ev => { ev.stopPropagation(); markQuote(div.id, 'notes', words.w); });
+  make('ll-mq-quote', 'Quote: copy the words as a quotation, with the citation', QUOTE_SVG, 'Quote', row.firstElementChild).addEventListener('click', ev => { ev.stopPropagation(); markQuote(div.id, 'copy', words.w); });
+  if (gs && V.entry && BYKEY.get(V.entry.k)) make('ll-mq-note', 'Add to notes, as a quotation with its page', NOTE_SVG, 'Add to notes').addEventListener('click', ev => { ev.stopPropagation(); markQuote(div.id, 'notes', words.w); });
 }
 // A highlight's words (from the page's text under it) and its page as printed.
 async function markWords(id) {
@@ -3642,14 +3622,6 @@ function toolbarAtTap() {
     if (b.bottom > window.innerHeight - 8) tb.style.top = (TAP.y - 16 - b.height - r.top) / k + 'px';
   });
 }
-// A colour chosen: its list closes (PDF.js leaves it open).
-$('#vPages').addEventListener('click', ev => {
-  const opt = ev.target.closest && ev.target.closest('.colorPicker .dropdown [data-color], .colorPicker .dropdown button');
-  if (!opt) return;
-  const cp = opt.closest('.colorPicker'), dd = opt.closest('.dropdown');
-  setTimeout(() => { dd.classList.add('hidden'); cp.setAttribute('aria-expanded', 'false'); }, 0);
-}, true);
-
 /* ---- picking up a mark when no tool is on */
 // A tap on a mark (the Pencil, a finger or the mouse) switches to the select
 // tool with that mark picked up and its toolbar showing; a tap on empty
@@ -4004,7 +3976,7 @@ $('#vPages').addEventListener('pointerdown', ev => { if (ev.target.closest('.not
     if (pe && !sameColour(pe.color, MARK.hlColor)) return;
     // (Not the highlight's toolbar, such as its colours, which PDF.js puts
     // inside the highlight: a tap there changes the colour.)
-    if (ev.target.closest && ev.target.closest('.editToolbar, .colorPicker, .dropdown, button')) return;
+    if (ev.target.closest && ev.target.closest('.editToolbar, button')) return;
     const div = ev.target.closest && ev.target.closest('.annotationEditorLayer > .highlightEditor');
     if (!div || div.classList.contains('free')) return;
     const ed = V.ui.getEditor(div.id);
@@ -4473,8 +4445,8 @@ async function showQuote() {
     QUOTE.el.innerHTML = `<button type="button" class="quote-go" title="Copy the passage as a quotation, with its citation (${esc(keyHint('quote'))})">${ICON.quote}<span>Quote</span></button>` +
       `<label class="quote-pg"><span>p.</span><input type="text" inputmode="numeric" autocomplete="off" aria-label="Page" readonly></label>` +
       // (Highlight it, in one of the highlighter's colours.)
-      `<span class="quote-hl" role="group" aria-label="Highlight">` + HL_COLORS.map(([n, c]) => `<button type="button" data-qhl="${c}" title="Highlight: ${n}" aria-label="Highlight ${n.toLowerCase()}" style="--sw:${c}"></button>`).join('') + `</span>` +
-      `<button type="button" class="quote-note" title="Quote in your notes, and highlight">${NOTE_ICON}<span>Add to notes</span></button>` +
+      `<span class="quote-hl" role="group" aria-label="Highlight">` + SW_HL.map(([n, c]) => `<button type="button" data-qhl="${c}" title="Highlight: ${n}" aria-label="Highlight ${n.toLowerCase()}" style="--sw:${c}"></button>`).join('') + `</span>` +
+      `<button type="button" class="quote-note" title="Add to notes, as a quotation with its page (and highlight it)">${NOTE_ICON}<span>Add to notes</span></button>` +
       // (A reference selected, in the paper's bibliography say: looked up,
       // to add to the library. See related.js.)
       `<button type="button" class="quote-add" title="Look this reference up, to add it to your library" hidden>${ICON.plus}<span>Add to library</span></button>`;
@@ -4505,7 +4477,6 @@ async function showQuote() {
   QUOTE.sel = sel;
   QUOTE.el.querySelector('.quote-note').hidden = !gs || !BYKEY.get(V.entry.k);
   QUOTE.el.querySelector('.quote-hl').hidden = !gs || !V.ui;
-  QUOTE.el.querySelectorAll('[data-qhl]').forEach(b => b.classList.toggle('on', b.dataset.qhl === MARK.hlColor));
   QUOTE.el.querySelector('.quote-add').hidden = !gs || $('#addBtn').hidden || !refLike(sel.text, sel.from);
   // (Another passage chosen: the last copy's tidying up is called off.)
   const go = QUOTE.el.querySelector('.quote-go');
@@ -5599,7 +5570,7 @@ async function showMarks() {
   // (One bar split in three, short words, so it fits a narrow sidebar;
   // the titles say the rest.)
   let h = unsaved + chips + (worded ? `<div class="v-marks-acts" role="group" aria-label="The annotations"><button type="button" data-marks-copy aria-label="Copy summary" title="Copy a summary: every highlight and note, by page, with the reference">${ICON.copy}<span>Summary</span></button>` + AI_BTN +
-    (gs ? `<button type="button" data-marks-notes aria-label="All to notes" title="Add them all to the publication\u2019s Notes">${ICON.pencil}<span>To notes</span></button>` : '') + `</div>` : '') + `<div class="v-marks">`, last = 0;
+    (gs ? `<button type="button" data-marks-notes aria-label="All to notes" title="Add them all to the publication\u2019s Notes">${NOTE_ICON}<span>To notes</span></button>` : '') + `</div>` : '') + `<div class="v-marks">`, last = 0;
   // (A mark of words, as a highlight or underline: Copy and Quote at its
   // top right.)
   SIDE.shown = shown;

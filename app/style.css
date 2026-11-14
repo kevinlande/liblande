@@ -138,7 +138,7 @@
 :root[data-glass] .v-tabs { background: linear-gradient(to bottom, color-mix(in srgb, var(--panel) 80%, transparent), color-mix(in srgb, var(--panel) 55%, transparent)); }
 /* (The light rim along a glass top edge only on what floats: on the bars
    at the top of the screen it drew a thin line under the status bar.) */
-:root[data-glass] .v-palette, :root[data-glass] .vp-show, :root[data-glass] .menu-list, :root[data-glass] .quote-bar, :root[data-glass] .ref-card, :root[data-glass] .rel-card, :root[data-glass] .v-tone {
+:root[data-glass] .v-palette, :root[data-glass] .vp-show, :root[data-glass] .menu-list, :root[data-glass] .quote-bar, :root[data-glass] .ref-card, :root[data-glass] .rel-card, :root[data-glass] #vPages .editToolbar, :root[data-glass] .v-tone {
   background: color-mix(in srgb, var(--panel) 62%, transparent);
   -webkit-backdrop-filter: saturate(190%) blur(26px); backdrop-filter: saturate(190%) blur(26px);
   border-color: var(--glass-edge); box-shadow: inset 0 1px 0 var(--glass-rim), inset 0 0 0 .5px var(--glass-rim), var(--shadow);
@@ -1805,7 +1805,7 @@ body.is-offline .fileicon:not(.saved), body.is-offline .pdf:not(.saved) { opacit
 .set-sync { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 14px; padding: 2px 0; cursor: pointer; }
 /* Quote: the bar by a passage selected while reading. */
 .quote-bar { position: fixed; z-index: 62; display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 10px;
-  background: var(--panel); box-shadow: 0 6px 20px rgba(0, 0, 0, .22); font: 500 13.5px var(--ui); color: var(--text); }
+  background: var(--panel); box-shadow: var(--shadow); font: 500 13.5px var(--ui); color: var(--text); }
 .quote-bar[hidden] { display: none; }
 .quote-go { display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 7px; background: none; color: inherit; font: inherit; padding: 6px 10px; cursor: pointer; }
 .quote-go:hover { background: var(--side-hover); }
@@ -1816,16 +1816,13 @@ body.is-offline .fileicon:not(.saved), body.is-offline .pdf:not(.saved) { opacit
 .quote-pg input:focus { border-color: var(--accent); outline: none; }
 .quote-bar.unsure .quote-pg input { border-color: #b8860b; }
 .quote-bar.unsure .quote-pg::after { content: '?'; color: #b8860b; font-weight: 700; }
-@media (pointer: coarse) { .quote-pg input { font-size: 16px; } .quote-go { padding: 9px 12px; } }
-/* The Quote bar's colours: the passage highlighted in one. */
-.quote-hl { display: inline-flex; align-items: center; gap: 2px; padding: 0 6px; border-left: 1px solid var(--line); }
+/* (Quote, Add to notes and Add to library as tall as the toolbar's buttons.) */
+.quote-go, .quote-note, .quote-add { min-height: 32px; padding-top: 0; padding-bottom: 0; }
+@media (pointer: coarse) { .quote-pg input { font-size: 16px; } .quote-go, .quote-note, .quote-add { min-height: 44px; padding: 0 12px; } }
+/* The Quote bar's colours: the passage highlighted in one. (The swatches
+   as on a mark's toolbar: see .ll-sws.) */
+.quote-hl { display: inline-flex; align-items: center; gap: 2px; padding: 0 4px; border-left: 1px solid var(--line); }
 .quote-hl[hidden] { display: none; }
-.quote-hl button { width: 24px; height: 28px; padding: 0; border: 0; border-radius: 6px; background: none; cursor: pointer; display: grid; place-items: center; }
-.quote-hl button::before { content: ''; width: 15px; height: 15px; border-radius: 50%; background: var(--sw); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .18); transition: transform .1s; }
-.quote-hl button:hover { background: var(--side-hover); }
-.quote-hl button:hover::before { transform: scale(1.15); }
-.quote-hl button.on::before { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .18), 0 0 0 2px var(--panel), 0 0 0 3.5px var(--accent); }
-@media (pointer: coarse) { .quote-hl button { width: 32px; height: 36px; } .quote-hl button::before { width: 18px; height: 18px; } }
 .ms-group { display: grid; gap: 4px; margin: 4px 0 8px; }
 .ms-gh { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin: 4px 0 2px; }
 .ms-gh .i { width: 14px; height: 14px; }
@@ -2102,13 +2099,15 @@ a.ms-ib { text-decoration: none; }
 .v-marks-acts button { flex: 1 1 0; min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 30px; padding: 4px 6px;
   border: 0; background: none; color: var(--text); font: 500 12.5px var(--ui); cursor: pointer; }
 .v-marks-acts button + button { border-left: 1px solid var(--line); }
-.v-marks-acts button:hover { background: var(--accent-soft); }
+.v-marks-acts button:hover { background: var(--side-hover); }
 .v-marks-acts button .i { flex: none; width: 14px; height: 14px; color: var(--muted); }
 .v-marks-acts button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-@media (pointer: coarse) { .v-marks-acts button { min-height: 36px; } }
+@media (pointer: coarse) { .v-marks-acts button { min-height: 40px; } }
 /* (Narrow, as the sidebar's usual 200px: the words without the icons.) */
 .v-marks-acts { container-type: inline-size; }
 @container (max-width: 250px) { .v-marks-acts button { padding: 4px 3px; } .v-marks-acts button .i { display: none; } }
+/* (Narrower still: the icons only; their names are in the tooltips.) */
+@container (max-width: 190px) { .v-marks-acts button .i { display: block; } .v-marks-acts button span { display: none; } }
 .v-marks-page { padding: 12px 12px 4px; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--faint); }
 /* A mark's Copy and Quote, at its top right. */
 /* A QR code of references, and what can be done with it. */
@@ -2347,15 +2346,39 @@ a.ms-ib { text-decoration: none; }
    not show mask images from another site inside Google's frame). */
 .annotationEditorLayer > :not(.bar-on) .editToolbar { display: none !important; }
 .v-scroll { -webkit-touch-callout: none; }
-/* LibLande's colours on the toolbar of a drawing, underline, strike-through
-   or text box (see colourList): laid out as PDF.js lays out a highlight's,
-   whose rules only reach highlights. */
-.annotationEditorLayer .editToolbar .buttons .ll-colours { position: relative; width: auto; min-width: 28px; display: flex; justify-content: center; align-items: center; gap: 4px; padding: 4px; }
-.annotationEditorLayer .editToolbar .buttons .ll-colours > .swatch { flex: none; width: 16px; height: 16px; }
-.annotationEditorLayer .editToolbar .buttons .ll-colours .dropdown { position: absolute; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 11px; padding-block: 8px; border-radius: 6px; background-color: var(--editor-toolbar-bg-color); border: 1px solid var(--editor-toolbar-border-color); box-shadow: var(--editor-toolbar-shadow); inset-block-start: calc(100% + 4px); width: calc(100% + 2 * var(--editor-toolbar-padding, 4px)); }
-.annotationEditorLayer .editToolbar .buttons .ll-colours .dropdown button { width: 100%; height: auto; border: none; cursor: pointer; display: flex; justify-content: center; align-items: center; background: none; }
-.annotationEditorLayer .editToolbar .buttons .ll-colours .dropdown .swatch { flex: none; width: 16px; height: 16px; }
-.annotationEditorLayer .editToolbar .buttons .ll-colours .dropdown [aria-selected="true"] > .swatch { outline: 2px solid var(--selected-outline-color, #0060df); outline-offset: 2px; }
+/* A mark's toolbar, as the Quote bar: the panel's colours and corners,
+   labelled buttons with the accent's icons, hairlines between groups,
+   and the colours (see colourList) as round swatches. (Under #vPages:
+   PDF.js's stylesheet is added after this one, so its rules would win
+   a tie.) */
+#vPages .editToolbar { height: auto; padding: 3px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); box-shadow: var(--shadow);
+  color: var(--text); font: 500 13.5px var(--ui); }
+#vPages .editToolbar .buttons { gap: 2px; height: auto; }
+#vPages .editToolbar .buttons > .divider { display: none; }
+#vPages .editToolbar .buttons > button.has-icon { width: auto; height: auto; min-height: 32px; gap: 6px; padding: 0 10px; border: 0; border-radius: 7px; background: none;
+  color: var(--text); font: inherit; white-space: nowrap; cursor: pointer; }
+#vPages .editToolbar .buttons > button.has-icon:hover { background: var(--side-hover); }
+#vPages .editToolbar .buttons > button.has-icon svg { color: var(--accent); }
+/* (Delete set a little apart, after a hairline: not hit for Comment.) */
+#vPages .editToolbar .buttons > button.deleteButton { margin-left: 4px; padding: 0 9px; border-left: 1px solid var(--line); border-radius: 0 7px 7px 0; }
+#vPages .editToolbar .buttons > button.deleteButton svg { color: var(--muted); }
+#vPages .editToolbar .buttons > button.deleteButton:hover svg { color: var(--warn); }
+#vPages .editToolbar .buttons > .ll-sws, #vPages .editToolbar .buttons > .ll-sws:hover { display: inline-flex; align-items: center; gap: 2px; height: auto; padding: 0 4px; border: 0; border-radius: 0; background: none; }
+#vPages .editToolbar .buttons > .ll-sws { border-right: 1px solid var(--line); }
+#vPages .editToolbar .buttons > .ll-mq-quote + .ll-sws { border-left: 1px solid var(--line); }
+/* The colours, here and on the Quote bar: round swatches, the mark's own
+   ringed. */
+.ll-sws button, .quote-hl button { width: 28px; height: 32px; padding: 0; border: 0; border-radius: 6px; background: none; cursor: pointer; display: grid; place-items: center; }
+.ll-sws button::before, .quote-hl button::before { content: ''; width: 16px; height: 16px; border-radius: 50%; background: var(--sw); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .18); transition: transform .1s; }
+.ll-sws button:hover, .quote-hl button:hover { background: var(--side-hover); }
+.ll-sws button:hover::before, .quote-hl button:hover::before { transform: scale(1.12); }
+.ll-sws button[aria-pressed="true"]::before { outline: 1.5px solid var(--accent); outline-offset: 2px; }
+/* (On a touch screen: every button 44 points tall, as Apple advises.) */
+@media (pointer: coarse) {
+  #vPages .editToolbar .buttons > button.has-icon { min-height: 44px; padding: 0 12px; }
+  .ll-sws button, .quote-hl button { width: 40px; height: 44px; }
+  .ll-sws button::before, .quote-hl button::before { width: 20px; height: 20px; }
+}
 /* With the Pencil, room to write by hand in a text box being typed in (the
    iPad turns handwriting into text there). Only while it's being edited:
    PDF.js sizes the finished box to its text. */
@@ -2389,9 +2412,9 @@ a.ms-ib { text-decoration: none; }
 .viewer .canvasWrapper svg.highlightOutline.selected, .viewer .canvasWrapper svg.highlightOutline.hovered { display: none !important; }
 .viewer .annotationEditorLayer .highlightEditor, .viewer .annotationEditorLayer .highlightEditor:focus, .viewer .annotationEditorLayer .highlightEditor:focus-visible { outline: none !important; }
 .viewer .v-scroll .editToolbar .buttons > button::before { -webkit-mask-size: 18px 18px; mask-size: 18px 18px; }
-.viewer .v-scroll .editToolbar .buttons > button.has-icon { display: inline-flex; align-items: center; justify-content: center; color: var(--editor-toolbar-fg-color, #2e2e56); }
-.viewer .v-scroll .editToolbar .buttons > button.has-icon::before { display: none !important; }
-.viewer .v-scroll .editToolbar .buttons > button.has-icon svg { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+#vPages .editToolbar .buttons > button.has-icon { display: inline-flex; align-items: center; justify-content: center; }
+#vPages .editToolbar .buttons > button.has-icon::before { display: none !important; }
+#vPages .editToolbar .buttons > button.has-icon svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
 .note-pins { position: absolute; top: 0; right: 0; bottom: 0; width: 0; z-index: 6; pointer-events: none; }
 .note-pin { position: absolute; right: 4px; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 6px; display: grid; place-items: center; background: #ffd84a; color: #6b5200; box-shadow: 0 1px 3px rgba(0,0,0,.3); pointer-events: auto; cursor: pointer; }
 .note-pin svg { width: 15px; height: 15px; fill: currentColor; }
@@ -2793,7 +2816,6 @@ a.ms-ib { text-decoration: none; }
 .quote-add .i { width: 16px; height: 16px; color: var(--accent); }
 .quote-add[hidden] { display: none; }
 .quote-note:has(+ .quote-add:not([hidden])) { border-radius: 0; }
-@media (pointer: coarse) { .quote-note, .quote-add { padding: 9px 12px; } }
 .ref-card { position: fixed; z-index: 63; width: min(340px, calc(100vw - 16px)); padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel);
   box-shadow: 0 10px 30px rgba(0, 0, 0, .22); font: 13px/1.4 var(--ui); color: var(--text); }
 .ref-card p { margin: 0; }
@@ -2808,6 +2830,8 @@ a.ms-ib { text-decoration: none; }
 .rel-seg { display: flex; margin: 0 4px 8px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
 .rel-seg button { flex: 1; min-width: 0; border: 0; background: none; color: var(--muted); font: 500 12.5px var(--ui); padding: 5px 4px; cursor: pointer; white-space: nowrap; }
 .rel-seg button + button { border-left: 1px solid var(--line); }
+.rel-seg button { min-height: 30px; }
+@media (pointer: coarse) { .rel-seg button { min-height: 40px; } }
 .rel-seg button[aria-selected="true"] { background: var(--accent-soft); color: var(--text); font-weight: 600; }
 .rel-seg button:disabled { opacity: .5; cursor: default; }
 .rel-n { color: var(--muted); font-weight: 500; font-variant-numeric: tabular-nums; }
@@ -2832,10 +2856,13 @@ a.rel-title:hover, button.rel-title:hover { text-decoration: underline; }
 /* A passage's Related: a card over the sidebar's list, the list dimmed
    behind it (see relPassage). */
 .rel-card { position: absolute; z-index: 6; left: 8px; right: 8px; max-height: calc(100% - 96px); overflow: auto; overscroll-behavior: contain;
-  padding: 10px 4px 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); box-shadow: 0 12px 32px rgba(0, 0, 0, .24);
-  font-size: 13px; line-height: 1.35; animation: relp-in .14s ease-out; }
-@keyframes relp-in { from { opacity: 0; transform: translateY(-4px); } }
-@media (prefers-reduced-motion: reduce) { .rel-card { animation: none; } }
+  padding: 10px 4px 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); box-shadow: var(--shadow);
+  font-size: 13px; line-height: 1.35; animation: relp-down .24s cubic-bezier(.2, .8, .2, 1); }
+/* (A shelf let down from under the tabs, and drawn up again as it goes.) */
+@keyframes relp-down { from { transform: translateY(-14px); clip-path: inset(-24px -24px 100% -24px); } to { transform: none; clip-path: inset(-24px -24px -48px -24px); } }
+.rel-card.relp-out { animation: relp-up .16s ease-in forwards; pointer-events: none; }
+@keyframes relp-up { from { transform: none; clip-path: inset(-24px -24px -48px -24px); } to { transform: translateY(-14px); clip-path: inset(-24px -24px 100% -24px); } }
+@media (prefers-reduced-motion: reduce) { .rel-card, .rel-card.relp-out { animation: none; } }
 .rel-card[hidden] { display: none; }
 .relp-hd { display: flex; align-items: flex-start; gap: 8px; padding: 0 6px 2px 8px; }
 .relp-q { flex: 1; margin: 0; padding-left: 8px; border-left: 3px solid var(--accent); color: var(--muted); font: italic 12.5px/1.4 Georgia, 'Times New Roman', serif;
@@ -2843,9 +2870,13 @@ a.rel-title:hover, button.rel-title:hover { text-decoration: underline; }
 .relp-x { flex: none; display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--faint); cursor: pointer; }
 .relp-x:hover { color: var(--text); background: var(--side-hover); }
 .relp-x .i { width: 14px; height: 14px; }
+@media (pointer: coarse) { .relp-x { width: 36px; height: 36px; } }
 .rel-card .rel-sec { margin-top: 10px; }
 .rel-card .v-side-note { padding: 4px 8px; }
-.v-side.relp-on #vSideBody { opacity: .35; filter: saturate(.6); transition: opacity .14s; }
+#vSideBody { transition: opacity .16s, filter .16s; }
+/* (The list dimmed behind the card, and not pressed through it: a tap
+   there only puts the card away.) */
+.v-side.relp-on #vSideBody { opacity: .35; filter: saturate(.6); pointer-events: none; }
 .rel .link-btn { border: 0; padding: 0; background: none; color: var(--accent); font: inherit; text-decoration: underline; cursor: pointer; }
 
 /* Settings › Word: the steps, each folder with Copy. */

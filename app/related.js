@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/related.js'] = '2026-11-14.02';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/related.js'] = '2026-11-14.03';
 /* ------------------------------------------------------------ a reference selected */
 // Words selected in a paper that look like a reference (a year, or a DOI,
 // with a name as "Fodor, J." or the like, pages or a journal's volume;
@@ -373,7 +373,7 @@ $('#vSideBody').addEventListener('click', ev => {
 // your publications most like its words, and OpenAlex's search for its
 // key terms. The list behind is left as it was; Esc, the x, or a press
 // anywhere else puts the card away.
-const RELP = { el: null, text: '', seq: 0, shut: '' };
+const RELP = { el: null, text: '', seq: 0, shut: '', outT: 0 };
 // Its author-year citations: [{ fam, year }] ("Fodor 2007", "Fodor
 // (2007)", "Green and Quilty-Dunn 2021", "Smith et al., 2019"). Only those
 // found among the references or in the library are shown, so a capital
@@ -417,7 +417,8 @@ async function relPassage(text, colour, again) {
   const e = infoEntry();
   text = String(text || '').replace(/\s+/g, ' ').trim();
   if (!e || !sideOpen() || SIDE.tab !== 'related') return;
-  if (text === RELP.text && RELP.el && !RELP.el.hidden) return;
+  const open = RELP.el && !RELP.el.hidden && !RELP.el.classList.contains('relp-out');
+  if (text === RELP.text && open) return;
   if (text === RELP.shut && !again) return;
   const idx = kwsIndex(), m = relPassageWords(text);
   // (A word or two selected is enough to go by; a highlight, any.)
@@ -450,7 +451,14 @@ async function relPassage(text, colour, again) {
   };
   const wait = `<p class="v-side-note">${navigator.onLine ? 'Asking OpenAlex\u2026' : 'Online only: you\u2019re offline.'}</p>`;
   draw(relCitedIn(text, st), wait);
-  RELP.el.hidden = false;
+  // (Let down, unless it's down already: then just its contents change,
+  // not to drop again at each passage. One going up comes down again.)
+  clearTimeout(RELP.outT);
+  if (!open) {
+    RELP.el.classList.remove('relp-out');
+    RELP.el.hidden = true; RELP.el.offsetWidth;
+    RELP.el.hidden = false;
+  }
   RELP.el.style.top = ($('#vSideBody').offsetTop + 6) + 'px';
   RELP.el.scrollTop = 0;
   $('#vSide').classList.add('relp-on');
@@ -473,8 +481,14 @@ function relPassageClose() {
   RELP.seq++;
   if (RELP.text) RELP.shut = RELP.text;
   RELP.text = '';
-  if (RELP.el) RELP.el.hidden = true;
   $('#vSide').classList.remove('relp-on');
+  const el = RELP.el;
+  if (!el || el.hidden || el.classList.contains('relp-out')) return;
+  // (Drawn up again, then gone.)
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches || !sideOpen()) { el.hidden = true; return; }
+  el.classList.add('relp-out');
+  clearTimeout(RELP.outT);
+  RELP.outT = setTimeout(() => { el.hidden = true; el.classList.remove('relp-out'); }, 170);
 }
 // A highlight clicked: its words and colour, and its note's words too.
 // (One saved in the PDF: as the PDF has them, as the Annotations tab
@@ -500,5 +514,6 @@ async function relPassageMark(hit) {
   }
   relPassage(text, colour, true);
 }
-document.addEventListener('pointerdown', ev => { if (RELP.el && !RELP.el.hidden && !ev.target.closest('.rel-card, .quote-bar')) relPassageClose(); }, true);
-document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && RELP.el && !RELP.el.hidden) { ev.stopPropagation(); relPassageClose(); } }, true);
+const relpOpen = () => RELP.el && !RELP.el.hidden && !RELP.el.classList.contains('relp-out');
+document.addEventListener('pointerdown', ev => { if (relpOpen() && !ev.target.closest('.rel-card, .quote-bar')) relPassageClose(); }, true);
+document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && relpOpen()) { ev.stopPropagation(); relPassageClose(); } }, true);
