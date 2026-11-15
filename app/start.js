@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-11-14.05';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-11-15.01';
 // On GitHub Pages, every part of the app must be from the same version: a
 // part kept from an older one (the offline copy, served when the network
 // was slow) lacks what this page needs. Then the kept copies go, and the
@@ -324,7 +324,7 @@ async function addPapers() {
 // With limited access: what's still to add, said when the library first
 // opens in a session, and again whenever an update brings more (new
 // papers filed in BibDesk). (True if it said so.)
-async function offerAddPapers() {
+async function offerAddPapers(tour) {
   if (!window.LIBLANDE_PAGES || !ENTRIES.length) return false;
   const first = TO_ADD === null;
   if (first) { try { ACCESS = (await callServer('getAccess')).access; } catch (e) { return false; } }
@@ -332,7 +332,7 @@ async function offerAddPapers() {
   const n = notAdded(), f = unseenFolders().length, more = !first && n + f > TO_ADD;
   TO_ADD = n + f;
   if (!(n + f) || !(first || more)) return false;
-  toast((first ? '' : 'New in your library: ') + toAddText(n, f) + ' to give LibLande, from your Google Drive', 15000, [{ label: 'Add them', run: addPapers }]);
+  toast((first ? '' : 'New in your library: ') + toAddText(n, f) + ' to give LibLande, from your Google Drive', 15000, [{ label: 'Add them', run: addPapers }].concat(tour ? [{ label: 'Take the tour', run: startTour }] : []));
   return true;
 }
 
@@ -358,8 +358,13 @@ function stage(msg) {
   const el = $('#loading > span');
   if (el && !$('#loading').hidden) el.textContent = msg + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)';
 }
+// (With a way on: again, or Settings, where the library's files are chosen.)
 const showError = err => {
-  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version ${esc(APP_VERSION)}</small>`;
+  $('#loading').innerHTML = `<b>The library didn\u2019t load</b><span>${esc(errText(err))}</span><small>Version ${esc(APP_VERSION)}</small>` +
+    `<div class="loading-acts"><button type="button" class="btn" data-load-again>Try again</button>${status ? '<button type="button" class="btn primary" data-load-settings>Settings\u2026</button>' : ''}</div>`;
+  $('#loading').querySelector('[data-load-again]').addEventListener('click', () => location.reload());
+  const set = $('#loading').querySelector('[data-load-settings]');
+  if (set) set.addEventListener('click', () => { $('#loading').hidden = true; showSetup(status, false); });
 };
 
 function gunzipJSON(bytes) {
@@ -931,10 +936,14 @@ if (RELOADING) {
     // place of links. In Settings, limited can be made full; the other
     // way is chosen at a first sign-in.)
     pickMode(false);
+    $('#adoptFirst').hidden = true;
     if (window.LIBLANDE_PAGES) callServer('getAccess').then(a => {
       ACCESS = a.access;
       pickMode(true, a.access === 'limited');
       if (configured) renderAddPapers();
+      // (A first setup with limited access can't see a LibLande folder made
+      // before with full access: the way back to it, offered here.)
+      $('#adoptFirst').hidden = configured || a.access !== 'limited';
       if (!configured) return;
       $('#signOutSec').hidden = false;
       $('#signOutBtn').disabled = false;
@@ -992,6 +1001,7 @@ if (RELOADING) {
   // Limited access: the LibLande folder used before (with full access),
   // with your settings, reading list and preferences, given in Google's
   // picker and used from now on; then LibLande starts again with it.
+  $('#adoptFirst').addEventListener('click', ev => { if (ev.target.closest('[data-adopt-first]')) $('#adoptBtn').click(); });
   $('#adoptBtn').addEventListener('click', async () => {
     const b = $('#adoptBtn');
     b.disabled = true;
@@ -1074,13 +1084,23 @@ if (RELOADING) {
   // it, as for new links, and opens it.
   // (From the sidebar, quiet: what's happening in a message at the foot.)
   let switching = false;
+  // (The button last pressed in the setup, as Safari doesn't focus one it clicks.)
+  const PRESSED = { el: null, at: 0 };
+  $('#setup').addEventListener('pointerdown', ev => { const b = ev.target.closest && ev.target.closest('.btn'); if (b) { PRESSED.el = b; PRESSED.at = Date.now(); } }, true);
   const otherLibrary = async (call, args, what, quiet, target, note) => {
     if (switching) return;
     switching = true;
+    // (A first setup: the tour offered once it's open, as for a .bib.)
+    const first = !$('#setup').hidden && !$('#setup').classList.contains('head-mode');
+    // (The button pressed shows it's at work: the one just pressed, or the
+    // one beside the box Return was pressed in. Not from the sidebar.)
+    const typedIn = document.activeElement && { newLibName: '#newLibGo', zotName: '#zotGo' }[document.activeElement.id];
+    const go = quiet ? null : (PRESSED.el && Date.now() - PRESSED.at < 2000 && PRESSED.el.isConnected ? PRESSED.el : typedIn ? $(typedIn) : null);
+    if (go) go.classList.add('busy');
     const say = (m, kind) => (quiet ? (m ? toast(m, kind === 'error' ? 7000 : 0) : null) : setupMsg(m, kind));
-    const btns = ['#setSave', '#setClose', '#setupGo', '#newLibGo', '#zotGo', '#zotPick', '#zotBibPick'].map(s => $(s)).concat([...$('#libOthers').querySelectorAll('button')]);
+    const btns = ['#setSave', '#setClose', '#setupGo', '#newLibGo', '#zotGo', '#zotPick', '#zotBibPick'].map(s => $(s)).concat([...$('#libOthers').querySelectorAll('button'), ...$('#setupWays').querySelectorAll('button')]);
     btns.forEach(b => { if (b) b.disabled = true; });
-    const msg = what + ' LibLande builds it, which can take a minute or two for a large library.';
+    const msg = what + (call === 'createLibrary' ? '' : ' LibLande builds it, which can take a minute or two for a large library.');
     say(msg, 'status');
     foldLibSub(target);
     try {
@@ -1099,11 +1119,13 @@ if (RELOADING) {
       $('#newLibRow').hidden = true; $('#newLibName').value = '';
       $('#zotRow').hidden = true; zotReset();
       const more = note ? note(status) : '';
+      if (first) { if (!(await offerAddPapers(true))) toast('Library ready' + (ENTRIES.length ? ': ' + ENTRIES.length.toLocaleString() + ' publication' + (ENTRIES.length === 1 ? '' : 's') : ''), 15000, [{ label: 'Take the tour', run: startTour }, { label: 'Features', run: openFeatures }]); return; }
       toast('Now using ' + (status.bibName || 'the library').replace(/\.bib$/i, '') + ': ' + ENTRIES.length.toLocaleString() + ' publication' + (ENTRIES.length === 1 ? '' : 's') + more, more ? 8000 : 3500);
     } catch (err) {
       say((quiet ? 'Couldn\u2019t switch: ' : '') + errText(err), 'error');
     } finally {
       btns.forEach(b => { if (b) b.disabled = false; });
+      if (go) go.classList.remove('busy');
       switching = false;
       endLibSwitch();
     }
@@ -1160,9 +1182,9 @@ if (RELOADING) {
     const notes = [];
     try {
       if (bibLink) {
-        setupMsg('Reading your .bib file and finding your papers. A large library takes a minute or two.', 'status');
+        setupMsg('Reading your .bib and finding your papers\u2026', 'status');
         status = await callServer('saveSettings', bibLink, papersLink);
-        await waitForBuild(secs => setupMsg('Reading your .bib file and finding your papers. A large library takes a minute or two. (' + secs + ' s)', 'status'));
+        await waitForBuild(secs => setupMsg('Reading your .bib and finding your papers\u2026 ' + secs + ' s', 'status'));
         setupMsg('Downloading your library\u2026', 'status');
         const lib = await download();
         await show(lib, ENTRIES.length > 0);
@@ -1193,10 +1215,12 @@ if (RELOADING) {
     if (!bibLink) { setupMsg(limitedPicks() ? 'Choose your .bib file first.' : 'Paste the link to your .bib file first.', 'error'); return; }
     if (limitedPicks() && ACCESS === 'limited' && !papersLink) { setupMsg('Choose your papers folder too.', 'error'); return; }
     go.disabled = cancel.disabled = true;
-    setupMsg('Reading your .bib file and finding your papers. A large library takes a minute or two.', 'status');
+    go.classList.add('busy');
+    $('#setupWays').querySelectorAll('button').forEach(b => { b.disabled = true; });
+    setupMsg('Reading your .bib and finding your papers\u2026', 'status');
     try {
       status = await callServer('saveSettings', bibLink, papersLink);
-      await waitForBuild(secs => setupMsg('Reading your .bib file and finding your papers. A large library takes a minute or two. (' + secs + ' s)', 'status'));
+      await waitForBuild(secs => setupMsg('Reading your .bib and finding your papers\u2026 ' + secs + ' s', 'status'));
       setupMsg('Downloading your library\u2026', 'status');
       const lib = await download();
       await show(lib, ENTRIES.length > 0);
@@ -1206,11 +1230,13 @@ if (RELOADING) {
       $('#bibLink').value = $('#papersLink').value = '';
       // (New here: the tour and Features offered, once; with limited
       // access, first the PDFs still to add.)
-      if (await offerAddPapers()) return;
+      if (await offerAddPapers(true)) return;
       toast('Library ready: ' + ENTRIES.length.toLocaleString() + ' publications', 15000, [{ label: 'Take the tour', run: startTour }, { label: 'Features', run: openFeatures }]);
     } catch (err) {
       setupMsg(errText(err), 'error');
     } finally {
+      go.classList.remove('busy');
+      $('#setupWays').querySelectorAll('button').forEach(b => { b.disabled = false; });
       go.disabled = cancel.disabled = false;
     }
   });

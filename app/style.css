@@ -140,7 +140,7 @@
 :root[data-glass] .v-tabs { background: linear-gradient(to bottom, color-mix(in srgb, var(--panel) 80%, transparent), color-mix(in srgb, var(--panel) 55%, transparent)); }
 /* (The light rim along a glass top edge only on what floats: on the bars
    at the top of the screen it drew a thin line under the status bar.) */
-:root[data-glass] .v-palette, :root[data-glass] .vp-show, :root[data-glass] .menu-list, :root[data-glass] .quote-bar, :root[data-glass] .ref-card, :root[data-glass] .rel-card, :root[data-glass] #vPages .editToolbar, :root[data-glass] .listwrap > .pick-bar, :root[data-glass] .vp-panel, :root[data-glass] .v-comment, :root[data-glass] .np, :root[data-glass] .v-ocr, :root[data-glass] .v-tone {
+:root[data-glass] .v-palette, :root[data-glass] .vp-show, :root[data-glass] .menu-list, :root[data-glass] .quote-bar, :root[data-glass] .ref-card, :root[data-glass] .rel-card, :root[data-glass] #vPages .editToolbar, :root[data-glass] .listwrap > .pick-bar, :root[data-glass] .vp-panel, :root[data-glass] .v-comment, :root[data-glass] .np, :root[data-glass] .access-card, :root[data-glass] .v-ocr, :root[data-glass] .v-tone {
   background: color-mix(in srgb, var(--panel) 62%, transparent);
   -webkit-backdrop-filter: saturate(190%) blur(26px); backdrop-filter: saturate(190%) blur(26px);
   border-color: var(--glass-edge); box-shadow: inset 0 1px 0 var(--glass-rim), inset 0 0 0 .5px var(--glass-rim), var(--shadow);
@@ -377,7 +377,7 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .setup-card h2 { margin: 0 0 4px; font: 600 26px/1.2 var(--serif); }
 .setup-card p { margin: 0; color: var(--muted); line-height: 1.5; }
 .setup-card label { margin-top: 12px; font-weight: 600; font-size: 13.5px; }
-.setup-card .opt { font-weight: 400; color: var(--faint); }
+.setup-card .opt { font-weight: 400; color: var(--muted); }
 .setup-card input { height: 40px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); font-size: 15px; min-width: 0; }
 .setup-card input:focus { border-color: var(--accent); outline: none; }
 .setup-card .hint { font-size: 12.5px; color: var(--muted); }
@@ -582,7 +582,7 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 @media (pointer: coarse) { #list .row, #list .card { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; } }
 .set-newlib { display: grid; gap: 8px; }
 .set-newlib .hint { margin: 0; font-size: 13px; }
-.set-newlib-go { display: flex; gap: 8px; }
+.set-newlib-go { display: flex; align-items: center; gap: 8px; }
 .set-newlib-go input { flex: 1; min-width: 0; }
 .set-links { display: grid; gap: 8px; }
 .set-links[hidden] { display: none; }
@@ -2555,6 +2555,7 @@ a.ms-ib { text-decoration: none; }
 #loading small { font-size: 11px; color: var(--faint); }
 /* Light while loading, unless Dark is the chosen appearance (the system's
    dark mode alone doesn't count: the choice may not be known yet). */
+:root:not([data-theme="dark"]) #loading, :root:not([data-theme="dark"]) .access-wrap { --bg: #ffffff; --panel: #ffffff; --text: #1b2321; --muted: #5d6a66; --faint: #8b9692; --line: #d8dfdc; --accent: #1f6b5c; --accent-ink: #ffffff; --side-hover: #e1e7e4; }
 :root:not([data-theme="dark"]) #loading { background: #ffffff; color: #5d6a66; }
 :root:not([data-theme="dark"]) #loading b { color: #1b2321; }
 :root:not([data-theme="dark"]) #loading small { color: #8b9692; }
@@ -2564,7 +2565,7 @@ a.ms-ib { text-decoration: none; }
   .grp { min-height: 36px; font-size: 15px; }
   .tb-btn, .search { height: 36px; }
   .row { font-size: 14px; }
-  .btn { min-height: 40px; }
+  .btn { min-height: 44px; }
   .search input, .kwfilter, .sortctl select, .setup-card input { font-size: 16px; }
   .pickbox { width: 22px; height: 22px; }
   .kw-add-input { height: 32px; font-size: 16px; }
@@ -3029,3 +3030,32 @@ button.rel-title, a.rel-title { cursor: pointer; }
 .np-tabs.np-journals .np-tab[aria-selected="true"] { background: var(--accent-soft); color: var(--text); font-weight: 600; border-color: transparent; }
 @media (hover: hover) { .np-title:hover { text-decoration: none; } }
 @media (max-width: 699px) { .np-item { flex-wrap: wrap; } .np-acts { flex: 1 1 100%; justify-content: flex-end; } }
+/* The loading screen's error: Try again, Settings. */
+.loading-acts { display: flex; gap: 8px; justify-content: center; margin-top: 10px; }
+.empty-lib { display: grid; justify-items: center; gap: 8px; text-align: center; padding-top: 12vh; }
+.empty-lib b { font-size: 15px; color: var(--text); }
+.empty-lib p { margin: 0; max-width: 280px; color: var(--muted); }
+/* Signing in (pages/server.js): the first sign-in's choice of access, and
+   the bar that reconnects to Drive (a tap or click anywhere does it). */
+.access-wrap { position: fixed; inset: 0; z-index: 2147483000; display: grid; place-items: center; padding: 16px; background: var(--scrim); font: 13.5px/1.4 var(--ui); color: var(--text); }
+.access-wrap[hidden] { display: none; }
+.access-card { width: min(360px, 100%); display: grid; gap: 10px; padding: 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); box-shadow: var(--shadow); }
+.access-title { font: 600 19px var(--serif); }
+.access-card p { margin: 0; color: var(--muted); }
+.access-opt { display: grid; gap: 3px; width: 100%; padding: 11px 13px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.access-opt b { font-size: 14.5px; }
+.access-opt span { color: var(--muted); font-size: 12.5px; line-height: 1.35; }
+.access-opt .access-for { color: var(--accent); font-size: 12px; }
+@media (hover: hover) { .access-opt:hover { border-color: var(--accent); background: var(--side-hover); } }
+.access-links { display: flex; gap: 14px; font-size: 12.5px; }
+.access-links a { color: var(--accent); }
+@media (pointer: coarse) { .access-links a, .dup-note button { display: inline-block; min-height: 44px; line-height: 44px; } .dup-note { align-items: center; } }
+.reconnect-bar { position: fixed; left: 50%; top: calc(10px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); z-index: 2147483000; max-width: calc(100% - 32px);
+  padding: 10px 16px; border: 0; border-radius: 10px; background: var(--accent); color: var(--accent-ink); box-shadow: var(--shadow); font: 600 14.5px var(--ui); cursor: pointer; }
+.reconnect-bar[hidden] { display: none; }
+/* The bar for an error the page hit (index.html): the theme's warning colours; a tap on it, or its x, puts it away. */
+.err-bar { position: fixed; left: 8px; right: 8px; bottom: calc(8px + env(safe-area-inset-bottom, 0px)); z-index: 200; display: flex; align-items: flex-start; gap: 8px; padding: 10px 6px 10px 12px; border-radius: 10px; background: var(--warn); color: var(--warn-ink); font: 13px/1.4 var(--ui); box-shadow: var(--shadow); cursor: pointer; }
+.err-bar > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.err-bar > button { flex: none; display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 7px; background: none; color: inherit; cursor: pointer; }
+.err-bar svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+@media (pointer: coarse) { .err-bar > button { width: 44px; height: 44px; } }

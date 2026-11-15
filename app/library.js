@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-14.05';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-15.01';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -2408,7 +2408,9 @@ function paint() {
   const h = rowH(), v = state.view;
   if (!v.length) {
     rowsEl.style.height = 'auto';
-    rowsEl.innerHTML = `<div class="empty">${state.q ? 'No publications match \u201c' + esc(state.q) + '\u201d.' : 'This group is empty.'}</div>`;
+    // (A library with nothing in it yet: how to start.)
+    rowsEl.innerHTML = !state.q && !ENTRIES.length ? `<div class="empty empty-lib"><b>No publications yet</b><p>Add one by its title, DOI or ISBN, from a PDF, or from a photo of its first page.</p>${gs ? `<button type="button" class="btn primary" data-empty-add>${ICON.plus}<span>Add a publication\u2026</span></button>` : ''}</div>`
+      : `<div class="empty">${state.q ? 'No publications match \u201c' + esc(state.q) + '\u201d.' : 'This group is empty.'}</div>`;
     return;
   }
   const top = Math.max(0, listEl.scrollTop - listOver), vh = listEl.clientHeight || 600;
@@ -3520,3 +3522,5 @@ function bibtex(e, extra) {
   });
   return `@${e.t}{${e.k},\n` + keys.map(k => `\t${k} = {${vals[k]}}`).join(',\n') + `}\n`;
 }
+// (An empty library's Add a publication: the + in the toolbar.)
+document.addEventListener('click', ev => { if (ev.target.closest && ev.target.closest('[data-empty-add]')) $('#addBtn').click(); });

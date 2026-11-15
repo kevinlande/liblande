@@ -17,7 +17,7 @@
   window.LIBLANDE_PAGES = true;
   // (Which version each part of the app is from: index.html checks they
   // match. build.py fills it in.)
-  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-11-14.05';
+  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-11-15.01';
   const CLIENT_ID = '789682218462-98mjugngb46ttd01ucp9dcj71ufspjgn.apps.googleusercontent.com';
   // Google Drive, in one of two ways (docs/drive-file-plan.md):
   // full: all of Drive (your .bib, papers and LibLande folder wherever
@@ -116,7 +116,7 @@
     return new Promise(resolve => {
       waiters.push(resolve);
       if (!access) chooser();
-      else bar(email ? 'Tap anywhere to reconnect to Google Drive' : 'Sign in with Google to open your library');
+      else bar(email ? TAP_RECONNECT() : 'Sign in with Google to open your library');
     });
   }
   // A tap renews a token that's missing, old or run out. (Not taps on a
@@ -138,10 +138,12 @@
     if (barEl && !barEl.hidden) bar(waiters.length ? OFFLINE_BAR : null);
   });
   window.addEventListener('online', () => {
-    if (waiters.length && !valid()) bar(email ? 'Tap anywhere to reconnect to Google Drive' : 'Sign in with Google to open your library');
-    else if (barEl && !barEl.hidden && barEl.textContent === OFFLINE_BAR) bar(!valid() ? (email ? 'Tap anywhere to reconnect to Google Drive' : 'Sign in with Google to open your library') : null);
+    if (waiters.length && !valid()) bar(email ? TAP_RECONNECT() : 'Sign in with Google to open your library');
+    else if (barEl && !barEl.hidden && barEl.textContent === OFFLINE_BAR) bar(!valid() ? (email ? TAP_RECONNECT() : 'Sign in with Google to open your library') : null);
   });
 
+  // (A tap anywhere reconnects, as it's needed often; on a Mac, a click.)
+  const TAP_RECONNECT = () => ((window.matchMedia && matchMedia('(pointer: fine)').matches && !matchMedia('(any-pointer: coarse)').matches) ? 'Click' : 'Tap') + ' anywhere to reconnect to Google Drive';
   // The bar: what's needed, at the top of the screen.
   let barEl = null;
   function bar(text) {
@@ -150,9 +152,7 @@
       barEl = document.createElement('button');
       barEl.type = 'button';
       barEl.id = 'pagesSignIn';
-      barEl.style.cssText = 'position:fixed;left:50%;top:calc(10px + env(safe-area-inset-top, 0px));transform:translateX(-50%);z-index:2147483000;' +
-        'max-width:calc(100% - 32px);padding:10px 18px;border-radius:999px;border:0;font:600 15px -apple-system,BlinkMacSystemFont,sans-serif;' +
-        'background:#1f6b5c;color:#fff;box-shadow:0 6px 20px rgba(0,0,0,.25);cursor:pointer';
+      barEl.className = 'reconnect-bar';
       barEl.addEventListener('click', ask);
       (document.body || document.documentElement).appendChild(barEl);
     }
@@ -167,22 +167,21 @@
   function chooser() {
     if (chooserEl) { chooserEl.hidden = false; return; }
     bar(null);
-    const dark = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches;
-    const ink = dark ? '#e2e8e5' : '#1b2321', muted = dark ? '#a9b5b1' : '#5d6a66', card = dark ? '#262b2a' : '#fff', line = dark ? '#3a4341' : '#d8dfdc';
+    // (Its look in app/style.css, as the rest of LibLande: the theme's
+    // colours, light or dark.)
     chooserEl = document.createElement('div');
     chooserEl.id = 'pagesAccess';
+    chooserEl.className = 'access-wrap';
     chooserEl.setAttribute('role', 'dialog');
-    chooserEl.setAttribute('aria-label', 'Sign in with Google');
-    chooserEl.style.cssText = 'position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;padding:16px;background:rgba(0,0,0,.18);font:15px/1.4 -apple-system,BlinkMacSystemFont,sans-serif';
-    const opt = (key, title, sub, best, primary) => '<button type="button" data-access="' + key + '" style="display:grid;gap:2px;width:100%;text-align:left;padding:12px 14px;border-radius:12px;cursor:pointer;font:inherit;' +
-      (primary ? 'background:#1f6b5c;color:#fff;border:1px solid #1f6b5c' : 'background:' + card + ';color:' + ink + ';border:1px solid ' + line) + '">' +
-      '<b style="font-size:15px">' + title + '</b><span style="font-size:13px;opacity:.85">' + sub + '</span><span style="font-size:13px;opacity:.85">' + best + '</span></button>';
-    chooserEl.innerHTML = '<div style="width:min(380px,100%);display:grid;gap:10px;padding:20px;border-radius:16px;background:' + card + ';color:' + ink + ';box-shadow:0 12px 40px rgba(0,0,0,.25)">' +
-      '<b style="font-size:18px">Sign in with Google</b>' +
-      '<span style="color:' + muted + ';font-size:13.5px">How much of your Google Drive LibLande can reach.</span>' +
-      opt('limited', 'Limited access', 'Only the files you give LibLande: your .bib and its PDFs, chosen once.', '(Best for a new, Zotero or small library.)', true) +
-      opt('full', 'Full access', 'All of your Google Drive: LibLande finds your PDFs itself. Google warns that LibLande isn\u2019t verified.', '(Best for a large library you also edit in other apps.)', false) +
-      '<a href="privacy.html#access" target="_blank" rel="noopener" style="justify-self:start;color:' + muted + ';font-size:13px">What each allows</a>' +
+    chooserEl.setAttribute('aria-modal', 'true');
+    chooserEl.setAttribute('aria-labelledby', 'accessTitle');
+    const opt = (key, title, sub, who) => '<button type="button" class="access-opt" data-access="' + key + '"><b>' + title + '</b><span>' + sub + '</span><span class="access-for">' + who + '</span></button>';
+    chooserEl.innerHTML = '<div class="access-card" tabindex="-1">' +
+      '<b class="access-title" id="accessTitle">Sign in with Google</b>' +
+      '<p>LibLande keeps your references and their PDFs in your own Google Drive. How much of it may LibLande reach?</p>' +
+      opt('full', 'Full access', 'LibLande finds your PDFs itself. Google will warn that LibLande isn\u2019t verified.', 'For an existing BibDesk library') +
+      opt('limited', 'Limited access', 'Only the files you choose: your .bib and its PDFs, picked once.', 'For a new library, or one from Zotero') +
+      '<div class="access-links"><a href="start.html" target="_blank" rel="noopener">Getting started</a><a href="privacy.html#access" target="_blank" rel="noopener">What each allows</a></div>' +
       '</div>';
     chooserEl.addEventListener('click', ev => {
       const b = ev.target.closest('[data-access]');
@@ -192,6 +191,9 @@
       ask();
     });
     (document.body || document.documentElement).appendChild(chooserEl);
+    // (The keyboard's place: in it.)
+    const card = chooserEl.querySelector('.access-card');
+    if (card) card.focus({ preventScroll: true });
   }
   // Full or limited access from now on, on this device: signed in again
   // with that, on the next tap.
