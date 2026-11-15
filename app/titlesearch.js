@@ -3,9 +3,9 @@
 // make a new one's cite key: pages/word/index.html gives it what it uses
 // from the rest. Its page wiring is only for LibLande's Add.)
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, tour, start.)
+// index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/titlesearch.js'] = '2026-11-15.01';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/titlesearch.js'] = '2026-11-15.02';
 /* ------------------------------------------------------------ title search */
 // A title (with an author or a year, if you like) typed in Add's lookup
 // box, instead of a DOI: candidates from Crossref (articles, chapters, and

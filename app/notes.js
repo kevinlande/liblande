@@ -1,8 +1,8 @@
 ﻿// LibLande: Notes: a publication's notes (the .bib's Notes field, written as Markdown) and its PDF's highlights and notes, in the details pane's Notes view and a large pop-out editor, both formatted as you type.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, tour, start.)
+// index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/notes.js'] = '2026-11-15.01';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/notes.js'] = '2026-11-15.02';
 /* ------------------------------------------------------------ notes */
 // The details pane shows Details or Notes (a switch at its top, or Alt-N;
 // the choice kept). Notes has your notes, in a box you type in, formatted
@@ -255,7 +255,9 @@ const nvMarkQuote = (r, m) => (m.text ? '\u201c' + m.text + '\u201d ' : '') + '(
 // Your notes as you wrote them: the .bib has each & as \& (or BibDesk's
 // \{&}), as LaTeX needs, and saving writes it so again (see texSafe in
 // pages/edits.js); shown and edited, it's &.
-const notesOf = e => rawOf(e, 'annote').replace(/\\\{&\}|\\&/g, '&');
+const notesOf = e => (NOTES.pendingMd && NOTES.pendingMd[e.k] != null ? NOTES.pendingMd[e.k] : notesRaw(e));
+// (As saved: see notesOf, which has the pop-out's while they're saved.)
+const notesRaw = e => rawOf(e, 'annote').replace(/\\\{&\}|\\&/g, '&');
 
 /* ---- saving */
 // One save at a time, each from the publication as it is after the last.
@@ -264,7 +266,7 @@ function notesSave(key, md, quiet) {
   md = String(md || '').trim();
   NOTES.saving = NOTES.saving.then(async () => {
     const e = BYKEY.get(key);
-    if (!e || md === notesOf(e).trim()) return true;
+    if (!e || md === notesRaw(e).trim()) return true;
     if (!balanced(md)) { toast('Your notes have unbalanced braces { }, so they weren\u2019t saved. Take one out, or add its pair.', 6000); return false; }
     try {
       const done = await writeEdit(e, { annote: md }, [], []);
@@ -506,8 +508,8 @@ function openNotesPop(e) {
   const wrap = document.createElement('div');
   wrap.className = 'np-wrap';
   wrap.innerHTML = `<div class="np-scrim" data-np-close></div><div class="np" role="dialog" aria-modal="true" aria-label="Notes on ${esc(e.f.title || e.k)}">` +
-    `<div class="np-head"><h2>${esc(e.f.title || e.k)}<small>${esc([who.replace(/[{}]/g, ''), year].filter(Boolean).join(' ') + ' \u00b7 ' + e.k)}</small></h2>` +
-    `<span class="np-state" aria-live="polite">Saved</span><button type="button" class="btn primary" data-np-close>Done</button></div>` +
+    `<div class="np-head"><button type="button" class="tb-btn np-x" data-np-close aria-label="Close" title="Close (Esc)">${ICON.x}</button><h2>${esc(e.f.title || e.k)}<small>${esc([who.replace(/[{}]/g, ''), year].filter(Boolean).join(' ') + ' \u00b7 ' + e.k)}</small></h2>` +
+    `<span class="np-state" aria-live="polite">Saved</span></div>` +
     `<div class="np-tools">` +
     NV_TOP(b, '<span class="np-sep"></span>') + NV_LISTS(b, I) + '<span class="np-sep"></span>' +
     `<button type="button" class="np-wide" data-np="cite" title="Cite another publication: its in-text citation, in your style">${I('<path d="M4 6h16M4 12h10M4 18h6"/>')}<span>Cite\u2026</span></button>` +
@@ -530,15 +532,25 @@ function openNotesPop(e) {
     if (range) s.addRange(range); else { const r = document.createRange(); r.selectNodeContents(ed); r.collapse(false); s.addRange(r); }
   };
   ed.focus();
-  const close = async () => {
+  // (Closed at once; the notes saved after it's gone, the details and the
+  // reader's notes drawn again once they are.)
+  const close = () => {
+    if (!wrap.isConnected) return;
     document.removeEventListener('selectionchange', keep);
     document.removeEventListener('keydown', onKey, true);
-    await save();
+    clearTimeout(timer);
+    const md = htmlToMd(ed);
     wrap.remove();
     NOTES.pop = null;
+    // (Shown as left at once, in the details and the reader's notes, while
+    // they're saved: so nothing typed meanwhile is lost under them.)
+    (NOTES.pendingMd = NOTES.pendingMd || {})[e.k] = md;
     if (state.selKey === e.k) renderDetail();
-    // (The reader's notes, as the large editor left them.)
     if (rnFor(e)) { RN.ed = null; rnMount(RN.host, BYKEY.get(e.k) || e, RN.where); }
+    notesSave(e.k, md, true).then(ok => {
+      if (NOTES.pendingMd[e.k] === md) delete NOTES.pendingMd[e.k];
+      if (!ok) toast('Your notes on \u201c' + shortTitle(e.f.title || e.k) + '\u201d weren\u2019t saved.', 6000);
+    });
   };
   const onKey = ev => { if (ev.key === 'Escape' && !wrap.querySelector('.np-cite:not([hidden])') && !document.querySelector('.nv-linkbox')) { ev.preventDefault(); ev.stopPropagation(); close(); } };
   document.addEventListener('keydown', onKey, true);

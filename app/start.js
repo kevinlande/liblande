@@ -1,8 +1,8 @@
 ﻿// LibLande: messages, navigation, and starting up.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, tour, start.)
+// index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-11-15.01';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-11-15.02';
 // On GitHub Pages, every part of the app must be from the same version: a
 // part kept from an older one (the offline copy, served when the network
 // was slow) lacks what this page needs. Then the kept copies go, and the
@@ -195,6 +195,8 @@ document.addEventListener('keydown', ev => {
     const mine = !typing && KEY_ACTS.find(a => inScope(a, 'pdf') && keyIs(ev, a.id));
     if (mine) { ev.preventDefault(); runPdfKey(mine.id); return; }
     if (typing || ev.metaKey || ev.ctrlKey || ev.altKey) return;
+    // Escape with the search showing: it's put away, before anything else.
+    if (ev.key === 'Escape' && searchShowing() && !V.selected && $('#vComment').hidden && $('#vpPanel').hidden) { ev.preventDefault(); closePaperSearch(); return; }
     // Escape: a tool that's on is put down (back to reading); with none on,
     // the paper is closed. (A selected mark, or an open panel, goes first.)
     if (ev.key === 'Escape' && !V.selected && $('#vComment').hidden && $('#vpPanel').hidden) {
@@ -1246,4 +1248,4 @@ if (RELOADING) {
 if (window.LIBLANDE_TEST) window.LL = { NOTES, mdToHtml, htmlToMd, notesSave, notesMarks, openNotesPop, setDetailView, apaCitation, renderDetail, state, CITE, citeRef, citeInText, citeInTextMany, citeList, citeChoose, citeLoad, citeShort, msFixes, quoteWith, addFromLink, addLinkTake, openFromLink, openLinkTake, pdfMetaQuery, webAddBookmark, webAddDescription, aiPrompt, aiCopyFor, aiCopyOpen, relateByDrag, apaCitation, origYear, chPdfPage, chPdfFile, CHP, lcFind, openLinkChapters, lcOffer, SIDE_FOLD, CHAPTERS: () => CHAPTERS, CHAPTER_ROWS: () => CHAPTER_ROWS, CHAPTER_OF: () => CHAPTER_OF, findChapters, toggleBook, OPEN_BOOKS, openAddChapter, fromPhoto, photoQuery, photoAsks, photoFind, photoDoi, photoLines, PHOTO, openQr, qrLink, LEN, countPdfPages, setSort, setCols, pageCount, setGroup, REACH, reachCheck, apaCitation, apaInText, loadPdfLib, entries: () => ENTRIES, KWS, kwsSuggest, kwsKey, kwsWithOA, ktFind, openKwTidy, TS, tsSearch, tsMerge, tsIsQuery, tsClose, PROGRESS, SOFT, RN, rnAddQuote, showQuote, toggleReaderNotes, progressMerge, progressReset, PROXIES, proxyPrefix, proxyLink, findPdf, renderProxies, TOUR, startTour, endTour, openFeatures, FEATURES, toggleBookmark, OLE, oleMake, headingOutline, pageRows, writeOutline, SPLIT, foldOf, splitStart, splitApply, printedContents, tocClean, tocDigits, checkPdf, uploadMarked, netError, REBUILD, rebuildNow, afterWrite, POS, shutReader, AWAY_SINCE, progressBoth, pullPrefs, saveProgress, pageLines, OCR, makeSearchable, ocrLayer, textlessPages, openMsCheck, runMsCheck, LIBS, renderGroups, SMART, NP, npCheck, openNewPapers, openFollow, sweepCovers, COVERS, V, BM, JOURNAL, LOCAL, AUTO, saveMarkup, setTool, setReading, renderRLBar, netBadge, placeToast, POS, MARK, PDFJS, pdfJsFix, pdfViewerFix, findEndPage, refHeading, combineMarks, makeZip, MARK_ERASER: () => MARK.eraserSize,
   lib: () => ({ ENTRIES, BYKEY, DATA, VERSION_OF, VERSIONS, NESTED, state, TABS, groupName }), init, refresh, openEdit, isForthcoming, forthChanges, parseBibtexEntry,
   oldLineMarks, convertOldLines, fetchAhead, PTABS, renderPaperTabs, openPdf, loadPdfJs, addStreamIteration, msCheck, msCites, msRef, msDocx, MS, msVisible,
-  refLike, REF, REL, RELP, relCites, relPassage, markRange, showSideTab, toggleSide, openPapersMenu };
+  refLike, REF, REL, RELP, relCites, relPassage, markRange, MX, mxSnip, mxStatus, SRCH, srchRun, showSideTab, toggleSide, openPapersMenu };

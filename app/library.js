@@ -1,8 +1,8 @@
 ﻿// LibLande: the library: data, the reading list, groups, search, the list and the details.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, tour, start.)
+// index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-15.01';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-15.02';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -218,6 +218,7 @@ const driveUrl = f => f.id
 
 function prep(e) {
   const f = e.f;
+  e._mxv = undefined;
   e.groups = null;
   e.kw = splitKw(f.keywords);
   e.authorsShort = lastNames(e.a && e.a.length ? e.a : e.e);
@@ -237,6 +238,8 @@ function prep(e) {
 // in spare moments after loading) rather than for every publication up
 // front.
 function searchText(e, field) {
+  // (Notes and the PDFs' highlights: see marksindex.js.)
+  if (field === 'sNotes') return mxNotesText(e);
   if (e.sAll === undefined) {
     const f = e.f, people = [...(e.a || []), ...(e.e || [])];
     const names = people.map(fullName).join(' ') + ' | ' + people.map(nameKey).join(' | ');
@@ -2068,7 +2071,9 @@ function syncSortCtx() {
 function refresh(resetSel) {
   syncSortCtx();
   const base = groupItems(state.group) || ENTRIES;
-  const field = { all: 'sAll', author: 'sAuthor', title: 'sTitle', kw: 'sKw' }[state.scope] || 'sAll';
+  const field = { all: 'sAll', author: 'sAuthor', title: 'sTitle', kw: 'sKw', notes: 'sNotes' }[state.scope] || 'sAll';
+  // (The highlights' index read first, then searched again.)
+  if (state.scope === 'notes' && !MX.data) mxLoad().then(() => { if (state.scope === 'notes') refresh(false); });
   const match = searchFilter(state.q, field), toks = match ? [1] : [];
   let v = match ? base.filter(match) : base.slice();
   // (In the reading list: Added is when it went on the list; and its own
@@ -2091,7 +2096,7 @@ function refresh(resetSel) {
     ? `${once.length.toLocaleString()} of ${base.length.toLocaleString()} publications match`
     : `${base.length.toLocaleString()} publications`;
   const nf = once.filter(e => e.files).length;
-  $('#statusR').textContent = `${nf.toLocaleString()} with files`;
+  $('#statusR').textContent = state.scope === 'notes' ? mxStatus() : `${nf.toLocaleString()} with files`;
   renderSortUI();
   lengthsWanted();
 
@@ -2352,21 +2357,24 @@ $('.search').addEventListener('focusout', () => setTimeout(() => { if (!$('.sear
 $('#scope').addEventListener('change', ev => { state.scope = ev.target.value; store.set('scope', state.scope); refresh(false); });
 
 /* ------------------------------------------------------------ virtual list */
-const rowH = () => phoneMQ.matches ? 108 : coarseMQ.matches ? 40 : 26;
+// (Searching notes and highlights: room under each for where it was found.)
+const snipRows = () => state.scope === 'notes' && !!String(state.q || '').trim();
+const rowH = () => phoneMQ.matches ? 108 : (coarseMQ.matches ? 40 : 26) + (snipRows() ? 18 : 0);
 // Where each row sits. Wide screens: one height for all. Phone cards: as
 // tall as the title needs (one line or two), measured once per list.
 const CARD_H = [88, 108];
 let CARDS = { view: null, w: 0, picking: false, tops: null };
 function cardTops() {
   const v = state.view, w = listEl.clientWidth;
-  if (CARDS.view === v && CARDS.w === w && CARDS.picking === state.picking && CARDS.tops) return CARDS.tops;
+  if (CARDS.view === v && CARDS.w === w && CARDS.picking === state.picking && CARDS.snip === snipRows() && CARDS.tops) return CARDS.tops;
   const c = cardTops.ctx || (cardTops.ctx = document.createElement('canvas').getContext('2d'));
   c.font = '600 15.5px ' + (getComputedStyle(document.body).getPropertyValue('--serif').trim() || 'serif');
   // A little under the real width, so a title that might wrap gets two lines.
   const room = (w - 32 - (state.picking ? 32 : 0)) * 0.93;
   const tops = new Float64Array(v.length + 1);
-  for (let i = 0; i < v.length; i++) tops[i + 1] = tops[i] + CARD_H[c.measureText(v[i].f.title || '(untitled)').width > room ? 1 : 0];
-  CARDS = { view: v, w, picking: state.picking, tops };
+  const extra = snipRows() ? 22 : 0;
+  for (let i = 0; i < v.length; i++) tops[i + 1] = tops[i] + extra + CARD_H[c.measureText(v[i].f.title || '(untitled)').width > room ? 1 : 0];
+  CARDS = { view: v, w, picking: state.picking, snip: snipRows(), tops };
   return tops;
 }
 const rowTop = i => (phoneMQ.matches ? cardTops()[i] : i * rowH());
@@ -2417,6 +2425,7 @@ function paint() {
   const s = Math.max(0, rowAt(top) - 6), e = Math.min(v.length, rowAt(top + vh) + 7);
   painted = { view: v, s, e };
   const phone = phoneMQ.matches;
+  rowsEl.classList.toggle('snips', snipRows());
   let out = '';
   for (let i = s; i < e; i++) out += phone ? cardHTML(v[i], i, rowTop(i), rowHt(i)) : rowHTML(v[i], i, rowTop(i), h);
   // (A publication held by a finger, to drag (editing.js), is kept, and
@@ -2481,7 +2490,7 @@ function rowHTML(e, i, top, h) {
   const ch = CHAPTER_ROWS.has(i);
   return `<div class="row${e.k === state.selKey ? ' sel' : ''}${state.picked.has(e.k) ? ' picked' : ''}${i % 2 ? ' odd' : ''}${NESTED.has(e.k) || ch ? ' child' : ''}${ch ? ' chap' : ''}" data-i="${i}"` +
     `${rowDrag() ? ' draggable="true"' : ''} style="top:${top}px;height:${h}px">` +
-    `<span class="c-file">${file}</span>` + COL_LIST.map(k => colCell(k, e, i)).join('') + `</div>`;
+    `<span class="c-file">${file}</span>` + COL_LIST.map(k => colCell(k, e, i)).join('') + (snipRows() ? `<span class="row-snip">${mxSnip(e, state.q)}</span>` : '') + `</div>`;
 }
 // Length's cell: the pages; waiting to be counted, a spinner; couldn't
 // be counted, a dash (why, on hover).
@@ -2528,7 +2537,7 @@ function cardHTML(e, i, top, h) {
     `<div class="m"><span>${esc(e.authorsInit)}${e.f.year ? ' \u00b7 ' + esc(e.f.year) : ''}${rlTag(e)}${cardWait(e)}</span></div>` +
     `<div class="m"><span class="v">${esc(e.venue)}</span>${!e.files ? '' : readablePdfs(e).length && !state.picking
       ? `<button type="button" class="pdf${savedHere(e) ? ' saved' : ''}" data-open-pdf="${i}" aria-label="Read the PDF${savedHere(e) ? ' (saved on this device)' : ''}">PDF${readablePdfs(e).length > 1 ? ' \u00b7 ' + readablePdfs(e).length : ''}</button>`
-      : '<span class="pdf">PDF</span>'}</div></div>`;
+      : '<span class="pdf">PDF</span>'}</div>${snipRows() ? `<div class="card-snip">${mxSnip(e, state.q)}</div>` : ''}</div>`;
 }
 // The PDFs of a publication that can be opened in the reader.
 const readablePdfs = e => (gs ? (e.files || []).filter(fl => fl.id) : []);

@@ -17,7 +17,7 @@
   window.LIBLANDE_PAGES = true;
   // (Which version each part of the app is from: index.html checks they
   // match. build.py fills it in.)
-  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-11-15.01';
+  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-11-15.02';
   const CLIENT_ID = '789682218462-98mjugngb46ttd01ucp9dcj71ufspjgn.apps.googleusercontent.com';
   // Google Drive, in one of two ways (docs/drive-file-plan.md):
   // full: all of Drive (your .bib, papers and LibLande folder wherever
@@ -465,6 +465,24 @@
       return { adopted: true, renamed: r.renamed };
     },
     async getPrefs() { prefsMemo = null; return loadPrefs(null); },
+    // The PDFs' highlights, indexed for searching (LibLande/marks.json:
+    // see marksindex.js): read whole; written as changes onto what's there.
+    async getMarksIndex() { const folder = await dataFolder(); marksMemo = (folder && await builder.readJson(folder, MARKS_FILE)) || null; return marksMemo; },
+    async putMarksIndex(changes) {
+      const folder = await dataFolder();
+      if (!folder) throw new Error('No LibLande folder to keep the index in.');
+      // (A fresh copy: another Mac may have written since. Each file kept at
+      // its newest reading; one changed since a reading, let go.)
+      const now = (await builder.readJson(folder, MARKS_FILE)) || { v: 1, files: {} };
+      now.files = now.files || {};
+      Object.entries((changes && changes.files) || {}).forEach(([id, r]) => { if (!now.files[id] || (now.files[id].at || 0) <= (r.at || 0)) now.files[id] = r; });
+      ((changes && changes.gone) || []).forEach(g => { const x = now.files[g.id]; if (x && (x.at || 0) <= g.at) delete now.files[g.id]; });
+      delete now.token;
+      now.at = Date.now();
+      await builder.writeFile(folder, MARKS_FILE, JSON.stringify(now), 'application/json');
+      marksMemo = now;
+      return { n: Object.keys(now.files).length };
+    },
     // New settings, from the files picked (or links pasted) in Settings (as Code.gs's
     // saveSettings): the .bib and, if given, the papers folder, checked and
     // kept in settings.json. A library built from other ones goes to the
@@ -759,7 +777,8 @@
   // from Apps Script's when LibLande moved). Changes are gathered for a moment, then written onto a
   // fresh copy of the file, so another device's changes to other
   // preferences aren't lost.
-  const PREFS_FILE = 'prefs.json';
+  const PREFS_FILE = 'prefs.json', MARKS_FILE = 'marks.json';
+  let marksMemo = null;
   let prefsMemo = null, prefsWaiting = {}, prefsTimer = null;
   async function loadPrefs(settings) {
     if (prefsMemo) return Object.assign({}, prefsMemo, prefsWaiting);
