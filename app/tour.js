@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-11-15.02';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-11-15.03';
 /* -------------------------------------------------------------- features */
 // What LibLande does, by area: each feature, what it's for, where to find
 // it, its icon (see featIcon), and other words it's found by (as "tag"
@@ -52,7 +52,7 @@ const FEATURES = [
   { area: 'Reading', items: [
     ['Papers in tabs', 'Several papers open at once; going back to the library keeps them open. Reader, in the library\u2019s toolbar, goes back to them; its count lists them, with a picture of each first page, as the count beside Reader does in the reader.', 'Reader, in the library\u2019s toolbar; the tabs along the top of the reader', 'path:M3.5 9h17v10.5h-17zM3.5 9V6a1 1 0 0 1 1-1H10l1.5 4M11.5 9V6a1 1 0 0 1 1-1H18l1.5 4', 'tabs open'],
     ['A start page', 'With no paper open, the reader lists the papers you closed lately, those read lately on your other devices (where you got to there), and your reading list. + opens a new tab to it.', 'Reader, with no paper open; + beside the paper tabs', '#vNewTab', 'new tab empty start safari recently closed reopen history'],
-    ['Search in the paper', 'In the sidebar: its text by page, your highlights and the PDF\u2019s notes, and your notes, each a tap away (Text, Marks, Notes, All). Matches lit in the pages, with the find bar\u2019s \u2039 \u203a to step through them.', '\u2318F, or the magnifier; the sidebar\u2019s search', '#vFindBtn', 'find text search notes highlights annotations'],
+    ['Search in the paper', 'In the sidebar: its text by page, your highlights and the PDF\u2019s notes, and your notes, each a tap away (Text, Marks, Notes, All). Matches lit in the pages; \u2039 \u203a by the search box, Return or the arrow keys step through them.', '\u2318F, or the magnifier; the sidebar\u2019s search', '#vFindBtn', 'find text search notes highlights annotations'],
     ['Zoom and fit', 'Pinch, double-tap, or + and \u2212. Click or tap the percentage to fit the whole page, the page\u2019s width, or actual size.', 'The reader\u2019s toolbar', 'path:M11 4.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM20 20l-4.2-4.2M11 8.5v5M8.5 11h5', 'size width fit'],
     ['Page tones', 'Light, sepia, dark or dark sepia pages, and a Warmth slider; the PDF isn\u2019t changed. A tap on the moon switches between your last two.', 'The moon in the reader\u2019s toolbar: rest the pointer on it (on an iPad or iPhone, hold it)', '#vDarkBtn', 'dark mode night sepia warmth'],
     ['Split screen', 'A second view of the paper below, to scroll on its own (to the references, say).', 'The split button in the reader\u2019s toolbar', '#vSplitBtn', 'two views'],
@@ -203,7 +203,7 @@ const TOUR_STEPS = [
   { sel: '#vSide', title: 'Your notes', text: 'Your notes on the paper, beside it (\u2325N), the same as in its details.', before: () => readerSide('notes') },
   { sel: '#vSide', title: 'Quote and cite', text: 'Select a passage: Quote (\u2325C) copies it with its page and citation; a colour highlights it; Add to notes quotes it in your notes. The Citation tab copies the paper\u2019s citation.', before: () => readerSide('info') },
   { sel: '#vSide', title: 'Cited here and related', text: 'Every work the paper cites, yours marked, the others to add with +; and works like it, in your library and not. Select a passage, or click a highlight, for works related to just that. Or select a reference in the paper and choose Add to library.', before: () => readerSide('related') },
-  { sel: '#vTools, .v-tools', title: 'Reading view', text: 'Search (\u2318F): the paper\u2019s text, highlights and your notes, in the sidebar. Light or dark pages, split screen, and the zoom: click or tap the percentage to fit the page or its width.' },
+  { sel: '#vTools, .v-tools', title: 'Reading view', text: 'Search (\u2318F): the paper\u2019s text, highlights and your notes, in the sidebar, with \u2039 \u203a to step through them. Light or dark pages, split screen, and the zoom: click or tap the percentage to fit the page or its width.' },
   { sel: '#vSide', title: 'Outline, pages and bookmarks', text: 'Jump by chapter; edit the outline, or make one from the Contents. Pages turns or splits pages; Bookmarks lists pages you\u2019ve marked.', before: () => readerSide('outline') },
   { sel: '#vShare', title: 'Share', text: 'Send the PDF to Mail or any app with its citation, or download it. Clean leaves out your marks.' },
   { title: 'That\u2019s the tour', text: 'Start by adding a paper with + (or drop a PDF on it), and open one with Read. To cite in Word (and add works found online as you write), install the add-in from Settings \u203a Extensions. Everything else is in Features, at the foot of the sidebar.' },

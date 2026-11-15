@@ -3066,8 +3066,18 @@ button.rel-title, a.rel-title { cursor: pointer; }
    Notes | All, and what's found, each a tap away. */
 .srch { padding: 8px 8px 24px; font-size: 13px; container: srch / inline-size; }
 @container srch (max-width: 260px) { .srch-seg .rel-n { display: none; } }
-.srch-box { display: flex; align-items: center; gap: 6px; margin: 0 4px 8px; padding: 0 8px; height: 32px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--muted); }
+.srch-box { display: flex; align-items: center; gap: 2px; margin: 0 4px 8px; padding: 0 2px 0 8px; height: 32px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--muted); }
 .srch-box:focus-within { border-color: var(--accent); }
+.srch-box > label { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; height: 100%; }
+.srch-count { flex: none; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; padding: 0 2px; }
+.srch-step { flex: none; display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 7px; background: none; color: var(--text); cursor: pointer; }
+.srch-step .i { width: 15px; height: 15px; }
+@media (hover: hover) { .srch-step:not(:disabled):hover { background: var(--side-hover); } }
+.srch-page { display: flex; justify-content: space-between; gap: 8px; margin: 10px 8px 2px; padding-bottom: 3px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.srch-page > span:last-child { font-weight: 400; }
+.srch-page:first-child { margin-top: 2px; }
+.srch-hit.current, .srch-hit.current:hover { background: var(--accent-soft); }
+.srch-hit:focus-visible { outline-offset: -2px; }
 .srch-box input { flex: 1; min-width: 0; border: 0; background: none; color: var(--text); font: 13.5px var(--ui); outline: none; }
 .srch-seg { margin-bottom: 4px; }
 .srch-hit { display: flex; gap: 8px; align-items: flex-start; width: 100%; padding: 7px 8px; border: 0; border-radius: 8px; background: none; color: var(--text); font: 12.5px/1.4 var(--ui); text-align: left; cursor: pointer; }
@@ -3076,7 +3086,7 @@ button.rel-title, a.rel-title { cursor: pointer; }
 .srch-pg { flex: none; min-width: 34px; color: var(--muted); font-size: 11.5px; font-variant-numeric: tabular-nums; }
 .srch-pg .i { width: 13px; height: 13px; }
 .srch-sw { flex: none; width: 10px; height: 10px; margin-top: 4px; border-radius: 3px; box-shadow: inset 0 0 0 1px var(--line); }
-@media (pointer: coarse) { .srch-box { height: 44px; } .srch-box input { font-size: 16px; } .srch-hit { min-height: 44px; padding: 10px 8px; } }
+@media (pointer: coarse) { .srch-box { height: 44px; } .srch-step { width: 44px; height: 42px; } .srch-box input { font-size: 16px; } .srch-hit { min-height: 44px; padding: 10px 8px; } }
 /* The library's search in Notes & highlights: where each was found, under it. */
 .row-snip, .card-snip { position: absolute; left: 38px; right: 12px; bottom: 3px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12px; color: var(--muted); pointer-events: none; }
 .card-snip { left: 16px; bottom: 6px; }
@@ -3085,3 +3095,9 @@ button.rel-title, a.rel-title { cursor: pointer; }
 .rows.snips .row { align-items: flex-start; }
 .rows.snips .row > * { margin-top: 4px; }
 .rows.snips .row > .row-snip { margin-top: 0; }
+/* The details' side column: Copy, Share and More named under their icons,
+   three across; Add to reading list across the column under them, named
+   in full (once it's on the list, the reading list's own box instead). */
+.d-side:not(.d-stack) .actions > .btn[data-rl="add"]:not(.act-read) { order: 1; flex: 1 1 100%; flex-direction: row; justify-content: center; gap: 6px; min-height: 36px; padding: 0 10px; }
+.d-side:not(.d-stack) .actions > .btn[data-rl="add"]:not(.act-read) > span { position: static; width: auto; height: auto; clip-path: none; font-size: 13.5px; font-weight: 500; color: var(--text); white-space: nowrap; }
+@media (pointer: coarse) { .d-side:not(.d-stack) .actions > .btn[data-rl="add"]:not(.act-read) { min-height: 44px; } }

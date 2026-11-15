@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-15.02';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-15.03';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -58,6 +58,7 @@ const ICON = {
   clip: '<svg class="i" viewBox="0 0 24 24"><path d="M20 11.5l-8 8a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L9.7 17.2a1.7 1.7 0 0 1-2.4-2.4L15 7"/></svg>',
   x: '<svg class="i" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7L7 17"/></svg>',
   bookmark: '<svg class="i" viewBox="0 0 24 24"><path d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1z"/></svg>',
+  bookmarkAdd: '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1z"/><path d="M12 7.5v6M9 10.5h6"/></svg>',
   search: '<svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg>',
   plus: '<svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
   citecheck: '<svg class="i" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M8.5 14.5l2.3 2.3 4.7-4.8"/></svg>',
@@ -3052,7 +3053,7 @@ function renderDetail() {
   const finds = findPdfItems(e);
   if (finds && !readable.length && !(e.files && e.files.some(fl => fl.id))) btns.push(menu('act-find', `${FIND_ICON}<span>Find PDF</span>`, 'Its free copy, or the article through your library', finds));
   else if (finds) more.push(`<div class="menu-head">Find a PDF</div>` + finds);
-  if (gs) btns.push(`<button type="button" class="btn" data-rl="add"${RL.has(e.k) ? ' hidden' : ''} title="Add to reading list" aria-label="Add to reading list">${ICON.bookmark}<span>Reading list</span></button>`);
+  if (gs) btns.push(`<button type="button" class="btn" data-rl="add"${RL.has(e.k) ? ' hidden' : ''} title="Add to reading list" aria-label="Add to reading list">${ICON.bookmarkAdd}<span>Add to reading list</span></button>`);
   if (f.doi) more.push(`<a role="menuitem" href="https:\/\/doi.org/${esc(f.doi.replace(/^https?:\/\/(dx\.)?doi\.org[/]/i, ''))}" target="_blank" rel="noopener" title="Open the DOI link">${ICON.link}<span>DOI</span></a>`);
   const doiish = u => /doi\.org[/]/i.test(u);
   (e.u || []).filter(u => safeUrl(u) && !(f.doi && doiish(u))).slice(0, 3).forEach(u => {

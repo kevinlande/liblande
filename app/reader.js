@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-15.02';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-15.03';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -425,11 +425,24 @@ async function pdfMd5(file) {
   return (await r.json()).md5Checksum || null;
 }
 
+// Is some of page n on screen?
+function pageInView(n) {
+  const pv = V.viewer && V.viewer.getPageView(n - 1), sc = $('#vScroll');
+  if (!pv || !pv.div || !sc) return false;
+  const r = pv.div.getBoundingClientRect(), b = sc.getBoundingClientRect();
+  return r.bottom > b.top + 40 && r.top < b.bottom - 40;
+}
 function ensureViewer(lib, VL) {
   if (V.viewer) return;
   const bus = new VL.EventBus();
   const link = new VL.PDFLinkService({ eventBus: bus, externalLinkTarget: VL.LinkTarget ? VL.LinkTarget.BLANK : 2 });
-  const findController = new VL.PDFFindController({ linkService: link, eventBus: bus });
+  // (The find controller goes to a match's page only when none of it is on
+  // screen, and leaves the match itself to revealFindMatch, which scrolls
+  // only when it's out of sight: so going from one match to the next, both
+  // in view, doesn't move the page.)
+  const findLink = Object.create(link, { page: { get: () => link.page, set: n => { if (!pageInView(n)) link.page = n; } } });
+  const findController = new VL.PDFFindController({ linkService: findLink, eventBus: bus });
+  findController.scrollMatchIntoView = function () { this._scrollMatches = false; };
   const viewer = new VL.PDFViewer({
     container: $('#vScroll'), viewer: $('#vPages'), eventBus: bus, linkService: link, findController,
     annotationEditorMode: lib.AnnotationEditorType.NONE,
@@ -472,7 +485,7 @@ function ensureViewer(lib, VL) {
     $('#vFindOcr').hidden = !(none && V.scan && !OCR.file);
   };
   bus.on('updatefindmatchescount', e => findCount(e.matchesCount));
-  bus.on('updatefindcontrolstate', e => { findCount(e.matchesCount, e.state); revealFindMatch(); });
+  bus.on('updatefindcontrolstate', e => { findCount(e.matchesCount, e.state); revealFindMatch(); if (e.state !== 3) srchSyncCur(); });
   bus.on('pagechanging', e => {
     $('#vPage').textContent = e.pageNumber + ' / ' + viewer.pagesCount;
     markCurrentThumb(true);
@@ -542,7 +555,7 @@ function ensureViewer(lib, VL) {
     if (tap && !handheld()) { linkChoice(dest, tap); return Promise.resolve(); }
     return goTo(dest);
   };
-  Object.assign(V, { lib, viewer, bus, link, VL });
+  Object.assign(V, { lib, viewer, bus, link, VL, find: findController });
 }
 
 // Every page PDF.js counts as on screen drawn (or none to draw).
@@ -5188,6 +5201,7 @@ function toggleSide(open) {
   // (Its header under the bars: they come down, and stay while it's open.)
   if (open && typeof barsHidden === 'function') barsHidden(false);
   if (!open && SIDE.tab === 'notes' && RN.where === 'side') { rnFlush(); RN.ed = null; setTimeout(rnPressed, 0); }
+  if (!open && SIDE.tab === 'search' && $('#vFind').hidden && V.bus) { V.bus.dispatch('findbarclose', { source: null }); $('#vFindBtn').setAttribute('aria-pressed', 'false'); }
   $('#vSide').hidden = !open;
   const was = $('#viewer').classList.contains('side-open');
   $('#viewer').classList.toggle('side-open', open && !sidePhone());
@@ -5216,6 +5230,7 @@ function showSideTab(tab) {
   // (Your notes kept as you leave them.)
   if (SIDE.tab === 'notes' && tab !== 'notes' && RN.where === 'side') { rnFlush(); RN.ed = null; }
   relPassageClose();
+  if (SIDE.tab === 'search' && tab !== 'search' && $('#vFind').hidden && V.bus) V.bus.dispatch('findbarclose', { source: null });
   SIDE.tab = tab;
   if (tab !== 'search') store.set('readerTab', tab);
   document.querySelectorAll('#vSide [data-vtab]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.vtab === tab)));
@@ -6529,7 +6544,6 @@ function closePaperSearch() {
 function openFind() {
   if (!V.doc) return;
   if (!searchShowing()) { SRCH.openedSide = !sideOpen(); SRCH.prevTab = SIDE.tab; }
-  if ($('#vFindInput').value.trim()) $('#vFind').hidden = false;
   $('#vFindBtn').setAttribute('aria-pressed', 'true');
   const input = $('#vFindInput');
   if (input.value.trim()) runFind('');
@@ -6541,7 +6555,6 @@ function openFind() {
   else { input.focus(); input.select(); }
 }
 function closeFind() {
-  if ($('#vFind').hidden) return;
   $('#vFind').hidden = true;
   $('#vFindBtn').setAttribute('aria-pressed', 'false');
   if (V.bus) V.bus.dispatch('findbarclose', { source: null });
@@ -6574,9 +6587,10 @@ $('#vFindInput').addEventListener('keydown', ev => {
 // Cmd-F (or the magnifier) opens a search in the sidebar: what's found in
 // the paper's text (by page), its highlights and notes, and your notes,
 // each a tap away (Text first, then Marks, Notes, and All). The text's
-// matches are lit in the pages too, as the find bar does, with its < > to
-// step through them; a scan with no text offers OCR there, as before.
-const SRCH = { q: '', seg: store.get('srchSeg', 'text'), doc: null, pages: null, loading: null, token: 0, t: 0 };
+// matches are lit in the pages too, with < > by the search box to step
+// through them; a scan with no text offers OCR. (The find bar is only for
+// a phone, where the sidebar covers the page.)
+const SRCH = { cur: -1, q: '', seg: store.get('srchSeg', 'text'), doc: null, pages: null, loading: null, token: 0, t: 0 };
 const SRCH_SEGS = [['text', 'Text'], ['marks', 'Marks'], ['notes', 'Notes'], ['all', 'All']];
 // (Case, and the different hyphens, not minded; the text's length kept.)
 const srchFold = s => String(s || '').toLowerCase().replace(/[\u2010-\u2015]/g, '-').replace(/[^\x00-\x7f]/g, c => { const d = c.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); return d.length === 1 ? d : c; });
@@ -6619,7 +6633,10 @@ async function srchMarks() {
 }
 function showSearch() {
   const body = $('#vSideBody');
-  body.innerHTML = `<div class="srch"><label class="srch-box">${ICON.search}<input type="search" id="vSrchInput" placeholder="Search this paper" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="Search this paper" value="${esc(SRCH.q)}"></label>` +
+  body.innerHTML = `<div class="srch"><div class="srch-box"><label>${ICON.search}<input type="search" id="vSrchInput" placeholder="Search this paper" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="Search this paper" value="${esc(SRCH.q)}"></label>` +
+    `<span class="srch-count" id="vSrchCount" aria-live="polite" hidden></span>` +
+    `<button type="button" class="srch-step" data-srch-step="-1" hidden aria-label="Previous result" title="Previous (\u21e7Return)"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>` +
+    `<button type="button" class="srch-step" data-srch-step="1" hidden aria-label="Next result" title="Next (Return)"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></div>` +
     `<div class="rel-seg srch-seg" role="tablist">` + SRCH_SEGS.map(([k, l]) => `<button type="button" role="tab" data-srch-seg="${k}" aria-selected="${SRCH.seg === k}">${l}<span class="rel-n"></span></button>`).join('') + `</div>` +
     `<div class="srch-list" id="vSrchList"></div></div>`;
   const inp = $('#vSrchInput');
@@ -6628,14 +6645,13 @@ function showSearch() {
     SRCH.t = setTimeout(() => {
       SRCH.q = inp.value;
       srchRun();
-      // (Lit in the pages too, with the find bar to step through them.)
-      $('#vFindInput').value = SRCH.q;
-      if (SRCH.q.trim()) { $('#vFind').hidden = false; $('#vFindBtn').setAttribute('aria-pressed', 'true'); }
+      // (Lit in the pages too.)
+      $('#vFindInput').value = SRCH.q.trim();
       runFind('');
     }, 200);
   });
   inp.addEventListener('keydown', ev => {
-    if (ev.key === 'Enter') { ev.preventDefault(); runFind('again', ev.shiftKey); }
+    if (ev.key === 'Enter') { ev.preventDefault(); clearTimeout(SRCH.t); if (SRCH.q !== inp.value) { SRCH.q = inp.value; $('#vFindInput').value = SRCH.q.trim(); srchRun().then(() => srchStep(ev.shiftKey ? -1 : 1)); } else srchStep(ev.shiftKey ? -1 : 1); }
     else if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); closePaperSearch(); }
   });
   srchRun();
@@ -6645,13 +6661,19 @@ async function srchRun() {
   if (!list || !V.doc) return;
   const my = ++SRCH.token, q = SRCH.q.trim();
   const counts = n => SRCH_SEGS.forEach(([k]) => { const c = document.querySelector(`[data-srch-seg="${k}"] .rel-n`); if (c) c.textContent = n && n[k] != null ? ' ' + n[k] : ''; });
-  if (q.length < 2) { list.innerHTML = ''; counts(null); return; }
+  SRCH.cur = -1; SRCH.sel = (SRCH.sel || 0) + 1;
+  if (q.length < 2) { list.innerHTML = ''; counts(null); srchCount(); return; }
   if (!SRCH.pages || SRCH.doc !== V.doc) list.innerHTML = `<p class="v-side-note">Searching\u2026</p>`;
   const [pages, marks] = await Promise.all([srchPages(), srchMarks()]);
   if (my !== SRCH.token || !$('#vSrchList')) return;
-  // The text: each match, by page (the first 300).
-  const text = [];
-  pages.forEach((p, i) => srchHits(p, q, 300 - text.length).forEach(at => text.push(`<button type="button" class="srch-hit" data-page="${i + 1}" data-srch-text><span class="srch-pg">p. ${i + 1}</span><span>${srchSnip(p, at, q.length)}</span></button>`)));
+  // The text: each match, under its page (the first 300).
+  const text = [], textH = [];
+  pages.forEach((p, i) => {
+    const at = srchHits(p, q, 300 - text.length);
+    if (!at.length) return;
+    textH.push(`<p class="srch-page"><span>Page ${i + 1}</span><span>${at.length} result${at.length === 1 ? '' : 's'}</span></p>`);
+    at.forEach((a, nth) => { const h = `<button type="button" class="srch-hit" data-srch-page="${i + 1}" data-nth="${nth}" data-srch-text><span>${srchSnip(p, a, q.length)}</span></button>`; text.push(h); textH.push(h); });
+  });
   // The highlights and notes in the PDF.
   const mk = marks.filter(m => srchHits(m.text, q, 1).length || srchHits(m.note, q, 1).length).map(m => {
     const c = markColour(m), t = srchHits(m.text, q, 1).length ? m.text : m.note, at = srchHits(t, q, 1)[0];
@@ -6668,10 +6690,106 @@ async function srchRun() {
   }
   counts({ text: text.length >= 300 ? '300+' : text.length, marks: mk.length, notes: notes.length, all: text.length + mk.length + notes.length });
   const sec = (h, rows) => rows.length ? `<p class="rel-sec">${h}</p>` + rows.join('') : '';
-  const none = `<p class="v-side-note">Not found${SRCH.seg === 'text' && V.scan && !OCR.file ? ': a scan has no text to find until it\u2019s made searchable (the find bar offers it).' : '.'}</p>`;
-  const h = SRCH.seg === 'text' ? text.join('') : SRCH.seg === 'marks' ? mk.join('') : SRCH.seg === 'notes' ? notes.join('')
-    : sec('Annotations', mk) + sec('Your notes', notes) + sec('In the text', text);
+  const none = SRCH.seg !== 'notes' && SRCH.seg !== 'marks' && V.scan && !OCR.file
+    ? `<p class="v-side-note">This scan has no text yet.</p><p class="v-side-note"><button type="button" class="btn" data-srch-ocr>Make searchable</button></p>`
+    : `<p class="v-side-note">Not found.</p>`;
+  const h = SRCH.seg === 'text' ? textH.join('') : SRCH.seg === 'marks' ? mk.join('') : SRCH.seg === 'notes' ? notes.join('')
+    : sec('Annotations', mk) + sec('Your notes', notes) + sec('In the text', textH);
   list.innerHTML = h || none;
+  srchCount();
+}
+// Stepping through what's found: the < > by the search box, Return and
+// shift-Return in it, or the arrow keys in the list. The one chosen is
+// marked, and gone to; in the text, it's the match lit as chosen in the
+// page (the page moving only if it's out of sight).
+const srchRows = () => [...document.querySelectorAll('#vSrchList .srch-hit')];
+const srchPageOf = r => +(r.dataset.srchPage || r.dataset.page || 0);
+function srchCount() {
+  const el = $('#vSrchCount');
+  if (!el) return;
+  const n = srchRows().length, all = n >= 300 && SRCH.seg === 'text' ? '300+' : n;
+  el.textContent = !n ? '' : SRCH.cur >= 0 ? (SRCH.cur + 1) + ' of ' + all : all + ' found';
+  // (Nothing found: no count, and no < > to press.)
+  el.hidden = !n;
+  document.querySelectorAll('[data-srch-step]').forEach(b => { b.hidden = !n; });
+}
+// (PDF.js's chosen match moved on its own, by Cmd-G or the phone's find
+// bar: the list follows. Not while a result chosen here is on its way.)
+function srchSyncCur() {
+  const sel = V.find && V.find.selected;
+  if (!sel || sel.pageIdx < 0 || SIDE.tab !== 'search' || SRCH.busy) return;
+  const rows = srchRows(), i = rows.findIndex(r => r.dataset.srchText != null && +r.dataset.srchPage === sel.pageIdx + 1 && +r.dataset.nth === sel.matchIdx);
+  if (i < 0 || i === SRCH.cur) return;
+  SRCH.cur = i;
+  rows.forEach(r => { r.classList.toggle('current', r === rows[i]); if (r === rows[i]) r.setAttribute('aria-current', 'true'); else r.removeAttribute('aria-current'); });
+  rows[i].scrollIntoView({ block: 'nearest' });
+  srchCount();
+}
+function srchStep(d) {
+  const rows = srchRows(), n = rows.length;
+  if (!n) return;
+  let i;
+  if (SRCH.cur >= 0) i = (SRCH.cur + d + n) % n;
+  else {
+    // (None chosen yet: the first from this page on, or the last before it.)
+    const here = V.viewer ? V.viewer.currentPageNumber : 1;
+    i = d > 0 ? rows.findIndex(r => srchPageOf(r) >= here) : rows.map(srchPageOf).findLastIndex(p => p && p <= here);
+    if (i < 0) i = d > 0 ? 0 : n - 1;
+  }
+  srchGo(i, true);
+}
+function srchGo(i, stepped) {
+  const rows = srchRows(), row = rows[i];
+  if (!row) return;
+  SRCH.cur = i;
+  rows.forEach(r => { r.classList.toggle('current', r === row); if (r === row) r.setAttribute('aria-current', 'true'); else r.removeAttribute('aria-current'); });
+  row.scrollIntoView({ block: 'nearest' });
+  if (stepped && document.activeElement && document.activeElement.closest('#vSrchList')) row.focus();
+  srchCount();
+  if (row.dataset.srchText != null) {
+    const p = +row.dataset.srchPage;
+    if (!pageInView(p)) pushBack();
+    srchSelect(p - 1, +row.dataset.nth);
+    // (On a phone the sidebar covers the page: a tap puts it away, with the
+    // find bar to go on from there.)
+    if (sidePhone() && !stepped) { $('#vFind').hidden = false; toggleSide(false); $('#vFindBtn').setAttribute('aria-pressed', 'true'); }
+  } else if (row.dataset.srchNote != null) {
+    // (A note: the notes open there, the words chosen.)
+    const q = SRCH.q.trim(), nth = +row.dataset.srchNote;
+    showSideTab('notes');
+    setTimeout(() => srchInNotes(q, nth), 120);
+  } else if (stepped && row.dataset.page) {
+    // (A mark, stepped to: gone to, as a tap on it does.)
+    const n = +row.dataset.page, y = row.dataset.y;
+    if (y) V.viewer.scrollPageIntoView({ pageNumber: n, destArray: [null, { name: 'XYZ' }, null, +y + 40, null], allowNegativeOffset: true });
+    else if (!pageInView(n)) V.viewer.scrollPageIntoView({ pageNumber: n });
+  }
+}
+// A match in the text chosen: PDF.js's find made to choose that one (the
+// nth on its page) as its current match, lit in the page.
+async function srchSelect(pi, nth) {
+  const fc = V.find, q = SRCH.q.trim(), doc = V.doc;
+  if (!fc || !V.bus || !q) return;
+  // (These words searched for by PDF.js first, if they aren't yet.)
+  if (!fc.state || fc.state.query !== q) { $('#vFindInput').value = q; runFind(''); }
+  // (Its search settled, and that page's matches counted, first.)
+  const my = SRCH.sel = (SRCH.sel || 0) + 1, until = performance.now() + 5000;
+  const ready = () => !fc._dirtyMatch && !fc._findTimeout && fc._resumePageIdx == null && fc._pageMatches[pi];
+  SRCH.busy = my;
+  try { while (!ready() && performance.now() < until) await new Promise(r => setTimeout(r, 50)); }
+  finally { if (SRCH.busy === my) SRCH.busy = 0; }
+  if (my !== SRCH.sel || V.doc !== doc || !ready()) return;
+  const m = fc._pageMatches[pi];
+  // (PDF.js reads the page's text a little differently, and found none
+  // there: the page, at least.)
+  if (!m.length) { if (!pageInView(pi + 1)) V.viewer.scrollPageIntoView({ pageNumber: pi + 1 }); return; }
+  nth = Math.min(nth, m.length - 1);
+  fc._offset = { pageIdx: pi, matchIdx: nth > 0 ? nth - 1 : null, wrapped: false };
+  // (PDF.js starts again from the page on screen if the last match chosen
+  // is out of sight: not here, where the one to choose is given.)
+  const vis = fc.onIsPageVisible;
+  fc.onIsPageVisible = () => true;
+  try { runFind('again', false); } finally { fc.onIsPageVisible = vis; }
 }
 // A note found: the notes open there, the words chosen.
 function srchInNotes(q, nth) {
@@ -6690,6 +6808,13 @@ function srchInNotes(q, nth) {
     }
   }
 }
+$('#vSideBody').addEventListener('keydown', ev => {
+  if (SIDE.tab !== 'search' || !ev.target.closest('#vSrchList') || ev.metaKey || ev.ctrlKey || ev.altKey) return;
+  const d = { ArrowLeft: -1, ArrowUp: -1, ArrowRight: 1, ArrowDown: 1 }[ev.key];
+  if (!d) return;
+  ev.preventDefault(); ev.stopPropagation();
+  srchStep(d);
+});
 $('#vSideBody').addEventListener('click', ev => {
   if (SIDE.tab !== 'search') return;
   const seg = ev.target.closest('[data-srch-seg]');
@@ -6699,21 +6824,13 @@ $('#vSideBody').addEventListener('click', ev => {
     srchRun();
     return;
   }
-  // (A match in the text: gone to its page already (see [data-page]); the
-  // find bar from there, so it's the one lit.)
-  if (ev.target.closest('[data-srch-text]')) {
-    $('#vFindInput').value = SRCH.q.trim();
-    $('#vFind').hidden = false;
-    $('#vFindBtn').setAttribute('aria-pressed', 'true');
-    setTimeout(() => runFind(''), 60);
-    return;
-  }
-  const nt = ev.target.closest('[data-srch-note]');
-  if (nt) {
-    const q = SRCH.q.trim(), nth = +nt.dataset.srchNote;
-    showSideTab('notes');
-    setTimeout(() => srchInNotes(q, nth), 120);
-  }
+  const st = ev.target.closest('[data-srch-step]');
+  if (st) { srchStep(+st.dataset.srchStep); return; }
+  const ocr = ev.target.closest('[data-srch-ocr]');
+  if (ocr) { ocr.classList.add('busy'); ocr.disabled = true; makeSearchable(); return; }
+  // (A result: chosen, and gone to (a mark by [data-page], above).)
+  const hit = ev.target.closest('.srch-hit');
+  if (hit) srchGo(srchRows().indexOf(hit), false);
 });
 // (Its items, as the details' Share menu has them, before Google Drive.)
 $('#vDrive').insertAdjacentHTML('beforebegin', shareItems(k => `data-vshare="${k}"`, true) + '<hr class="mi-sep">');

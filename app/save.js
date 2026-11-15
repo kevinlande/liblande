@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/save.js'] = '2026-11-15.02';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/save.js'] = '2026-11-15.03';
 /* ---- saving markup */
 // A new mark isn't in the PDF's annotations until PDF.js commits it (on a
 // change of tool), so anything done with a tool counts as possibly
@@ -15,15 +15,16 @@
 let FIND_REVEAL = 0;
 function revealFindMatch() {
   cancelAnimationFrame(FIND_REVEAL);
-  const until = performance.now() + 900;
+  const until = performance.now() + 2500;
   const step = () => {
     const el = document.querySelector('#vPages .textLayer .highlight.selected'), sc = $('#vScroll');
-    if (el && sc) {
+    if (el && sc && el.getClientRects().length) {
       const r = el.getBoundingClientRect(), box = sc.getBoundingClientRect();
       let top = box.top;
       document.querySelectorAll('#vTop, #viewer .v-bar, #vFind').forEach(b => { if (!b.hidden && b.offsetParent !== null) top = Math.max(top, b.getBoundingClientRect().bottom); });
       const bottom = box.bottom;
       if (r.top < top + 8 || r.bottom > bottom - 8) sc.scrollTop += r.top - (top + (bottom - top) / 3);
+      return;
     }
     if (performance.now() < until) FIND_REVEAL = requestAnimationFrame(step);
   };
