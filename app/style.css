@@ -140,7 +140,7 @@
 :root[data-glass] .v-tabs { background: linear-gradient(to bottom, color-mix(in srgb, var(--panel) 80%, transparent), color-mix(in srgb, var(--panel) 55%, transparent)); }
 /* (The light rim along a glass top edge only on what floats: on the bars
    at the top of the screen it drew a thin line under the status bar.) */
-:root[data-glass] .v-palette, :root[data-glass] .vp-show, :root[data-glass] .menu-list, :root[data-glass] .quote-bar, :root[data-glass] .ref-card, :root[data-glass] .rel-card, :root[data-glass] #vPages .editToolbar, :root[data-glass] .listwrap > .pick-bar, :root[data-glass] .vp-panel, :root[data-glass] .v-comment, :root[data-glass] .np, :root[data-glass] .access-card, :root[data-glass] .v-ocr, :root[data-glass] .v-tone {
+:root[data-glass] .v-palette, :root[data-glass] .vp-show, :root[data-glass] .menu-list, :root[data-glass] .quote-bar, :root[data-glass] .ref-card, :root[data-glass] .rel-card, :root[data-glass] .cc-card, :root[data-glass] #vPages .editToolbar, :root[data-glass] .listwrap > .pick-bar, :root[data-glass] .vp-panel, :root[data-glass] .v-comment, :root[data-glass] .np, :root[data-glass] .access-card, :root[data-glass] .v-ocr, :root[data-glass] .v-tone {
   background: color-mix(in srgb, var(--panel) 62%, transparent);
   -webkit-backdrop-filter: saturate(190%) blur(26px); backdrop-filter: saturate(190%) blur(26px);
   border-color: var(--glass-edge); box-shadow: inset 0 1px 0 var(--glass-rim), inset 0 0 0 .5px var(--glass-rim), var(--shadow);
@@ -3101,3 +3101,38 @@ button.rel-title, a.rel-title { cursor: pointer; }
 .d-side:not(.d-stack) .actions > .btn[data-rl="add"]:not(.act-read) { order: 1; flex: 1 1 100%; flex-direction: row; justify-content: center; gap: 6px; min-height: 36px; padding: 0 10px; }
 .d-side:not(.d-stack) .actions > .btn[data-rl="add"]:not(.act-read) > span { position: static; width: auto; height: auto; clip-path: none; font-size: 13.5px; font-weight: 500; color: var(--text); white-space: nowrap; }
 @media (pointer: coarse) { .d-side:not(.d-stack) .actions > .btn[data-rl="add"]:not(.act-read) { min-height: 44px; } }
+
+/* A citation's card (citecard.js): the work cited, beside the citation. */
+.cc-card { position: fixed; z-index: 64; width: min(370px, calc(100vw - 16px)); border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--text); box-shadow: var(--shadow); font: 13.5px/1.4 var(--ui); animation: cc-in .14s ease-out; }
+@keyframes cc-in { from { opacity: 0; } }
+.cc-card p { margin: 0; }
+.cc-bd { padding: 11px 14px 10px; }
+.cc-kind { display: flex; align-items: center; gap: 5px; margin-bottom: 4px !important; font-size: 11px; color: var(--muted); }
+.cc-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex: none; }
+.cc-stars { color: var(--star); letter-spacing: 1px; }
+.cc-pager { display: flex; align-items: center; gap: 2px; margin-left: auto; font-variant-numeric: tabular-nums; }
+.cc-pager button { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 7px; background: none; color: var(--text); cursor: pointer; }
+.cc-pager .i { width: 14px; height: 14px; }
+.cc-t { font: 600 15px/1.3 var(--serif); }
+.cc-m { margin-top: 2px !important; color: var(--muted); font-size: 12.5px; overflow-wrap: anywhere; }
+.cc-abs { margin-top: 8px !important; font: 13.5px/1.5 var(--serif); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.cc-abs.open { display: block; -webkit-line-clamp: unset; max-height: min(240px, 40vh); overflow: auto; overscroll-behavior: contain; }
+.cc-abs-wait { color: var(--muted); }
+.cc-more { display: inline-flex; align-items: center; gap: 3px; margin-top: 4px; padding: 2px 0; border: 0; background: none; color: var(--accent); font: 500 12.5px var(--ui); cursor: pointer; }
+.cc-more .i { width: 13px; height: 13px; stroke-width: 2.2; }
+.cc-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 10px; border-top: 1px solid var(--line); }
+.cc-acts .btn { min-height: 32px; padding: 0 10px; border-radius: 7px; font-size: 12.5px; }
+.cc-sp { flex: 1; }
+.cc-ib { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 7px; background: none; color: var(--accent); cursor: pointer; }
+.cc-wait { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+.cc-spin { width: 12px; height: 12px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: cc-spin .8s linear infinite; flex: none; }
+@keyframes cc-spin { to { transform: rotate(360deg); } }
+.cc-lit { position: fixed; z-index: 61; pointer-events: none; border-radius: 3px; background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.cc-flash { animation: cc-flash 1.6s ease-out forwards; }
+@keyframes cc-flash { 0%, 50% { opacity: 1; } 100% { opacity: 0; } }
+@media (hover: hover) { .cc-pager button:hover, .cc-ib:hover { background: var(--side-hover); } .cc-more:hover { text-decoration: underline; } }
+.cc-ib .i { width: 16px; height: 16px; }
+:root[data-theme="dark"] .cc-lit { background: color-mix(in srgb, var(--accent) 24%, transparent); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .cc-lit { background: color-mix(in srgb, var(--accent) 24%, transparent); } }
+@media (pointer: coarse) { .cc-acts .btn, .cc-more { min-height: 44px; } .cc-ib, .cc-pager button { width: 44px; height: 44px; } }
+@media (prefers-reduced-motion: reduce) { .cc-spin, .cc-card { animation: none; } }

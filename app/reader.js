@@ -1,8 +1,8 @@
 ﻿// LibLande: the PDF reader: pages, marks, tools, saving, the sidebar.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, tour, start.)
+// index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-15.03';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-16.01';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -552,7 +552,7 @@ function ensureViewer(lib, VL) {
   link.goToDestination = dest => {
     const tap = LINKTAP.at;
     LINKTAP.at = null;
-    if (tap && !handheld()) { linkChoice(dest, tap); return Promise.resolve(); }
+    if (tap) { linkChoice(dest, tap); return Promise.resolve(); }
     return goTo(dest);
   };
   Object.assign(V, { lib, viewer, bus, link, VL, find: findController });
@@ -5859,14 +5859,14 @@ function goSpot(b) {
 // A link inside the paper offers two ways to see where it goes: go there,
 // or show it in a panel along the bottom, leaving your place as it is (in
 // a narrow window too). On a phone, too small for the panel, it goes
-// there, with Back. (The link's own click handler hands PDF.js the
+// there, with Back. A link to the reference list shows the work's card
+// instead, with both in it (see citecard.js). (The link's own click handler hands PDF.js the
 // destination, which goToDestination then passes to linkChoice.)
 const LINKTAP = { at: null };
 $('#vPages').addEventListener('click', ev => {
   const a = ev.target.closest('.annotationLayer a');
   if (!a || !V.doc || !(a.getAttribute('href') || '').startsWith('#')) return;
-  if (handheld()) { pushBack(); return; }
-  LINKTAP.at = { x: ev.clientX, y: ev.clientY };
+  LINKTAP.at = { x: ev.clientX, y: ev.clientY, phone: handheld() };
   setTimeout(() => { LINKTAP.at = null; }, 0);
 }, true);
 // Where a destination is: its page, and how far down it (in PDF units).
@@ -5885,6 +5885,10 @@ async function linkChoice(dest, at) {
   let where = null;
   try { where = await destWhere(dest); } catch (err) { /* go there instead */ }
   if (!where) { pushBack(); V.link.goTo(dest); return; }
+  // (A link to the reference list: the work's card, with these two in it;
+  // see citecard.js. Otherwise, on a phone, there at once.)
+  if (ccShowLink(dest, where, at)) return;
+  if (at.phone) { pushBack(); V.link.goTo(dest); return; }
   const m = document.createElement('div');
   m.className = 'menu-list pdf-menu link-menu';
   m.id = 'linkMenu';
@@ -6391,6 +6395,9 @@ $('#vScroll').addEventListener('pointerup', ev => {
     return;
   }
   BARS.lastTap = { t: now, x, y };
+  // A tap on a citation shows its card (see citecard.js), not the bars;
+  // a second tap is still a double tap.
+  if (!hiddenNow && ccTapAt(x, y)) return;
   BARS.tapTimer = setTimeout(() => {
     BARS.lastTap = null;
     const hidden = $('#viewer').classList.contains('bars-hidden');

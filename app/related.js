@@ -1,8 +1,8 @@
 ﻿// LibLande: Related, in the reader: a reference selected in a paper looked up, to add it; and the sidebar's list of the works a paper cites, and of works like it, in your library and not.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, tour, start.)
+// index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/related.js'] = '2026-11-15.03';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/related.js'] = '2026-11-16.01';
 /* ------------------------------------------------------------ a reference selected */
 // Words selected in a paper that look like a reference (a year, or a DOI,
 // with a name as "Fodor, J." or the like, pages or a journal's volume;
@@ -79,7 +79,7 @@ function refShow(offline) {
   refCard(`<p class="ref-k">${have ? 'In your library' : 'Found on ' + esc(c.src)}</p><p class="ref-t">${esc(have ? have.f.title || c.title : c.title)}</p>` +
     `<p class="ref-m">${meta}${c.doi ? ' \u00b7 ' + esc(c.doi) : ''}</p>` +
     `<div class="ref-row">${REF.list.length > REF.at + 1 || !have ? '<button type="button" class="btn" data-ref-next>Not this one</button>' : '<button type="button" class="btn" data-ref-x>Close</button>'}` +
-    (have ? `<button type="button" class="btn primary" data-ref-open>Open</button>` : `<button type="button" class="btn primary" data-ref-add>Add\u2026</button>`) + `</div>`);
+    (have ? `<button type="button" class="btn primary" data-ref-open>Read</button>` : `<button type="button" class="btn primary" data-ref-add>Add\u2026</button>`) + `</div>`);
 }
 // The card: under the Quote bar (or the passage), until Esc, a tap
 // elsewhere, or a choice.
