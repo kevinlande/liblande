@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LibLande: Licence</title>
+<link rel="icon" href="icon.png">
+<style>
+:root { --bg: #ffffff; --text: #1b2321; --muted: #5d6a66; --line: #d8dfdc; --accent: #1f6b5c; }
+@media (prefers-color-scheme: dark) { :root { --bg: #151a19; --text: #e4e9e7; --muted: #9aa6a2; --line: #2c3533; --accent: #6cc0a4; } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
+main { max-width: 680px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 26px; margin: 0 0 4px; }
+h2 { font-size: 18px; margin: 28px 0 6px; }
+.meta { color: var(--muted); margin: 0 0 24px; }
+a { color: var(--accent); }
+ul { padding-left: 22px; }
+li { margin-bottom: 6px; }
+.lic { color: var(--muted); }
+footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+</style>
+</head>
+<body>
+<main>
+<h1>LibLande Licence</h1>
+<p class="meta">Copyright &copy; 2026 Kevin Lande</p>
+
+<p>LibLande is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.</p>
+<p>LibLande is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.</p>
+<ul>
+  <li><a href="licenses/AGPL-3.0.txt">The GNU Affero General Public License, version 3</a> (the full text)</li>
+  <li><a href="https://github.com/kevinlande/liblande">The source code</a>, on GitHub: everything this site runs, as it runs it</li>
+</ul>
+
+<h2>Open-source libraries</h2>
+<p>LibLande includes copies of these libraries, each under its own licence:</p>
+<ul>
+  <li><a href="https://mozilla.github.io/pdf.js/">PDF.js</a> 6.5.438, Mozilla Foundation <span class="lic">&middot; Apache License 2.0 &middot; <a href="licenses/pdf.js-LICENSE.txt">licence</a></span><br>
+    <span class="lic">With its fonts (<a href="vendor/pdf.js/6.5.438/standard_fonts/LICENSE_FOXIT">Foxit</a>, <a href="vendor/pdf.js/6.5.438/standard_fonts/LICENSE_LIBERATION">Liberation</a>), character maps (<a href="vendor/pdf.js/6.5.438/cmaps/LICENSE">Adobe</a>) and decoders (<a href="vendor/pdf.js/6.5.438/wasm/LICENSE_OPENJPEG">OpenJPEG</a>, <a href="vendor/pdf.js/6.5.438/wasm/LICENSE_JBIG2">JBIG2</a>, <a href="vendor/pdf.js/6.5.438/wasm/LICENSE_QCMS">qcms</a>, <a href="vendor/pdf.js/6.5.438/wasm/LICENSE_QUICKJS">QuickJS</a>), each under its own licence</span></li>
+  <li><a href="https://pdf-lib.js.org/">pdf-lib</a> 1.17.1, Andrew Dillon <span class="lic">&middot; MIT &middot; <a href="licenses/pdf-lib-LICENSE.txt">licence</a></span></li>
+  <li><a href="https://stuk.github.io/jszip/">JSZip</a> 3.10.2, Stuart Knightley and others <span class="lic">&middot; MIT or GPLv3 (used under MIT) &middot; <a href="licenses/jszip-LICENSE.txt">licence</a></span></li>
+  <li><a href="https://tesseract.projectnaptha.com/">Tesseract.js</a> 7.0.0 and its engine, tesseract.js-core 7.0.0, Project Naptha and others <span class="lic">&middot; Apache License 2.0 &middot; <a href="licenses/tesseract.js-LICENSE.txt">licence</a>, <a href="licenses/tesseract.js-core-LICENSE.txt">engine's licence</a>, <a href="licenses/tesseract.min.js.LICENSE.txt">notices</a>; the engine includes <a href="licenses/leptonica-LICENSE.txt">Leptonica</a> (BSD)</span></li>
+  <li>Tesseract's English data (@tesseract.js-data/eng 1.0.0) <span class="lic">&middot; MIT (the data: Apache License 2.0) &middot; <a href="licenses/tesseract-eng-LICENSE.txt">details</a></span></li>
+  <li><a href="https://github.com/Juris-M/citeproc-js">citeproc-js</a> 2.4.63, Frank Bennett <span class="lic">&middot; CPAL or AGPL (used under the AGPL) &middot; <a href="licenses/citeproc-LICENSE.txt">licence</a></span></li>
+  <li><a href="https://github.com/kazuhikoarase/qrcode-generator">QR Code Generator</a> 2.0.4, Kazuhiko Arase <span class="lic">&middot; MIT &middot; <a href="licenses/qrcode-generator-LICENSE.txt">licence</a></span></li>
+</ul>
+<p>Citation styles are fetched, as they're used, from the <a href="https://github.com/citation-style-language/styles">Citation Style Language</a> project (CC BY-SA 3.0).</p>
+
+<footer><a href="./">LibLande</a> &middot; <a href="start.html">Getting started</a> &middot; <a href="privacy.html">Privacy Policy</a> &middot; <a href="terms.html">Terms of Service</a></footer>
+</main>
+</body>
+</html>

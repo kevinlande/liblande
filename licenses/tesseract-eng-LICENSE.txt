@@ -1,0 +1,7 @@
+@tesseract.js-data/eng 1.0.0 (Tesseract's English data, 4.0.0_best_int)
+
+The npm package @tesseract.js-data/eng is published under the MIT license.
+The trained data it contains comes from the Tesseract OCR project's
+tessdata_best repository (https://github.com/tesseract-ocr/tessdata_best),
+licensed under the Apache License, Version 2.0; its text is in
+tesseract.js-LICENSE.txt alongside this file.

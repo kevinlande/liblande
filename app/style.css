@@ -2599,6 +2599,7 @@ a.ms-ib { text-decoration: none; }
   .proxy-row input { font-size: 16px; height: 40px; }
   .set-lib-x, .proxy-row [data-proxy-del] { width: 44px; height: 44px; }
   .set-files .linkish, .setup-card .hint .linkish { display: inline-block; min-height: 36px; }
+  .set-file a { display: inline-block; min-height: 36px; line-height: 36px; }
   .kw-chip button { min-width: 32px; min-height: 32px; }
   .kw-sugs-x { width: 36px; height: 36px; }
   .add-pdf-row .menu > summary.btn, .add-pdf-row .add-pdf-pick { min-height: 40px; height: 40px; }
