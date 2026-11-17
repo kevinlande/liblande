@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-16.01';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-17.01';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -137,22 +137,70 @@ async function importPdfJs() {
   } catch (err) { console.warn(err); }
   return import(PDFJS + 'pdf.min.mjs');
 }
+async function startPdfJs() {
+  const lib = await importPdfJs();
+  // A worker from another site isn't allowed, so start it from a copy.
+  const r = await fetch(PDFJS + 'pdf.worker.min.mjs');
+  if (!r.ok) throw new Error('worker ' + r.status);
+  const url = URL.createObjectURL(new Blob(['(' + addStreamIteration + ')();\n', await r.text()], { type: 'text/javascript' }));
+  const worker = new Worker(url, { type: 'module' });
+  // (Started, or not: a worker whose script is bad doesn't throw here but
+  // fails after, so it's waited for: its "ready", or its error.)
+  const ready = new Promise((ok, no) => {
+    const t = setTimeout(() => no(new Error('the worker didn\u2019t start')), 20000);
+    const on = ev => { if (ev.data && ev.data.action === 'ready') { clearTimeout(t); worker.removeEventListener('message', on); ok(); } };
+    worker.addEventListener('message', on);
+    worker.addEventListener('error', ev => { clearTimeout(t); no(new Error('the worker failed' + (ev.message ? ': ' + ev.message : ''))); }, { once: true });
+  });
+  lib.GlobalWorkerOptions.workerPort = worker;
+  PDF_WORKER = new lib.PDFWorker({ port: worker });
+  try { await ready; }
+  catch (err) {
+    try { PDF_WORKER.destroy(); } catch (e2) { /* gone */ }
+    worker.terminate();
+    PDF_WORKER = null;
+    lib.GlobalWorkerOptions.workerPort = null;
+    throw err;
+  }
+  URL.revokeObjectURL(url);
+  globalThis.pdfjsLib = lib;
+  return lib;
+}
+// PDF.js's own files kept on this device (by sw.js, for reading offline)
+// let go, so they're fetched afresh: a copy gone bad (cut short, say)
+// would otherwise fail every time. Not offline (nothing to fetch them
+// with), and not its fonts and character maps. Said whether there were any.
+const PDFJS_CORE = /\/vendor\/pdf\.js\/[^/]+\/(pdf\.min\.mjs|pdf\.worker\.min\.mjs|pdf_viewer\.mjs|pdf_viewer\.css)$/;
+async function dropPdfJsCopies() {
+  if (!('caches' in window) || !navigator.onLine) return false;
+  let n = 0;
+  for (const k of await caches.keys()) {
+    if (!k.startsWith('liblande-libs')) continue;
+    const c = await caches.open(k);
+    for (const req of await c.keys()) if (PDFJS_CORE.test(new URL(req.url).pathname)) { await c.delete(req); n++; }
+  }
+  return n > 0;
+}
+// The error said: plainly, with the browser's reason apart (shown small).
+function pdfJsError(err) {
+  const e = new Error(navigator.onLine ? 'The PDF reader couldn\u2019t load. Check your connection.' : 'The PDF reader couldn\u2019t load: you\u2019re offline.');
+  e.detail = String((err && err.message) || err || '').replace(/\s+/g, ' ').slice(0, 120);
+  return e;
+}
 function loadPdfJs() {
   if (!pdfjsReady) {
     pdfjsReady = (async () => {
-      const lib = await importPdfJs();
-      // A worker from another site isn't allowed, so start it from a copy.
-      const r = await fetch(PDFJS + 'pdf.worker.min.mjs');
-      if (!r.ok) throw new Error('worker ' + r.status);
-      const url = URL.createObjectURL(new Blob(['(' + addStreamIteration + ')();\n', await r.text()], { type: 'text/javascript' }));
-      lib.GlobalWorkerOptions.workerPort = new Worker(url, { type: 'module' });
-      PDF_WORKER = new lib.PDFWorker({ port: lib.GlobalWorkerOptions.workerPort });
-      globalThis.pdfjsLib = lib;
-      return lib;
+      try { return await startPdfJs(); }
+      catch (err) {
+        // (Once more, from fresh copies, before saying it couldn't.)
+        console.warn('PDF.js didn\u2019t start; trying fresh copies:', err);
+        if (!(await dropPdfJsCopies().catch(() => false))) throw err;
+        return await startPdfJs();
+      }
     })().catch(err => {
       pdfjsReady = null;
       console.warn(err);
-      throw new Error('The PDF reader couldn\u2019t load. Check your connection.');
+      throw pdfJsError(err);
     });
   }
   return pdfjsReady;
@@ -164,12 +212,20 @@ function loadPdfViewer() {
   if (!viewerReady) {
     viewerReady = (async () => {
       const lib = await loadPdfJs();
-      const [css, viewerLib] = await Promise.all([
+      const files = () => Promise.all([
         // Not the .min.css: its minifier joins some selectors together
         // (":is(.a .b) canvas" becomes ":is(.a.b)canvas"), which breaks page sizing.
         fetch(PDFJS + 'pdf_viewer.css').then(r => (r.ok ? r.text() : '')),
         importPdfViewer(),
       ]);
+      // (Once more, from fresh copies, before saying it couldn't.)
+      let css, viewerLib;
+      try { [css, viewerLib] = await files(); }
+      catch (err) {
+        console.warn('The PDF viewer didn\u2019t load; trying fresh copies:', err);
+        if (!(await dropPdfJsCopies().catch(() => false))) throw pdfJsError(err);
+        try { [css, viewerLib] = await files(); } catch (err2) { throw pdfJsError(err2); }
+      }
       const style = document.createElement('style');
       style.textContent = css.replace(/\.sidebar(?![\w-])/g, '.pdfjs-sidebar').replace(/url\((['"]?)images[/]/g, 'url($1' + PDFJS + 'images/');
       document.head.appendChild(style);
@@ -384,17 +440,18 @@ const MARK = {
   eraserSize: store.get('eraserSize', 12),
 };
 
-// Messages over the page, optionally with buttons: [[label, action], ...].
-function vStatus(msg, isError, actions) {
+// Messages over the page, optionally with buttons: [[label, action, keep],
+// ...] (keep: the message stays after), and a detail in small type.
+function vStatus(msg, isError, actions, detail) {
   const el = $('#vStatus');
   el.hidden = !msg;
   el.classList.toggle('err', !!isError);
   if (!msg) { el.replaceChildren(); return; }
-  el.innerHTML = esc(msg) + (isError && V.file && !actions ? `<br><a href="${esc(driveUrl(V.file))}" target="_blank" rel="noopener">Open it in Google Drive instead</a>` : '') +
+  el.innerHTML = esc(msg) + (detail ? `<small class="v-status-why">${esc(detail)}</small>` : '') + (isError && V.file && !actions ? `<br><a href="${esc(driveUrl(V.file))}" target="_blank" rel="noopener">Open it in Google Drive instead</a>` : '') +
     (actions ? `<div class="v-status-acts">` + actions.map((a, i) => `<button type="button" class="btn${i === 0 ? ' primary' : ''}" data-act="${i}">${esc(a[0])}</button>`).join('') + `</div>` : '');
   if (actions) {
     el.querySelectorAll('[data-act]').forEach(b => b.addEventListener('click', () => {
-      vStatus('');
+      if (!actions[+b.dataset.act][2]) vStatus('');
       const fn = actions[+b.dataset.act][1];
       if (fn) fn();
     }));
@@ -802,10 +859,14 @@ async function openReader(entry, file, pos) {
     // Offline, a request that couldn't be made (the browser's own words for
     // it are no help): said plainly.
     const net = /load failed|failed to fetch|networkerror|respondwith|network connection/i.test(errText(err));
+    // (With Try again: the paper opened afresh; and Google Drive's own
+    // viewer, online.)
+    const acts = [['Try again', () => openReader(entry, file, pos)]];
+    if (!isOffline()) acts.push(['Open in Google Drive', () => window.open(driveUrl(file), '_blank', 'noopener'), true]);
     if (net && isOffline()) {
       vStatus(SAVED.has(file.id) ? 'Not available offline yet. Open it once online.'
-        : 'You\u2019re offline, and this paper isn\u2019t on this device. Open it once online.', true);
-    } else vStatus(errText(err), true);
+        : 'You\u2019re offline, and this paper isn\u2019t on this device. Open it once online.', true, acts);
+    } else vStatus(errText(err), true, acts, err && err.detail);
   }
 }
 

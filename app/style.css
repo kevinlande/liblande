@@ -2291,7 +2291,9 @@ a.ms-ib { text-decoration: none; }
 @media (max-width: 699px) { #vSplitBtn { display: none; } }
 .v-status { z-index: 6; }
 .v-status-acts { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 12px; }
-.v-status-acts .btn { min-height: 32px; padding: 4px 12px; font-size: 13px; }
+.v-status-acts .btn { min-height: 32px; padding: 4px 12px; font-size: 13.5px; }
+@media (pointer: coarse) { .v-status-acts .btn { min-height: 44px; } }
+.v-status-why { display: block; margin-top: 6px; color: var(--muted); font-size: 12.5px; overflow-wrap: anywhere; }
 .v-palette { position: absolute; z-index: 5; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom, 0px) + var(--peek-h, 0px)); transform: translateX(-50%);
   display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 2px; width: max-content; max-width: calc(100% - 16px);
   padding: 4px 6px 4px 2px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
