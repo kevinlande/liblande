@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/save.js'] = '2026-11-17.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/save.js'] = '2026-11-17.05';
 /* ---- saving markup */
 // A new mark isn't in the PDF's annotations until PDF.js commits it (on a
 // change of tool), so anything done with a tool counts as possibly
@@ -15,6 +15,8 @@
 let FIND_REVEAL = 0;
 function revealFindMatch() {
   cancelAnimationFrame(FIND_REVEAL);
+  // (Searching marks or notes: the page isn't moved to a match in the text.)
+  if (srchQuiet()) return;
   const until = performance.now() + 2500;
   const step = () => {
     const el = document.querySelector('#vPages .textLayer .highlight.selected'), sc = $('#vScroll');

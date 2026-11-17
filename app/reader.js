@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-17.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-17.05';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -497,7 +497,7 @@ function ensureViewer(lib, VL) {
   // screen, and leaves the match itself to revealFindMatch, which scrolls
   // only when it's out of sight: so going from one match to the next, both
   // in view, doesn't move the page.)
-  const findLink = Object.create(link, { page: { get: () => link.page, set: n => { if (!pageInView(n)) link.page = n; } } });
+  const findLink = Object.create(link, { page: { get: () => link.page, set: n => { if (!pageInView(n) && !srchQuiet()) link.page = n; } } });
   const findController = new VL.PDFFindController({ linkService: findLink, eventBus: bus });
   findController.scrollMatchIntoView = function () { this._scrollMatches = false; };
   const viewer = new VL.PDFViewer({
@@ -543,6 +543,9 @@ function ensureViewer(lib, VL) {
   };
   bus.on('updatefindmatchescount', e => findCount(e.matchesCount));
   bus.on('updatefindcontrolstate', e => { findCount(e.matchesCount, e.state); revealFindMatch(); if (e.state !== 3) srchSyncCur(); });
+  // (Searching marks: what's lit in each page as it's drawn or its matches change; see srchMarkPaint.)
+  bus.on('textlayerrendered', srchMarkSoon);
+  bus.on('updatetextlayermatches', srchMarkSoon);
   bus.on('pagechanging', e => {
     $('#vPage').textContent = e.pageNumber + ' / ' + viewer.pagesCount;
     markCurrentThumb(true);
@@ -715,6 +718,7 @@ async function openReader(entry, file, pos) {
   $('#vFind').hidden = true;
   // (Search, for the paper before: put away; the sidebar it stood in for, kept as it is.)
   if (!$('#vFSide').hidden) { FS.hidSide = false; toggleFSide(false); }
+  $('#viewer').classList.remove('srch-marks');
   $('#vFindBtn').setAttribute('aria-pressed', 'false');
   $('#vFindCount').textContent = '';
   const fromLibrary = $('#viewer').hidden;
@@ -5601,6 +5605,8 @@ function thumbsResized() {
 function sideChanged() {
   SIDE.thumbs.forEach(t => { t.done = false; });
   SIDE.marks = null;
+  // (And the search's, with the marks as they now are.)
+  if (fsideOpen() && SRCH.q.trim().length > 1) srchRun();
   if (!sideOpen()) return;
   if (SIDE.tab === 'pages') SIDE.thumbs.forEach(t => {
     const r = t.el.getBoundingClientRect(), b = $('#vSideBody').getBoundingClientRect();
@@ -5630,7 +5636,7 @@ async function collectMarks(doc, my) {
       }
       const c = a.color;
       onPage.push({
-        page: n, y: a.rect ? a.rect[3] : null,
+        page: n, y: a.rect ? a.rect[3] : null, rect: a.rect || null, quads: a.quadPoints && a.quadPoints.length ? Array.from(a.quadPoints) : null,
         name: note ? 'Note' : a.it === 'InkHighlight' ? 'Highlight' : MARK_NAMES[a.subtype],
         color: c && c.length >= 3 ? `rgb(${c[0]},${c[1]},${c[2]})` : null,
         text, note: (a.contentsObj && a.contentsObj.str) || '',
@@ -6618,6 +6624,7 @@ function toggleFSide(open) {
   // (Put away with the find bar not showing, as on a phone: matches unlit.)
   if (!open && $('#vFind').hidden && V.bus) V.bus.dispatch('findbarclose', { source: null });
   $('#vFSide').hidden = !open;
+  if (!open) { $('#viewer').classList.remove('srch-marks'); srchMarkSoon(); }
   const was = $('#viewer').classList.contains('fside-open');
   $('#viewer').classList.toggle('fside-open', open && !sidePhone());
   $('#vFindBtn').setAttribute('aria-pressed', String(open || !$('#vFind').hidden));
@@ -6634,6 +6641,8 @@ function closePaperSearch() {
   if (FS.hidSide) { FS.hidSide = false; toggleSide(true, true); }
   $('#vFindBtn').setAttribute('aria-pressed', 'false');
   if (hadFocus) $('#vFindBtn').focus({ preventScroll: true });
+  // (The marks left outlined on a phone: gone with the search.)
+  if ($('#viewer').classList.contains('srch-marks')) { $('#viewer').classList.remove('srch-marks'); srchMarkSoon(); }
 }
 function openFind() {
   if (!V.doc) return;
@@ -6754,8 +6763,13 @@ function srchHits(text, q, max) {
   for (let i = t.indexOf(f); i >= 0 && out.length < max; i = t.indexOf(f, i + f.length)) out.push(i);
   return out;
 }
+// (Enough around it to get the gist: about a sentence each side, cut
+// where a word ends.)
 function srchSnip(text, i, len, around) {
-  const a = Math.max(0, i - (around || 40)), b = Math.min(text.length, i + len + (around || 40) + 20);
+  const before = around || 90, after = around ? around + 20 : 170;
+  let a = Math.max(0, i - before), b = Math.min(text.length, i + len + after);
+  if (a > 0) { const sp = text.indexOf(' ', a); if (sp > 0 && sp < i) a = sp + 1; }
+  if (b < text.length) { const sp = text.lastIndexOf(' ', b); if (sp > i + len) b = sp; }
   return (a ? '\u2026' : '') + esc(text.slice(a, i)) + '<mark>' + esc(text.slice(i, i + len)) + '</mark>' + esc(text.slice(i + len, b)) + (b < text.length ? '\u2026' : '');
 }
 // The paper's text, page by page, read once (for this copy of it).
@@ -6816,7 +6830,7 @@ async function srchRun() {
   const my = ++SRCH.token, q = SRCH.q.trim();
   const counts = n => SRCH_SEGS.forEach(([k]) => { const c = document.querySelector(`[data-srch-seg="${k}"] .rel-n`); if (c) c.textContent = n && n[k] != null ? ' ' + n[k] : ''; });
   SRCH.cur = -1; SRCH.sel = (SRCH.sel || 0) + 1;
-  if (q.length < 2) { list.innerHTML = ''; counts(null); srchCount(); return; }
+  if (q.length < 2) { list.innerHTML = ''; counts(null); srchCount(); SRCH.mk = []; SRCH.curMk = -1; srchLight(); return; }
   if (!SRCH.pages || SRCH.doc !== V.doc) list.innerHTML = `<p class="v-side-note">Searching\u2026</p>`;
   const [pages, marks] = await Promise.all([srchPages(), srchMarks()]);
   if (my !== SRCH.token || !$('#vSrchList')) return;
@@ -6829,9 +6843,11 @@ async function srchRun() {
     at.forEach((a, nth) => { const h = `<button type="button" class="srch-hit" data-srch-page="${i + 1}" data-nth="${nth}" data-srch-text><span>${srchSnip(p, a, q.length)}</span></button>`; text.push(h); textH.push(h); });
   });
   // The highlights and notes in the PDF.
-  const mk = marks.filter(m => srchHits(m.text, q, 1).length || srchHits(m.note, q, 1).length).map(m => {
+  SRCH.mk = marks.filter(m => srchHits(m.text, q, 1).length || srchHits(m.note, q, 1).length);
+  SRCH.curMk = -1;
+  const mk = SRCH.mk.map((m, mi) => {
     const c = markColour(m), t = srchHits(m.text, q, 1).length ? m.text : m.note, at = srchHits(t, q, 1)[0];
-    return `<button type="button" class="srch-hit" data-page="${m.page}"${m.y != null ? ` data-y="${m.y}"` : ''}><span class="srch-pg">p. ${m.page}</span>` +
+    return `<button type="button" class="srch-hit" data-mk="${mi}" data-page="${m.page}"${m.y != null ? ` data-y="${m.y}"` : ''}><span class="srch-pg">p. ${m.page}</span>` +
       `<i class="srch-sw" style="background:${c ? c.css : 'var(--line)'}"></i><span>${srchSnip(t, at, q.length)}</span></button>`;
   });
   // Your notes, paragraph by paragraph; a tap opens them there.
@@ -6851,6 +6867,72 @@ async function srchRun() {
     : sec('Annotations', mk) + sec('Your notes', notes) + sec('In the text', textH);
   list.innerHTML = h || none;
   srchCount();
+  srchLight();
+}
+// What's lit in the pages, by the tab chosen: in Text and All, every match
+// (PDF.js's find); in Marks, only the marks with the words, faintly
+// outlined (the chosen one glowing), and the words inside them outlined,
+// the other matches hidden; in Notes, nothing. In Marks and Notes the page
+// isn't moved to a match in the text (quiet).
+const srchQuiet = () => fsideOpen() && (SRCH.seg === 'marks' || SRCH.seg === 'notes');
+function srchLight() {
+  const q = SRCH.q.trim();
+  $('#viewer').classList.toggle('srch-marks', fsideOpen() && SRCH.seg === 'marks' && q.length > 1);
+  if (!V.bus || !fsideOpen() || q.length < 2) { srchMarkSoon(); return; }
+  $('#vFindInput').value = q;
+  if (SRCH.seg === 'notes') V.bus.dispatch('findbarclose', { source: null });
+  else runFind('highlightallchange');
+  srchMarkSoon();
+}
+let srchMarkFrame = 0;
+// (A moment after the page's drawn or its matches change; several at once, once.)
+function srchMarkSoon() { clearTimeout(srchMarkFrame); srchMarkFrame = setTimeout(srchMarkPaint, 40); }
+// A mark's boxes on its page, in the page's own pixels (one a line, from
+// its quadrilaterals; else its rectangle).
+function srchMarkBoxes(m, pv) {
+  const vp = pv.viewport, out = [];
+  // (Its corners turned into the page's pixels: PDF.js 6 converts points only.)
+  const box = r => {
+    const [x1, y1] = vp.convertToViewportPoint(r[0], r[1]), [x2, y2] = vp.convertToViewportPoint(r[2], r[3]);
+    out.push({ l: Math.min(x1, x2), t: Math.min(y1, y2), r: Math.max(x1, x2), b: Math.max(y1, y2) });
+  };
+  if (m.quads && m.quads.length >= 8) {
+    for (let i = 0; i + 7 < m.quads.length; i += 8) {
+      const xs = [m.quads[i], m.quads[i + 2], m.quads[i + 4], m.quads[i + 6]], ys = [m.quads[i + 1], m.quads[i + 3], m.quads[i + 5], m.quads[i + 7]];
+      box([Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]);
+    }
+  } else if (m.rect) box(m.rect);
+  return out;
+}
+function srchMarkPaint() {
+  srchMarkFrame = 0;
+  const on = $('#viewer').classList.contains('srch-marks') && V.viewer;
+  document.querySelectorAll('#vPages .srch-ov').forEach(el => { if (!on) el.remove(); else el.replaceChildren(); });
+  document.querySelectorAll('#vPages .textLayer .highlight.in-mark').forEach(el => el.classList.remove('in-mark'));
+  if (!on) return;
+  const byPage = new Map();
+  (SRCH.mk || []).forEach((m, i) => { if (!byPage.has(m.page)) byPage.set(m.page, []); byPage.get(m.page).push([m, i]); });
+  for (const [n, list] of byPage) {
+    const pv = V.viewer.getPageView(n - 1);
+    if (!pv || !pv.div || !pv.viewport) continue;
+    let ov = pv.div.querySelector(':scope > .srch-ov');
+    if (!ov) { ov = document.createElement('div'); ov.className = 'srch-ov'; pv.div.appendChild(ov); }
+    const all = [];
+    list.forEach(([m, i]) => srchMarkBoxes(m, pv).forEach(bx => {
+      all.push(bx);
+      const d = document.createElement('div');
+      d.className = 'srch-mk' + (i === SRCH.curMk ? ' cur' : '');
+      Object.assign(d.style, { left: bx.l - 2 + 'px', top: bx.t - 1 + 'px', width: bx.r - bx.l + 4 + 'px', height: bx.b - bx.t + 2 + 'px' });
+      ov.appendChild(d);
+    }));
+    // (The words lit by the search: kept, outlined, only inside these marks.)
+    const pr = pv.div.getBoundingClientRect(), sx = pv.div.offsetWidth ? pr.width / pv.div.offsetWidth : 1;
+    pv.div.querySelectorAll('.textLayer .highlight').forEach(h => {
+      const r = h.getBoundingClientRect(), l = (r.left - pr.left) / sx, t = (r.top - pr.top) / sx, rr = (r.right - pr.left) / sx, b = (r.bottom - pr.top) / sx;
+      const cx = (l + rr) / 2, cy = (t + b) / 2;
+      if (all.some(bx => cx >= bx.l - 1 && cx <= bx.r + 1 && cy >= bx.t - 2 && cy <= bx.b + 2)) h.classList.add('in-mark');
+    });
+  }
 }
 // Stepping through what's found: the < > by the search box, Return and
 // shift-Return in it, or the arrow keys in the list. The one chosen is
@@ -6914,12 +6996,18 @@ function srchGo(i, stepped) {
     showSideTab('notes');
     setTimeout(() => srchInNotes(q, nth), 120);
   } else if (row.dataset.page) {
-    // (A mark: gone to.)
+    // (A mark: gone to, and glowing there.)
+    SRCH.curMk = row.dataset.mk != null ? +row.dataset.mk : -1;
+    srchMarkSoon();
     const n = +row.dataset.page, y = row.dataset.y;
     if (n !== V.viewer.currentPageNumber || y) pushBack();
     if (y) V.viewer.scrollPageIntoView({ pageNumber: n, destArray: [null, { name: 'XYZ' }, null, +y + 40, null], allowNegativeOffset: true });
     else if (!pageInView(n)) V.viewer.scrollPageIntoView({ pageNumber: n });
-    if (sidePhone() && !stepped) toggleFSide(false);
+    if (sidePhone() && !stepped) {
+      const marksOn = $('#viewer').classList.contains('srch-marks');
+      toggleFSide(false);
+      if (marksOn) { $('#viewer').classList.add('srch-marks'); srchMarkSoon(); }
+    }
   }
 }
 // A match in the text chosen: PDF.js's find made to choose that one (the
