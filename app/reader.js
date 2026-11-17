@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-17.06';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-17.07';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -6904,6 +6904,24 @@ function srchMarkBoxes(m, pv) {
   } else if (m.rect) box(m.rect);
   return out;
 }
+// A mark brought into view: left where it is if it's on screen already
+// (false); else scrolled to a third of the way down (true); or null, if its
+// place on its page isn't known (gone to as before).
+function srchShowMark(m) {
+  const pv = V.viewer && V.viewer.getPageView(m.page - 1), sc = $('#vScroll');
+  if (!pv || !pv.div || !pv.viewport || !sc) return null;
+  const boxes = srchMarkBoxes(m, pv);
+  if (!boxes.length) return null;
+  const pr = pv.div.getBoundingClientRect(), sx = pv.div.offsetWidth ? pr.width / pv.div.offsetWidth : 1;
+  const top = pr.top + Math.min(...boxes.map(b => b.t)) * sx, bottom = pr.top + Math.max(...boxes.map(b => b.b)) * sx;
+  const box = sc.getBoundingClientRect();
+  let vtop = box.top;
+  document.querySelectorAll('#vTop, #viewer .v-bar, #vFind').forEach(b => { if (!b.hidden && b.offsetParent !== null) vtop = Math.max(vtop, b.getBoundingClientRect().bottom); });
+  if (top >= vtop + 8 && bottom <= box.bottom - 8) return false;
+  pushBack();
+  sc.scrollTop += top - (vtop + (box.bottom - vtop) / 3);
+  return true;
+}
 function srchMarkPaint() {
   srchMarkFrame = 0;
   const on = $('#viewer').classList.contains('srch-marks') && V.viewer;
@@ -6991,10 +7009,14 @@ function srchGo(i, stepped) {
     // (A mark: gone to, and glowing there.)
     SRCH.curMk = row.dataset.mk != null ? +row.dataset.mk : -1;
     srchMarkSoon();
-    const n = +row.dataset.page, y = row.dataset.y;
-    if (n !== V.viewer.currentPageNumber || y) pushBack();
-    if (y) V.viewer.scrollPageIntoView({ pageNumber: n, destArray: [null, { name: 'XYZ' }, null, +y + 40, null], allowNegativeOffset: true });
-    else if (!pageInView(n)) V.viewer.scrollPageIntoView({ pageNumber: n });
+    const n = +row.dataset.page, y = row.dataset.y, m = row.dataset.mk != null && SRCH.mk ? SRCH.mk[+row.dataset.mk] : null;
+    // (Moved only if the mark isn't on screen, as a match in the text is.)
+    const shown = m ? srchShowMark(m) : null;
+    if (shown === null) {
+      if (n !== V.viewer.currentPageNumber || y) pushBack();
+      if (y) V.viewer.scrollPageIntoView({ pageNumber: n, destArray: [null, { name: 'XYZ' }, null, +y + 40, null], allowNegativeOffset: true });
+      else if (!pageInView(n)) V.viewer.scrollPageIntoView({ pageNumber: n });
+    }
     if (sidePhone() && !stepped) {
       const marksOn = $('#viewer').classList.contains('srch-marks');
       toggleFSide(false);
