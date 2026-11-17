@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-17.05';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-17.06';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -6766,7 +6766,7 @@ function srchHits(text, q, max) {
 // (Enough around it to get the gist: about a sentence each side, cut
 // where a word ends.)
 function srchSnip(text, i, len, around) {
-  const before = around || 90, after = around ? around + 20 : 170;
+  const before = around || 55, after = around ? around + 20 : 105;
   let a = Math.max(0, i - before), b = Math.min(text.length, i + len + after);
   if (a > 0) { const sp = text.indexOf(' ', a); if (sp > 0 && sp < i) a = sp + 1; }
   if (b < text.length) { const sp = text.lastIndexOf(' ', b); if (sp > i + len) b = sp; }
@@ -6870,10 +6870,10 @@ async function srchRun() {
   srchLight();
 }
 // What's lit in the pages, by the tab chosen: in Text and All, every match
-// (PDF.js's find); in Marks, only the marks with the words, faintly
-// outlined (the chosen one glowing), and the words inside them outlined,
-// the other matches hidden; in Notes, nothing. In Marks and Notes the page
-// isn't moved to a match in the text (quiet).
+// (PDF.js's find); in Marks, only the matches inside the marks with the
+// words, in the usual colour (the chosen mark's as the current match);
+// in Notes, nothing. In Marks and Notes the page isn't moved to a match in
+// the text (quiet).
 const srchQuiet = () => fsideOpen() && (SRCH.seg === 'marks' || SRCH.seg === 'notes');
 function srchLight() {
   const q = SRCH.q.trim();
@@ -6907,30 +6907,22 @@ function srchMarkBoxes(m, pv) {
 function srchMarkPaint() {
   srchMarkFrame = 0;
   const on = $('#viewer').classList.contains('srch-marks') && V.viewer;
-  document.querySelectorAll('#vPages .srch-ov').forEach(el => { if (!on) el.remove(); else el.replaceChildren(); });
-  document.querySelectorAll('#vPages .textLayer .highlight.in-mark').forEach(el => el.classList.remove('in-mark'));
+  document.querySelectorAll('#vPages .textLayer .highlight.in-mark').forEach(el => el.classList.remove('in-mark', 'cur-mk'));
   if (!on) return;
   const byPage = new Map();
   (SRCH.mk || []).forEach((m, i) => { if (!byPage.has(m.page)) byPage.set(m.page, []); byPage.get(m.page).push([m, i]); });
   for (const [n, list] of byPage) {
     const pv = V.viewer.getPageView(n - 1);
     if (!pv || !pv.div || !pv.viewport) continue;
-    let ov = pv.div.querySelector(':scope > .srch-ov');
-    if (!ov) { ov = document.createElement('div'); ov.className = 'srch-ov'; pv.div.appendChild(ov); }
     const all = [];
-    list.forEach(([m, i]) => srchMarkBoxes(m, pv).forEach(bx => {
-      all.push(bx);
-      const d = document.createElement('div');
-      d.className = 'srch-mk' + (i === SRCH.curMk ? ' cur' : '');
-      Object.assign(d.style, { left: bx.l - 2 + 'px', top: bx.t - 1 + 'px', width: bx.r - bx.l + 4 + 'px', height: bx.b - bx.t + 2 + 'px' });
-      ov.appendChild(d);
-    }));
-    // (The words lit by the search: kept, outlined, only inside these marks.)
+    list.forEach(([m, i]) => srchMarkBoxes(m, pv).forEach(bx => all.push(Object.assign(bx, { cur: i === SRCH.curMk }))));
+    // (The words lit by the search: kept only inside these marks; the chosen one's as the current match.)
     const pr = pv.div.getBoundingClientRect(), sx = pv.div.offsetWidth ? pr.width / pv.div.offsetWidth : 1;
     pv.div.querySelectorAll('.textLayer .highlight').forEach(h => {
       const r = h.getBoundingClientRect(), l = (r.left - pr.left) / sx, t = (r.top - pr.top) / sx, rr = (r.right - pr.left) / sx, b = (r.bottom - pr.top) / sx;
       const cx = (l + rr) / 2, cy = (t + b) / 2;
-      if (all.some(bx => cx >= bx.l - 1 && cx <= bx.r + 1 && cy >= bx.t - 2 && cy <= bx.b + 2)) h.classList.add('in-mark');
+      const inBoxes = all.filter(bx => cx >= bx.l - 1 && cx <= bx.r + 1 && cy >= bx.t - 2 && cy <= bx.b + 2);
+      if (inBoxes.length) { h.classList.add('in-mark'); if (inBoxes.some(bx => bx.cur)) h.classList.add('cur-mk'); }
     });
   }
 }

@@ -3099,18 +3099,13 @@ button.rel-title, a.rel-title { cursor: pointer; }
 .srch-page > span:last-child { font-weight: 400; }
 .srch-page:first-child { margin-top: 2px; }
 .srch-hit.current, .srch-hit.current:hover { background: var(--accent-soft); }
-/* (An excerpt: at most six lines, the word in the first few.) */
-.srch-hit > span:last-child { display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; }
-/* Searching marks: the text's matches hidden but those inside a matching mark,
-   outlined; the marks with the words outlined faintly, the chosen one glowing. */
-.viewer.srch-marks .textLayer .highlight, .viewer.srch-marks .textLayer .highlight.selected { background-color: transparent !important; }
-.viewer { --srch-word: #1b2321; --srch-halo: rgba(255, 255, 255, .75); }
-.viewer.dark-pages { --srch-word: rgba(255, 255, 255, .88); --srch-halo: rgba(0, 0, 0, .7); }
-.viewer.srch-marks .textLayer .highlight.in-mark { box-shadow: 0 0 0 1.5px var(--srch-word); border-radius: 2px; }
-.srch-ov { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
-/* (A ring of the accent with a thin halo, so it shows on any highlight colour, light pages or dark.) */
-.srch-mk { position: absolute; border-radius: 3px; box-shadow: 0 0 0 1.5px var(--accent), 0 0 0 2.5px var(--srch-halo); }
-.srch-mk.cur { box-shadow: 0 0 0 3px var(--accent), 0 0 0 4px var(--srch-halo); }
+/* (An excerpt: at most four lines, the word in the first two.) */
+.srch-hit > span:last-child { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+/* Searching marks: only the matches inside a matching mark lit, in the usual
+   search colour; the chosen mark's in the current match's (green). */
+.viewer.srch-marks .textLayer .highlight:not(.in-mark) { background-color: transparent !important; }
+.viewer.srch-marks .textLayer .highlight.in-mark { background-color: var(--highlight-bg-color, rgb(180 0 170 / .25)) !important; }
+.viewer.srch-marks .textLayer .highlight.in-mark.cur-mk { background-color: var(--highlight-selected-bg-color, rgb(0 100 0 / .25)) !important; }
 .srch-hit:focus-visible { outline-offset: -2px; }
 .srch-box input { flex: 1; min-width: 0; border: 0; background: none; color: var(--text); font: 13.5px var(--ui); outline: none; }
 .srch-seg { margin-bottom: 4px; }
