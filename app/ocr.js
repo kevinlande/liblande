@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/ocr.js'] = '2026-11-17.07';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/ocr.js'] = '2026-11-17.08';
 /* ------------------------------------------------------------------ OCR */
 // A scan's pages are pictures, with no text to search, select or mark.
 // Make searchable reads each page without text with Tesseract (in this
@@ -150,7 +150,8 @@ $('#vFindOcr').addEventListener('click', () => { $('#vFindOcr').hidden = true; m
 // Make the open paper searchable.
 async function makeSearchable() {
   if (OCR.file) { toast(V.file && OCR.file.id === V.file.id ? 'This paper is being made searchable already.' : 'Another paper is being made searchable: one at a time.', 3500); return; }
-  if (!V.doc || !V.file || !V.bytes) return;
+  if (!V.doc || !V.file) return;
+  if (!V.bytes) { toast('The paper is still downloading. Make it searchable once it\u2019s open.', 4000); return; }
   if (!gs) { toast('Sign in to Google Drive to make it searchable.', 4000); return; }
   if (!navigator.onLine) { toast('Making it searchable needs a connection.', 4000); return; }
   const file = V.file, entry = V.entry;

@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-17.07';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-17.08';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -558,6 +558,8 @@ function ensureViewer(lib, VL) {
   });
   bus.on('pagerendered', e => { if (SPLIT.n === e.pageNumber) splitLine(); });
   bus.on('pagesloaded', e => {
+    // (Search kept open as the same paper opened again: run on its text now.)
+    if (SRCH.again && fsideOpen()) { SRCH.again = false; SRCH.pages = null; SRCH.doc = null; if (SRCH.q.trim().length > 1) { $('#vFindInput').value = SRCH.q.trim(); runFind(''); srchRun(); } }
     $('#vPage').textContent = viewer.currentPageNumber + ' / ' + e.pagesCount; RAIL.lastPage = viewer.currentPageNumber; railSoon();
     V.endPage = 0;
     endPageFor(V.doc, V.file).catch(err => console.warn('Where the references start:', err));
@@ -709,6 +711,7 @@ async function openReader(entry, file, pos) {
   $('#viewer').classList.remove('bars-hidden');
   V.restore = pos && pos.top != null ? pos : null;
   if (SPLIT.n && !SPLIT.busy) splitEnd();
+  const samePaper = !!(V.file && file && V.file.id === file.id);
   Object.assign(V, { entry, file, bytes: null, md5: null, stale: null, scan: false, dirty: false, drawing: false, selected: false, canUndo: false, canRedo: false, pageLabels: undefined, quotePages: null, quoteFonts: null });
   hideQuote();
   $('#vTitle').textContent = entry.f.title || file.n;
@@ -716,9 +719,12 @@ async function openReader(entry, file, pos) {
   syncReaderRL();
   $('#vPage').textContent = '';
   $('#vFind').hidden = true;
-  // (Search, for the paper before: put away; the sidebar it stood in for, kept as it is.)
-  if (!$('#vFSide').hidden) { FS.hidSide = false; toggleFSide(false); }
-  $('#viewer').classList.remove('srch-marks');
+  // (Search, for the paper before: put away; the sidebar it stood in for,
+  // kept as it is. The same paper opened again, as after it's made
+  // searchable: search kept, and run again once it's open; see SRCH.again.)
+  if (!$('#vFSide').hidden && !samePaper) { FS.hidSide = false; toggleFSide(false); }
+  if (!samePaper) $('#viewer').classList.remove('srch-marks');
+  SRCH.again = samePaper && !$('#vFSide').hidden;
   $('#vFindBtn').setAttribute('aria-pressed', 'false');
   $('#vFindCount').textContent = '';
   const fromLibrary = $('#viewer').hidden;
@@ -5383,7 +5389,7 @@ $('#vSideBtn').addEventListener('click', () => toggleSide());
 (() => {
   const grip = $('#vSideGrip'), viewer = $('#viewer'), SIDE_W = 200;
   const clamp = w => Math.round(Math.max(160, Math.min(w, Math.max(160, Math.min(480, window.innerWidth * 0.5)))));
-  const set = w => { viewer.style.setProperty('--side-w', clamp(w) + 'px'); return clamp(w); };
+  const set = w => { const c = clamp(w); viewer.style.setProperty('--side-w', c + 'px'); grip.setAttribute('aria-valuenow', c); grip.setAttribute('aria-valuetext', c + ' pixels wide'); return c; };
   // (Notes keep a width of their own: wider, to write in.)
   // (Notes and Related wider, each its own width.)
   const wide = () => SIDE.tab === 'related';
@@ -6672,7 +6678,7 @@ window.addEventListener('resize', () => {
 (() => {
   const grip = $('#vFSideGrip'), viewer = $('#viewer'), USUAL = 300;
   const clamp = w => Math.round(Math.max(240, Math.min(w, Math.max(240, Math.min(480, window.innerWidth * 0.45)))));
-  const set = w => { viewer.style.setProperty('--fside-w', clamp(w) + 'px'); return clamp(w); };
+  const set = w => { const c = clamp(w); viewer.style.setProperty('--fside-w', c + 'px'); grip.setAttribute('aria-valuenow', c); grip.setAttribute('aria-valuetext', c + ' pixels wide'); return c; };
   const done = w => { store.set('fsideW', w); refit(); placePalette(); railSoon(); };
   set(store.get('fsideW', USUAL));
   let drag = null, frame = 0;

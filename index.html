@@ -184,11 +184,11 @@ try {
   <div class="v-comment" id="vComment" hidden role="dialog" aria-label="Comment" data-mode="view"><div class="v-comment-bar"><span class="v-comment-title">Comment</span><button type="button" id="vCommentEdit" aria-label="Edit comment" title="Edit comment"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg></button><button type="button" class="danger" id="vCommentDelete" aria-label="Delete comment" title="Delete comment"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13M10 11v6M14 11v6"/></svg></button><button type="button" id="vCommentClose" aria-label="Close" title="Close"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"/></svg></button></div><div class="v-comment-view" id="vCommentView" title="Tap to edit"></div><textarea id="vCommentText" rows="4" placeholder="Add a comment"></textarea><div class="v-comment-acts"><span></span><button type="button" class="btn" id="vCommentCancel">Cancel</button><button type="button" class="btn primary" id="vCommentSave">Save</button></div></div>
   <div class="v-body">
     <div class="v-peek" id="vPeek" hidden role="region" aria-label="Link destination"><div class="v-peek-grip" id="vPeekGrip" role="separator" aria-orientation="horizontal" aria-label="Resize the panel" title="Drag to resize (double-click for a third)" tabindex="0"></div><div class="v-peek-head"><span class="v-peek-title" id="vPeekTitle"></span><button type="button" class="btn" id="vPeekGo"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h14"/><path d="M13 6l6 6-6 6"/></svg><span>Go there</span></button><button type="button" class="tb-btn v-peek-x" id="vPeekX" aria-label="Close" title="Close (Esc)"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div><div class="v-peek-notes" id="vPeekNotes" hidden></div><div class="v-peek-body" id="vPeekBody"><div class="pdfViewer" id="vPeekPages"></div></div></div>
-    <aside class="v-side" id="vSide" hidden aria-label="Sidebar"><div class="v-side-grip" id="vSideGrip" role="separator" aria-orientation="vertical" aria-label="Resize the sidebar" title="Drag to resize (double-click for the usual width)" tabindex="0"></div>
+    <aside class="v-side" id="vSide" hidden aria-label="Sidebar"><div class="v-side-grip" id="vSideGrip" role="separator" aria-orientation="vertical" aria-valuemin="160" aria-valuemax="480" aria-label="Resize the sidebar" title="Drag to resize (double-click for the usual width)" tabindex="0"></div>
       <div class="v-side-tabs" role="tablist"><button type="button" role="tab" data-vtab="pages" aria-label="Pages" title="Pages"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3.5" width="7" height="8" rx="1"/><rect x="13" y="3.5" width="7" height="8" rx="1"/><rect x="4" y="13.5" width="7" height="8" rx="1"/><rect x="13" y="13.5" width="7" height="8" rx="1"/></svg></button><button type="button" role="tab" data-vtab="outline" aria-label="Outline" title="Outline"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h2M9 6h11M7 12h2M12 12h8M7 18h2M12 18h8"/></svg></button><button type="button" role="tab" data-vtab="bookmarks" aria-label="Bookmarks" title="Bookmarks"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1z"/></svg></button><span class="v-side-sep" aria-hidden="true"></span><button type="button" role="tab" data-vtab="marks" aria-label="Annotations" title="Annotations"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 4.5l5 5-7.5 7.5H7v-5z"/><path d="M4 20.5h9"/><path d="M11 8l5 5"/></svg></button><button type="button" role="tab" data-vtab="notes" aria-label="Notes" title="Your notes (&#x2325;N)"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v11l-5 5H5z"/><path d="M14 20v-5h5"/><path d="M8.5 9h7M8.5 12.5h4"/></svg></button><span class="v-side-sep" aria-hidden="true"></span><button type="button" role="tab" data-vtab="info" aria-label="Citation" title="Citation"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.6v.4"/></svg></button><button type="button" role="tab" data-vtab="related" aria-label="Cited here and related" title="Cited here and related"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="8.5" cy="15" r="4"/><circle cx="17" cy="6" r="2.6"/><circle cx="19" cy="15.5" r="1.9"/><circle cx="4.5" cy="5.5" r="1.7"/><path d="M11 11.9l4.3-4.1M12.5 15.2h4.6M7.3 11.2L5.2 7.1"/></svg></button></div>
       <div class="v-side-body" id="vSideBody"></div>
     </aside>
-    <aside class="v-fside" id="vFSide" hidden aria-label="Search this paper"><div class="v-fside-grip" id="vFSideGrip" role="separator" aria-orientation="vertical" aria-label="Resize the search panel" title="Drag to resize (double-click for the usual width)" tabindex="0"></div>
+    <aside class="v-fside" id="vFSide" hidden aria-label="Search this paper"><div class="v-fside-grip" id="vFSideGrip" role="separator" aria-orientation="vertical" aria-valuemin="240" aria-valuemax="480" aria-label="Resize the search panel" title="Drag to resize (double-click for the usual width)" tabindex="0"></div>
       <div class="v-fside-head"><span class="v-fside-title">Search</span><button type="button" class="tb-btn" id="vFSideClose" aria-label="Close search" title="Close search (Esc)"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
       <div class="v-side-body" id="vFSideBody"></div>
     </aside>
@@ -388,7 +388,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-11-17.07</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-11-17.08</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -403,7 +403,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-11-17.07';
+      l.querySelector('small').textContent = 'Version 2026-11-17.08';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -416,7 +416,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.firstChild.textContent = 'LibLande hit an error (version 2026-11-17.07): ' + msg;
+    bar.firstChild.textContent = 'LibLande hit an error (version 2026-11-17.08): ' + msg;
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });

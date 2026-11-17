@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/related.js'] = '2026-11-17.07';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/related.js'] = '2026-11-17.08';
 /* ------------------------------------------------------------ a reference selected */
 // Words selected in a paper that look like a reference (a year, or a DOI,
 // with a name as "Fodor, J." or the like, pages or a journal's volume;
@@ -21,6 +21,10 @@ function refLike(text, page) {
   if (/^\s*(\[\d+\]|\d+\.)?\s*(\p{Lu}[\p{L}'\u2019-]+,\s*\p{Lu}|\p{Lu}\.\s*(\p{Lu}\.\s*)?\p{Lu}[\p{L}'\u2019-]+)/u.test(t)) s++;
   if (/\bet al\.|\(eds?\.\)|\beds?\.|\bpp?\.\s*\d|\b\d+\s*\(\d+\)|\b\d+\s*[-\u2013]\s*\d+\b|\bpress\b|\bjournal\b|\bvol\.|\bIn\s+\p{Lu}/u.test(t)) s++;
   if (/\(\s*(1[5-9]\d\d|20\d\d)[a-z]?\s*\)/.test(t)) s++;
+  // (A footnote's full citation: "(City: Publisher, Year)", a title in
+  // quotation marks, an edition.)
+  if (/\([^()]{2,80}:\s*[^()]{2,80},\s*(1[5-9]\d\d|20\d\d)\)/.test(t)) s++;
+  if (/["\u201c\u2018]{1,2}[^"\u201d\u2019]{6,}[,.]?["\u201d\u2019]{1,2}|''[^']{6,}''|``[^']{6,}''/.test(t)) s++;
   if (V.endPage && page >= V.endPage) s++;
   return s >= 2;
 }

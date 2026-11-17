@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/citecard.js'] = '2026-11-17.07';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/citecard.js'] = '2026-11-17.08';
 /* ------------------------------------------------------------ a citation's card */
 // Rest the pointer on a citation in the text, "Siegel (2010)" or "(Burge,
 // 2010; Siegel, 2010)" (each name and year its own), on a link to the
@@ -182,6 +182,58 @@ function ccEntryAt(hit, x, y) {
   return { kind: 'entry', key: 'E:' + page + ':' + Math.round(part[0].t), text, page,
     rects: part.map(L => new DOMRect(pr.left + L.l, pr.top + L.t, L.r - L.l, L.b - L.t)) };
 }
+// A citation in a footnote, in full ("Descartes, Philosophical Works, ed.
+// Haldane and Ross (New York: Dover, 1955), vol. 1, p. 8"): the footnote
+// under the pointer (its lines smaller than the page's, in its lower half,
+// from where it starts, with its number, to where the next does), and of it
+// the part between semicolons the pointer's in, if that reads as a
+// reference. Its card as an entry's in a reference list.
+function ccNoteAt(hit, x, y) {
+  const pr = hit.layer.getBoundingClientRect(), lines = ccLines(hit.layer), px = x - pr.left, py = y - pr.top;
+  const me = lines.find(L => py >= L.t - 1 && py <= L.b + 1 && px >= L.l - 2 && px <= L.r + 2);
+  if (!me) return null;
+  // (In the page's lower part; the notes below a gap wider than the lines'
+  // own spacing: the footnote rule. A scan's text, read by OCR, may not be
+  // smaller, so it's where the lines are that counts.)
+  const H = pr.height;
+  if (me.t < H * 0.45) return null;
+  const col = lines.filter(L => L.l < me.r && L.r > me.l && L.t > H * 0.3).sort((a, b) => a.t - b.t);
+  const minL = Math.min(...col.map(L => L.l));
+  const lh = me.b - me.t;
+  const gapAbove = j => j > 0 && col[j].t - col[j - 1].b > lh * 0.9;
+  const startsAt = j => (/^\s*[\d*\u2020\u2021\u00a7]{1,3}(?!\d)/.test(col[j].text) && col[j].l <= minL + 14) || gapAbove(j);
+  let a = col.indexOf(me), b = a;
+  while (a > 0 && !startsAt(a) && b - a < 10) a--;
+  while (b + 1 < col.length && !startsAt(b + 1) && b - a < 10) b++;
+  // (Below the body text: a gap above where it starts.)
+  if (!gapAbove(a) && !col.slice(0, a).some((L, j) => gapAbove(j + 1) && j + 1 <= a)) return null;
+  const part = col.slice(a, b + 1);
+  // (The pointer's place in the footnote's words, near enough.)
+  let pos = 0;
+  for (const L of part) {
+    if (L === me) {
+      const i = L.runs.findIndex(u => u.node === hit.node);
+      pos += L.runs.slice(0, Math.max(0, i)).reduce((n, u) => n + u.node.data.length + 1, 0) + (i >= 0 ? hit.off : 0);
+      break;
+    }
+    pos += L.text.length + 1;
+  }
+  const text = part.map(L => L.text).join(' ');
+  // (Its parts, between semicolons; the one the pointer's in.)
+  let at = 0, seg = null;
+  for (const s of text.split(/;\s+/)) {
+    if (pos >= at && pos <= at + s.length + 1) { seg = { s, at }; break; }
+    at += s.length + 2;
+  }
+  if (!seg) return null;
+  const clean = seg.s.replace(/-\s+(?=\p{Ll})/gu, '').replace(/^\s*[\d*\u2020\u2021\u00a7]{1,3}\s*/, '').replace(/^(see( also)?|cf\.|e\.g\.,?)\s+/i, '').trim();
+  if (!refLike(clean, ccPageOf(hit.layer))) return null;
+  // (Lit: the footnote's lines the part is on.)
+  let off = 0;
+  const rects = [];
+  part.forEach(L => { const end = off + L.text.length; if (end >= seg.at && off <= seg.at + seg.s.length) rects.push(new DOMRect(pr.left + L.l, pr.top + L.t, L.r - L.l, L.b - L.t)); off = end + 1; });
+  return { kind: 'entry', note: true, key: 'N:' + ccPageOf(hit.layer) + ':' + Math.round(part[0].t) + ':' + seg.at, text: clean, page: ccPageOf(hit.layer), rects };
+}
 // A link within the paper: its destination, from the link's address
 // (PDF.js writes a named destination there, or the array as JSON).
 function ccLinkDest(a) {
@@ -206,7 +258,7 @@ function ccTargetAt(x, y) {
   }
   const hit = ccSpanAt(x, y);
   if (!hit) return null;
-  const entry = ccEntryAt(hit, x, y);
+  const entry = ccEntryAt(hit, x, y) || ccNoteAt(hit, x, y);
   if (entry) return entry;
   if (V.endPage && ccPageOf(hit.layer) >= V.endPage) return null;
   const win = ccWindow(hit), cite = win && ccCiteAt(win);
