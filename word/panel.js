@@ -114,7 +114,7 @@
 
   /* ---- the library: library.json.gz in My Drive's LibLande folder */
   async function findLibrary() {
-    const folders = (await (await drive('files?q=' + encodeURIComponent("name = 'LibLande' and 'root' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false") + '&fields=files(id)')).json()).files || [];
+    const folders = (await (await drive('files?q=' + encodeURIComponent("name = 'LibLande' and 'root' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false") + '&fields=files(id)')).json()).files || [];   // keep-name: the folder in Drive
     for (const f of folders) {
       const lib = ((await (await drive('files?q=' + encodeURIComponent("name = 'library.json.gz' and " + q(f.id) + ' in parents and trashed = false') + '&fields=files(id,modifiedTime)')).json()).files || [])[0];
       if (lib) return lib;

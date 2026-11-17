@@ -36,14 +36,14 @@
           <FunctionFile resid="Panel.Url"/>
           <ExtensionPoint xsi:type="PrimaryCommandSurface">
             <OfficeTab id="TabHome">
-              <Group id="LibLande.Group">
+              <Group id="LibLande.Group"><!-- keep-name: the ribbon's IDs, so customisations stay -->
                 <Label resid="Group.Label"/>
                 <Icon>
                   <bt:Image size="16" resid="Icon.16"/>
                   <bt:Image size="32" resid="Icon.32"/>
                   <bt:Image size="80" resid="Icon.80"/>
                 </Icon>
-                <Control xsi:type="Button" id="LibLande.Open">
+                <Control xsi:type="Button" id="LibLande.Open"><!-- keep-name -->
                   <Label resid="Button.Label"/>
                   <Supertip>
                     <Title resid="Button.Label"/>
@@ -55,7 +55,7 @@
                     <bt:Image size="80" resid="Icon.80"/>
                   </Icon>
                   <Action xsi:type="ShowTaskpane">
-                    <TaskpaneId>LibLande.Panel</TaskpaneId>
+                    <TaskpaneId>LibLande.Panel</TaskpaneId><!-- keep-name -->
                     <SourceLocation resid="Panel.Url"/>
                   </Action>
                 </Control>

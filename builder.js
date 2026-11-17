@@ -20,9 +20,9 @@
  */
 (function (root) {
   'use strict';
-  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).builder = '2026-11-17.02';
+  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).builder = '2026-11-17.03';
   const FOLDER = 'application/vnd.google-apps.folder';
-  const DATA_FOLDER = 'LibLande', LIBRARY_FILE = 'library.json.gz', INDEX_FILE = 'file-index.json',
+  const DATA_FOLDER = 'LibLande', LIBRARY_FILE = 'library.json.gz', INDEX_FILE = 'file-index.json',   // keep-name: the folder in Drive
     SETTINGS_FILE = 'settings.json', INBOX_FOLDER = 'Inbox', INBOX_FILE = 'LibLande inbox.bib';
   // As in Code.gs.
   const FULL_CHECK_MS = 24 * 60 * 60 * 1000, MAX_FILES = 40000, MAX_LOOKUPS = 40,
