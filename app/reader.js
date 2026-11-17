@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-17.03';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-17.04';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -713,6 +713,8 @@ async function openReader(entry, file, pos) {
   syncReaderRL();
   $('#vPage').textContent = '';
   $('#vFind').hidden = true;
+  // (Search, for the paper before: put away; the sidebar it stood in for, kept as it is.)
+  if (!$('#vFSide').hidden) { FS.hidSide = false; toggleFSide(false); }
   $('#vFindBtn').setAttribute('aria-pressed', 'false');
   $('#vFindCount').textContent = '';
   const fromLibrary = $('#viewer').hidden;
@@ -1989,8 +1991,9 @@ function placePalette() {
     el.style.maxHeight = el.classList.contains('vertical') ? Math.max(120, H - $('#vTop').offsetHeight - 16) + 'px' : '';
     const h = el.offsetHeight || 44;
     const inset = $('#viewer').classList.contains('side-open') ? $('#vSide').offsetWidth : 0;
-    const left = dock === 'left' ? inset + 8 : dock === 'right' ? W - w - 8 : pos.x * W;
-    el.style.left = Math.max(inset + 8, Math.min(W - w - 8, left)) + 'px';
+    const rinset = $('#viewer').classList.contains('fside-open') ? $('#vFSide').offsetWidth : 0;
+    const left = dock === 'left' ? inset + 8 : dock === 'right' ? W - rinset - w - 8 : pos.x * W;
+    el.style.left = Math.max(inset + 8, Math.min(W - rinset - w - 8, left)) + 'px';
     const top = $('#vTop').offsetHeight + 8;
     el.style.top = Math.max(top, Math.min(H - h - 8, pos.y * H)) + 'px';
   });
@@ -2147,7 +2150,8 @@ function snapDrag(ev, h, box, isShow) {
       const e = last, b = $('.v-body').getBoundingClientRect(), W = b.width, H = b.height;
       const x = e.clientX - b.left, y = e.clientY - b.top;
       const inset = $('#viewer').classList.contains('side-open') ? $('#vSide').offsetWidth : 0;
-      const fromLeft = x - inset, fromRight = W - x;
+      const rinset = $('#viewer').classList.contains('fside-open') ? $('#vFSide').offsetWidth : 0;
+      const fromLeft = x - inset, fromRight = W - rinset - x;
       const was = dock;
       if (!canDock()) dock = null;
       else if (dock === 'left' && fromLeft > UNDOCK_EDGE) dock = null;
@@ -5257,17 +5261,20 @@ function resetSide() {
   Object.assign(OLE, { on: false, items: [], sel: -1, from: '' });
   $('#vSideBody').replaceChildren();
 }
-function toggleSide(open) {
+// (aside: shut or opened for search's sake, not kept as your choice.)
+function toggleSide(open, aside) {
   if (open == null) open = !sideOpen();
   // (Its header under the bars: they come down, and stay while it's open.)
   if (open && typeof barsHidden === 'function') barsHidden(false);
   if (!open && SIDE.tab === 'notes' && RN.where === 'side') { rnFlush(); RN.ed = null; setTimeout(rnPressed, 0); }
-  if (!open && SIDE.tab === 'search' && $('#vFind').hidden && V.bus) { V.bus.dispatch('findbarclose', { source: null }); $('#vFindBtn').setAttribute('aria-pressed', 'false'); }
+  // (No room for both, as on an iPad upright: the sidebar asked for puts
+  // search away.)
+  if (open && fsideOpen() && (sidePhone() || !fsideRoom(true))) { FS.hidSide = false; closePaperSearch(); }
   $('#vSide').hidden = !open;
   const was = $('#viewer').classList.contains('side-open');
   $('#viewer').classList.toggle('side-open', open && !sidePhone());
   $('#vSideBtn').setAttribute('aria-pressed', String(open));
-  if (!sidePhone()) store.set('readerSide', open);
+  if (!sidePhone() && !aside) store.set('readerSide', open);
   // Only when the page area changed width (not for the phone's overlay).
   if (was !== $('#viewer').classList.contains('side-open')) refit();
   placePalette();
@@ -5291,11 +5298,10 @@ function showSideTab(tab) {
   // (Your notes kept as you leave them.)
   if (SIDE.tab === 'notes' && tab !== 'notes' && RN.where === 'side') { rnFlush(); RN.ed = null; }
   relPassageClose();
-  if (SIDE.tab === 'search' && tab !== 'search' && $('#vFind').hidden && V.bus) V.bus.dispatch('findbarclose', { source: null });
+  if (tab === 'search') tab = 'pages';
   SIDE.tab = tab;
-  if (tab !== 'search') store.set('readerTab', tab);
+  store.set('readerTab', tab);
   document.querySelectorAll('#vSide [data-vtab]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.vtab === tab)));
-  $('#vFindBtn').setAttribute('aria-pressed', String(tab === 'search' || !$('#vFind').hidden));
   sideWidthFor(tab);
   setTimeout(rnPressed, 0);
   if (tab === 'notes') {
@@ -5310,7 +5316,6 @@ function showSideTab(tab) {
   if (tab === 'pages') showThumbs();
   else if (tab === 'marks') showMarks();
   else if (tab === 'bookmarks') showBookmarks();
-  else if (tab === 'search') showSearch();
   else showOutline();
 }
 // Citation: the paper's entry in the library (as it is now, with any
@@ -5377,7 +5382,7 @@ $('#vSideBtn').addEventListener('click', () => toggleSide());
   const set = w => { viewer.style.setProperty('--side-w', clamp(w) + 'px'); return clamp(w); };
   // (Notes keep a width of their own: wider, to write in.)
   // (Notes and Related wider, each its own width.)
-  const wide = () => SIDE.tab === 'related' || SIDE.tab === 'search';
+  const wide = () => SIDE.tab === 'related';
   const key = () => SIDE.tab === 'notes' ? 'notesSideW' : wide() ? 'relSideW' : 'sideW', usual = () => SIDE.tab === 'notes' ? 380 : wide() ? 320 : SIDE_W;
   const done = w => { store.set(key(), w); refit(); placePalette(); railSoon(); thumbsResized(); };
   set(store.get(key(), usual()));
@@ -6392,7 +6397,7 @@ function kbFit() {
   v.style.setProperty('--vv-h', vv.height + 'px');
 }
 if (window.visualViewport) { visualViewport.addEventListener('resize', kbFit); visualViewport.addEventListener('scroll', kbFit); }
-const keepBars = () => !TOUCH_UI.matches || !$('#vFind').hidden || sideOpen() || !$('#vComment').hidden || !$('#vpPanel').hidden || $('#vShare').open || $('#vRLMenu').open || V.selected;
+const keepBars = () => !TOUCH_UI.matches || !$('#vFind').hidden || sideOpen() || fsideOpen() || !$('#vComment').hidden || !$('#vpPanel').hidden || $('#vShare').open || $('#vRLMenu').open || V.selected;
 // (Scrolling leaves them as they are: only a tap hides or shows them.)
 // The link within the paper nearest a point, if one is within reach (px).
 // (Not links to websites: a near miss shouldn't open another page.)
@@ -6593,35 +6598,116 @@ $('#vZoomLevel').addEventListener('click', () => {
 });
 
 // Search in the paper with PDF.js's find controller: every match is
-// highlighted, Return goes to the next one, shift-Return to the previous.
-// The search, as one: the find bar and the sidebar's search. The magnifier
-// shows it or puts it away; Cmd-F always shows it; Esc puts it away. Put
-// away, the sidebar closes if the search opened it, or goes back to the
-// tab it was on.
-const searchShowing = () => !$('#vFind').hidden || (sideOpen() && SIDE.tab === 'search');
+// highlighted, and found in a panel of its own on the right (the magnifier,
+// at the right end of the bar; Cmd-F; Esc puts it away), beside the
+// sidebar, so the outline, your notes or the pages can stay open while you
+// search. Where there isn't room for both (an iPad upright), search takes
+// the sidebar's place while it's open, and gives it back as it was; the
+// sidebar asked for then puts search away. On a phone it fills the screen.
+const FS = { hidSide: false };
+const fsideOpen = () => !$('#vFSide').hidden;
+// (Room for both, with a page of at least 520px between them?)
+function fsideRoom(sideToo) {
+  if (sidePhone()) return true;
+  const side = sideToo || sideOpen() ? ($('#vSide').offsetWidth || parseInt(getComputedStyle($('#viewer')).getPropertyValue('--side-w'), 10) || 200) : 0;
+  const fs = $('#vFSide').offsetWidth || parseInt(getComputedStyle($('#viewer')).getPropertyValue('--fside-w'), 10) || 300;
+  return window.innerWidth - side - fs >= 520;
+}
+function toggleFSide(open) {
+  if (open && typeof barsHidden === 'function') barsHidden(false);
+  // (Put away with the find bar not showing, as on a phone: matches unlit.)
+  if (!open && $('#vFind').hidden && V.bus) V.bus.dispatch('findbarclose', { source: null });
+  $('#vFSide').hidden = !open;
+  const was = $('#viewer').classList.contains('fside-open');
+  $('#viewer').classList.toggle('fside-open', open && !sidePhone());
+  $('#vFindBtn').setAttribute('aria-pressed', String(open || !$('#vFind').hidden));
+  if (was !== $('#viewer').classList.contains('fside-open')) refit();
+  placePalette();
+  if (open) showSearch();
+}
+const searchShowing = () => !$('#vFind').hidden || fsideOpen();
 function closePaperSearch() {
+  const hadFocus = $('#vFSide').contains(document.activeElement) || $('#vFind').contains(document.activeElement);
   closeFind();
-  if (sideOpen() && SIDE.tab === 'search') {
-    // (Its tab given back first, so the sidebar opens on it next time.)
-    showSideTab(SRCH.prevTab && SRCH.prevTab !== 'search' ? SRCH.prevTab : 'pages');
-    if (SRCH.openedSide) toggleSide(false);
-  }
-  SRCH.openedSide = false;
+  if (fsideOpen()) toggleFSide(false);
+  // (The sidebar it took the place of, back as it was.)
+  if (FS.hidSide) { FS.hidSide = false; toggleSide(true, true); }
   $('#vFindBtn').setAttribute('aria-pressed', 'false');
+  if (hadFocus) $('#vFindBtn').focus({ preventScroll: true });
 }
 function openFind() {
   if (!V.doc) return;
-  if (!searchShowing()) { SRCH.openedSide = !sideOpen(); SRCH.prevTab = SIDE.tab; }
+  if (!fsideOpen()) {
+    // (On a phone, both fill the screen: the sidebar shut, and not given back.)
+    if (sideOpen() && sidePhone()) toggleSide(false, true);
+    else if (sideOpen() && !fsideRoom()) { FS.hidSide = true; toggleSide(false, true); }
+    toggleFSide(true);
+  }
   $('#vFindBtn').setAttribute('aria-pressed', 'true');
   const input = $('#vFindInput');
   if (input.value.trim()) runFind('');
-  // (And the search in the sidebar, where what's found is listed.)
-  if (!sideOpen()) toggleSide(true);
-  if (SIDE.tab !== 'search') showSideTab('search');
   const side = $('#vSrchInput');
   if (side) { if (!side.value && input.value) { side.value = input.value; SRCH.q = input.value; srchRun(); } side.focus(); side.select(); }
   else { input.focus(); input.select(); }
 }
+$('#vFSideClose').addEventListener('click', closePaperSearch);
+window.addEventListener('resize', () => {
+  if (!fsideOpen()) return;
+  const was = $('#viewer').classList.contains('fside-open');
+  $('#viewer').classList.toggle('fside-open', !sidePhone());
+  if (sideOpen() && (sidePhone() || !fsideRoom())) { FS.hidSide = !sidePhone(); toggleSide(false, true); }
+  if (was !== $('#viewer').classList.contains('fside-open')) { refit(); placePalette(); }
+});
+// Its width: dragged by its left edge (or with the arrow keys on it), kept
+// on this device; double-click (or double-tap) for the usual width.
+(() => {
+  const grip = $('#vFSideGrip'), viewer = $('#viewer'), USUAL = 300;
+  const clamp = w => Math.round(Math.max(240, Math.min(w, Math.max(240, Math.min(480, window.innerWidth * 0.45)))));
+  const set = w => { viewer.style.setProperty('--fside-w', clamp(w) + 'px'); return clamp(w); };
+  const done = w => { store.set('fsideW', w); refit(); placePalette(); railSoon(); };
+  set(store.get('fsideW', USUAL));
+  let drag = null, frame = 0;
+  grip.addEventListener('pointerdown', ev => {
+    if (ev.button > 0) return;
+    ev.preventDefault(); ev.stopPropagation();
+    drag = { id: ev.pointerId, right: $('#vFSide').getBoundingClientRect().right, w: $('#vFSide').offsetWidth };
+    try { grip.setPointerCapture(ev.pointerId); } catch (err) { /* fine without */ }
+    grip.classList.add('dragging');
+    viewer.classList.add('side-sizing');
+  });
+  grip.addEventListener('pointermove', ev => {
+    if (!drag || ev.pointerId !== drag.id) return;
+    ev.preventDefault();
+    drag.x = ev.clientX;
+    if (!frame) frame = requestAnimationFrame(() => { frame = 0; if (drag) drag.w = set(drag.right - drag.x); });
+  });
+  const end = ev => {
+    if (!drag || ev.pointerId !== drag.id) return;
+    const w = drag.x != null ? set(drag.right - drag.x) : drag.w;
+    drag = null;
+    grip.classList.remove('dragging');
+    viewer.classList.remove('side-sizing');
+    done(w);
+  };
+  grip.addEventListener('pointerup', end);
+  grip.addEventListener('pointercancel', end);
+  grip.addEventListener('touchstart', ev => ev.preventDefault(), { passive: false });
+  grip.addEventListener('dblclick', () => done(set(USUAL)));
+  let lastTap = 0;
+  grip.addEventListener('pointerup', ev => {
+    if (ev.pointerType === 'mouse') return;
+    const now = Date.now();
+    if (now - lastTap < 320) { lastTap = 0; done(set(USUAL)); } else lastTap = now;
+  });
+  grip.addEventListener('keydown', ev => {
+    const step = ev.shiftKey ? 48 : 16;
+    const d = ev.key === 'ArrowLeft' ? step : ev.key === 'ArrowRight' ? -step : 0;
+    if (!d) return;
+    ev.preventDefault();
+    done(set($('#vFSide').offsetWidth + d));
+  });
+  window.addEventListener('resize', () => set(store.get('fsideW', USUAL)));
+})();
 function closeFind() {
   $('#vFind').hidden = true;
   $('#vFindBtn').setAttribute('aria-pressed', 'false');
@@ -6700,7 +6786,7 @@ async function srchMarks() {
   } catch (err) { return []; } finally { if (temp) closePdf(temp); }
 }
 function showSearch() {
-  const body = $('#vSideBody');
+  const body = $('#vFSideBody');
   body.innerHTML = `<div class="srch"><div class="srch-box"><label>${ICON.search}<input type="search" id="vSrchInput" placeholder="Search this paper" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="Search this paper" value="${esc(SRCH.q)}"></label>` +
     `<span class="srch-count" id="vSrchCount" aria-live="polite" hidden></span>` +
     `<button type="button" class="srch-step" data-srch-step="-1" hidden aria-label="Previous result" title="Previous (\u21e7Return)"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>` +
@@ -6785,7 +6871,7 @@ function srchCount() {
 // bar: the list follows. Not while a result chosen here is on its way.)
 function srchSyncCur() {
   const sel = V.find && V.find.selected;
-  if (!sel || sel.pageIdx < 0 || SIDE.tab !== 'search' || SRCH.busy) return;
+  if (!sel || sel.pageIdx < 0 || !fsideOpen() || SRCH.busy) return;
   const rows = srchRows(), i = rows.findIndex(r => r.dataset.srchText != null && +r.dataset.srchPage === sel.pageIdx + 1 && +r.dataset.nth === sel.matchIdx);
   if (i < 0 || i === SRCH.cur) return;
   SRCH.cur = i;
@@ -6820,17 +6906,20 @@ function srchGo(i, stepped) {
     srchSelect(p - 1, +row.dataset.nth);
     // (On a phone the sidebar covers the page: a tap puts it away, with the
     // find bar to go on from there.)
-    if (sidePhone() && !stepped) { $('#vFind').hidden = false; toggleSide(false); $('#vFindBtn').setAttribute('aria-pressed', 'true'); }
+    if (sidePhone() && !stepped) { $('#vFind').hidden = false; toggleFSide(false); $('#vFindBtn').setAttribute('aria-pressed', 'true'); }
   } else if (row.dataset.srchNote != null) {
-    // (A note: the notes open there, the words chosen.)
+    // (A note: your notes open in the sidebar there, the words chosen.)
     const q = SRCH.q.trim(), nth = +row.dataset.srchNote;
+    if (!sideOpen()) toggleSide(true);
     showSideTab('notes');
     setTimeout(() => srchInNotes(q, nth), 120);
-  } else if (stepped && row.dataset.page) {
-    // (A mark, stepped to: gone to, as a tap on it does.)
+  } else if (row.dataset.page) {
+    // (A mark: gone to.)
     const n = +row.dataset.page, y = row.dataset.y;
+    if (n !== V.viewer.currentPageNumber || y) pushBack();
     if (y) V.viewer.scrollPageIntoView({ pageNumber: n, destArray: [null, { name: 'XYZ' }, null, +y + 40, null], allowNegativeOffset: true });
     else if (!pageInView(n)) V.viewer.scrollPageIntoView({ pageNumber: n });
+    if (sidePhone() && !stepped) toggleFSide(false);
   }
 }
 // A match in the text chosen: PDF.js's find made to choose that one (the
@@ -6876,15 +6965,14 @@ function srchInNotes(q, nth) {
     }
   }
 }
-$('#vSideBody').addEventListener('keydown', ev => {
-  if (SIDE.tab !== 'search' || !ev.target.closest('#vSrchList') || ev.metaKey || ev.ctrlKey || ev.altKey) return;
+$('#vFSideBody').addEventListener('keydown', ev => {
+  if (!ev.target.closest('#vSrchList') || ev.metaKey || ev.ctrlKey || ev.altKey) return;
   const d = { ArrowLeft: -1, ArrowUp: -1, ArrowRight: 1, ArrowDown: 1 }[ev.key];
   if (!d) return;
   ev.preventDefault(); ev.stopPropagation();
   srchStep(d);
 });
-$('#vSideBody').addEventListener('click', ev => {
-  if (SIDE.tab !== 'search') return;
+$('#vFSideBody').addEventListener('click', ev => {
   const seg = ev.target.closest('[data-srch-seg]');
   if (seg) {
     SRCH.seg = seg.dataset.srchSeg; store.set('srchSeg', SRCH.seg);

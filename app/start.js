@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-11-17.03';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-11-17.04';
 // On GitHub Pages, every part of the app must be from the same version: a
 // part kept from an older one (the offline copy, served when the network
 // was slow) lacks what this page needs. Then the kept copies go, and the
@@ -187,7 +187,7 @@ document.addEventListener('keydown', ev => {
     const typing = /^(input|textarea|select)$/i.test(ev.target.tagName || '') || ev.target.isContentEditable;
     if ((ev.metaKey || ev.ctrlKey) && ev.key === 's') { ev.preventDefault(); saveMarkup().then(keptNote); return; }
     if ((ev.metaKey || ev.ctrlKey) && ev.key === 'f') { ev.preventDefault(); openFind(); return; }
-    if ((ev.metaKey || ev.ctrlKey) && ev.key === 'g') { ev.preventDefault(); if (SIDE.tab === 'search' && sideOpen() && srchRows().length) srchStep(ev.shiftKey ? -1 : 1); else runFind('again', ev.shiftKey); return; }
+    if ((ev.metaKey || ev.ctrlKey) && ev.key === 'g') { ev.preventDefault(); if (fsideOpen() && srchRows().length) srchStep(ev.shiftKey ? -1 : 1); else runFind('again', ev.shiftKey); return; }
     // Esc with the Quote bar up: just the bar goes (and the selection),
     // even from its page field; not the paper.
     if (ev.key === 'Escape' && QUOTE.el && !QUOTE.el.hidden) { ev.preventDefault(); quoteDismiss(); return; }

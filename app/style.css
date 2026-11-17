@@ -1638,7 +1638,7 @@ details.d-sec[open] summary { margin-bottom: 8px; }
 .v-title-wrap { flex: 1; min-width: 0; display: flex; align-items: center; gap: 2px; }
 /* The start page, with no paper open: three lists of papers to open,
    the reader's tools put away meanwhile. */
-.viewer.start .v-tools, .viewer.start .v-page, .viewer.start #vPalette, .viewer.start .v-scroll, .viewer.start .v-rail, .viewer.start .v-pagepill, .viewer.start .v-side { display: none !important; }
+.viewer.start .v-tools, .viewer.start .v-page, .viewer.start #vPalette, .viewer.start .v-scroll, .viewer.start .v-rail, .viewer.start .v-pagepill, .viewer.start .v-side, .viewer.start .v-fside { display: none !important; }
 /* (The sidebar button left in its place, grayed out: no paper to show
    pages of, but nothing moves from library to reader.) */
 .viewer.start #vSideBtn { opacity: .35; pointer-events: none; }
@@ -1843,6 +1843,8 @@ body.is-offline .fileicon:not(.saved), body.is-offline .pdf:not(.saved) { opacit
 .viewer.tinted :is(#vPages, #vPeekPages) .canvasWrapper::after { content: ""; position: absolute; inset: 0; background: var(--page-tint); mix-blend-mode: multiply; pointer-events: none; }
 /* The moon's choices: the tones, and how warm. */
 .v-tone-pair { display: inline-flex; align-items: center; }
+/* (The reader's bar: the view (zoom, tone, split) | the paper (notes, share, reading list), then search at the end.) */
+.v-tools .v-sep { flex: none; width: 1px; height: 16px; margin: 0 3px; background: var(--line); }
 .v-tools .tb-btn.v-tone-more { width: 18px; min-width: 18px; padding: 0; margin-left: -4px; color: var(--muted); }
 .v-tools .tb-btn.v-tone-more .i { width: 14px; height: 14px; }
 #vDarkBtn[data-tone="sepia"] { color: #c9a464; }
@@ -2061,6 +2063,9 @@ a.ms-ib { text-decoration: none; }
 .v-rail.dragging .v-grab-tip { opacity: 1; }
 .v-pagepill { position: absolute; z-index: 6; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); padding: 6px 13px; border-radius: 999px; background: rgba(27, 35, 33, .8); color: #fff; font: 600 13px var(--ui); font-variant-numeric: tabular-nums; pointer-events: none; opacity: 0; transition: opacity .35s; white-space: nowrap; }
 .v-pagepill.show { opacity: 1; transition: opacity .12s; }
+.viewer.side-open .v-pagepill { left: calc(50% + var(--side-w, 200px) / 2); }
+.viewer.fside-open .v-pagepill { left: calc(50% - var(--fside-w, 300px) / 2); }
+.viewer.side-open.fside-open .v-pagepill { left: calc(50% + (var(--side-w, 200px) - var(--fside-w, 300px)) / 2); }
 .v-back { position: absolute; z-index: 6; right: calc(16px + env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); display: flex; align-items: center; border-radius: 999px; background: var(--accent); color: var(--accent-ink); box-shadow: var(--shadow); }
 .v-back button { border: 0; background: none; color: inherit; display: flex; align-items: center; }
 .v-back.fwd .v-back-go svg { transform: scaleX(-1); }
@@ -2071,6 +2076,18 @@ a.ms-ib { text-decoration: none; }
 .v-back button:hover { opacity: 1; }
 .v-side { position: absolute; left: 0; top: var(--top-h, 48px); bottom: 0; width: var(--side-w, 200px); z-index: 4; display: flex; flex-direction: column; background: var(--panel); border-right: 1px solid var(--line); }
 .viewer.side-open .v-scroll { left: var(--side-w, 200px); }
+/* Search: a panel of its own on the right (the magnifier), its left edge to drag. */
+.v-fside { position: absolute; right: 0; top: var(--top-h, 48px); bottom: 0; width: var(--fside-w, 300px); z-index: 4; display: flex; flex-direction: column; background: var(--panel); border-left: 1px solid var(--line); }
+.viewer.fside-open .v-scroll, .viewer.fside-open .v-peek { right: var(--fside-w, 300px); }
+.viewer.fside-open .v-rail { right: calc(var(--fside-w, 300px) + 8px); }
+.v-fside-grip { position: absolute; z-index: 2; top: 0; bottom: 0; left: -7px; width: 14px; cursor: col-resize; touch-action: none; outline: none; }
+.v-fside-grip::after { content: ""; position: absolute; top: 50%; left: 5px; width: 4px; height: 40px; margin-top: -20px; border-radius: 2px; background: var(--line); transition: background .15s; }
+.v-fside-grip:focus-visible::after, .v-fside-grip.dragging::after { background: var(--accent); }
+@media (hover: hover) { .v-fside-grip:hover::after { background: var(--accent); } }
+.viewer.side-sizing .v-fside { user-select: none; -webkit-user-select: none; }
+.v-fside-head { display: flex; align-items: center; gap: 6px; height: 39px; box-sizing: border-box; padding: 0 4px 0 14px; border-bottom: 1px solid var(--line); }
+@media (pointer: coarse) { #vFSideClose { width: 44px; height: 44px; } .v-fside-head { height: 47px; } }
+.v-fside-title { flex: 1; font-weight: 600; font-size: 13.5px; }
 /* The panel below the page: under the page, beside the sidebar (not over it). */
 .viewer.side-open .v-peek { left: var(--side-w, 200px); }
 /* Its right edge: drag to make it wider or narrower. */
@@ -2250,6 +2267,8 @@ a.ms-ib { text-decoration: none; }
 @media (max-width: 599px) {
   .v-side { width: 100%; z-index: 7; border-right: 0; }
   .v-side-grip { display: none; }
+  .v-fside { width: 100%; z-index: 7; border-left: 0; }
+  .v-fside-grip { display: none; }
   .v-thumbs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .v-thumb-img { width: 128px; }
 }
@@ -2286,7 +2305,7 @@ a.ms-ib { text-decoration: none; }
 .v-cut-grip { position: absolute; left: 4px; top: 50%; width: 20px; height: 44px; margin-top: -22px; border-radius: 10px; background: var(--accent); box-shadow: 0 2px 8px rgba(0, 0, 0, .3); }
 .v-cut-grip::after { content: ""; position: absolute; left: 7px; right: 7px; top: 14px; bottom: 14px; border-left: 2px solid var(--accent-ink); border-right: 2px solid var(--accent-ink); opacity: .7; }
 .v-cut-line.moving .v-cut-grip { transform: scale(1.1); }
-@media (max-width: 599px) { .v-zoomctl { display: none; } }
+@media (max-width: 599px) { .v-zoomctl, .v-tools .v-zoom, .v-tools .v-sep { display: none; } }
 /* (The panel doesn't open on a phone.) */
 @media (max-width: 699px) { #vSplitBtn { display: none; } }
 .v-status { z-index: 6; }
