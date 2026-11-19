@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/citecard.js'] = '2026-11-17.08';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/citecard.js'] = '2026-11-19.01';
 /* ------------------------------------------------------------ a citation's card */
 // Rest the pointer on a citation in the text, "Siegel (2010)" or "(Burge,
 // 2010; Siegel, 2010)" (each name and year its own), on a link to the
@@ -12,7 +12,7 @@
 // authors, journal and year, and its abstract to open or close. On a
 // touch screen a tap shows it; a link to the reference list, tapped or
 // clicked, shows it too, with the link's own choices in it (Go to the
-// page, Show in a panel), so there's one thing to read, not a card and a
+// page, Show in split screen), so there's one thing to read, not a card and a
 // menu. Found from your library, the paper's own reference list (OpenAlex's,
 // as Related has it), or the text of its entry looked up as Related's Add
 // to library does; nothing asked online until a card is wanted, and each
@@ -36,7 +36,7 @@ const ccFam = s => relFam(s).split(' ').pop();
 function ccSpanAt(x, y) {
   for (const el of document.elementsFromPoint(x, y)) {
     if (el.closest('.cc-card')) return null;
-    if (el.tagName !== 'SPAN' || !el.closest('#vPages .textLayer')) continue;
+    if (el.tagName !== 'SPAN' || !el.closest('#vPages .textLayer, #vPeekPages .textLayer')) continue;
     const n = el.firstChild;
     if (!n || n.nodeType !== 3 || !n.data.trim() || el.childElementCount) continue;
     const r = document.createRange();
@@ -228,11 +228,19 @@ function ccNoteAt(hit, x, y) {
   if (!seg) return null;
   const clean = seg.s.replace(/-\s+(?=\p{Ll})/gu, '').replace(/^\s*[\d*\u2020\u2021\u00a7]{1,3}\s*/, '').replace(/^(see( also)?|cf\.|e\.g\.,?)\s+/i, '').trim();
   if (!refLike(clean, ccPageOf(hit.layer))) return null;
+  if (ccShortOnly(clean)) return null;
   // (Lit: the footnote's lines the part is on.)
   let off = 0;
   const rects = [];
   part.forEach(L => { const end = off + L.text.length; if (end >= seg.at && off <= seg.at + seg.s.length) rects.push(new DOMRect(pr.left + L.l, pr.top + L.t, L.r - L.l, L.b - L.t)); off = end + 1; });
   return { kind: 'entry', note: true, key: 'N:' + ccPageOf(hit.layer) + ':' + Math.round(part[0].t) + ':' + seg.at, text: clean, page: ccPageOf(hit.layer), rects };
+}
+function ccShortOnly(clean) {
+  // (Its years all in short citations, "Klein (2009)", "Sarkar 2015a": a list of them, not a full one.
+  // A book's "(Oxford: Clarendon Press, 2009)" kept out first: its year isn't one.)
+  if (/\([^()]*:\s*\p{L}[^()]*(?:1[5-9]|20)\d\d[^()]*\)/u.test(clean)) return false;
+  const rest = clean.replace(/\p{Lu}[\p{L}'\u2019\-]+(?:\s+(?:et al\.|and|&)\s*(?:\p{Lu}[\p{L}'\u2019\-]+)?)?,?\s*\(?\s*(?:1[5-9]|20)\d\d[a-z]?(?:\s*[,;]\s*(?:1[5-9]|20)\d\d[a-z]?)*\)?/gu, ' ');
+  return !/(?:1[5-9]|20)\d\d/.test(rest);
 }
 // A link within the paper: its destination, from the link's address
 // (PDF.js writes a named destination there, or the array as JSON).
@@ -250,7 +258,7 @@ function ccLinkDest(a) {
 // citation in the text.
 function ccTargetAt(x, y) {
   const top = document.elementFromPoint(x, y);
-  if (!top || !top.closest('#vPages')) return null;
+  if (!top || !top.closest('#vPages, #vPeekPages')) return null;
   const a = top.closest('.annotationLayer a');
   if (a) {
     const dest = ccLinkDest(a);
@@ -449,8 +457,8 @@ const ccIcon = k => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${CC_
 const ccBtn = (act, icon, label, primary) => `<button type="button" class="btn${primary ? ' primary' : ''}" data-cc="${act}">${ccIcon(icon)}<span>${label}</span></button>`;
 // Where the work is cited from, as the card's buttons go there.
 function ccGoButtons(t) {
-  if (t.kind === 'link' && t.where) return ccBtn('go', 'go', 'Go to reference') + (handheld() ? '' : ccBtn('peek', 'peek', 'Show in a panel'));
-  if (t.kind === 'cite' && t.entry) return ccBtn('ref', 'go', 'Go to reference');
+  if (t.kind === 'link' && t.where) return ccBtn('go', 'go', 'Go to reference') + (handheld() ? '' : ccBtn('peek', 'peek', 'Show in split screen'));
+  if (t.kind === 'cite' && t.entry) return ccBtn('ref', 'go', 'Go to reference') + (handheld() ? '' : ccBtn('refpeek', 'peek', 'Show in split screen'));
   return '';
 }
 function ccDraw() {
@@ -525,7 +533,7 @@ function ccUnlight() { CC.lit.forEach(d => d.remove()); CC.lit = []; }
 // what's found.
 async function ccShow(t, pinned) {
   const my = ++CC.seq;
-  clearTimeout(CC.hideT); clearTimeout(CC.showT);
+  clearTimeout(CC.hideT); clearTimeout(CC.showT); clearTimeout(CC.awayT); CC.awayT = 0;
   // (A link: only one to the reference list has a card.)
   if (t.kind === 'link' && !t.where) {
     t.where = await destWhere(t.dest).catch(() => null);
@@ -543,7 +551,7 @@ async function ccShow(t, pinned) {
     CC.el.setAttribute('role', 'dialog');
     CC.el.setAttribute('aria-label', 'The work cited');
     document.body.appendChild(CC.el);
-    CC.el.addEventListener('pointerenter', () => { CC.inCard = true; clearTimeout(CC.hideT); });
+    CC.el.addEventListener('pointerenter', () => { CC.inCard = true; clearTimeout(CC.hideT); clearTimeout(CC.awayT); CC.awayT = 0; });
     CC.el.addEventListener('pointerleave', () => { CC.inCard = false; if (!CC.pinned) ccHideSoon(); });
     CC.el.addEventListener('click', ccClick);
   }
@@ -586,7 +594,7 @@ function ccClose() {
   const back = CC.back, had = CC.el && CC.el.contains(document.activeElement);
   CC.back = null; CC.focusNext = false;
   if (had && back && back.isConnected && back.focus) back.focus({ preventScroll: true });
-  clearTimeout(CC.hideT); clearTimeout(CC.showT);
+  clearTimeout(CC.hideT); clearTimeout(CC.showT); clearTimeout(CC.awayT); CC.awayT = 0;
   CC.key = ''; CC.want = null; CC.t = null; CC.pinned = false; CC.inCard = false; CC.leave = null;
   ccUnlight();
   if (CC.el) { CC.el.remove(); CC.el = null; }
@@ -608,6 +616,7 @@ function ccClick(ev) {
   if (act === 'go' && t.dest) { closePeek(); pushBack(); V.link.goTo(t.dest); }
   else if (act === 'peek' && t.dest) showPeek(t.dest, t.where);
   else if (act === 'ref' && t.entry) { pushBack(); ccGoToEntry(t); }
+  else if (act === 'refpeek' && t.entry) ccPeekEntry(t);
   else if (act === 'open' && c && c.e) relOpen(c.e);
   else if (act === 'show' && c && c.e) relOpen(c.e);
   else if (act === 'rl' && c && c.e) rlAdd(c.e.k);
@@ -617,30 +626,38 @@ function ccClick(ev) {
 }
 // To a citation's entry: its page, then the entry's first words there,
 // once the page is drawn, scrolled to and lit for a moment.
-async function ccGoToEntry(t) {
+async function ccGoToEntry(t, peek) {
   const n = t.entry.page;
-  V.viewer.scrollPageIntoView({ pageNumber: n });
+  const pages = peek ? '#vPeekPages' : '#vPages', sc = $(peek ? '#vPeekBody' : '#vScroll');
+  (peek ? PEEK.viewer : V.viewer).scrollPageIntoView({ pageNumber: n });
   const first = new RegExp('^\\W*(?:\\[\\d+\\]\\s*|\\d+\\.\\s*)?' + ccEsc(srchFold(t.fam)) + '(?![a-z])'), any = new RegExp('(^|[^a-z])' + ccEsc(srchFold(t.fam)) + '(?![a-z])');
   const has = (lines, j, re) => re.test(srchFold(lines[j].text)) && (lines[j].text + ' ' + ((lines[j + 1] || {}).text || '')).includes(t.year);
   for (let i = 0; i < 30; i++) {
-    const layer = document.querySelector(`#vPages .page[data-page-number="${n}"] .textLayer`);
+    const layer = document.querySelector(`${pages} .page[data-page-number="${n}"] .textLayer`);
     const lines = layer && layer.childElementCount ? ccLines(layer) : null;
     const L = lines && (lines.find((x, j) => has(lines, j, first)) || lines.find((x, j) => has(lines, j, any)));
     if (L) {
-      const pr = layer.getBoundingClientRect(), sc = $('#vScroll'), box = sc.getBoundingClientRect();
+      const pr = layer.getBoundingClientRect(), box = sc.getBoundingClientRect();
       sc.scrollTop += pr.top + L.t - (box.top + box.height / 3);
       await ccSleep(60);
       const pr2 = layer.getBoundingClientRect(), d = document.createElement('div');
       d.className = 'cc-lit cc-flash';
       Object.assign(d.style, { left: pr2.left + L.l - 3 + 'px', top: pr2.top + L.t - 2 + 'px', width: L.r - L.l + 6 + 'px', height: L.b - L.t + 4 + 'px' });
       document.body.appendChild(d);
-      const gone = () => { d.remove(); $('#vScroll').removeEventListener('scroll', gone); };
+      const gone = () => { d.remove(); sc.removeEventListener('scroll', gone); };
       setTimeout(gone, 1600);
-      $('#vScroll').addEventListener('scroll', gone, { passive: true });
+      sc.addEventListener('scroll', gone, { passive: true });
       return;
     }
     await ccSleep(150);
   }
+}
+
+// The entry in the split screen (opened at its page), lit there.
+async function ccPeekEntry(t) {
+  if (!V.doc) return;
+  await showPeek(null, { page: t.entry.page, top: null });
+  if (PEEK.viewer) ccGoToEntry(t, true);
 }
 
 /* ---- hovering, tapping, clicking */
@@ -648,13 +665,21 @@ const ccDist = (x, y) => { if (!CC.el) return Infinity; const r = CC.el.getBound
 function ccMove() {
   CC.raf = 0;
   const x = CC.px, y = CC.py;
-  if (!ccOn() || !V.doc || !ccToolOk() || !getSelection().isCollapsed || $('#viewer').hidden) { ccWant(null); return; }
+  // (Hovering shows it with a markup tool on too; a tap only with none.)
+  if (!ccOn() || !V.doc || V.selected || !getSelection().isCollapsed || $('#viewer').hidden) { ccWant(null); return; }
   let t = null;
   try { t = ccTargetAt(x, y); } catch (err) { t = null; }
   ccWant(t, x, y);
 }
+// (Within 40px of the citation, lit.)
+const ccNearLit = (x, y) => CC.lit.some(d => { const r = d.getBoundingClientRect(); return Math.hypot(Math.max(r.left - x, 0, x - r.right), Math.max(r.top - y, 0, y - r.bottom)) < 40; });
 function ccWant(t, x, y) {
-  if (CC.pinned) return;
+  if (CC.pinned) {
+    // (Kept: put away after the pointer rests elsewhere on the page a while.)
+    if (CC.inCard || (t && t.key === CC.key) || ccDist(x, y) < 40 || ccNearLit(x, y)) { clearTimeout(CC.awayT); CC.awayT = 0; }
+    else if (!CC.awayT) CC.awayT = setTimeout(() => { CC.awayT = 0; if (CC.pinned && !CC.inCard) ccClose(); }, 1500);
+    return;
+  }
   const showing = !!CC.el;
   if (t && t.key === CC.key) { clearTimeout(CC.hideT); CC.leave = null; return; }
   if (showing && !CC.leave) CC.leave = { t: Date.now(), d: ccDist(x, y) };
@@ -678,7 +703,33 @@ $('#vScroll').addEventListener('pointermove', ev => {
   CC.px = ev.clientX; CC.py = ev.clientY;
   if (!CC.raf) CC.raf = requestAnimationFrame(ccMove);
 }, { passive: true });
-$('#vScroll').addEventListener('pointerleave', ev => { if (ev.pointerType !== 'touch' && !CC.pinned) { clearTimeout(CC.showT); CC.want = null; if (CC.el) ccHideSoon(); } });
+// The split screen: the same, hovered or tapped (any tool: nothing's
+// marked there); scrolled, the card's put away.
+$('#vPeekBody').addEventListener('pointermove', ev => {
+  if (ev.pointerType === 'touch' || ev.buttons) return;
+  CC.px = ev.clientX; CC.py = ev.clientY;
+  if (!CC.raf) CC.raf = requestAnimationFrame(ccMove);
+}, { passive: true });
+$('#vPeekBody').addEventListener('scroll', () => { if (CC.el) ccClose(); }, { passive: true });
+(() => {
+  let down = null;
+  $('#vPeekBody').addEventListener('pointerdown', ev => { down = { id: ev.pointerId, x: ev.clientX, y: ev.clientY, t: Date.now() }; }, true);
+  $('#vPeekBody').addEventListener('pointerup', ev => {
+    const d = down;
+    down = null;
+    if (!d || ev.pointerId !== d.id || ev.button !== 0 || ev.ctrlKey || !ccOn() || !V.doc) return;
+    if (Math.hypot(ev.clientX - d.x, ev.clientY - d.y) > 8 || Date.now() - d.t > 400) return;
+    if (ev.target.closest('a, button')) return;
+    const x = ev.clientX, y = ev.clientY;
+    setTimeout(() => {
+      if (!getSelection().isCollapsed) return;
+      let t = null;
+      try { t = ccTargetAt(x, y); } catch (err) { t = null; }
+      if (t && t.kind !== 'link') ccShow(t, true);
+    }, 0);
+  });
+})();
+$('#vScroll').addEventListener('pointerleave', ev => { if (ev.pointerType !== 'touch' && CC.pinned) { clearTimeout(CC.awayT); CC.awayT = 0; } if (ev.pointerType !== 'touch' && !CC.pinned) { clearTimeout(CC.showT); CC.want = null; if (CC.el) ccHideSoon(); } });
 $('#vScroll').addEventListener('scroll', () => {
   if (!CC.el && !CC.want) return;
   const sc = $('#vScroll'), dy = sc.scrollTop - CC.st0, dx = sc.scrollLeft - CC.sl0;
@@ -695,14 +746,35 @@ document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && CC.el) {
 // A tap on a citation (touch, with no tool on): its card, kept until a tap
 // elsewhere. Said whether it was one (so the tap doesn't also show or hide
 // the bars).
-function ccTapAt(x, y) {
-  if (!ccOn() || !V.doc || !ccToolOk()) return false;
+function ccTapTarget(x, y) {
+  if (!ccOn() || !V.doc || !ccToolOk() || !getSelection().isCollapsed) return null;
   let t = null;
   try { t = ccTargetAt(x, y); } catch (err) { t = null; }
-  if (!t || t.kind === 'link') return false;
+  return t && t.kind !== 'link' ? t : null;
+}
+function ccTapAt(x, y) {
+  const t = ccTapTarget(x, y);
+  if (!t) return false;
   ccShow(t, true);
   return true;
 }
+// A tap or click on a citation that the bars' tap (reader.js) doesn't see:
+// with the Select tool on, or a mouse on a Mac. Its card, kept.
+(() => {
+  let down = null;
+  $('#vScroll').addEventListener('pointerdown', ev => { down = { id: ev.pointerId, x: ev.clientX, y: ev.clientY, t: Date.now() }; }, true);
+  $('#vScroll').addEventListener('pointerup', ev => {
+    const d = down;
+    down = null;
+    if (!d || ev.pointerId !== d.id || ev.button !== 0 || ev.ctrlKey || !ccToolOk() || (V.tool === 'read' && TOUCH_UI.matches)) return;
+    // (A finger's, with the Pencil in use: the bars' tap has it.)
+    if (V.pencil && ev.pointerType === 'touch' && TOUCH_UI.matches) return;
+    if (Math.hypot(ev.clientX - d.x, ev.clientY - d.y) > 6 || Date.now() - d.t > 400) return;
+    if (ev.target.closest('a, button, .annotationLayer section, .editToolbar')) return;
+    const x = ev.clientX, y = ev.clientY;
+    setTimeout(() => { if (getSelection().isCollapsed) ccTapAt(x, y); }, 0);
+  });
+})();
 // A link to the reference list, clicked or tapped: its card, pinned, with
 // the link's choices in it (see linkChoice).
 function ccShowLink(dest, where, at) {

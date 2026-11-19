@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-17.08';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-19.01';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -1648,7 +1648,6 @@ function setTool(tool) {
     if (sel) { stickyOn(sel); return; }
   }
   if (tool !== 'read') hideQuote();
-  if (tool === 'read') fingerMode(false);
   if (tool === 'markup') tool = markupTool();
   if (tool === 'lines') tool = lineTool();
   if (V.tool === 'text' && tool !== 'text') commitTextBox();
@@ -2009,9 +2008,7 @@ function placePalette() {
   });
 }
 // (Menus are placed to be seen whole: placeMenu.)
-// (What pressed a tool: a finger, the Pencil or the mouse; see FINGER.)
 $('#vPalette').addEventListener('pointerdown', ev => {
-  FINGER.by = ev.pointerType;
   // (The passage selected, in case pressing the toolbar loses it.)
   const sel = V.tool === 'read' ? quoteSelection() : null;
   QUOTE.palSel = sel ? { sel, at: Date.now() } : null;
@@ -2023,7 +2020,6 @@ $('#vPalette').addEventListener('click', ev => {
     $('#vPalette').classList.remove('more-open');
     $('#vpMore').setAttribute('aria-expanded', 'false');
     const on = toolOn(t.dataset.tool, V.tool);
-    if (!on) fingerMode(FINGER.by === 'touch' && (V.pencil || FINGER.on));
     setTool(on ? 'read' : t.dataset.tool);
     return;
   }
@@ -2250,23 +2246,19 @@ function endStrokes() {
     STROKES.timer = setTimeout(endStrokes, 1500);
   }, true);
 })();
-// A tool chosen with a finger is used with a finger, even where there's a
-// Pencil (as on a phone: one finger marks, two scroll); chosen with the
-// Pencil, the Pencil marks and fingers scroll. Putting the tool down, or
-// using the Pencil, goes back to the Pencil's way.
-const FINGER = { on: false, by: '' };
-function fingerMode(on) {
-  if (!on && !FINGER.on) return;
-  FINGER.on = !!on;
-  V.pencil = !on && matchMedia('(pointer: coarse)').matches && store.get('pencil', false);
-  $('#viewer').classList.toggle('pencil', V.pencil);
-}
+// Where the Pencil's in use, it marks and fingers scroll, however the
+// tool was picked (a finger that marked turned scrolls into strokes).
+// One not used for 3 days is forgotten: fingers mark again (as on a
+// phone: one finger marks, two scroll) until the Pencil's next used.
+const pencilRecent = () => Date.now() - store.get('pencilAt', Date.now()) < 3 * 864e5;
 (() => {
   const sc = $('#vScroll');
-  if (matchMedia('(pointer: coarse)').matches && store.get('pencil', false)) { V.pencil = true; $('#viewer').classList.add('pencil'); }
+  if (matchMedia('(pointer: coarse)').matches && store.get('pencil', false) && pencilRecent()) { V.pencil = true; $('#viewer').classList.add('pencil'); }
+  let stamped = 0;
   const pencilOn = () => {
+    // (When it was last used: kept, at most once an hour.)
+    if (Date.now() - stamped > 36e5) { stamped = Date.now(); store.set('pencilAt', stamped); }
     if (V.pencil) return;
-    FINGER.on = false;
     V.pencil = true;
     $('#viewer').classList.add('pencil');
     store.set('pencil', true);
@@ -2980,6 +2972,7 @@ function commentView(text) {
   box.dataset.mode = 'view';
   $('#vCommentView').textContent = text;
   commentTrash();
+  commentNoteBtn();
 }
 // The one trash: the comment; or, where it's on a mark that can go too,
 // a choice of which.
@@ -2992,9 +2985,36 @@ function commentTrash() {
   commentWhichClose();
 }
 function commentWhichClose() { const m = $('#vCommentWhich'); if (m) m.remove(); }
+// Add to notes: shown for a saved comment being read, on a paper in the library.
+function commentNoteBtn() {
+  const box = $('#vComment');
+  $('#vCommentNote').hidden = !(gs && V.entry && BYKEY.get(V.entry.k) && box.dataset.mode === 'view' && box._ed && commentText(box._ed));
+}
+// The comment into your notes: a highlight's (or underline's) under a
+// quotation of its words; any other's (a note, a drawing's) with its page.
+async function commentToNotes() {
+  const box = $('#vComment'), ed = box._ed, note = ed ? commentText(ed).trim() : '', k = V.entry && V.entry.k;
+  if (!ed || !note || $('#vCommentNote').hidden) return;
+  // (Once: a second tap while the words are read does nothing.)
+  $('#vCommentNote').hidden = true;
+  let w = null;
+  if (box._what === 'highlight' && ed.id) { try { w = await markWords(ed.id); } catch (err) { w = null; } }
+  let pg = w ? w.page : '';
+  if (!w) {
+    const n = (ed.pageIndex != null ? ed.pageIndex : (ed.parent && ed.parent.pageIndex)) + 1;
+    try { pg = n ? (await printedPage(n)).page : ''; } catch (err) { pg = n || ''; }
+  }
+  if (!V.entry || V.entry.k !== k) return;
+  if (box._ed === ed) closeComment(false);
+  // (Put down, as Add to notes for a highlight does.)
+  if (V.ui) { try { V.ui.unselectAll(); } catch (err) { /* nothing picked up */ } }
+  rnAddPassage(w ? w.text : '', pg, note);
+}
+$('#vCommentNote').addEventListener('click', commentToNotes);
 function commentEdit() {
   const box = $('#vComment'), ta = $('#vCommentText');
   box.dataset.mode = 'edit';
+  commentNoteBtn();
   if (box._ed) ta.value = commentText(box._ed);
   setTimeout(() => { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }, 30);
 }
@@ -5972,7 +5992,7 @@ async function linkChoice(dest, at) {
   m.id = 'linkMenu';
   m.setAttribute('role', 'menu');
   m.innerHTML = `<button type="button" role="menuitem" data-link="go"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h14"/><path d="M13 6l6 6-6 6"/></svg><span>Go to page ${where.page}</span></button>` +
-    `<button type="button" role="menuitem" data-link="peek"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4" width="17" height="16" rx="2"/><path d="M3.5 13.5h17"/><path d="M7 16.8h10" opacity=".6"/></svg><span>Show in a panel</span></button>`;
+    `<button type="button" role="menuitem" data-link="peek"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4" width="17" height="16" rx="2"/><path d="M3.5 13.5h17"/><path d="M7 16.8h10" opacity=".6"/></svg><span>Show in split screen</span></button>`;
   document.body.appendChild(m);
   m.style.left = Math.max(8, Math.min(window.innerWidth - m.offsetWidth - 8, at.x - 12)) + 'px';
   m.style.top = (at.y + 14 + m.offsetHeight > window.innerHeight - 8 ? Math.max(8, at.y - m.offsetHeight - 10) : at.y + 14) + 'px';
@@ -6403,8 +6423,10 @@ function barsHidden(on) {
 function kbFit() {
   const vv = window.visualViewport, v = $('#viewer');
   if (!vv || v.hidden) { v.classList.remove('kb-up'); return; }
-  const up = innerHeight - vv.height > 120;
+  const up = innerHeight - vv.height > 120, was = v.classList.contains('kb-up');
   v.classList.toggle('kb-up', up);
+  // (The toolbar measured with the keyboard up would stay short: fitted again.)
+  if (was !== up) setTimeout(placePalette, 50);
   v.style.setProperty('--vv-top', (up ? vv.offsetTop : 0) + 'px');
   v.style.setProperty('--vv-h', vv.height + 'px');
 }
@@ -6456,8 +6478,9 @@ $('#vScroll').addEventListener('pointerup', ev => {
   }
   // A tap just beside a link within the paper (they can be tiny, like a
   // footnote's star) is a tap on the link, not on the page.
+  // (Not when it's right on a citation of its own, which has its card.)
   const near = linkNear(ev.clientX, ev.clientY, 24);
-  if (near) {
+  if (near && !ccTapTarget(ev.clientX, ev.clientY)) {
     const x = ev.clientX, y = ev.clientY;
     setTimeout(() => near.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX: x, clientY: y })), 0);
     return;
@@ -6473,9 +6496,9 @@ $('#vScroll').addEventListener('pointerup', ev => {
     return;
   }
   BARS.lastTap = { t: now, x, y };
-  // A tap on a citation shows its card (see citecard.js), not the bars;
-  // a second tap is still a double tap.
-  if (!hiddenNow && ccTapAt(x, y)) return;
+  // A tap on a citation shows its card (see citecard.js), not the bars,
+  // hidden or not; a second tap is still a double tap.
+  if (ccTapAt(x, y)) return;
   BARS.tapTimer = setTimeout(() => {
     BARS.lastTap = null;
     const hidden = $('#viewer').classList.contains('bars-hidden');

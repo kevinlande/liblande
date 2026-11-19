@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/notes.js'] = '2026-11-17.08';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/notes.js'] = '2026-11-19.01';
 /* ------------------------------------------------------------ notes */
 // The details pane shows Details or Notes (a switch at its top, or Alt-N;
 // the choice kept). Notes has your notes, in a box you type in, formatted
@@ -249,8 +249,36 @@ function nvQuote(ed, q) {
   nvExec('outdent');
   nvExec('formatBlock', '<p>');
   nvTagPages(ed);
+  nvToNextLine(ed);
 }
-const nvMarkQuote = (r, m) => (m.text ? '\u201c' + m.text + '\u201d ' : '') + '(p. ' + nvPage(r, m.page) + ')' + (m.note ? ' \u2014 ' + m.note : '');
+// (A page tag, made, puts the caret back by its count of letters: at the
+// end of what was put in, not the empty line after it. There again.)
+function nvToNextLine(ed) {
+  const b = nvBlock(ed), at = b && (b.closest('blockquote') || b), next = at && at.nextElementSibling;
+  if (!next || next.tagName !== 'P' || next.textContent.trim() || !at.textContent.trim()) return;
+  const r = document.createRange(), s = getSelection();
+  r.setStart(next, 0); r.collapse(true);
+  s.removeAllRanges(); s.addRange(r);
+}
+// A paragraph of its own (a comment): on a new line if the caret's line
+// has words, and a plain line after it, to go on writing.
+function nvPara(ed, text) {
+  const line = nvBlock(ed);
+  if (line && line.textContent.trim()) nvExec('insertParagraph');
+  nvExec('insertText', String(text).replace(/\s*\n\s*/g, ' ').trim());
+  nvExec('insertParagraph');
+  nvTagPages(ed);
+  nvToNextLine(ed);
+}
+// A mark put in your notes: a highlight as a quotation with its page, its
+// comment (if any) under it; a comment on its own, with its page.
+function nvInsertMark(ed, r, m) {
+  const pg = nvPage(r, m.page);
+  if (m.text) {
+    nvQuote(ed, '\u201c' + m.text.replace(/[.,;:]+$/, '') + '\u201d (p. ' + pg + ')');
+    if (m.note) nvPara(ed, m.note);
+  } else if (m.note) nvPara(ed, m.note + ' (p. ' + pg + ')');
+}
 
 // Your notes as you wrote them: the .bib has each & as \& (or BibDesk's
 // \{&}), as LaTeX needs, and saving writes it so again (see texSafe in
@@ -309,22 +337,41 @@ function nvMarksHTML(r, insert) {
   all.forEach(m => { const c = markColour(m); if (c) { const x = cols.get(c.key) || { c, n: 0 }; x.n++; cols.set(c.key, x); } });
   const notes = all.filter(m => m.note).length;
   const on = insert ? null : NOTES.colour;
-  const shown = all.filter(m => !on || (on === 'note' ? !!m.note : (markColour(m) || {}).key === on));
-  let h = insert ? '' : `<div class="nv-chips"><button type="button" class="nv-chip${on ? '' : ' on'}" data-nv-col="">All ${all.length}</button>` +
+  // (To insert: all, only highlights (marks with words), or only comments.)
+  const kind = insert ? nvInsKind(all) : '';
+  const shown = all.filter(m => insert ? (kind === 'hl' ? !!m.text : kind === 'cm' ? !!m.note : true) : !on || (on === 'note' ? !!m.note : (markColour(m) || {}).key === on));
+  const hls = all.filter(m => m.text).length;
+  let h = insert ? (hls && notes ? `<div class="nv-chips" role="group" aria-label="Show">` +
+    [['', 'All', all.length], ['hl', 'Highlights', hls], ['cm', 'Comments', notes]].map(([k, l, n]) => `<button type="button" class="nv-chip${kind === k ? ' on' : ''}" data-np-kind="${k}" aria-pressed="${kind === k}">${l} ${n}</button>`).join('') + `</div>` : '') : `<div class="nv-chips"><button type="button" class="nv-chip${on ? '' : ' on'}" data-nv-col="">All ${all.length}</button>` +
     [...cols.values()].map(({ c, n }) => `<button type="button" class="nv-chip${on === c.key ? ' on' : ''}" data-nv-col="${esc(c.key)}"><i style="background:${esc(c.css)}"></i>${esc(c.name)} ${n}</button>`).join('') +
-    (notes ? `<button type="button" class="nv-chip${on === 'note' ? ' on' : ''}" data-nv-col="note">Notes ${notes}</button>` : '') + `</div>`;
+    (notes ? `<button type="button" class="nv-chip${on === 'note' ? ' on' : ''}" data-nv-col="note">Comments ${notes}</button>` : '') + `</div>`;
   let last = 0;
   shown.forEach(m => {
     const i = all.indexOf(m);
     if (m.page !== last) { last = m.page; h += `<div class="nv-pg">p. ${esc(nvPage(r, m.page))}${insert ? '' : ` <button type="button" class="linkish" data-nv-open="${m.page}">open</button>`}</div>`; }
     const c = markColour(m);
     h += `<div class="nv-mark"><span class="nv-bar" style="background:${esc((c && c.css) || 'var(--line)')}"></span><div class="nv-mk">` +
-      (m.text ? `\u201c${esc(m.text)}\u201d` : '') + (m.note ? `<div class="nv-nt"><b>${m.text ? 'Note:' : 'Note'}</b> ${esc(m.note)}</div>` : '') + `</div>` +
+      (m.text ? `\u201c${esc(m.text)}\u201d` : '') + (m.note ? `<div class="nv-nt"><b>${m.name === 'Note' ? 'Note' : 'Comment'}${m.text ? ':' : ''}</b> ${esc(m.note)}</div>` : '') + `</div>` +
       (insert ? `<button type="button" class="nv-ins" data-np-ins="${i}">Insert</button>`
         : `<button type="button" class="nv-copy" data-nv-copy="${i}" title="Copy the words" aria-label="Copy the words">${ICON.copy}</button>`) + `</div>`;
   });
   return h;
 }
+// Which to insert from (kept): all, highlights or comments; all where
+// there aren't both.
+function nvInsKind(all) {
+  const k = store.get('notesInsKind', '');
+  return (k === 'hl' && all.some(m => m.text) && all.some(m => m.note)) || (k === 'cm' && all.some(m => m.note) && all.some(m => m.text)) ? k : '';
+}
+// Chosen, in the pop-out or the reader's notes: that list drawn again.
+document.addEventListener('click', ev => {
+  const b = ev.target.closest && ev.target.closest('[data-np-kind]');
+  if (!b) return;
+  const box = b.closest('.np-marks, .rn-marks'), r = box && (box.classList.contains('np-marks') ? NOTES.popMarks : RN.marks);
+  if (!r) return;
+  store.set('notesInsKind', b.dataset.npKind);
+  box.innerHTML = nvMarksHTML(r, true);
+});
 // All of them, with the citation: as the reader's Marks tab copies them.
 function nvMarksCopy(r) {
   const list = r.marks.filter(m => !NOTES.colour || (NOTES.colour === 'note' ? !!m.note : (markColour(m) || {}).key === NOTES.colour));
@@ -515,7 +562,7 @@ function openNotesPop(e) {
     `<button type="button" class="np-wide" data-np="cite" title="Cite another publication: its in-text citation, in your style">${I('<path d="M4 6h16M4 12h10M4 18h6"/>')}<span>Cite\u2026</span></button>` +
     `<div class="np-cite" hidden><input type="search" placeholder="A title or author in your library" aria-label="Find a publication to cite" autocomplete="off" spellcheck="false"><div class="np-cite-list"></div></div>` +
     `</div><div class="np-body"><div class="np-edit notes-rich" role="textbox" aria-multiline="true" aria-label="Your notes" data-placeholder="Write your notes\u2026"></div>` +
-    (readablePdfs(e).length ? `<aside class="np-side"><h4>From the PDF \u00b7 insert a quotation</h4><div class="np-marks"><p class="nv-none">Reading the PDF\u2019s highlights\u2026</p></div></aside>` : '') + `</div>` +
+    (readablePdfs(e).length ? `<aside class="np-side"><h4>From the PDF \u00b7 insert into your notes</h4><div class="np-marks"><p class="nv-none">Reading the PDF\u2019s highlights\u2026</p></div></aside>` : '') + `</div>` +
     `<div class="np-foot"><span>Markdown, in the .bib\u2019s Notes field \u00b7 saved as you type</span><span></span></div></div>`;
   document.body.appendChild(wrap);
   const ed = wrap.querySelector('.np-edit'), state_ = wrap.querySelector('.np-state');
@@ -556,7 +603,7 @@ function openNotesPop(e) {
   document.addEventListener('keydown', onKey, true);
   NOTES.pop = { e, close };
   // The buttons keep the caret where it was.
-  wrap.addEventListener('mousedown', ev => { if (ev.target.closest('[data-np], [data-np-ins]')) ev.preventDefault(); });
+  wrap.addEventListener('mousedown', ev => { if (ev.target.closest('[data-np], [data-np-ins], [data-np-kind]')) ev.preventDefault(); });
   wrap.addEventListener('click', ev => {
     if (ev.target.closest('[data-np-close]')) { close(); return; }
     const t = ev.target.closest('[data-np]');
@@ -580,7 +627,7 @@ function openNotesPop(e) {
       back();
       // (A quotation of its own: on a new line if the caret's line has
       // words, and a plain line after it, to go on writing.)
-      nvQuote(ed, nvMarkQuote(NOTES.popMarks, m));
+      nvInsertMark(ed, NOTES.popMarks, m);
       ed.dispatchEvent(new Event('input'));
       return;
     }
@@ -742,13 +789,13 @@ function rnClick(ev) {
     const m = RN.marks.marks[+ins.dataset.npIns];
     if (!m) return;
     rnBack();
-    nvQuote(ed, nvMarkQuote(RN.marks, m));
+    nvInsertMark(ed, RN.marks, m);
     ed.dispatchEvent(new Event('input'));
   }
 }
 document.addEventListener('click', rnClick);
 // (The buttons keep the caret where it was.)
-document.addEventListener('mousedown', ev => { if (RN.host && RN.host.contains(ev.target) && ev.target.closest('[data-rn], [data-np-ins], [data-rn-marks]')) ev.preventDefault(); });
+document.addEventListener('mousedown', ev => { if (RN.host && RN.host.contains(ev.target) && ev.target.closest('[data-rn], [data-np-ins], [data-np-kind], [data-rn-marks]')) ev.preventDefault(); });
 // The paper's highlights and notes (as it is now, in the reader), to insert.
 async function rnMarks() {
   const box = RN.host.querySelector('.rn-marks'), btn = RN.host.querySelector('[data-rn-marks]');
@@ -843,18 +890,23 @@ function rnAddQuote() {
   hideQuote();
   rnAddPassage(s.text, pg);
 }
-// (A highlight's words too: see markQuote.)
-function rnAddPassage(text, pg) {
+// (A highlight's words too: see markQuote; with its comment, under the
+// quotation; or a comment alone, text '', with its page.)
+function rnAddPassage(text, pg, note) {
   if (!V.entry || !gs || !BYKEY.get(V.entry.k)) return;
   pg = String(pg || '').trim().replace(/-+/g, '\u2013');
-  const q = '\u201c' + text.replace(/[.,;:]+$/, '') + '\u201d' + (pg ? ' (p. ' + pg + ')' : '');
+  note = String(note || '').replace(/\s*\n\s*/g, ' ').trim();
+  if (!text && !note) return;
+  const at = pg ? ' (p. ' + pg + ')' : '';
+  const q = text ? '\u201c' + text.replace(/[.,;:]+$/, '') + '\u201d' + at : '';
+  const md = text ? '> ' + q + (note ? '\n\n' + note : '') : note + at;
   if (handheld() && !rnShown()) {
     // (After any save still going, so two in a row both stay.)
     const k = V.entry.k;
     NOTES.saving.then(() => {
       const was = notesOf(BYKEY.get(k)).trim();
-      return notesSave(k, (was ? was + '\n\n' : '') + '> ' + q, true);
-    }).then(ok => { if (ok) toast('Added to your notes' + (pg ? ' (p. ' + pg + ')' : ''), 2200); });
+      return notesSave(k, (was ? was + '\n\n' : '') + md, true);
+    }).then(ok => { if (ok) toast('Added to your notes' + at, 2200); });
     return;
   }
   // (Not open: on an iPad held upright, below the page, whatever the notes
@@ -864,13 +916,16 @@ function rnAddPassage(text, pg) {
   }
   if (!RN.ed) return;
   rnBack();
-  nvQuote(RN.ed, q);
+  if (q) nvQuote(RN.ed, q);
+  if (note) nvPara(RN.ed, q ? note : note + at);
   RN.ed.dispatchEvent(new Event('input'));
   rnKeep();
-  // (The new quotation in view, lit for a moment; on a touch screen the
-  // keyboard not brought up over the paper.)
-  const sel = getSelection(), at = sel && sel.anchorNode, el = at && (at.nodeType === 3 ? at.parentElement : at);
-  const bq = (el && el.closest && el.closest('blockquote')) || [...RN.ed.querySelectorAll('blockquote')].pop();
+  // (The new quotation, or comment, in view, lit for a moment; on a touch
+  // screen the keyboard not brought up over the paper.)
+  const sel = getSelection(), an = sel && sel.anchorNode, el = an && (an.nodeType === 3 ? an.parentElement : an);
+  const cur = el && el.closest && el.closest('p,blockquote');
+  const bq = q ? (el && el.closest && el.closest('blockquote')) || (note && cur && cur.previousElementSibling && cur.previousElementSibling.previousElementSibling) || [...RN.ed.querySelectorAll('blockquote')].pop()
+    : cur && cur.previousElementSibling;
   if (coarseMQ.matches) RN.ed.blur();
   if (bq) { bq.scrollIntoView({ block: 'nearest' }); bq.classList.add('rn-new'); setTimeout(() => bq.classList.remove('rn-new'), 1400); }
 }

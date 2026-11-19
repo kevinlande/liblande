@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/related.js'] = '2026-11-17.08';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/related.js'] = '2026-11-19.01';
 /* ------------------------------------------------------------ a reference selected */
 // Words selected in a paper that look like a reference (a year, or a DOI,
 // with a name as "Fodor, J." or the like, pages or a journal's volume;
@@ -39,6 +39,8 @@ function refFit(c, text) {
   const inTitle = tw.filter(w => words.has(w)).length / tw.length;
   const fam = tsWords(tsFamily(c.people[0] || '')), who = fam.length && fam.every(w => words.has(w));
   const when = c.year && words.has(c.year);
+  // (A title of one word: its author's name in it too, not only the year.)
+  if (tw.length < 2 && !who) return 0;
   return inTitle >= 0.75 && (who || when) ? inTitle + (who ? 0.5 : 0) + (when ? 0.3 : 0) : 0;
 }
 const REF = { seq: 0, el: null, list: [], at: 0, text: '' };

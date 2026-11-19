@@ -145,6 +145,8 @@
   -webkit-backdrop-filter: saturate(190%) blur(26px); backdrop-filter: saturate(190%) blur(26px);
   border-color: var(--glass-edge); box-shadow: inset 0 1px 0 var(--glass-rim), inset 0 0 0 .5px var(--glass-rim), var(--shadow);
 }
+/* (Menus nearly solid: their words read over a page's text behind them.) */
+:root[data-glass] .menu-list { background: color-mix(in srgb, var(--panel) 94%, transparent); }
 :root[data-glass] .v-back { background: color-mix(in srgb, var(--panel) 62%, transparent); color: var(--accent);
   -webkit-backdrop-filter: saturate(190%) blur(26px); backdrop-filter: saturate(190%) blur(26px);
   box-shadow: inset 0 1px 0 var(--glass-rim), inset 0 0 0 .5px var(--glass-rim), var(--shadow); }
@@ -905,7 +907,7 @@ body:has(#sheet:not([hidden])) .pick-bar { visibility: hidden; }
 @media (hover: hover) { .rl-list-bar .btn:hover { background: var(--side-hover); } }
 .rl-list-bar select { height: 28px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); color: var(--text); font: 13px var(--ui); padding: 0 6px; }
 .rl-list-bar label { display: inline-flex; align-items: center; gap: 6px; }
-#vRL { cursor: pointer; }
+#vRL, #vShare > summary { cursor: pointer; }
 #vRL.on { color: var(--accent); }
 #vRL.on svg { fill: currentColor; }
 #vRLMenu .menu-list { min-width: 230px; }
@@ -2525,6 +2527,9 @@ a.ms-ib { text-decoration: none; }
 #vPages .hidden, #vPeekPages .hidden { display: none !important; }
 .v-comment[data-mode="view"] textarea, .v-comment[data-mode="view"] .v-comment-acts, .v-comment[data-mode="edit"] .v-comment-view, .v-comment[data-mode="edit"] #vCommentEdit { display: none; }
 .v-comment-acts span { flex: 1; }
+.v-comment-note { justify-self: start; align-self: start; min-height: 30px; padding: 4px 12px; font-size: 13px; gap: 6px; }
+.v-comment-note .i { width: 16px; height: 16px; }
+.v-comment[data-mode="edit"] .v-comment-note { display: none; }
 .v-comment-acts .btn { min-height: 30px; padding: 4px 12px; font-size: 13px; }
 /* Underline, strike-through, comment: the page's text takes the pointer
    (marks are found by position), and the preview is a line. */
@@ -2610,9 +2615,11 @@ a.ms-ib { text-decoration: none; }
   .menu-list button, .menu-list a { min-height: 44px; }
   .menu-list button.op-x { width: 40px; height: 40px; border-radius: 8px; }
   .v-comment-bar button { width: 44px; height: 44px; }
+  .v-comment-note { min-height: 40px; }
   /* (Notes: their toolbars, and text big enough that Safari doesn't zoom.) */
   .rn-tools > button, .np-tools > button { min-height: 44px; height: 44px; min-width: 40px; }
   .nv-ins, .nv-copy, .nv-pg .linkish, [data-rn-marks] { min-height: 40px; padding-inline: 10px; }
+  .nv-chip { min-height: 36px; padding-inline: 12px; font-size: 13px; }
   .rn-edit, .nv-box, .np-cite input, .nv-linkbox input { font-size: 16px; }
   /* (Settings and Add.) */
   .proxy-row input { font-size: 16px; height: 40px; }
@@ -2886,13 +2893,15 @@ a.ms-ib { text-decoration: none; }
 .np-cite-list button { border: 0; background: none; text-align: left; padding: 6px 8px; border-radius: var(--r-s); font-size: 13px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
 @media (hover: hover) { .np-cite-list button:hover { background: var(--side-hover); } }
 .np-cite-list b { color: var(--accent); font-weight: 600; margin-right: 4px; }
-.np-body { display: grid; grid-template-columns: minmax(0, 1fr) 300px; min-height: 0; }
+.np-body { display: grid; grid-template-columns: minmax(0, 1fr) clamp(300px, 26vw, 420px); min-height: 0; }
 .np-body:not(:has(.np-side)) { grid-template-columns: minmax(0, 1fr); }
 .np-edit { position: relative; padding: 22px 34px 40px; overflow: auto; font-size: 16.5px; line-height: 1.7; outline: none; }
-.np-edit > * { max-width: 70ch; }
+/* (As wide as the window, up to a long but readable line.) */
+.np-edit > * { max-width: 110ch; }
 .np-side { border-left: 1px solid var(--line); overflow: auto; padding: 12px 14px; background: var(--panel); }
 .np-side h4 { margin: 0 0 4px; font: 600 11px var(--ui); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 .np-side .nv-mk { font-size: 13.5px; }
+.np-side .nv-chips, .rn-marks .nv-chips { margin: 6px 0 4px; }
 .np-foot { display: flex; justify-content: space-between; gap: 10px; padding: 7px 16px; border-top: 1px solid var(--line); font-size: 12px; color: var(--faint); }
 @media (max-width: 699px) {
   .np { inset: 0; border-radius: 0; border: 0; padding-top: env(safe-area-inset-top, 0px); }
