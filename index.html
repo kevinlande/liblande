@@ -155,9 +155,7 @@ try {
     <button type="button" class="tb-btn v-newtab" id="vNewTab" aria-label="New tab" title="New tab"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
     <span class="v-page" id="vPage"></span>
     <div class="v-tools">
-      <button type="button" class="tb-btn v-zoomctl" id="vZoomOut" aria-label="Zoom out" title="Zoom out">&#x2212;</button>
-      <button type="button" class="v-zoom" id="vZoomLevel" title="Fit the whole page" aria-label="Zoom 100%, fit the whole page">100%</button>
-      <button type="button" class="tb-btn v-zoomctl" id="vZoomIn" aria-label="Zoom in" title="Zoom in">+</button>
+      <span class="v-zoomgrp" role="group" aria-label="Zoom"><button type="button" class="tb-btn v-zoomctl" id="vZoomOut" aria-label="Zoom out" title="Zoom out"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg></button><button type="button" class="v-zoom" id="vZoomLevel" title="Fit the whole page" aria-label="Zoom 100%, fit the whole page">100%</button><button type="button" class="tb-btn v-zoomctl" id="vZoomIn" aria-label="Zoom in" title="Zoom in"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12M12 6v12"/></svg></button></span>
       <span class="v-tone-pair"><button type="button" class="tb-btn" id="vDarkBtn" aria-pressed="false" aria-label="Page tone" title="Light or dark pages"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg></button><button type="button" class="tb-btn v-tone-more" id="vToneMore" hidden aria-label="Page tones" title="Page tones" aria-haspopup="dialog" aria-expanded="false"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg></button></span>
       <button type="button" class="tb-btn v-split" id="vSplitBtn" aria-pressed="false" aria-label="Split screen" title="Split screen"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4" width="17" height="16" rx="2"/><path d="M3.5 12h17"/><path d="M11 8h2M11 16h2" opacity=".55"/></svg></button>
       <span class="v-sep" aria-hidden="true"></span>
@@ -388,7 +386,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-11-19.01</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-11-19.02</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -403,7 +401,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-11-19.01';
+      l.querySelector('small').textContent = 'Version 2026-11-19.02';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -416,7 +414,7 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.firstChild.textContent = 'LibLande hit an error (version 2026-11-19.01): ' + msg;
+    bar.firstChild.textContent = 'LibLande hit an error (version 2026-11-19.02): ' + msg;
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });

@@ -1480,7 +1480,8 @@ button.fileicon { border: 0; background: none; cursor: pointer; }
 .menu { position: relative; }
 .menu > summary { list-style: none; }
 .menu > summary::-webkit-details-marker { display: none; }
-.menu > summary svg:last-child:not(.dots) { width: 13px; height: 13px; opacity: .7; }
+/* (The arrow after a menu button's icon or words; not a toolbar button's only icon.) */
+.menu > summary svg:last-child:not(.dots):not(.tb-btn > svg:only-of-type) { width: 13px; height: 13px; opacity: .7; }
 .menu-list { position: absolute; z-index: 20; top: calc(100% + 4px); left: 0; min-width: 170px; padding: 4px; display: grid; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); box-shadow: var(--shadow); }
 .menu.right .menu-list { left: auto; right: 0; }
 .menu.up .menu-list { top: auto; bottom: calc(100% + 4px); }
@@ -1691,6 +1692,19 @@ details.d-sec[open] summary { margin-bottom: 8px; }
 button.v-zoom { height: 28px; padding: 0 6px; border: 1px solid transparent; border-radius: 7px; background: none; cursor: pointer; font-family: inherit; }
 @media (hover: hover) { button.v-zoom:hover { background: var(--side-hover); color: var(--text); } }
 .v-tools { display: flex; align-items: center; gap: 2px; }
+/* (Zoom out, the zoom, zoom in: one bordered segment, as .seg; a space
+   after it.) */
+.v-zoomgrp { display: inline-flex; align-items: stretch; height: 28px; margin-right: 8px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.v-zoomgrp > button { height: 100%; border: 0; border-radius: 0; }
+.v-zoomgrp .v-zoomctl { width: 26px; padding: 0; justify-content: center; }
+.v-zoomgrp .v-zoomctl .i { width: 14px; height: 14px; }
+.v-zoomgrp button.v-zoom { min-width: 40px; padding: 0 2px; border-inline: 1px solid var(--line); }
+.v-zoomgrp :focus-visible { outline-offset: -2px; }
+@media (pointer: coarse) {
+  .v-zoomgrp { height: 36px; }
+  .v-zoomgrp > button, .v-zoomgrp button.v-zoom { height: 100%; min-height: 0; }
+  .v-zoomgrp .v-zoomctl { width: 40px; }
+}
 .v-bar .btn { min-height: 30px; padding: 4px 10px; }
 .v-bar .btn:disabled { opacity: .5; }
 .v-bar .menu-list { top: calc(100% + 6px); }
@@ -2307,7 +2321,7 @@ a.ms-ib { text-decoration: none; }
 .v-cut-grip { position: absolute; left: 4px; top: 50%; width: 20px; height: 44px; margin-top: -22px; border-radius: 10px; background: var(--accent); box-shadow: 0 2px 8px rgba(0, 0, 0, .3); }
 .v-cut-grip::after { content: ""; position: absolute; left: 7px; right: 7px; top: 14px; bottom: 14px; border-left: 2px solid var(--accent-ink); border-right: 2px solid var(--accent-ink); opacity: .7; }
 .v-cut-line.moving .v-cut-grip { transform: scale(1.1); }
-@media (max-width: 599px) { .v-zoomctl, .v-tools .v-zoom, .v-tools .v-sep { display: none; } }
+@media (max-width: 599px) { .v-zoomgrp, .v-tools .v-sep { display: none; } }
 /* (The panel doesn't open on a phone.) */
 @media (max-width: 699px) { #vSplitBtn { display: none; } }
 .v-status { z-index: 6; }
