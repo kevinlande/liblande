@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, inbox, trash, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-20.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-20.05';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -410,9 +410,11 @@ async function lookupIntoEdit() {
   }
 }
 
-function openAdd(pdf) {
-  sheet = { mode: 'add', pdf: null };
-  const h = sheetHead('Add a publication', 'Add to library') +
+// (inbox: into the Inbox, not the library: + with the Inbox open.)
+function openAdd(pdf, inbox) {
+  sheet = { mode: 'add', pdf: null, toInbox: !!inbox };
+  const save = inbox ? 'Add to Inbox' : 'Add to library';
+  const h = sheetHead(inbox ? 'Add to your Inbox' : 'Add a publication', save) +
     `<div class="fld"><label for="doiLookup">Find</label><div class="doi-row">` +
     `<input id="doiLookup" type="text" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Title, DOI, ISBN, arXiv ID or BibTeX" aria-controls="tsList">` +
     `<button type="button" class="btn" id="doiGo">Fill in</button>` +
@@ -427,8 +429,8 @@ function openAdd(pdf) {
     // (Its free copy, or the article through your library: see findpdf.js.)
     `<details class="menu" id="addFind"><summary class="btn" title="Its free copy, or the article through your library">${FIND_ICON}<span>Find PDF</span>${ICON.chev}</summary><div class="menu-list" role="menu" id="addFindList"></div></details></div>` +
     `<p class="add-pdf-name" id="addPdfName" hidden></p></div>` +
-    `<label class="check"><input type="checkbox" id="addRL">Put it on my reading list</label>`;
-  showSheet(h, 'Add to library');
+    (inbox ? '' : `<label class="check"><input type="checkbox" id="addRL">Put it on my reading list</label>`);
+  showSheet(h, save);
   $('#sheet').classList.add('head-mode', 'compact', 'pop');
   renderAddFields({});
   // (A PDF chosen here is read for its DOI or ISBN too, as one dropped is.)
@@ -996,6 +998,7 @@ async function saveAdd() {
     sheetMsg('This looks like \u201c' + (same.f.title || same.k) + '\u201d (' + (same.authorsShort || same.k) + (same.f.year ? ', ' + same.f.year : '') + '), already in your ' + (same.ib ? 'inbox' : 'library') + '. Press ' + $('#sheetSave').textContent + ' again to add it anyway.', true);
     return;
   }
+  if (sheet.toInbox) { saveAddInbox(type, vals); return; }
   const bad = Object.keys(vals).find(n => !balanced(vals[n]));
   if (bad) { sheetMsg('The ' + (FIELD_LABELS[bad] || bad) + ' field has unbalanced braces { }. Check it and try again.', true); return; }
   let key = makeCiteKey(vals);
@@ -1056,6 +1059,18 @@ async function saveAdd() {
     // (A folder LibLande isn't given yet: Add papers first.)
     toast('Couldn\u2019t add ' + name + ': ' + errText(err), 12000, (err && err.unseenFolder ? [{ label: 'Add papers', run: addPapers }] : []).concat([{ label: 'Try again', run: () => reopenAdd(snap, errText(err)) }]));
   }
+}
+// Into the Inbox (Add opened with the Inbox open): its details, and its
+// PDF (uploaded to LibLande/Inbox/Papers); not in the .bib.
+function saveAddInbox(type, vals) {
+  const pdf = $('#addPdf').files[0] || sheet.pdf;
+  if (pdf && isOffline()) { sheetMsg('Adding a PDF needs a connection. Add it without the PDF now, and attach the PDF when you\u2019re back online.', true); return; }
+  const people = (vals.author ? parseNamesLite(vals.author) : vals.editor ? parseNamesLite(vals.editor) : []).map(([f, g]) => g ? f + ', ' + g : f);
+  const x = ibAdd({ title: vals.title, people, year: vals.year || '', venue: vals.journal || vals.booktitle || vals.publisher || '', doi: vals.doi || '', type, abs: vals.abstract || '', url: vals.url || '' });
+  if (!x) return;
+  closeSheet();
+  ibShow(x.id);
+  if (pdf) ibAttach(x, pdf);
 }
 // Add opened again as it was left, with why it didn't add.
 function reopenAdd(snap, why) {
@@ -1141,8 +1156,10 @@ document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && !$('#she
 $('#addBtn').addEventListener('click', () => {
   // (Not after a long press, which showed its menu.)
   if (AB.long) { AB.long = false; return; }
-  openAdd();
+  openAdd(undefined, addToInboxHere());
 });
+// (+ with the Inbox open in the library: adds to the Inbox.)
+const addToInboxHere = () => state.group === 'inbox' && $('#viewer').hidden;
 // On a touch screen, + held: Paste (a BibTeX entry, a DOI or ISBN, or a
 // title, from the clipboard) or From a photo (the camera, or a photo
 // chosen), each opening Add with that under way. (On a phone, + can be
@@ -1160,9 +1177,12 @@ function openAddMenu(btn) {
   m.setAttribute('aria-label', 'Add a publication');
   // (With a book selected, a chapter of it too, named by its title.)
   const sel = state.selKey && BYKEY.get(state.selKey), book = !state.picking && isBook(sel) && !sel.ib ? sel : null;
-  m.innerHTML = `<div class="menu-head">Add a publication</div>` +
+  m.innerHTML = `<div class="menu-head">${addToInboxHere() ? 'Add to your Inbox' : 'Add a publication'}</div>` +
     (navigator.clipboard && navigator.clipboard.readText ? `<button type="button" role="menuitem" class="mi" data-add="paste">${ICON.paste}<span class="op-text"><span class="rc-title">Paste</span><span class="rc-sub">A BibTeX entry, DOI or title you copied</span></span></button>` : '') +
     `<button type="button" role="menuitem" class="mi" data-add="photo">${ICON.camera}<span class="op-text"><span class="rc-title">From a photo</span><span class="rc-sub">Take one, or choose one</span></span></button>` +
+    (addToInboxHere()
+      ? `<button type="button" role="menuitem" class="mi" data-add="library">${ICON.lib}<span class="op-text"><span class="rc-title">Add to library</span><span class="rc-sub">Straight into your .bib</span></span></button>`
+      : `<button type="button" role="menuitem" class="mi" data-add="inbox">${ICON.inbox}<span class="op-text"><span class="rc-title">Add to Inbox</span><span class="rc-sub">To read and decide on, not in your library yet</span></span></button>`) +
     (book ? `<button type="button" role="menuitem" class="mi" data-add="chapter">${ICON.addChapter}<span class="op-text"><span class="rc-title">Add a chapter</span><span class="rc-sub">To ${esc(shortTitle(book.f.title || book.k))}</span></span></button>` : '');
   document.body.appendChild(m);
   $('#addMore').setAttribute('aria-expanded', 'true');
@@ -1181,15 +1201,16 @@ function openAddMenu(btn) {
     if (!b) return;
     closeAddMenu();
     if (b.dataset.add === 'chapter') { if (book) openAddChapter(book); return; }
+    if (b.dataset.add === 'inbox' || b.dataset.add === 'library') { openAdd(undefined, b.dataset.add === 'inbox'); return; }
     if (b.dataset.add === 'paste') {
       // (Asked now, at the tap, as browsers require.)
       let read;
       try { read = navigator.clipboard.readText(); } catch (err) { read = Promise.reject(err); }
       read.catch(() => {});
-      openAdd();
+      openAdd(undefined, addToInboxHere());
       pasteIntoForm(read);
     } else {
-      openAdd();
+      openAdd(undefined, addToInboxHere());
       $('#photoIn').click();
     }
   });

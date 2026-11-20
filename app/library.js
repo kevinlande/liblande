@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, inbox, trash, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-20.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-20.05';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -1041,7 +1041,7 @@ document.addEventListener('drop', ev => {
   if (!file) { toast('That isn\u2019t a PDF.', 3000); return; }
   if (files.length > 1) toast('Using ' + file.name + ' (drop one PDF at a time).', 3000);
   if (t.kind === 'form') { setAddPdf(file); return; }
-  if (t.kind === 'new') { openAdd(file); return; }
+  if (t.kind === 'new') { openAdd(file, addToInboxHere()); return; }
   if (state.selKey !== t.e.k) { state.selKey = t.e.k; paint(); renderDetail(); }
   // (One in the Inbox: its PDF, kept there.)
   if (t.e.inbox) { ibAttach(t.e.inbox, file); return; }
@@ -2451,7 +2451,7 @@ function paint() {
     rowsEl.style.height = 'auto';
     // (A library with nothing in it yet: how to start.)
     rowsEl.innerHTML = !state.q && !ENTRIES.length ? `<div class="empty empty-lib"><b>No publications yet</b><p>Add one by its title, DOI or ISBN, from a PDF, or from a photo of its first page.</p>${gs ? `<button type="button" class="btn primary" data-empty-add>${ICON.plus}<span>Add a publication\u2026</span></button>` : ''}</div>`
-      : `<div class="empty">${state.q ? 'No publications match \u201c' + esc(state.q) + '\u201d.' : state.group === 'inbox' ? 'Nothing in your Inbox. Put works here from a citation\u2019s card, or from Related and Cited here in the reader.' : state.group === 'trash' ? 'The Trash is empty.' : 'This group is empty.'}</div>`;
+      : `<div class="empty">${state.q ? 'No publications match \u201c' + esc(state.q) + '\u201d.' : state.group === 'inbox' ? 'Your Inbox is empty. It holds works you\u2019re considering: read them here, then add them to your library or remove them.' : state.group === 'trash' ? 'The Trash is empty.' : 'This group is empty.'}</div>`;
     return;
   }
   const top = Math.max(0, listEl.scrollTop - listOver), vh = listEl.clientHeight || 600;
