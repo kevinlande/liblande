@@ -17,7 +17,7 @@
   window.LIBLANDE_PAGES = true;
   // (Which version each part of the app is from: index.html checks they
   // match. build.py fills it in.)
-  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-11-20.02';
+  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-11-20.03';
   const CLIENT_ID = '789682218462-98mjugngb46ttd01ucp9dcj71ufspjgn.apps.googleusercontent.com';
   // Google Drive, in one of two ways (docs/drive-file-plan.md):
   // full: all of Drive (your .bib, papers and LibLande folder wherever
@@ -730,6 +730,22 @@
   // One that can't be made (changed elsewhere meanwhile, say): kept, with
   // why, in a list of its own, never just dropped (liblandeStuck).
   window.liblandeStuck = () => store.get('outboxStuck', []).slice();
+  // (One tried again: back in the queue, at its end, and sent; or let go.)
+  // (anyway: a change to a publication changed since (in BibDesk, say)
+  // made over it: its own fields set, the others left as they are now.)
+  window.liblandeRetryStuck = (id, anyway) => {
+    const all = store.get('outboxStuck', []), item = all.find(x => x.id === id);
+    if (!item) return Promise.resolve(false);
+    store.set('outboxStuck', all.filter(x => x.id !== id));
+    const back = JSON.parse(JSON.stringify(item)); delete back.reason; delete back.stuckAt;
+    if (anyway && back.name === 'saveEntry' && back.args && back.args[0]) { delete back.args[0].expectHash; delete back.args[0].expectGroupsHash; delete back.args[0].expectStamp; }
+    store.set('outbox', freshOutbox().concat([back]));
+    outbox = store.get('outbox', []);
+    window.dispatchEvent(new CustomEvent('liblande-waiting', { detail: { waiting: outbox.length } }));
+    return flushOutbox().then(() => true, () => true);
+  };
+  window.liblandeDiscardStuck = id => { store.set('outboxStuck', store.get('outboxStuck', []).filter(x => x.id !== id)); window.dispatchEvent(new CustomEvent('liblande-waiting', {})); return true; };
+  window.liblandeSendNow = () => { laterAt = 0; return flushOutbox(); };
   function keepForLater(name, args) {
     freshOutbox().push({ name, args, at: Date.now(), id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8) });
     store.set('outbox', outbox);

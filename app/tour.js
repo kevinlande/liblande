@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, inbox, trash, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-11-20.02';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-11-20.03';
 /* -------------------------------------------------------------- features */
 // What LibLande does, by area: each feature, what it's for, where to find
 // it, its icon (see featIcon), and other words it's found by (as "tag"
@@ -19,7 +19,7 @@ const FEATURES = [
     ['Sign out', 'Sign out of one device: its Google sign-in, settings, saved library and offline papers are forgotten there. Nothing in Google Drive changes, and other devices stay signed in.', 'Settings \u203a Library \u203a Google account', 'path:M14 4.5h4.5a1.5 1.5 0 0 1 1.5 1.5v12a1.5 1.5 0 0 1-1.5 1.5H14M10 8l-4 4 4 4M6 12h10', 'log out logout account switch account'],
     ['Install it', 'Add LibLande to your Dock or Home Screen, to open it like an app.', 'Safari\u2019s Share menu: Add to Dock, or Add to Home Screen', 'path:M4.5 4.5h15v15h-15zM12 8v8M8 12h8', 'app web app home screen'],
     ['iPad and iPhone', 'Made for touch and the Apple Pencil: write with the Pencil, scroll with a finger.', '', 'path:M6.5 3h11a1.5 1.5 0 0 1 1.5 1.5v15a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 19.5v-15A1.5 1.5 0 0 1 6.5 3zM11 18h2', 'pencil touch mobile'],
-    ['Works offline', 'The library and the papers you\u2019ve read stay on the device. Marks and edits made offline go to Google Drive when you\u2019re back online.', 'The cloud in the toolbar shows what\u2019s waiting', '#netBadge', 'offline sync'],
+    ['Works offline', 'The library and the papers you\u2019ve read stay on the device. Marks and edits made offline go to Google Drive when you\u2019re back online.', 'The cloud in the toolbar: tap it for what\u2019s waiting (a red dot: something couldn\u2019t be made: Try again, Copy or Discard)', '#netBadge', 'offline sync waiting queue'],
     ['Saved as you go', 'Marks are saved into the PDF on Google Drive, so other apps show them: two minutes after your last change (five for a big PDF), and when you leave the paper. Changed elsewhere meanwhile? Combine merges your marks in.', '', 'path:M7.5 18.5h9.8a3.7 3.7 0 0 0 .6-7.35A5.6 5.6 0 0 0 7.2 9.6a4.45 4.45 0 0 0 .3 8.9zM9.4 13.6l1.9 1.9 3.4-3.6', 'save autosave conflict'],
     ['Backups', 'A copy of the .bib before each change (the last 10, then daily for two weeks, weekly for three months); a PDF\u2019s copy before its first save each day, kept 60 days.', 'Settings \u203a Library; the copies in Drive, LibLande \u203a Backups', 'path:M4.5 7.5h15v12h-15zM3.5 4.5h17v3h-17zM10 11h4', 'restore history'],
     ['Check for changes', 'Pick up changes made in BibDesk or on another device. LibLande also looks when it opens.', 'The circling arrow in the toolbar; on an iPad or iPhone, pull down on the list', '#refreshBtn', 'reload refresh sync'],

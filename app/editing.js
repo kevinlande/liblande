@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, inbox, trash, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-20.02';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-20.03';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -1081,7 +1081,7 @@ function reopenAdd(snap, why) {
 $('#sheetForm').addEventListener('submit', ev => {
   ev.preventDefault();
   if (!sheet || $('#sheetSave').disabled) return;
-  if (sheet.mode === 'edit') saveEdit(); else if (sheet.mode === 'forth') saveForth(); else if (sheet.mode === 'join') saveJoin(); else if (sheet.mode === 'export') runExport(); else if (sheet.mode === 'export-save') saveExport(); else if (sheet.mode === 'help' || sheet.mode === 'msreport' || sheet.mode === 'newpapers' || sheet.mode === 'qr') closeSheet(); else if (sheet.mode === 'npfollow') saveFollow(); else if (sheet.mode === 'mscheck') runMsCheck(); else if (sheet.mode === 'msfix') runMsFix(); else if (sheet.mode === 'smart') saveSmart(); else if (sheet.mode === 'bulk') saveBulk(); else if (sheet.mode === 'kwtidy') saveKwTidy(); else if (sheet.mode === 'linkch') saveLinkChapters(); else if (sheet.mode === 'trash' || sheet.mode === 'trashdel' || sheet.mode === 'trashkey') trSheetSave(); else if (sheet.mode === 'attach') { const a = sheet, mode = ($('#sheetBody').querySelector('[name=attachMode]:checked') || {}).value; closeSheet(); runAttach(a.entry, a.file, mode === 'replace'); } else saveAdd();
+  if (sheet.mode === 'edit') saveEdit(); else if (sheet.mode === 'forth') saveForth(); else if (sheet.mode === 'join') saveJoin(); else if (sheet.mode === 'export') runExport(); else if (sheet.mode === 'export-save') saveExport(); else if (sheet.mode === 'help' || sheet.mode === 'msreport' || sheet.mode === 'newpapers' || sheet.mode === 'qr' || sheet.mode === 'waiting') closeSheet(); else if (sheet.mode === 'npfollow') saveFollow(); else if (sheet.mode === 'mscheck') runMsCheck(); else if (sheet.mode === 'msfix') runMsFix(); else if (sheet.mode === 'smart') saveSmart(); else if (sheet.mode === 'bulk') saveBulk(); else if (sheet.mode === 'kwtidy') saveKwTidy(); else if (sheet.mode === 'linkch') saveLinkChapters(); else if (sheet.mode === 'trash' || sheet.mode === 'trashdel' || sheet.mode === 'trashkey') trSheetSave(); else if (sheet.mode === 'attach') { const a = sheet, mode = ($('#sheetBody').querySelector('[name=attachMode]:checked') || {}).value; closeSheet(); runAttach(a.entry, a.file, mode === 'replace'); } else saveAdd();
 });
 $('#sheetCancel').addEventListener('click', closeSheet);
 $('#sheetBody').addEventListener('click', ev => { const x = ev.target.closest('[data-sheet-cancel]'); if (x && !x.disabled) closeSheet(); });
@@ -1313,7 +1313,8 @@ function overlayOffline(data) {
 // outbox) and papers whose marks are kept here (JOURNAL). A tap says what
 // that means.
 async function netBadge() {
-  NET.changes = window.liblandeOutbox ? window.liblandeOutbox().length : 0;
+  NET.changes = (window.liblandeOutbox ? window.liblandeOutbox().length : 0) + Object.keys(INBOX.pending || {}).length;
+  NET.stuck = window.liblandeStuck ? window.liblandeStuck().length : 0;
   try { NET.papers = ((await JOURNAL.run('readonly', st => st.getAllKeys())) || []).filter(k => !String(k).startsWith('open:')).length; } catch (err) { NET.papers = 0; }
   netRender();
 }
@@ -1325,10 +1326,12 @@ function netRender() {
   const off = isOffline(), n = NET.changes + NET.papers;
   document.querySelectorAll('[data-net]').forEach(b => {
     const viewer = b.id === 'vNetBadge', st = viewer && !$('#viewer').hidden ? NET.save : '';
-    b.hidden = !gs || (!off && !n && !st);
+    b.hidden = !gs || (!off && !n && !st && !NET.stuck);
     b.classList.toggle('off', off);
+    // (Changes that couldn't be made: a mark on the cloud until they're seen to.)
+    b.classList.toggle('attn', !!NET.stuck);
     ['unsaved', 'saving', 'saved'].forEach(c => b.classList.toggle(c, st === c && !off));
-    b.querySelector('.net-n').textContent = n ? String(n) : '';
+    b.querySelector('.net-n').textContent = n + (NET.stuck || 0) ? String(n + (NET.stuck || 0)) : '';
     b.title = st && !off ? saveText(st) : netText();
     b.setAttribute('aria-label', b.title);
   });
@@ -1340,14 +1343,93 @@ function netText() {
   const parts = [NET.changes && plural(NET.changes, 'change to your library', 'changes to your library'), NET.papers && 'marks on ' + plural(NET.papers, 'paper', 'papers')].filter(Boolean);
   const waiting = parts.length ? parts.join(' and ') + (NET.changes + NET.papers === 1 && !NET.papers ? ' is' : ' are') + ' kept on this device' : '';
   if (isOffline()) return 'You\u2019re offline. ' + (waiting ? waiting.charAt(0).toUpperCase() + waiting.slice(1) + ', and go to Google Drive when you\u2019re back online.' : 'Changes are kept here until you\u2019re online.');
-  return waiting ? waiting.charAt(0).toUpperCase() + waiting.slice(1) + ', waiting for Google Drive.' : 'Everything is saved to Google Drive.';
+  const stuck = NET.stuck ? ' ' + plural(NET.stuck, 'change', 'changes') + ' couldn\u2019t be made: tap the cloud to see.' : '';
+  return (waiting ? waiting.charAt(0).toUpperCase() + waiting.slice(1) + ', waiting for Google Drive.' : NET.stuck ? 'Everything else is saved to Google Drive.' : 'Everything is saved to Google Drive.') + stuck;
 }
 document.addEventListener('click', ev => {
   const b = ev.target.closest('[data-net]');
   if (!b) return;
   // (The viewer's, with changes to save and Drive there: save them now.)
   if (b.id === 'vNetBadge' && NET.save === 'unsaved' && !isOffline()) { saveMarkup().then(keptNote); return; }
-  toast(b.classList.contains('unsaved') || NET.save === 'saving' ? saveText(NET.save) : netText(), 6000);
+  if (b.id === 'vNetBadge' && NET.save === 'saving') { toast(saveText(NET.save), 4000); return; }
+  openWaiting();
+});
+
+/* ---- What's waiting for Google Drive, in one place */
+// From the cloud: every change kept on this device for Drive (library
+// changes, the Inbox, papers' marks), and those that couldn't be made
+// (changed elsewhere meanwhile, say), each with what it was, why, and
+// Try again, Copy (its content, never lost) or Discard.
+const WT_NAMES = { saveEntry: 'Edit', addToMain: 'Added', createGroup: 'New group', readingOps: 'Reading list', renameKey: 'New cite key' };
+function wtWhat(x) {
+  const r = (x.args || [])[0] || {}, e = r.key && BYKEY.get(r.key), t = e ? '\u201c' + shortTitle(e.f.title || e.k) + '\u201d' : r.key ? r.key : '';
+  if (x.name === 'saveEntry') {
+    const fields = Object.keys(r.set || {}).filter(n => n !== 'date-modified').map(n => (FIELD_LABELS[n] || n).toLowerCase());
+    const g = r.groups || {}, groups = (g.add || []).map(n => 'into ' + n).concat((g.remove || []).map(n => 'out of ' + n));
+    return { title: t || 'A publication', what: fields.concat(groups).join(', ') || 'changes' };
+  }
+  if (x.name === 'addToMain') return { title: '\u201c' + shortTitle((r.fields && r.fields.title) || r.key || '') + '\u201d', what: 'added to your library' };
+  if (x.name === 'createGroup') return { title: r.name || 'A group', what: 'a new group' + ((r.keys || []).length ? ', with ' + plural(r.keys.length, 'publication', 'publications') : '') };
+  if (x.name === 'renameKey') return { title: t || r.key, what: 'cite key ' + r.key + ' \u2192 ' + r.newKey };
+  if (x.name === 'readingOps') return { title: 'Your reading list', what: plural((r.ops || []).length, 'change', 'changes') };
+  return { title: WT_NAMES[x.name] || x.name, what: '' };
+}
+async function wtPapers() {
+  let keys = [];
+  try { keys = ((await JOURNAL.run('readonly', st => st.getAllKeys())) || []).filter(k => typeof k === 'string' && !k.startsWith('open:')); } catch (err) { keys = []; }
+  return keys.map(id => { const e = ENTRIES.find(x => (x.files || []).some(f => f.id === id)); return e ? '\u201c' + shortTitle(e.f.title || e.k) + '\u201d' : 'A paper'; });
+}
+async function openWaiting() {
+  if (sheet && sheet.mode !== 'waiting') { toast(netText(), 6000); return; }
+  const out = window.liblandeOutbox ? window.liblandeOutbox() : [], stuck = window.liblandeStuck ? window.liblandeStuck() : [];
+  const papers = await wtPapers(), inbox = Object.keys(INBOX.pending || {}).length, off = isOffline();
+  // (Changed meanwhile (in BibDesk, say): Apply anyway, its own fields over
+  // what's there now. A reading-list change isn't tried again: sent late,
+  // it could undo a newer one.)
+  const clashed = x => x.name === 'saveEntry' && /changed since/i.test(x.reason || '');
+  const retry = x => (x.name === 'readingOps' ? '' : clashed(x)
+    ? `<button type="button" class="btn" data-wt-retry="${esc(x.id)}" data-anyway="1" title="Your change, put over what\u2019s there now (only the fields you changed)">Apply anyway</button>`
+    : `<button type="button" class="btn" data-wt-retry="${esc(x.id)}">Try again</button>`);
+  const row = (x, s) => { const w = wtWhat(x); return `<li class="wt-row"><div class="wt-t"><b>${esc(w.title)}</b><span>${esc(w.what)}${x.at ? ' \u00b7 ' + esc(ago(Math.round(x.at / 1000))) : ''}</span>` +
+    (s ? `<span class="wt-why">${esc(x.reason || '')}</span>` : '') + `</div>` +
+    (s ? `<div class="wt-acts">${retry(x)}<button type="button" class="btn quiet" data-wt-copy="${esc(x.id)}">Copy</button><button type="button" class="btn quiet danger" data-wt-drop="${esc(x.id)}">Discard</button></div>` : '') + `</li>`; };
+  let h = `<h2>Waiting for Google Drive</h2><p class="sheet-note">${esc(netText())}</p>`;
+  if ((out.length || papers.length || inbox) && !off) h += `<p class="wt-send"><button type="button" class="btn primary" data-wt-send>Send now</button></p>`;
+  if (stuck.length) h += `<h3 class="wt-h attn">Couldn\u2019t be made (${stuck.length})</h3><p class="sheet-note">Changed elsewhere meanwhile, say. Apply it anyway (only the fields you changed), copy what it was, or discard it.</p><ul class="wt-list">${stuck.map(x => row(x, true)).join('')}</ul>`;
+  if (out.length) h += `<h3 class="wt-h">Changes to your library (${out.length})</h3><ul class="wt-list">${out.map(x => row(x, false)).join('')}</ul>`;
+  if (papers.length) h += `<h3 class="wt-h">Marks kept on this device (${papers.length})</h3><ul class="wt-list">${papers.map(t => `<li class="wt-row"><div class="wt-t"><b>${esc(t)}</b><span>highlights and notes</span></div></li>`).join('')}</ul>`;
+  if (inbox) h += `<h3 class="wt-h">Your Inbox</h3><ul class="wt-list"><li class="wt-row"><div class="wt-t"><b>${plural(inbox, 'change', 'changes')}</b><span>works added or removed</span></div></li></ul>`;
+  if (!stuck.length && !out.length && !papers.length && !inbox) h += `<p class="wt-none">Nothing waiting: everything is on Google Drive.</p>`;
+  showSheet(h, 'Done');
+  $('#sheetCancel').hidden = true;
+  sheet = { mode: 'waiting' };
+}
+$('#sheetBody').addEventListener('click', async ev => {
+  if (!sheet || sheet.mode !== 'waiting') return;
+  const stuck = () => (window.liblandeStuck ? window.liblandeStuck() : []);
+  const r = ev.target.closest('[data-wt-retry]'), c = ev.target.closest('[data-wt-copy]'), d = ev.target.closest('[data-wt-drop]');
+  // (Drawn again when done, if it's still open.)
+  const again = () => { netBadge(); if (sheet && sheet.mode === 'waiting') openWaiting(); };
+  const send = ev.target.closest('[data-wt-send]');
+  if (send) {
+    if (send.classList.contains('busy')) return;
+    send.classList.add('busy'); send.disabled = true;
+    await Promise.all([window.liblandeSendNow ? window.liblandeSendNow().catch(() => {}) : null, uploadKept(true), ibSend()]);
+    again();
+  } else if (r && window.liblandeRetryStuck) {
+    if (isOffline()) { toast('This needs a connection.', 3000); return; }
+    if (r.dataset.anyway && r.dataset.sure !== '1') { r.dataset.sure = '1'; r.textContent = 'Apply it over what\u2019s there'; return; }
+    r.classList.add('busy'); r.disabled = true;
+    await window.liblandeRetryStuck(r.dataset.wtRetry, !!r.dataset.anyway);
+    again();
+  } else if (c) {
+    const x = stuck().find(y => y.id === c.dataset.wtCopy);
+    if (x) { const w = wtWhat(x); copy(w.title + ': ' + w.what + '\n' + JSON.stringify(x.args && x.args[0], null, 2), 'Copied what the change was'); }
+  } else if (d && window.liblandeDiscardStuck) {
+    if (d.dataset.sure !== '1') { d.dataset.sure = '1'; d.textContent = 'Discard it'; return; }
+    window.liblandeDiscardStuck(d.dataset.wtDrop);
+    again();
+  }
 });
 window.addEventListener('liblande-waiting', netBadge);
 setInterval(() => { if (!document.hidden && gs) netBadge(); }, 20000);
@@ -1360,7 +1442,7 @@ window.addEventListener('liblande-outbox', ev => {
     const who = failed.map(f => { const e = f.key && BYKEY.get(f.key); return e ? '\u201c' + (e.f.title || e.k) + '\u201d' : f.key; }).filter(Boolean);
     msg += (msg ? ' ' : '') + failed.length + ' couldn\u2019t be' + (who.length ? ' (' + who.slice(0, 3).join(', ') + (who.length > 3 ? '\u2026' : '') + ')' : '') + ': ' + failed[0].reason;
   }
-  toast(msg, failed.length ? 10000 : 5000);
+  toast(msg, failed.length ? 10000 : 5000, failed.length ? { label: 'Show', run: openWaiting } : null);
   afterWrite();
 });
 

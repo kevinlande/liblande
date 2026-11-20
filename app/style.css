@@ -1870,6 +1870,21 @@ body.is-offline .fileicon:not(.saved), body.is-offline .pdf:not(.saved) { opacit
 .net-badge.off .net-slash { display: inline; }
 .net-badge.off { color: #b2662b; }
 .net-badge .net-n:empty { display: none; }
+.net-badge.attn { position: relative; }
+.net-badge.attn::after { content: ''; position: absolute; top: 3px; right: 3px; width: 7px; height: 7px; border-radius: 50%; background: var(--warn); }
+.wt-h { margin: 14px 0 4px; font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.wt-h.attn { color: var(--warn); }
+.wt-list { list-style: none; margin: 0; padding: 0; }
+.wt-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.wt-t { flex: 1 1 220px; min-width: 0; display: grid; gap: 2px; font-size: 13.5px; }
+.wt-t span { color: var(--muted); font-size: 12.5px; }
+.wt-t .wt-why { color: var(--warn); }
+.wt-acts { display: flex; gap: 6px; flex: none; }
+.wt-acts .btn { min-height: 30px; padding: 3px 10px; font-size: 12.5px; }
+.wt-acts .btn.quiet { border-color: transparent; background: none; color: var(--muted); }
+.wt-acts .btn.danger { color: var(--warn); }
+.wt-none { color: var(--muted); }
+@media (pointer: coarse) { .wt-acts .btn { min-height: 44px; } }
 /* The viewer's: the open paper's saving. */
 .net-badge .net-up, .net-badge .net-ok { display: none; }
 .net-badge.unsaved, .net-badge.saving { color: var(--accent); }
