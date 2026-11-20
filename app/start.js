@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, inbox, trash, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-11-20.03';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-11-20.04';
 // On GitHub Pages, every part of the app must be from the same version: a
 // part kept from an older one (the offline copy, served when the network
 // was slow) lacks what this page needs. Then the kept copies go, and the
@@ -20,12 +20,48 @@ if (window.LIBLANDE_PAGES && navigator.onLine) {
       try { sessionStorage.setItem('liblande.partsFixed', want); } catch (e) { /* tried once anyway */ }
       const again = () => location.reload();
       RELOADING = true;
-      (window.caches ? caches.keys().then(ks => Promise.all(ks.filter(k => k.indexOf('liblande-app-') === 0).map(k => caches.delete(k)))) : Promise.resolve()).then(again, again);
+      // (Only once the internet's seen to answer, past the copy: with Wi-Fi
+      // and no internet, letting the copy go would leave nothing to open.)
+      const net = window.AbortController ? new AbortController() : null;
+      if (net) setTimeout(() => net.abort(), 8000);
+      // (sw.js itself, which no worker keeps a copy of, asked for anew: so
+      // the answer is the internet's. Then only other versions' copies go,
+      // not this version's, which a new worker may have just made.)
+      fetch('sw.js?net=' + Date.now(), Object.assign({ cache: 'no-store', headers: { 'X-LibLande-Net': '1' } }, net ? { signal: net.signal } : {}))
+        .then(r => { if (!r.ok) throw new Error('no'); return window.caches ? caches.keys().then(ks => Promise.all(ks.filter(k => k.indexOf('liblande-app-') === 0 && k !== 'liblande-app-' + want).map(k => caches.delete(k)))) : null; })
+        .then(again, () => { RELOADING = false; console.warn('LibLande: parts from another version, and the internet not answering: kept as they are.'); });
     } else {
       console.warn('LibLande: parts from another version: ' + old.join(', '));
     }
   }
 }
+// A new version, installed whole beside this one: switched to at once if
+// LibLande has only just opened and nothing's open to lose; otherwise
+// offered (Reload), and taken next time LibLande opens anyway.
+const OPENED_AT = Date.now();
+function updateNow() {
+  const w = window.LIBLANDE_UPDATE;
+  if (!w) return;
+  window.LIBLANDE_UPDATING = true;
+  try { w.postMessage({ type: 'skipWaiting' }); } catch (e) { location.reload(); }
+}
+const updateSafe = () => !sheet && !(window.V && V.doc && (V.dirty || V.bmDirty || V.drawing)) && !(window.NOTES && NOTES.pop) && !(typeof RN !== 'undefined' && RN.ed && RN.ed.contains(document.activeElement));
+function updateOffer() {
+  if (Date.now() - OPENED_AT < 20000 && updateSafe()) { updateNow(); return; }
+  setTimeout(() => toast('A new version of LibLande is ready.', 15000, { label: 'Reload', run: updateWhenSaved }), 1500);
+}
+// (The open paper saved first; switched only once nothing's left unsaved.)
+async function updateWhenSaved() {
+  if (typeof saveNow === 'function' && window.V && V.doc) { try { await saveNow(); } catch (e) { /* said there */ } }
+  if (window.V && V.doc && (V.dirty || V.bmDirty)) { toast('Your marks aren\u2019t saved yet, so LibLande didn\u2019t reload. Try again once they are.', 6000); return; }
+  updateNow();
+}
+window.addEventListener('liblande-update', updateOffer);
+// (One found before this script ran, as LibLande loaded: offered now.)
+if (window.LIBLANDE_UPDATE) setTimeout(updateOffer, 0);
+// Another window switched to the new version: this one's parts in memory
+// are the old ones, so it's offered a reload too.
+window.addEventListener('liblande-switched', () => setTimeout(() => toast('LibLande was updated in another window.', 30000, { label: 'Reload', run: () => { if (window.V && V.doc && (V.dirty || V.bmDirty)) saveNow().finally(() => location.reload()); else location.reload(); } }), 500));
 /* ------------------------------------------------------------ clipboard + toast */
 let toastTimer;
 // action: {label, run}, a button in the message (such as Undo).

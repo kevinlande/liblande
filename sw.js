@@ -3,9 +3,12 @@
  * (build.py fills in VERSION, VENDOR_FILES and APP_FILES, the app's own
  * scripts and styles in app/.)
  *
- * - The app (index.html, app/, server.js, the icon): from the internet when it
- *   answers within a few seconds, so updates arrive; otherwise the copy
- *   kept here.
+ * - The app (index.html, app/, server.js, the icon): from this version's
+ *   copy, kept whole at install (if any part can't be fetched, the install
+ *   fails and the version before stays). A new version installs beside it
+ *   and waits; the page says when to switch (see server.js), and the old
+ *   copy goes once the new one is in use. So every part is from one
+ *   version, online or not.
  * - The libraries (PDF.js with its stylesheet, icons and fonts, pdf-lib, JSZip),
  *   served from the site's own vendor/ folder: all kept here at install
  *   (their addresses change with their versions). The fonts and Google's
@@ -15,7 +18,7 @@
  *   with marks replaces the copy kept here, so it opens with them.
  *   (The library itself is kept by the page, in IndexedDB.)
  */
-const VERSION = '2026-11-20.03';
+const VERSION = '2026-11-20.04';
 const VENDOR_FILES = ["vendor/citeproc/2.4.63/citeproc_commonjs.js", "vendor/jszip/3.10.2/jszip.min.js", "vendor/pdf-lib/1.17.1/pdf-lib.min.js", "vendor/pdf.js/6.5.438/images/altText_add.svg", "vendor/pdf.js/6.5.438/images/altText_disclaimer.svg", "vendor/pdf.js/6.5.438/images/altText_done.svg", "vendor/pdf.js/6.5.438/images/altText_spinner.svg", "vendor/pdf.js/6.5.438/images/altText_warning.svg", "vendor/pdf.js/6.5.438/images/annotation-check.svg", "vendor/pdf.js/6.5.438/images/annotation-comment.svg", "vendor/pdf.js/6.5.438/images/annotation-help.svg", "vendor/pdf.js/6.5.438/images/annotation-insert.svg", "vendor/pdf.js/6.5.438/images/annotation-key.svg", "vendor/pdf.js/6.5.438/images/annotation-newparagraph.svg", "vendor/pdf.js/6.5.438/images/annotation-noicon.svg", "vendor/pdf.js/6.5.438/images/annotation-note.svg", "vendor/pdf.js/6.5.438/images/annotation-paperclip.svg", "vendor/pdf.js/6.5.438/images/annotation-paragraph.svg", "vendor/pdf.js/6.5.438/images/annotation-pushpin.svg", "vendor/pdf.js/6.5.438/images/checkmark.svg", "vendor/pdf.js/6.5.438/images/comment-actionsButton.svg", "vendor/pdf.js/6.5.438/images/comment-closeButton.svg", "vendor/pdf.js/6.5.438/images/comment-editButton.svg", "vendor/pdf.js/6.5.438/images/comment-popup-editButton.svg", "vendor/pdf.js/6.5.438/images/cursor-editorFreeHighlight.svg", "vendor/pdf.js/6.5.438/images/cursor-editorFreeText.svg", "vendor/pdf.js/6.5.438/images/cursor-editorInk.svg", "vendor/pdf.js/6.5.438/images/cursor-editorTextHighlight.svg", "vendor/pdf.js/6.5.438/images/editor-toolbar-delete.svg", "vendor/pdf.js/6.5.438/images/editor-toolbar-edit.svg", "vendor/pdf.js/6.5.438/images/findbarButton-next.svg", "vendor/pdf.js/6.5.438/images/findbarButton-previous.svg", "vendor/pdf.js/6.5.438/images/gv-editor-toolbar-close.svg", "vendor/pdf.js/6.5.438/images/gv-toolbarButton-download.svg", "vendor/pdf.js/6.5.438/images/loading-icon.gif", "vendor/pdf.js/6.5.438/images/loading.svg", "vendor/pdf.js/6.5.438/images/messageBar_closingButton.svg", "vendor/pdf.js/6.5.438/images/messageBar_info.svg", "vendor/pdf.js/6.5.438/images/messageBar_warning.svg", "vendor/pdf.js/6.5.438/images/pages_closeButton.svg", "vendor/pdf.js/6.5.438/images/pages_selected.svg", "vendor/pdf.js/6.5.438/images/pages_viewArrow.svg", "vendor/pdf.js/6.5.438/images/pages_viewButton.svg", "vendor/pdf.js/6.5.438/images/secondaryToolbarButton-documentProperties.svg", "vendor/pdf.js/6.5.438/images/secondaryToolbarButton-firstPage.svg", "vendor/pdf.js/6.5.438/images/secondaryToolbarButton-handTool.svg", "vendor/pdf.js/6.5.438/images/secondaryToolbarButton-lastPage.svg", "vendor/pdf.js/6.5.438/images/secondaryToolbarButton-rotateCcw.svg", "vendor/pdf.js/6.5.438/images/secondaryToolbarButton-rotateCw.svg", "vendor/pdf.js/6.5.438/images/secondaryToolbarButton-scrollHorizontal.svg", "vendor/pdf.js/6.5.438/images/secondaryToolbarButton-scrollPage.svg", "vendor/pdf.js/6.5.438/images/secondaryToolbarButton-scrollVertical.svg", "vendor/pdf.js/6.5.438/images/secondaryToolbarButton-scrollWrapped.svg", "vendor/pdf.js/6.5.438/images/secondaryToolbarButton-selectTool.svg", "vendor/pdf.js/6.5.438/images/secondaryToolbarButton-spreadEven.svg", "vendor/pdf.js/6.5.438/images/secondaryToolbarButton-spreadNone.svg", "vendor/pdf.js/6.5.438/images/secondaryToolbarButton-spreadOdd.svg", "vendor/pdf.js/6.5.438/images/signature-properties-row-check.svg", "vendor/pdf.js/6.5.438/images/toolbarButton-bookmark.svg", "vendor/pdf.js/6.5.438/images/toolbarButton-currentOutlineItem.svg", "vendor/pdf.js/6.5.438/images/toolbarButton-download.svg", "vendor/pdf.js/6.5.438/images/toolbarButton-editorFreeText.svg", "vendor/pdf.js/6.5.438/images/toolbarButton-editorHighlight.svg", "vendor/pdf.js/6.5.438/images/toolbarButton-editorInk.svg", "vendor/pdf.js/6.5.438/images/toolbarButton-editorSignature.svg", "vendor/pdf.js/6.5.438/images/toolbarButton-editorStamp.svg", "vendor/pdf.js/6.5.438/images/toolbarButton-menuArrow.svg", "vendor/pdf.js/6.5.438/images/toolbarButton-menuArrowNova.svg", "vendor/pdf.js/6.5.438/images/toolbarButton-openFile.svg", "vendor/pdf.js/6.5.438/images/toolbarButton-pageDown.svg", "vendor/pdf.js/6.5.438/images/toolbarButton-pageUp.svg", "vendor/pdf.js/6.5.438/images/toolbarButton-presentationMode.svg", "vendor/pdf.js/6.5.438/images/toolbarButton-print.svg", "vendor/pdf.js/6.5.438/images/toolbarButton-search.svg", "vendor/pdf.js/6.5.438/images/toolbarButton-secondaryToolbarToggle.svg", "vendor/pdf.js/6.5.438/images/toolbarButton-signaturePropertiesError.svg", "vendor/pdf.js/6.5.438/images/toolbarButton-signaturePropertiesVerified.svg", "vendor/pdf.js/6.5.438/images/toolbarButton-viewAttachments.svg", "vendor/pdf.js/6.5.438/images/toolbarButton-viewLayers.svg", "vendor/pdf.js/6.5.438/images/toolbarButton-viewOutline.svg", "vendor/pdf.js/6.5.438/images/toolbarButton-viewThumbnail.svg", "vendor/pdf.js/6.5.438/images/toolbarButton-viewsManagerToggle.svg", "vendor/pdf.js/6.5.438/images/toolbarButton-zoomIn.svg", "vendor/pdf.js/6.5.438/images/toolbarButton-zoomOut.svg", "vendor/pdf.js/6.5.438/images/treeitem-collapsed.svg", "vendor/pdf.js/6.5.438/images/treeitem-expanded.svg", "vendor/pdf.js/6.5.438/pdf.min.mjs", "vendor/pdf.js/6.5.438/pdf.worker.min.mjs", "vendor/pdf.js/6.5.438/pdf_viewer.css", "vendor/pdf.js/6.5.438/pdf_viewer.mjs", "vendor/pdf.js/6.5.438/standard_fonts/FoxitDingbats.pfb", "vendor/pdf.js/6.5.438/standard_fonts/FoxitFixed.pfb", "vendor/pdf.js/6.5.438/standard_fonts/FoxitFixedBold.pfb", "vendor/pdf.js/6.5.438/standard_fonts/FoxitFixedBoldItalic.pfb", "vendor/pdf.js/6.5.438/standard_fonts/FoxitFixedItalic.pfb", "vendor/pdf.js/6.5.438/standard_fonts/FoxitSerif.pfb", "vendor/pdf.js/6.5.438/standard_fonts/FoxitSerifBold.pfb", "vendor/pdf.js/6.5.438/standard_fonts/FoxitSerifBoldItalic.pfb", "vendor/pdf.js/6.5.438/standard_fonts/FoxitSerifItalic.pfb", "vendor/pdf.js/6.5.438/standard_fonts/FoxitSymbol.pfb", "vendor/pdf.js/6.5.438/standard_fonts/LiberationSans-Bold.ttf", "vendor/pdf.js/6.5.438/standard_fonts/LiberationSans-BoldItalic.ttf", "vendor/pdf.js/6.5.438/standard_fonts/LiberationSans-Italic.ttf", "vendor/pdf.js/6.5.438/standard_fonts/LiberationSans-Regular.ttf", "vendor/pdf.js/6.5.438/wasm/jbig2.wasm", "vendor/pdf.js/6.5.438/wasm/jbig2_nowasm_fallback.js", "vendor/pdf.js/6.5.438/wasm/openjpeg.wasm", "vendor/pdf.js/6.5.438/wasm/openjpeg_nowasm_fallback.js", "vendor/pdf.js/6.5.438/wasm/qcms_bg.wasm", "vendor/pdf.js/6.5.438/wasm/quickjs-eval.js", "vendor/pdf.js/6.5.438/wasm/quickjs-eval.wasm", "vendor/qrcode-generator/2.0.4/qrcode.js"];
 const VENDOR = new URL('vendor/', self.location).href;
 const APP = 'liblande-app-' + VERSION, LIBS = 'liblande-libs-2', PAPERS = 'liblande-papers';
@@ -32,14 +35,19 @@ self.addEventListener('install', ev => {
     const app = await caches.open(APP);
     // (Past the browser's own cache, which GitHub Pages lets keep a page
     // for 10 minutes: otherwise a new version could keep the old app.)
-    await app.addAll(SHELL.map(s => new Request(s, { cache: 'reload' })));
+    // (One part that can't be fetched fails the install, and the version
+    // before stays; tried again at the next look for an update.)
+    await app.addAll(SHELL.map(s => new Request(new URL(s, self.location).href, { cache: 'reload' })))
+      .catch(e => { console.warn('LibLande ' + VERSION + ' not installed (a part couldn\u2019t be fetched); the version before stays.', e); throw e; });
     // The libraries now, so the first paper opened offline works; one that
     // fails is fetched when it's first needed instead.
     const libs = await caches.open(LIBS);
     await Promise.all(VENDOR_FILES.map(async u => { if (!(await libs.match(u))) await libs.add(u).catch(() => {}); }));
-    await self.skipWaiting();
+    // (The first: in use at once. A new version: waits for the page.)
+    if (!self.registration.active) await self.skipWaiting();
   })());
 });
+self.addEventListener('message', ev => { if (ev.data && ev.data.type === 'skipWaiting') self.skipWaiting(); });
 self.addEventListener('activate', ev => {
   ev.waitUntil((async () => {
     for (const k of await caches.keys()) if ((k.startsWith('liblande-app-') && k !== APP) || k === 'liblande-libs') await caches.delete(k);
@@ -146,27 +154,35 @@ self.addEventListener('fetch', ev => {
     })());
     return;
   }
-  // The app itself: the internet if it answers in 3 seconds (10 for its
-  // scripts, so a slow network doesn't mix a new page with old ones), else
-  // the copy.
+  // The app itself: this version's copy (whole, from the install), so no
+  // part comes from another version. New versions come by a new sw.js.
+  // (A request the page marks X-LibLande-Net goes to the network only: its
+  // check that the internet answers before letting the copy go.)
   if (u.origin === self.location.origin) {
+    if (req.headers.get('X-LibLande-Net')) return;
     ev.respondWith((async () => {
       const app = await caches.open(APP);
       // (Only the app's own page is kept as the app: opening cite.html,
       // privacy.html or terms.html mustn't replace it.)
       const root = new URL('./', self.registration.scope).pathname;
       const isApp = req.mode === 'navigate' && (u.pathname === root || u.pathname === root + 'index.html');
-      const key = isApp ? './' : req;
-      // (Checked with GitHub Pages each time, not taken from the browser's
-      // own cache, so a new version arrives the next time LibLande opens.)
-      const net = fetch(req, { cache: 'no-cache' }).then(res => {
-        if (res.ok && (isApp || SHELL.some(s => u.pathname.endsWith('/' + s)))) app.put(key, res.clone());
-        return res;
-      });
-      const kept = await app.match(key, { ignoreSearch: true });
-      if (!kept) return net;
-      const late = new Promise(r => setTimeout(() => r(null), req.mode === 'navigate' ? 3000 : 10000));
-      try { return (await Promise.race([net, late])) || kept; } catch (e) { return kept; }
+      // (One asked for by its version (?v=, as the Word add-in does): not
+      // the copy's, which may be another version; the network's, the copy
+      // only if that fails.)
+      const versioned = !isApp && u.searchParams.has('v');
+      const kept = await app.match(isApp ? './' : req, { ignoreSearch: true });
+      if (kept && !versioned) return kept;
+      if (versioned) { try { return await fetch(req, { cache: 'no-cache' }); } catch (e) { if (kept) return kept; throw e; } }
+      // (Not in the copy (another page of the site; or the copy not made
+      // yet): the network; one of the app's own files kept, if the copy
+      // is still being made.)
+      let res;
+      try { res = await fetch(req, { cache: 'no-cache' }); } catch (e) {
+        if (req.mode !== 'navigate') throw e;
+        return new Response('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Offline</title><p style="font:16px system-ui;margin:2em">You\u2019re offline, and this page isn\u2019t kept on this device. Try again when you\u2019re online.</p>', { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+      }
+      if (res.ok && isApp && !(await app.match('./'))) app.put('./', res.clone());
+      return res;
     })());
     return;
   }

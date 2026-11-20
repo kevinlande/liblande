@@ -17,7 +17,7 @@
   window.LIBLANDE_PAGES = true;
   // (Which version each part of the app is from: index.html checks they
   // match. build.py fills it in.)
-  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-11-20.03';
+  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-11-20.04';
   const CLIENT_ID = '789682218462-98mjugngb46ttd01ucp9dcj71ufspjgn.apps.googleusercontent.com';
   // Google Drive, in one of two ways (docs/drive-file-plan.md):
   // full: all of Drive (your .bib, papers and LibLande folder wherever
@@ -1035,7 +1035,26 @@
   // so LibLande opens (and opens those papers) with no connection. Storage
   // marked persistent isn't cleared by Safari to make room.
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
-    navigator.serviceWorker.register('sw.js').catch(e => console.warn('Offline support didn\u2019t start:', e));
+    // A new version: looked for on opening and on coming back to the
+    // front; when it has installed whole, the page is told
+    // (liblande-update) and decides when to switch (see start.js).
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(reg => {
+      const ready = w => { window.LIBLANDE_UPDATE = w; window.dispatchEvent(new CustomEvent('liblande-update')); };
+      if (reg.waiting && navigator.serviceWorker.controller) ready(reg.waiting);
+      reg.addEventListener('updatefound', () => {
+        const w = reg.installing;
+        if (w) w.addEventListener('statechange', () => { if (w.state === 'installed' && navigator.serviceWorker.controller) ready(w); });
+      });
+      document.addEventListener('visibilitychange', () => { if (!document.hidden && navigator.onLine) reg.update().catch(() => {}); });
+    }).catch(e => console.warn('Offline support didn\u2019t start:', e));
+    // (Switched: the page opened again, once, from the new version.)
+    let switched = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (window.LIBLANDE_UPDATING) { if (!switched) { switched = true; location.reload(); } return; }
+      // (Switched by another window: this one's told, to reload.)
+      if (window.LIBLANDE_HAD_CONTROLLER) window.dispatchEvent(new CustomEvent('liblande-switched'));
+    });
+    window.LIBLANDE_HAD_CONTROLLER = !!navigator.serviceWorker.controller;
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
   }
   document.addEventListener('DOMContentLoaded', () => {
