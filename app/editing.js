@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, inbox, trash, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-19.03';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-19.04';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -702,12 +702,23 @@ async function lookupIntoForm() {
   }
 }
 
-async function uploadPdf(file, name, info) {
+async function uploadPdf(file, name, info, again) {
   const form = new FormData();
   form.append('metadata', new Blob([JSON.stringify({ name, parents: [info.folderId], mimeType: 'application/pdf' })], { type: 'application/json' }));
   form.append('file', file);
-  const r = await fetch('https:\/\/www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',
-    { method: 'POST', headers: { Authorization: 'Bearer ' + info.token }, body: form });
+  // (A while for it to go, by its size, at a slow 25 KB a second, and at
+  // least a minute; then given up, saying so.)
+  const stop = window.AbortController ? new AbortController() : null;
+  const timer = stop && setTimeout(() => stop.abort(), Math.max(60000, (file.size || 0) / 25));
+  let r;
+  try {
+    r = await fetch('https:\/\/www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',
+      Object.assign({ method: 'POST', headers: { Authorization: 'Bearer ' + info.token }, body: form }, stop ? { signal: stop.signal } : {}));
+  } catch (err) {
+    throw new Error(stop && stop.signal.aborted ? 'The PDF didn\u2019t finish uploading (the connection is too slow just now). Try again.' : 'Google Drive can\u2019t be reached just now, so the PDF wasn\u2019t uploaded.');
+  } finally { if (timer) clearTimeout(timer); }
+  // (Its token lapsed: nothing was made, so asked again once with a new one.)
+  if (r.status === 401 && !again) return uploadPdf(file, name, Object.assign({}, info, { token: await callServer('getToken', true) }), true);
   if (!r.ok) throw new Error('Google Drive didn\u2019t accept the PDF (error ' + r.status + ').');
   return r.json();
 }

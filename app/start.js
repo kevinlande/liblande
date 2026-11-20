@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, inbox, trash, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-11-19.03';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-11-19.04';
 // On GitHub Pages, every part of the app must be from the same version: a
 // part kept from an older one (the offline copy, served when the network
 // was slow) lacks what this page needs. Then the kept copies go, and the
@@ -390,8 +390,17 @@ async function download() {
   // (A library just built on this device is at hand.)
   const built = window.LIBLANDE_BUILT;
   if (built && status && built.id === status.libraryId && built.stamp === status.stamp) return { stamp: built.stamp, gz: built.gz };
-  const get = info => fetch('https:\/\/www.googleapis.com/drive/v3/files/' + encodeURIComponent(info.id) + '?alt=media',
-    { headers: { Authorization: 'Bearer ' + info.token } });
+  // (Not forever: no answer, or the library not all here, in 3 minutes:
+  // given up, and asked for another way.)
+  const get = async info => {
+    const stop = window.AbortController ? new AbortController() : null, timer = stop && setTimeout(() => stop.abort(), 180000);
+    try {
+      const r = await fetch('https:\/\/www.googleapis.com/drive/v3/files/' + encodeURIComponent(info.id) + '?alt=media',
+        Object.assign({ headers: { Authorization: 'Bearer ' + info.token } }, stop ? { signal: stop.signal } : {}));
+      const body = r.ok ? await r.arrayBuffer() : null;
+      return { ok: r.ok, status: r.status, arrayBuffer: async () => body };
+    } finally { if (timer) clearTimeout(timer); }
+  };
   try {
     let info = fromStatus, r = null;
     if (info) { stage('Downloading the library from Google Drive'); r = await get(info); }
@@ -1254,4 +1263,4 @@ if (RELOADING) {
 if (window.LIBLANDE_TEST) window.LL = { NOTES, mdToHtml, htmlToMd, notesSave, notesMarks, openNotesPop, setDetailView, nvInsertMark, nvMarksHTML, rnAddPassage, commentToNotes, apaCitation, renderDetail, state, CITE, citeRef, citeInText, citeInTextMany, citeList, citeChoose, citeLoad, citeShort, msFixes, quoteWith, addFromLink, addLinkTake, openFromLink, openLinkTake, pdfMetaQuery, webAddBookmark, webAddDescription, aiPrompt, aiCopyFor, aiCopyOpen, relateByDrag, apaCitation, origYear, chPdfPage, chPdfFile, CHP, lcFind, openLinkChapters, lcOffer, SIDE_FOLD, CHAPTERS: () => CHAPTERS, CHAPTER_ROWS: () => CHAPTER_ROWS, CHAPTER_OF: () => CHAPTER_OF, findChapters, toggleBook, OPEN_BOOKS, openAddChapter, fromPhoto, photoQuery, photoAsks, photoFind, photoDoi, photoLines, PHOTO, openQr, qrLink, LEN, countPdfPages, setSort, setCols, pageCount, setGroup, REACH, reachCheck, apaCitation, apaInText, loadPdfLib, entries: () => ENTRIES, KWS, kwsSuggest, kwsKey, kwsWithOA, ktFind, openKwTidy, TS, tsSearch, tsMerge, tsIsQuery, tsClose, PROGRESS, SOFT, RN, rnAddQuote, showQuote, toggleReaderNotes, progressMerge, progressReset, PROXIES, proxyPrefix, proxyLink, findPdf, renderProxies, TOUR, startTour, endTour, openFeatures, FEATURES, toggleBookmark, OLE, oleMake, headingOutline, pageRows, writeOutline, SPLIT, foldOf, splitStart, splitApply, printedContents, tocClean, tocDigits, checkPdf, uploadMarked, netError, REBUILD, rebuildNow, afterWrite, POS, shutReader, AWAY_SINCE, progressBoth, pullPrefs, saveProgress, pageLines, OCR, makeSearchable, ocrLayer, textlessPages, openMsCheck, runMsCheck, LIBS, renderGroups, SMART, NP, npCheck, openNewPapers, openFollow, sweepCovers, COVERS, V, BM, JOURNAL, LOCAL, AUTO, saveMarkup, setTool, setReading, renderRLBar, netBadge, placeToast, POS, MARK, PDFJS, pdfJsFix, pdfViewerFix, findEndPage, refHeading, combineMarks, makeZip, MARK_ERASER: () => MARK.eraserSize,
   lib: () => ({ ENTRIES, BYKEY, DATA, VERSION_OF, VERSIONS, NESTED, state, TABS, groupName }), init, refresh, openEdit, isForthcoming, forthChanges, parseBibtexEntry,
   oldLineMarks, convertOldLines, fetchAhead, PTABS, renderPaperTabs, openPdf, loadPdfJs, addStreamIteration, msCheck, msCites, msRef, msDocx, MS, msVisible,
-  refLike, REF, REL, RELP, relCites, relPassage, markRange, MX, mxSnip, mxStatus, SRCH, srchRun, showSideTab, toggleSide, openPapersMenu, CC, ccTargetAt, ccTapAt, ccClose, ccCiteAt, ccLines, ccNoteAt, ccShortOnly, pencilRecent, PEEK, INBOX, ibAdd, ibByKey, ibEntries, ibRemove, ibAdded, ibHas, ibPassed, rlWhich, ibLoad, ibToLibrary, ibPut, IB_PRE, closeReader, get sheet() { return sheet; }, TRASH, trAskPub, trRestore, trByKey, trLoad, trSet, trEntries, ccSpanAt, srchMarks, srchSnip };
+  refLike, REF, REL, RELP, relCites, relPassage, markRange, MX, mxSnip, mxStatus, SRCH, srchRun, showSideTab, toggleSide, openPapersMenu, CC, ccTargetAt, ccTapAt, ccClose, ccCiteAt, ccLines, ccNoteAt, ccShortOnly, pencilRecent, PEEK, INBOX, ibAdd, ibByKey, ibEntries, ibRemove, ibAdded, ibHas, ibPassed, rlWhich, ibLoad, ibToLibrary, ibPut, IB_PRE, closeReader, openPaper, get sheet() { return sheet; }, TRASH, trAskPub, trRestore, trByKey, trLoad, trSet, trEntries, ccSpanAt, srchMarks, srchSnip };

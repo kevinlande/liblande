@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, inbox, trash, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-19.03';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-19.04';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -294,7 +294,7 @@ async function googleFetch(url, opts = {}, ms) {
 }
 async function driveToken(fresh) {
   if (!fresh && tokenCache && Date.now() - tokenCache.at < 30 * 60 * 1000) return tokenCache.token;
-  const token = await callServer('getToken');
+  const token = await callServer('getToken', !!fresh);
   tokenCache = { token, at: Date.now() };
   return tokenCache.token;
 }
@@ -345,34 +345,65 @@ function trimRecentPdfs() {
     recentPdfs.delete(k); recentMd5.delete(k);
   }
 }
+// (No answer for this long, or nothing more of it for this long: given
+// up, and the copy kept on this device used if there is one.)
+const NET_MS = { get first() { return window.LIBLANDE_NET_MS || 25000; }, get stall() { return window.LIBLANDE_NET_MS || 20000; } };
 async function getPdfBytes(file, onProgress) {
   if (recentPdfs.has(file.id)) return recentPdfs.get(file.id);
   const url = 'https:\/\/www.googleapis.com/drive/v3/files/' + encodeURIComponent(file.id) + '?alt=media';
-  const r = await googleFetch(url);
+  try { return await getPdfBytesFrom(url, file, onProgress); } catch (err) {
+    const kept = window.caches ? await caches.match(url).catch(() => null) : null;
+    if (kept && (err.noAnswer || err instanceof TypeError || err.status === 401)) {
+      // (Perhaps older than Drive's: its own checksum goes with it, so a
+      // save finds the difference and offers Combine, never writing over
+      // Drive's newer copy. Not kept for opening again: Drive's next time.)
+      const bytes = new Uint8Array(await kept.arrayBuffer());
+      const sum = await caches.match('https:\/\/www.googleapis.com/drive/v3/files/' + encodeURIComponent(file.id) + '?fields=md5Checksum').then(x => (x ? x.json() : null)).catch(() => null);
+      bytes.keptMd5 = (sum && sum.md5Checksum) || 'kept-copy';
+      return bytes;
+    }
+    throw err;
+  }
+}
+async function getPdfBytesFrom(url, file, onProgress) {
+  const stop = window.AbortController ? new AbortController() : null;
+  let timer = 0;
+  const wait = ms => { clearTimeout(timer); if (stop) timer = setTimeout(() => stop.abort(), ms); };
+  const noAnswer = () => { const e = new Error('Google Drive can\u2019t be reached just now (no answer).'); e.noAnswer = true; return e; };
+  wait(NET_MS.first);
+  let r;
+  try { r = await googleFetch(url, stop ? { signal: stop.signal } : {}); } catch (err) { clearTimeout(timer); throw stop && stop.signal.aborted ? noAnswer() : err; }
   if (!r.ok) {
+    clearTimeout(timer);
+    if (r.status === 401) { const e = new Error('Not signed in to Google just now.'); e.status = 401; throw e; }
     throw new Error(r.status === 404
       ? 'Google Drive can\u2019t find this file any more. It may have been moved or deleted.'
       : 'Google Drive didn\u2019t send the file (error ' + r.status + ').');
   }
   let bytes;
   const total = Number(r.headers.get('Content-Length')) || 0;
-  if (r.body && total && onProgress) {
-    const reader = r.body.getReader();
-    const parts = [];
-    let got = 0;
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      parts.push(value);
-      got += value.length;
-      onProgress(got / total);
+  try {
+    if (r.body && r.body.getReader) {
+      // (Each piece that comes puts the stall off again.)
+      const reader = r.body.getReader();
+      const parts = [];
+      let got = 0;
+      for (;;) {
+        wait(NET_MS.stall);
+        const { done, value } = await reader.read();
+        if (done) break;
+        parts.push(value);
+        got += value.length;
+        if (total && onProgress) onProgress(got / total);
+      }
+      bytes = new Uint8Array(got);
+      let at = 0;
+      for (const p of parts) { bytes.set(p, at); at += p.length; }
+    } else {
+      wait(NET_MS.first * 4);
+      bytes = new Uint8Array(await r.arrayBuffer());
     }
-    bytes = new Uint8Array(got);
-    let at = 0;
-    for (const p of parts) { bytes.set(p, at); at += p.length; }
-  } else {
-    bytes = new Uint8Array(await r.arrayBuffer());
-  }
+  } catch (err) { throw stop && stop.signal.aborted ? noAnswer() : err; } finally { clearTimeout(timer); }
   recentPdfs.set(file.id, bytes);
   refreshSavedSoon();
   trimRecentPdfs();
@@ -743,10 +774,12 @@ async function openReader(entry, file, pos) {
   $('#vClose').focus();
   vStatus('Downloading the paper\u2026');
   try {
-    const [{ lib, viewerLib }, md5] = await Promise.all([loadPdfViewer(), gs ? pdfMd5(file).catch(() => null) : null]);
+    let [{ lib, viewerLib }, md5] = await Promise.all([loadPdfViewer(), gs ? pdfMd5(file).catch(() => null) : null]);
     if (md5 && recentMd5.get(file.id) !== md5) recentPdfs.delete(file.id);
     const bytes = await getPdfBytes(file, f => { if (my === V.token) vStatus('Downloading the paper\u2026 ' + Math.round(f * 100) + '%'); });
-    if (md5) recentMd5.set(file.id, md5);
+    // (The copy kept on this device, Drive not answering: its checksum, not Drive's.)
+    if (bytes.keptMd5) md5 = bytes.keptMd5;
+    else if (md5) recentMd5.set(file.id, md5);
     if (my !== V.token) return;
     // Changes kept on this device and never uploaded: opened with them,
     // if the PDF on Drive is still the one they were made to (or you said

@@ -17,7 +17,7 @@
   window.LIBLANDE_PAGES = true;
   // (Which version each part of the app is from: index.html checks they
   // match. build.py fills it in.)
-  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-11-19.03';
+  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-11-19.04';
   const CLIENT_ID = '789682218462-98mjugngb46ttd01ucp9dcj71ufspjgn.apps.googleusercontent.com';
   // Google Drive, in one of two ways (docs/drive-file-plan.md):
   // full: all of Drive (your .bib, papers and LibLande folder wherever
@@ -73,6 +73,9 @@
         token = { value: resp.access_token, at: Date.now(), expiresIn: +resp.expires_in || 3600, scope: scope() };
         store.set('token', token);
         bar(null);
+        window.LIBLANDE_SIGNIN_WAIT = 0;
+        // (Changes kept meanwhile: sent now.)
+        setTimeout(() => { flushOutbox().catch(() => {}); }, 1500);
         const w = waiters; waiters = [];
         w.forEach(f => f(token.value));
         if (!email) whoAmI();
@@ -99,14 +102,20 @@
   }
   async function whoAmI() {
     try {
-      const r = await fetch(API + 'about?fields=user(emailAddress)', { headers: { Authorization: 'Bearer ' + token.value } });
+      const stop = window.AbortController ? new AbortController() : null;
+      if (stop) setTimeout(() => stop.abort(), 20000);
+      const r = await fetch(API + 'about?fields=user(emailAddress)', Object.assign({ headers: { Authorization: 'Bearer ' + token.value } }, stop ? { signal: stop.signal } : {}));
       const j = await r.json();
       if (j.user && j.user.emailAddress) { email = j.user.emailAddress; store.set('email', email); }
     } catch (e) { /* only a hint for next time */ }
   }
+  // (How long a request waits for a sign-in before going ahead without it.)
+  const SIGNIN_WAIT_MS = window.LIBLANDE_SIGNIN_WAIT_MS || 10 * 1000;
   function getToken(fresh) {
     if (fresh) token = null;
-    if (valid()) return Promise.resolve(token.value);
+    // (One got meanwhile, by another tab: used here too.)
+    if (!valid()) { const st = store.get('token', null), was = token; if (st) { token = st; if (!valid()) token = was; } }
+    if (valid()) { window.LIBLANDE_SIGNIN_WAIT = 0; return Promise.resolve(token.value); }
     // Offline, Google can't be asked: the old token goes along (Drive won't
     // be reached, and papers kept on this device answer instead).
     if (!navigator.onLine) {
@@ -117,6 +126,16 @@
       waiters.push(resolve);
       if (!access) chooser();
       else bar(email ? TAP_RECONNECT() : 'Sign in with Google to open your library');
+      // (Not forever: after a while, what waits goes ahead with the old
+      // token, as when offline, so a paper kept here opens, marks are kept
+      // on this device and changes wait to be sent; the bar still asks.
+      // On Wi-Fi with no internet, or an iPad just woken, Google's window
+      // can't help.)
+      const old = token || store.get('token', null);
+      if (old) {
+        window.LIBLANDE_SIGNIN_WAIT = window.LIBLANDE_SIGNIN_WAIT || Date.now();
+        setTimeout(() => { const i = waiters.indexOf(resolve); if (i >= 0) { waiters.splice(i, 1); resolve(old.value); } }, SIGNIN_WAIT_MS);
+      }
     });
   }
   // A tap renews a token that's missing, old or run out. (Not taps on a
@@ -558,7 +577,8 @@
         try { google.accounts.oauth2.revoke(t.value, () => {}); } catch (e) { /* forgotten here anyway */ }
       }
       try {
-        Object.keys(localStorage).filter(k => k.indexOf('liblande.pages.') === 0).forEach(k => localStorage.removeItem(k));
+        // (Not the changes that couldn't be made: the only copy of them.)
+        Object.keys(localStorage).filter(k => k.indexOf('liblande.pages.') === 0 && k !== 'liblande.pages.outboxStuck').forEach(k => localStorage.removeItem(k));
       } catch (e) { /* private mode */ }
       token = null; client = null; access = null; email = '';
       return { ok: true };
@@ -616,7 +636,7 @@
       if (!lib) throw new Error('The library hasn\u2019t been built yet. Tap Refresh to build it.');
       return { id: lib.id, stamp: Date.parse(lib.modifiedTime), token: await getToken() };
     },
-    getToken() { return getToken(); },
+    getToken(fresh) { return getToken(!!fresh); },
     // The library, when the page's own download of it failed: through the
     // storage here (drive(), which waits and asks again). (Handed over as
     // it is: Apps Script had to send it as base64 text.)
@@ -692,26 +712,49 @@
     window.dispatchEvent(new CustomEvent('liblande-waiting', { detail: { waiting: outbox.length } }));
   });
   window.liblandeOutbox = () => freshOutbox().slice();
-  const isOffline = e => !navigator.onLine || !!(e && e.offline);
+  // (A 401 after asking for a new token: not signed in just now. Kept for
+  // later, as offline.)
+  const isOffline = e => !navigator.onLine || !!(e && (e.offline || e.status === 401));
+  // Troubles that pass (Drive busy or asked too fast, its server's errors,
+  // the library being changed just then): the change waits, to be tried
+  // again, rather than dropped.
+  const passingTrouble = e => isOffline(e) || !!(e && (e.status === 429 || e.status >= 500 || e.noAnswer)) ||
+    /updating your library right now|try again in a minute|rate ?limit|backend ?error|didn\u2019t answer/i.test(String(e && e.message));
+  // One that can't be made (changed elsewhere meanwhile, say): kept, with
+  // why, in a list of its own, never just dropped (liblandeStuck).
+  window.liblandeStuck = () => store.get('outboxStuck', []).slice();
   function keepForLater(name, args) {
     freshOutbox().push({ name, args, at: Date.now(), id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8) });
     store.set('outbox', outbox);
+    // (Not kept: this device's storage is full. Said, not left to seem saved.)
+    if (!store.get('outbox', []).some(x => x.id === outbox[outbox.length - 1].id)) {
+      freshOutbox();
+      const e = new Error('This device\u2019s storage for LibLande is full, so the change couldn\u2019t be kept to send later. Connect to the internet and try again.');
+      e.storageFull = true;
+      throw e;
+    }
     window.dispatchEvent(new CustomEvent('liblande-waiting', { detail: { waiting: outbox.length } }));
   }
   // (Made in Drive first: anything kept from before, so the order holds.)
+  // (A sign-in wanted and not come: as offline, for changes.)
+  const signInWanted = () => !!window.LIBLANDE_SIGNIN_WAIT;
   function later(name, offline) {
     return async (...args) => {
-      if (navigator.onLine && freshOutbox().length) { try { await flushOutbox(); } catch (e) { /* tried */ } }
+      if (navigator.onLine && !signInWanted() && freshOutbox().length) { try { await flushOutbox(); } catch (e) { /* tried */ } }
       // (The answer first: a change that can't be kept offline says so,
       // and isn't kept.)
-      const keep = () => { const res = offline(...args); keepForLater(name, args); return res; };
-      if (!navigator.onLine || freshOutbox().length) return keep();
+      const keep = () => {
+        const was = JSON.stringify(offlineLists.known), res = offline(...args);
+        try { keepForLater(name, args); } catch (e) { offlineLists.known = JSON.parse(was); store.set('lists', offlineLists.known); throw e; }
+        return res;
+      };
+      if (!navigator.onLine || signInWanted() || freshOutbox().length) return keep();
       try {
         const res = await edits[name](...args);
         offlineLists.update(res);
         return res;
       } catch (e) {
-        if (!isOffline(e)) throw e;
+        if (!(isOffline(e) || e.status === 429 || /updating your library right now/i.test(String(e && e.message)))) throw e;
         return keep();
       }
     };
@@ -757,7 +800,7 @@
   let flushing = null;
   function flushOutbox() {
     if (flushing) return flushing;
-    if (!freshOutbox().length || !navigator.onLine) return Promise.resolve();
+    if (!freshOutbox().length || !navigator.onLine || signInWanted()) return Promise.resolve();
     const work = async () => {
       let saved = 0;
       const failed = [], hashes = {};
@@ -770,8 +813,9 @@
           if (item.name === 'saveEntry' && res && res.hash && req.expectHash) hashes[req.key] = { from: req.expectHash, to: res.hash };
           saved++;
         } catch (e) {
-          if (isOffline(e)) break;
+          if (passingTrouble(e)) { tryLater(); break; }
           failed.push({ name: item.name, key: req && req.key || (typeof req === 'string' ? req : ''), reason: e.message });
+          store.set('outboxStuck', store.get('outboxStuck', []).concat([Object.assign({}, item, { reason: e.message, stuckAt: Date.now() })]).slice(-50));
         }
         // (Taken off as itself: the list as it is now, which another tab
         // may have added to meanwhile.)
@@ -785,11 +829,23 @@
     flushing = Promise.resolve(locked).finally(() => { flushing = null; });
     return flushing;
   }
+  // (After a passing trouble: tried again, a little later each time.)
+  let laterWait = 0, laterTimer = 0, laterAt = 0;
+  function tryLater() {
+    laterWait = Math.min(laterWait ? laterWait * 2 : 20 * 1000, 10 * 60 * 1000);
+    clearTimeout(laterTimer);
+    const ms = laterWait + Math.random() * 3000;
+    laterAt = Date.now() + ms;
+    laterTimer = setTimeout(() => { flushOutbox().catch(() => {}); }, ms);
+  }
+  window.addEventListener('liblande-outbox', ev => { if (ev.detail && ev.detail.saved && !ev.detail.waiting) { laterWait = 0; laterAt = 0; } });
   window.addEventListener('online', () => setTimeout(() => { flushOutbox().catch(() => {}); }, 1500));
+  // (For the tests.)
+  window.liblandeFlushOutbox = () => flushOutbox();
   // (Safari often doesn't say it's back online, as when LibLande comes
   // back to the screen with a connection already: so also then, and every
   // half minute while changes wait, with the page on screen.)
-  const flushSoon = () => { if (freshOutbox().length && navigator.onLine && !document.hidden) flushOutbox().catch(() => {}); };
+  const flushSoon = () => { if (freshOutbox().length && navigator.onLine && !document.hidden && Date.now() >= laterAt) flushOutbox().catch(() => {}); };
   document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(flushSoon, 1500); });
   setInterval(flushSoon, 30 * 1000);
 

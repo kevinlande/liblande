@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, inbox, trash, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-19.03';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-19.04';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -76,7 +76,17 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const norm = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[\u2010-\u2015]/g, '-');
 const store = {
   get(k, d) { try { const v = localStorage.getItem('landelib.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
-  set(k, v) { try { localStorage.setItem('landelib.' + k, JSON.stringify(v)); } catch {} },
+  set(k, v) {
+    try { localStorage.setItem('landelib.' + k, JSON.stringify(v)); } catch (err) {
+      // (Full: said once, not left to seem kept. Private browsing throws too,
+      // with nothing to say.)
+      if (/quota/i.test(String(err && (err.name + ' ' + err.message))) && !store.full) {
+        store.full = true;
+        setTimeout(() => { if (typeof toast === 'function') toast('This device\u2019s storage for LibLande is full: some things (your Inbox, settings kept here) may not be kept on it. Close papers you\u2019re not reading, or clear website data for other sites.', 10000); }, 0);
+      }
+    }
+  },
+  full: false,
 };
 const safeUrl = u => /^https?:[/][/]/i.test(u) ? u : null;
 

@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, inbox, trash, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/save.js'] = '2026-11-19.03';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/save.js'] = '2026-11-19.04';
 /* ---- saving markup */
 // A new mark isn't in the PDF's annotations until PDF.js commits it (on a
 // change of tool), so anything done with a tool counts as possibly
@@ -216,7 +216,7 @@ async function saveMarkup(force, auto, now) {
   return res;
 }
 // A save that failed for want of a connection (rather than being refused).
-const netError = err => err instanceof TypeError ||
+const netError = err => err instanceof TypeError || !!window.LIBLANDE_SIGNIN_WAIT || (err && err.status === 401) ||
   /offline|can\u2019t be reached|NetworkError|Load failed|Failed to fetch|respondWith|network connection/i.test(String(err && err.message));
 // The open paper's changes kept on this device now (not in a few
 // seconds): true once they are.
@@ -319,7 +319,7 @@ async function uploadMarked(file, bytes, pages) {
     }
     throw err;
   }
-  if (!r.ok) throw new Error('Google Drive didn\u2019t accept the changes (error ' + r.status + ').');
+  if (!r.ok) { const e = new Error('Google Drive didn\u2019t accept the changes (error ' + r.status + ').'); e.status = r.status; throw e; }
   return (await r.json().catch(() => ({}))).md5Checksum || null;
 }
 async function checkPdf(bytes, pages) {

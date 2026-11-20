@@ -20,7 +20,7 @@
  */
 (function (root) {
   'use strict';
-  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).builder = '2026-11-19.03';
+  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).builder = '2026-11-19.04';
   const FOLDER = 'application/vnd.google-apps.folder';
   const DATA_FOLDER = 'LibLande', LIBRARY_FILE = 'library.json.gz', INDEX_FILE = 'file-index.json',   // keep-name: the folder in Drive
     SETTINGS_FILE = 'settings.json', INBOX_FOLDER = 'Inbox', INBOX_FILE = 'LibLande inbox.bib';
@@ -258,7 +258,10 @@
       const folder = await dataFolder();
       const f = folder && await named(folder, SETTINGS_FILE, 'id');
       if (!f) return null;
-      try { const s = JSON.parse(await text(f.id)); return s && s.bibId ? s : null; } catch (e) { return null; }
+      // (Only a file that isn't JSON counts as none: one that couldn't be
+      // read (offline, Drive busy) is an error, not a blank to write over.)
+      const raw = await text(f.id);
+      try { const s = JSON.parse(raw); return s && s.bibId ? s : null; } catch (e) { return null; }
     }
     async function settings(fresh) {
       if (known && !fresh) return known;
