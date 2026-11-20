@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, inbox, trash, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-20.06';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-20.07';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -1678,13 +1678,13 @@ let TABS = store.get('tabs', []);
 const tabCloseable = id => id !== 'all' && id !== 'toread' && id !== 'inbox';
 function renderTabs() {
   if (!ENTRIES.length) return;
-  TABS = TABS.filter(id => id !== 'all' && id !== 'recent' && id !== 'inbox' && groupItems(id));
+  // (The library, the reading list and the Inbox share the first tab.)
+  TABS = TABS.filter(id => !HOME_IDS.includes(id) && id !== 'recent' && groupItems(id));
   const rb = $('#recentBtn');
   rb.classList.toggle('on', state.group === 'recent');
   rb.setAttribute('aria-pressed', String(state.group === 'recent'));
-  if (gs && TABS.indexOf('toread') < 0) TABS.unshift('toread');
-  if (!gs) TABS = TABS.filter(id => id !== 'toread');
   store.set('tabs', TABS);
+  const home = homeList();
   const on = id => state.group === id;
   const count = id => (groupItems(id) || []).length.toLocaleString();
   const lib = $('#tabs .tab.pinned');
@@ -1692,28 +1692,28 @@ function renderTabs() {
   // phone, instead of a strip of tabs: the list showing, with how many
   // are open, and a tap lists them (phoneLists).
   if (phoneMQ.matches) {
-    const n = TABS.length + 1;
+    const n = TABS.length + (gs ? HOME_IDS.length : 1);
     lib.innerHTML = listIcon(state.group) + `<span class="nm">${esc(groupName(state.group))}</span><span class="ct"></span>` +
       (n > 1 ? `<span class="tab-n" aria-hidden="true">${n}</span>` : '') + ICON.chev;
     lib.setAttribute('aria-selected', 'true');
     lib.setAttribute('aria-haspopup', 'menu');
     lib.setAttribute('aria-label', groupName(state.group) + '; ' + n + ' open list' + (n > 1 ? 's' : '') + '. Show them');
   } else {
-    if (lib.querySelector('.tab-n') || !lib.querySelector('.i')) lib.innerHTML = ICON.lib + '<span class="nm">Library</span><span class="ct"></span>';
+    // The first tab: the library's list chosen (the library, the reading
+    // list or the Inbox), its v a menu of the three.
+    lib.innerHTML = listIcon(home) + `<span class="nm">${esc(homeName(home))}</span><span class="ct"></span>` +
+      (gs ? `<span class="tab-dd" data-home-dd role="button" aria-haspopup="menu" aria-label="Your library, reading list or Inbox" title="Your library, reading list or Inbox">${ICON.chev}</span>` : '');
+    lib.dataset.tab = home;
+    lib.title = homeName(home);
     lib.removeAttribute('aria-haspopup'); lib.removeAttribute('aria-label');
-    lib.setAttribute('aria-selected', String(on('all')));
+    lib.setAttribute('aria-selected', String(on(home)));
   }
-  lib.querySelector('.ct').textContent = count('all');
+  lib.querySelector('.ct').textContent = count(phoneMQ.matches ? 'all' : home);
   const box = $('#tabScroll'), keep = box.scrollLeft;
-  // On a phone the reading list's tab is "Reading", to save room.
-  const short = id => (id === 'toread' && phoneMQ.matches ? 'Reading' : groupName(id));
-  // (The reading list's tab shows it or the Inbox: its arrow switches.)
-  const slot = id => (id === 'toread' ? rlWhich() : id);
-  box.innerHTML = TABS.map(id0 => { const id = slot(id0); return `<button type="button" class="tab${id0 === 'toread' ? ' rl-slot' : ''}" role="tab" data-tab="${esc(id)}" aria-selected="${on(id)}" title="${esc(groupName(id))}">` +
-    (id === 'toread' ? ICON.bookmark : id === 'inbox' ? ICON.inbox : '') + `<span class="nm">${esc(short(id))}</span><span class="ct">${count(id)}</span>` +
-    (id0 === 'toread' ? `<span class="tab-dd" data-tab-dd role="button" aria-haspopup="menu" aria-label="Reading list or Inbox" title="Reading list or Inbox">${ICON.chev}</span>` : '') +
+  box.innerHTML = TABS.map(id => `<button type="button" class="tab" role="tab" data-tab="${esc(id)}" aria-selected="${on(id)}" title="${esc(groupName(id))}">` +
+    (id === 'trash' ? ICON.trash : '') + `<span class="nm">${esc(groupName(id))}</span><span class="ct">${count(id)}</span>` +
     (tabCloseable(id) ? `<span class="tab-x" data-close="${esc(id)}" role="button" aria-label="Close ${esc(groupName(id))}" title="Close">${ICON.x}</span>` : '') +
-    `</button>`; }).join('');
+    `</button>`).join('');
   box.scrollLeft = keep;
   const cur = box.querySelector('.tab[aria-selected="true"]');
   if (cur) {
@@ -1724,6 +1724,16 @@ function renderTabs() {
   fitToolbar();
   foldTabs();
 }
+// The first tab's lists: the library (by its own name), the reading list
+// and the Inbox; the one it shows is the last of them open.
+const HOME_IDS = ['all', 'toread', 'inbox'];
+function homeList() {
+  if (!gs) return 'all';
+  if (HOME_IDS.includes(state.group)) { store.set('homeList', state.group); return state.group; }
+  const h = store.get('homeList', 'all');
+  return HOME_IDS.includes(h) ? h : 'all';
+}
+const homeName = id => (id === 'all' && gs && LIBS.current ? libName(LIBS.current) : groupName(id));
 // Lists whose tabs are out of sight at an end of the strip: a button over
 // that end says how many, and a tap lists them (as the open papers' tabs).
 const LIB_OUT = { left: [], right: [] };
@@ -1796,7 +1806,7 @@ function phoneLists() {
   const was = $('#tabsMenu');
   closeTabsMenu();
   if (was && was.dataset.side === 'phone') return;
-  const ids = ['all'].concat(...TABS.map(id => (id === 'toread' && gs ? ['toread', 'inbox'] : [id]))), btn = $('#tabs .tab.pinned');
+  const ids = (gs ? HOME_IDS : ['all']).concat(TABS), btn = $('#tabs .tab.pinned');
   const row = id => `<div class="op-row"><button type="button" role="menuitem" class="mi" data-tl="${esc(id)}"${state.group === id ? ' aria-current="true"' : ''}>${listIcon(id)}` +
     `<span class="lm-nm">${esc(groupName(id))}</span><span class="lm-ct">${(groupItems(id) || []).length.toLocaleString()}</span></button>` +
     (id !== 'recent' && tabCloseable(id) ? `<button type="button" class="op-x" data-tl-x="${esc(id)}" aria-label="Close ${esc(groupName(id))}" title="Close">${ICON.x}</button>` : '') + `</div>`;
@@ -1834,8 +1844,8 @@ function closeTab(id) {
 $('#tabs').addEventListener('click', ev => {
   const x = ev.target.closest('[data-close]');
   if (x) { ev.stopPropagation(); closeTab(x.dataset.close); return; }
-  const dd = ev.target.closest('[data-tab-dd]');
-  if (dd) { ev.stopPropagation(); if (rlMenuOpen() && RLH.hov) { RLH.hov = false; return; } rlSwitchMenu(dd.closest('.tab'), id => setGroup(id)); return; }
+  const dd = ev.target.closest('[data-home-dd]');
+  if (dd) { ev.stopPropagation(); if (rlMenuOpen() && RLH.hov) { RLH.hov = false; return; } homeMenu(dd.closest('.tab')); return; }
   const t = ev.target.closest('[data-tab]');
   if (t && rlMenuOpen()) rlMenuClose();
   if (!t) return;
@@ -1926,7 +1936,7 @@ function tabDrag(box, sel, moved) {
   box.addEventListener('pointerdown', ev => {
     dropped = 0;
     const el = ev.target.closest(sel);
-    if (d || !el || ev.button !== 0 || ev.target.closest('[data-close], [data-ptab-x], [data-tab-dd]')) return;
+    if (d || !el || ev.button !== 0 || ev.target.closest('[data-close], [data-ptab-x], [data-home-dd]')) return;
     const all = tabs();
     if (all.length < 2) return;
     d = { el, id: ev.pointerId, from: all.indexOf(el), x0: ev.clientX, y0: ev.clientY, x: ev.clientX, touch: ev.pointerType !== 'mouse' };

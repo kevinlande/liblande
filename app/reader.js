@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, inbox, trash, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-20.06';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-20.07';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -990,10 +990,10 @@ const EASE = 'cubic-bezier(.2, .7, .3, 1)';
 // moving with it as the column folds. Returns a tidying-up, for when
 // the reader covers it.
 function switchSlide(toReader, ms) {
-  const pair = $('#readerPair'), libTab = $('#tabs .tab.pinned');
+  const pair = $('#readerBtn'), libTab = $('#modeLib');
   const tb = pair && pair.closest('.toolbar');
   if (!tb || !libTab || pair.offsetParent === null || libTab.offsetParent === null) return Promise.resolve(() => {});
-  const ct = libTab.querySelector('.ct'), full = ct ? ct.scrollWidth : 0;
+  const ct = null, full = 0;
   const box = () => tb.getBoundingClientRect();
   const at = el => { const r = el.getBoundingClientRect(), b = box(); return { left: r.left - b.left, top: r.top - b.top, width: r.width, height: r.height }; };
   // (Where it starts: under Library as it is, or under Reader with the count folded.)

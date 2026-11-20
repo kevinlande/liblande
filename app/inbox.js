@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, inbox, trash, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/inbox.js'] = '2026-11-20.06';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/inbox.js'] = '2026-11-20.07';
 /* ------------------------------------------------------------ the Inbox */
 // Works you came across (cited in a paper you're reading, say) and want to
 // look at before deciding to keep them: their details, where you found
@@ -183,26 +183,60 @@ function rlSwitchMenu(btn, onPick) {
 // Resting the pointer on the tab (as on the Reader button) brings the
 // menu down; leaving it, and the menu, puts it away.
 const RLH = { t: 0, hide: 0, hov: false, on: false };
-const rlMenuOpen = () => { const m = $('#tabsMenu'); return !!(m && m.dataset.side === 'rlswitch'); };
+const rlMenuOpen = () => { const m = $('#tabsMenu'); return !!(m && (m.dataset.side === 'rlswitch' || m.dataset.side === 'home')); };
+// The first tab's menu: the library (by its name), then the reading list
+// and the Inbox, each with its count, the one shown ticked; one chosen
+// opens in the tab.
+function homeMenu(btn) {
+  const was = $('#tabsMenu');
+  closeTabsMenu();
+  if (was && was.dataset.side === 'home') return;
+  const m = document.createElement('div');
+  m.className = 'menu-list pdf-menu link-menu recent-menu rl-switch home-menu';
+  m.id = 'tabsMenu';
+  m.dataset.side = 'home';
+  m.setAttribute('role', 'menu');
+  m.setAttribute('aria-label', 'Your library, reading list or Inbox');
+  const cur = btn.dataset.tab;
+  const item = (id, sub) => `<button type="button" role="menuitemradio" aria-checked="${cur === id}" data-home="${id}">${listIcon(id)}` +
+    `<span class="op-text"><span class="rc-title">${esc(homeName(id))}</span><span class="rc-sub">${sub}</span></span><span class="lm-ct">${(groupItems(id) || []).length.toLocaleString()}</span></button>`;
+  m.innerHTML = item('all', 'Your whole library') + '<div class="menu-sep"></div>' + item('toread', 'In your library, to read') + item('inbox', 'Not in your library yet, to decide on');
+  m.querySelectorAll('[aria-checked="true"] .lm-ct').forEach(c => c.insertAdjacentHTML('beforebegin', '<span class="rlw-tick" aria-hidden="true">\u2713</span>'));
+  document.body.appendChild(m);
+  const r = btn.getBoundingClientRect();
+  m.style.left = Math.max(8, Math.min(innerWidth - m.offsetWidth - 8, r.left)) + 'px';
+  m.style.top = (r.bottom + 6) + 'px';
+  m.addEventListener('pointerenter', () => clearTimeout(RLH.hide));
+  m.addEventListener('pointerleave', ev => { if (ev.pointerType === 'mouse' && RLH.hov) RLH.hide = setTimeout(rlMenuClose, 250); });
+  m.addEventListener('click', ev => {
+    const b = ev.target.closest('[data-home]');
+    if (!b) return;
+    closeTabsMenu();
+    if (b.dataset.home !== 'all') store.set('rlWhich', b.dataset.home);
+    if (b.dataset.home === state.group) listEl.scrollTo({ top: 0, behavior: 'smooth' }); else setGroup(b.dataset.home);
+  });
+}
 function rlMenuClose() { RLH.hov = false; if (rlMenuOpen()) closeTabsMenu(); }
-$('#tabScroll').addEventListener('pointerover', ev => {
+const homeTab = () => (phoneMQ.matches || !gs ? null : $('#tabs .tab.pinned'));
+$('#tabs').addEventListener('pointerover', ev => {
   if (ev.pointerType !== 'mouse') return;
-  const tab = ev.target.closest('.rl-slot');
+  const tab = ev.target.closest('.tab.pinned');
+  if (tab && !homeTab()) return;
   if (!tab || (ev.relatedTarget && tab.contains(ev.relatedTarget))) return;
   RLH.on = true;
   clearTimeout(RLH.hide);
   if (rlMenuOpen()) return;
   clearTimeout(RLH.t);
   RLH.t = setTimeout(() => {
-    const now = $('#tabScroll .rl-slot');
+    const now = homeTab();
     if (!now || !RLH.on || rlMenuOpen()) return;
-    rlSwitchMenu(now, id => setGroup(id));
+    homeMenu(now);
     RLH.hov = true;
   }, 350);
 });
-$('#tabScroll').addEventListener('pointerout', ev => {
+$('#tabs').addEventListener('pointerout', ev => {
   if (ev.pointerType !== 'mouse') return;
-  const tab = ev.target.closest('.rl-slot');
+  const tab = ev.target.closest('.tab.pinned');
   if (!tab || (ev.relatedTarget && tab.contains(ev.relatedTarget))) return;
   RLH.on = false;
   clearTimeout(RLH.t);
