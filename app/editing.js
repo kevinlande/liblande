@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, inbox, trash, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-20.01';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-20.02';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -702,19 +702,34 @@ async function lookupIntoForm() {
   }
 }
 
+// (A PDF of this name in the folder, made since `since`: one that arrived
+// though its answer didn't.)
+async function uploadLanded(name, info, since) {
+  try {
+    const q = `'${info.folderId}' in parents and name = '${name.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}' and trashed = false and createdTime > '${since}'`;
+    const r = await fetchWithin('https:\/\/www.googleapis.com/drive/v3/files?q=' + encodeURIComponent(q) + '&fields=files(id,createdTime)&orderBy=createdTime desc', { headers: { Authorization: 'Bearer ' + info.token } }, 20000);
+    if (!r.ok) return null;
+    const f = ((await r.json()).files || [])[0];
+    return f ? { id: f.id } : null;
+  } catch (err) { return null; }
+}
 async function uploadPdf(file, name, info, again) {
   const form = new FormData();
   form.append('metadata', new Blob([JSON.stringify({ name, parents: [info.folderId], mimeType: 'application/pdf' })], { type: 'application/json' }));
   form.append('file', file);
   // (A while for it to go, by its size, at a slow 25 KB a second, and at
   // least a minute; then given up, saying so.)
-  const stop = window.AbortController ? new AbortController() : null;
+  const stop = window.AbortController ? new AbortController() : null, t0 = new Date(Date.now() - 5 * 60000).toISOString();
   const timer = stop && setTimeout(() => stop.abort(), Math.max(60000, (file.size || 0) / 25));
   let r;
   try {
     r = await fetch('https:\/\/www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',
       Object.assign({ method: 'POST', headers: { Authorization: 'Bearer ' + info.token }, body: form }, stop ? { signal: stop.signal } : {}));
   } catch (err) {
+    // (It may have arrived all the same: one of that name, made since this
+    // began, is it. Otherwise said, to try again.)
+    const found = await uploadLanded(name, info, t0);
+    if (found) return found;
     throw new Error(stop && stop.signal.aborted ? 'The PDF didn\u2019t finish uploading (the connection is too slow just now). Try again.' : 'Google Drive can\u2019t be reached just now, so the PDF wasn\u2019t uploaded.');
   } finally { if (timer) clearTimeout(timer); }
   // (Its token lapsed: nothing was made, so asked again once with a new one.)

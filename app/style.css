@@ -1354,7 +1354,7 @@ button.fileicon { border: 0; background: none; cursor: pointer; }
 .d-cite { color: var(--text); font-size: 13px; line-height: 1.35; font-variant-numeric: tabular-nums; }
 /* Each piece has a bracket and a label under it, drawn by CSS so that
    selecting and copying the line takes only the citation. */
-.cs { display: inline-block; position: relative; min-width: 17px; max-width: 100%; margin: 0; padding-bottom: 14px; text-align: center; vertical-align: baseline; }
+.cs { display: inline-block; position: relative; min-width: max(17px, calc(var(--lw, 0) * 0.56em + 4px)); max-width: 100%; margin: 0; padding-bottom: 14px; text-align: center; vertical-align: baseline; }
 .cs-wide { text-align: left; margin-left: 0; }
 .cs[data-f] { cursor: text; border-radius: 3px; }
 @media (hover: hover) { .cs[data-f]:not(.editing):hover { background: var(--accent-soft); } }

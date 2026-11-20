@@ -19,7 +19,7 @@
  */
 (function (root) {
   'use strict';
-  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).edits = '2026-11-20.01';
+  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).edits = '2026-11-20.02';
   const READING_FILE = 'reading-list.json',
     INBOX_FOLDER = 'Inbox', INBOX_FILE = 'LibLande inbox.bib', BACKUP_FOLDER = 'Backups';
   const READING_GROUP = '★ Reading List';
@@ -73,19 +73,22 @@
     hasKey: (text, key) => parseBib_(text)[0].some(e => e[1] === key),
     // (As Code.gs's saveEntry, between reading the file and writing it.)
     saveEntry(text, req, fileName, stamp) {
-      if (stamp != null && !req.expectHash && req.expectStamp && stamp !== req.expectStamp) {
-        throw new Error(fileName + ' has changed since LibLande last read it (perhaps it was saved in BibDesk). ' + CHANGED);
-      }
       const before = parseBib_(text);
       const clash = !!req.expectHash && hashOf(text, req.key) !== req.expectHash;
       const changingGroups = !!req.groups && ((req.groups.add || []).length + (req.groups.remove || []).length > 0);
-      if (changingGroups && req.expectGroupsHash && groupsHashOf(before) !== req.expectGroupsHash) {
-        throw new Error('Your static groups have been changed since LibLande last read them (perhaps in BibDesk). ' + CHANGED);
-      }
       const set = Object.assign({}, req.set || {});
       if (Object.keys(set).length || changingGroups) set['date-modified'] = req.modified;
       let edited = Object.keys(set).length ? editEntry_(text, req.key, set) : text;
       if (req.groups) edited = editGroups_(edited, req.key, req.groups.add || [], req.groups.remove || []);
+      // (Already there exactly, groups too (to its date-modified): made
+      // before, its answer lost, and sent again.)
+      if (edited === text && (clash || req.expectGroupsHash || req.expectStamp) && (Object.keys(req.set || {}).length || changingGroups)) return { text: null, hash: hashOf(text, req.key), already: true, gh: groupsHashOf(before) };
+      if (stamp != null && !req.expectHash && req.expectStamp && stamp !== req.expectStamp) {
+        throw new Error(fileName + ' has changed since LibLande last read it (perhaps it was saved in BibDesk). ' + CHANGED);
+      }
+      if (changingGroups && req.expectGroupsHash && groupsHashOf(before) !== req.expectGroupsHash) {
+        throw new Error('Your static groups have been changed since LibLande last read them (perhaps in BibDesk). ' + CHANGED);
+      }
       // Changed since it was read: a clash, unless the change is already
       // there exactly (to its date-modified), as when this edit reached
       // Drive before but its answer was lost, and it's made again.
@@ -116,6 +119,8 @@
       return { text: edited, hash: hashOf(edited, req.key), groupsHash: groupsHashOf(after) };
     },
     createGroup(text, name, keys, modified, fileName) {
+      const had = staticGroups_(parseBib_(text)[1]).find(g => g.name === name);
+      if (had && keys.length && keys.every(k => had.keys.indexOf(k) >= 0)) return { text: null, already: true, gh: groupsHashOf(parseBib_(text)) };
       const before = checkGroup(text, name, keys, fileName);
       let edited = ensureStaticGroup_(text, name);
       keys.forEach(k => {
@@ -147,6 +152,12 @@
         throw new Error('The reading-list group didn’t come out right, so LibLande didn’t save it.');
       }
       return { text: edited, gh: groupsHashOf(after), groupKeys: group.keys };
+    },
+    // (Made already: an entry with this key and this add's own date-added,
+    // as when the answer was lost and it's sent again.)
+    addedAlready(text, key, added, title) {
+      const e = parseBib_(text)[0].find(x => x[1] === key);
+      return !!(e && added && e[2]['date-added'] === added && String(e[2].title || '') === String(title || ''));
     },
     addToMain(text, type, key, fields) {
       const before = parseBib_(text)[0];
@@ -249,6 +260,10 @@
     // if its own has been used since), and into its groups again.
     restoreEntry(text, entry, key, groups, newKey) {
       const before = parseBib_(text), use = newKey || key;
+      if (before[0].some(e => e[1] === use)) {
+        const body0 = newKey ? entry.replace(/^(\s*@\w+\s*[{(]\s*)[^,\s]+/, '$1' + newKey) : entry, l = locateEntry_(text, use);
+        if (text.slice(l.start, l.end).trim() === body0.trim()) return { text: null, already: true, hash: hashOf(text, use), key: use, gh: groupsHashOf(before) };
+      }
       if (before[0].some(e => e[1] === use)) { const e = new Error('Your library has a publication with the cite key ' + use + ' now.'); e.keyTaken = use; throw e; }
       const body = newKey ? entry.replace(/^(\s*@\w+\s*[{(]\s*)[^,\s]+/, '$1' + newKey) : entry;
       let cur = appendEntry_(text, body);
@@ -264,6 +279,12 @@
     },
     // A new cite key (renameKey_ and checkRename_ in Build.gs).
     renameKey(text, req) {
+      const keys = new Set(parseBib_(text)[0].map(e => e[1])), nk = String(req.newKey || '').trim();
+      if (!keys.has(req.key) && nk && keys.has(nk)) {
+        // (Only if it's this one: its text with the old key back is what it was.)
+        const l = locateEntry_(text, nk), asOld = text.slice(l.start, l.end).replace(nk, req.key);
+        if (!req.expectHash || fingerprint_(asOld) === req.expectHash) return { text: null, already: true, hash: hashOf(text, nk), gh: groupsHashOf(parseBib_(text)) };
+      }
       const loc = locateEntry_(text, req.key);
       if (req.expectHash && fingerprint_(text.slice(loc.start, loc.end)) !== req.expectHash) {
         throw new Error('This publication has been changed since LibLande last read it (perhaps in BibDesk). Tap Refresh, wait for the library to update, and try again.');
@@ -479,8 +500,27 @@
           step('Saving to Google Drive');
           saved = await writeText(m, out.text);
         } catch (e) {
-          if (out.undo) await out.undo();
-          throw e;
+          // (No answer, or a server's error: perhaps it was saved all the
+          // same. The file read again: if it's now just this text, it was.
+          // If that can't be told, nothing's undone (a PDF filed with no
+          // entry linking it is harmless; an entry linking a PDF put back
+          // isn't), and the error says it's unsure.)
+          const unclear = e.offline || e.noAnswer || (e.status >= 500) || (e && e.name === 'TypeError');
+          if (!unclear) { if (out.undo) await out.undo(); throw e; }
+          let made = null, known = false;
+          try {
+            const after = await meta(id, 'id,modifiedTime,size');
+            known = true;
+            if (after.modifiedTime !== m.modifiedTime && await B.text(id) === out.text) made = after;
+          } catch (e2) { known = false; }
+          if (!made) {
+            if (known) { if (out.undo) await out.undo(); throw e; }
+            const u = new Error('Google Drive didn\u2019t answer, so LibLande can\u2019t tell whether your change was saved. Tap Refresh in a moment to see.');
+            u.unsure = true; u.offline = true;
+            throw u;
+          }
+          B.remember(m.id, made.modifiedTime, out.text);
+          saved = made;
         }
         // (Not waited for: the save is done, and the first pruning under
         // the new rule can move many copies to the trash.)
@@ -662,7 +702,10 @@
     F.addToMain = req => serial(async () => {
       let filed = null;
       const out = await changeFile(await mainBibId(), async (text, m) => {
-        if (await run('hasKey', text, req.key)) throw new Error('Your library already has a publication with the cite key ' + req.key + '.');
+        if (await run('hasKey', text, req.key)) {
+          if (await run('addedAlready', text, req.key, req.now, texSafe(Object.assign({}, req.fields)).title)) return { text: null, already: true, hash: await run('hashOf', text, req.key) };
+          throw new Error('Your library already has a publication with the cite key ' + req.key + '.');
+        }
         const fields = texSafe(Object.assign({}, req.fields));
         fields['date-added'] = fields['date-modified'] = req.now;
         filed = req.uploadId ? await filePdf(m, req.uploadId, fields, req.prefix, req.avoid) : null;
@@ -675,7 +718,7 @@
         }
       }, req.backupName);
       if (filed) noteFiled(filed);
-      return { key: req.key, hash: out.hash, file: filed && filed.info };
+      return { key: req.key, hash: out.hash, file: filed && filed.info, already: !!out.already };
     });
 
     // Link an uploaded PDF to a publication in the main .bib (as Code.gs's
@@ -760,9 +803,9 @@
       let out;
       try {
         out = await changeFile(bibId, text => run('trashEntry', text, req.key, req.expectHash || null), req.backupName);
-      } catch (e) { try { await trashForget([item.id]); } catch (e2) { /* left: it can be deleted */ } throw e; }
+      } catch (e) { if (!e.unsure) { try { await trashForget([item.id]); } catch (e2) { /* left: it can be deleted */ } } throw e; }
       // (As written now, in case it changed between the two reads.)
-      item.entry = out.entry; item.groups = out.groups || [];
+      if (out.entry) { item.entry = out.entry; item.groups = out.groups || []; }
       let reading = null;
       try {
         reading = await changeJson(READING_FILE, blankReading, d => {
@@ -858,9 +901,16 @@
         const after = new Set(d.items.map(x => x.key));
         add = Array.from(after).filter(k => !before.has(k)).concat(req.push || []);
         remove = Array.from(before).filter(k => !after.has(k)).concat(req.pull || []);
+        // (A change before whose group step didn't happen (the connection
+        // lost between): kept here until it's done, then done with this.
+        // Only its own keys: what BibDesk changes isn't touched.)
+        const was = d.groupPending || { add: [], remove: [] };
+        add = add.concat(was.add.filter(k => after.has(k) && add.indexOf(k) < 0 && remove.indexOf(k) < 0));
+        remove = remove.concat(was.remove.filter(k => !after.has(k) && remove.indexOf(k) < 0 && add.indexOf(k) < 0));
+        d.groupPending = add.length || remove.length ? { add, remove } : null;
       });
       const out = add.length || remove.length ? await syncReadingGroup(add, remove, req) : {};
-      if (out.groupKeys) d = await changeJson(READING_FILE, blankReading, x => { x.syncedKeys = out.groupKeys; });
+      d = await changeJson(READING_FILE, blankReading, x => { if (out.groupKeys) x.syncedKeys = out.groupKeys; if (!x.groupPending && !out.groupKeys) return false; x.groupPending = null; });
       out.reading = readingOut(d);
       return out;
     });

@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, inbox, trash, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-20.01';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-20.02';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -2756,7 +2756,9 @@ function venueHTML(e) {
   // a library that can be changed, a click on a piece edits it, and the +
   // adds one.
   const f = e.f;
-  const seg = (n, text, label, cls) => (text ? `<span class="cs${cls ? ' ' + cls : ''}" data-l="${label}"${n ? ` data-f="${n}"` : ''}>${text}</span>` : '');
+  // (Its label's length (--lw): the piece at least as wide as its label, so
+  // a short one, "Nov" under MONTH, doesn't run into the next one's.)
+  const seg = (n, text, label, cls) => (text ? `<span class="cs${cls ? ' ' + cls : ''}" data-l="${label}" style="--lw:${String(label).length}"${n ? ` data-f="${n}"` : ''}>${text}</span>` : '');
   const eds = e.e && e.e.length ? e.e.map(fullName).join(', ') : '';
   const edsLabel = e.e && e.e.length > 1 ? 'Editors' : 'Editor';
   const pub = join2(seg('address', f.address && esc(f.address), 'Place'), seg('publisher', f.publisher && esc(f.publisher), 'Publisher'), ': ');

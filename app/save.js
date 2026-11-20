@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, inbox, trash, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/save.js'] = '2026-11-20.01';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/save.js'] = '2026-11-20.02';
 /* ---- saving markup */
 // A new mark isn't in the PDF's annotations until PDF.js commits it (on a
 // change of tool), so anything done with a tool counts as possibly
@@ -304,6 +304,9 @@ window.addEventListener('online', () => setTimeout(() => uploadKept(true), 1500)
 // when that's given. One that isn't is never sent.
 async function uploadMarked(file, bytes, pages) {
   await checkPdf(bytes, pages);
+  // (What Drive had before: an upload cut off is taken as arrived only if
+  // Drive's copy has changed from it.)
+  const prev = recentMd5.get(file.id) || (V.file && V.file.id === file.id ? V.md5 : null);
   // (A big file on a slow connection takes a while: at least 5 minutes,
   // more at about 40 KB a second.)
   const within = Math.max(5 * 60 * 1000, bytes.byteLength / 40);
@@ -315,10 +318,10 @@ async function uploadMarked(file, bytes, pages) {
     // (Given up on, the upload may still have arrived: if Drive's file is
     // now exactly this size, it did, and its checksum is the new one;
     // otherwise the next save would take it for a change made elsewhere.)
-    if (err.noAnswer) {
+    if (err.noAnswer || err instanceof TypeError) {
       const now = await googleFetch('https:\/\/www.googleapis.com/drive/v3/files/' + encodeURIComponent(file.id) + '?fields=md5Checksum,size', {}, 45 * 1000)
         .then(x => (x.ok ? x.json() : null)).catch(() => null);
-      if (now && now.md5Checksum && Number(now.size) === bytes.byteLength) return now.md5Checksum;
+      if (now && now.md5Checksum && Number(now.size) === bytes.byteLength && (!prev || now.md5Checksum !== prev)) return now.md5Checksum;
     }
     throw err;
   }
