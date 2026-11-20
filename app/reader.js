@@ -1,8 +1,8 @@
 ﻿// LibLande: the PDF reader: pages, marks, tools, saving, the sidebar.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, citecard, tour, start.)
+// index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, inbox, trash, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-19.02';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-19.03';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -717,6 +717,7 @@ async function openReader(entry, file, pos) {
   $('#vTitle').textContent = entry.f.title || file.n;
   $('#vDrive').href = driveUrl(file);
   syncReaderRL();
+  ibBar();
   $('#vPage').textContent = '';
   $('#vFind').hidden = true;
   // (Search, for the paper before: put away; the sidebar it stood in for,
@@ -1059,7 +1060,8 @@ const PTABS = { list: store.get('readerTabs', []), active: store.get('readerActi
 // (An empty tab isn't kept: it's filled, or gone.)
 if (PTABS.list.some(t => t.blank)) { const front = PTABS.list[PTABS.active]; PTABS.list = PTABS.list.filter(t => !t.blank); PTABS.active = front && !front.blank ? PTABS.list.indexOf(front) : (PTABS.list.length ? 0 : -1); }
 function tabEntry(t) {
-  const e = BYKEY.get(t.key);
+  // (A paper from the Inbox: see inbox.js.)
+  const e = BYKEY.get(t.key) || ibByKey(t.key);
   const f = e && (e.files || []).find(x => x.id === t.fileId);
   return e && f ? { e, f } : null;
 }
@@ -1293,6 +1295,7 @@ function showStart() {
   if (fromLibrary) sideSweep(true);
   renderPaperTabs();
   renderStart();
+  ibBar();
 }
 function renderStart() {
   const box = $('#vStart');
@@ -1315,21 +1318,28 @@ function renderStart() {
   const others = SYNC.position ? Object.entries(POS).filter(([id, x]) => x.dev !== DEVICE && x.page && !open.has(id) && where(id))
     .sort((a, b) => b[1].at - a[1].at).slice(0, 6)
     .map(([id, x]) => { const w = where(id); return card(w.e, w.f, 'p. ' + x.page + ' \u00b7 ' + ago(Math.round(x.at / 1000)), x.name ? `<span class="vs-dev">${esc(x.name)}</span>` : '', x.page); }) : [];
-  // The reading list: up next, then later.
-  const rl = readingOrder().map(x => ({ x, e: BYKEY.get(x.key) })).filter(({ e }) => e && readablePdfs(e).length).slice(0, 6)
-    .map(({ x, e }) => card(e, readablePdfs(e)[0], '', `<span class="vs-tag">${x.list === 'next' ? 'Up next' : 'Later'}</span>`));
+  // The reading list: up next, then later. Or (its heading switches) the
+  // Inbox: those with a PDF open here, the others are shown in the library.
+  const inbox = rlWhich() === 'inbox';
+  const rl = inbox ? ibEntries().slice(0, 6).map(e => e.files ? card(e, e.files[0], ibFromText(e.inbox)) : `<button type="button" class="vs-card vs-nopdf" data-vs-ib="${esc(e.inbox.id)}"><span class="vs-tx"><span class="vs-t">${esc(e.f.title)}</span><span class="vs-m">${esc([e.authorsShort, e.f.year].filter(Boolean).join(' \u00b7 '))}</span><span class="vs-w">${esc(ibFromText(e.inbox))}${e.inbox.from ? ' \u00b7 ' : ''}No PDF yet</span></span></button>`)
+    : readingOrder().map(x => ({ x, e: BYKEY.get(x.key) })).filter(({ e }) => e && readablePdfs(e).length).slice(0, 6)
+      .map(({ x, e }) => card(e, readablePdfs(e)[0], '', `<span class="vs-tag">${x.list === 'next' ? 'Up next' : 'Later'}</span>`));
   const col = (title, items, more) => `<section class="vs-col"><h3>${title}${more || ''}</h3>${items.length ? items.join('') : '<p class="vs-none">None yet.</p>'}</section>`;
   // (Below the reader's bar, which lies over the page.)
   box.style.paddingTop = ($('#vTop').getBoundingClientRect().height + 24) + 'px';
   box.innerHTML = col('Recently opened', recent) + col('On your other devices', others) +
-    col('Reading list', rl, '<button type="button" class="linkish" data-vs-rl>Open the list</button>');
+    col(`<button type="button" class="vs-switch" data-vs-switch aria-haspopup="menu">${inbox ? 'Inbox' : 'Reading list'}${ICON.chev}</button>`, rl, `<button type="button" class="linkish" data-vs-rl>Open ${inbox ? 'the Inbox' : 'the list'}</button>`);
   opThumbs(box);
 }
 $('#vStart').addEventListener('click', async ev => {
-  if (ev.target.closest('[data-vs-rl]')) { await closeReader(); setGroup('toread'); return; }
+  if (ev.target.closest('[data-vs-rl]')) { await closeReader(); setGroup(rlWhich()); return; }
+  const sw = ev.target.closest('[data-vs-switch]');
+  if (sw) { rlSwitchMenu(sw, () => renderStart()); return; }
+  const nb = ev.target.closest('[data-vs-ib]');
+  if (nb) { ibShow(nb.dataset.vsIb); return; }
   const c = ev.target.closest('[data-vs-k]');
   if (!c) return;
-  const e = BYKEY.get(c.dataset.vsK), f = e && (e.files || []).find(x => x.id === c.dataset.vsF);
+  const e = BYKEY.get(c.dataset.vsK) || ibByKey(c.dataset.vsK), f = e && (e.files || []).find(x => x.id === c.dataset.vsF);
   if (!e || !f) return;
   // (From another device: opened at the page you got to there.)
   if (c.dataset.vsP) {

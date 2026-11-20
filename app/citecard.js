@@ -1,8 +1,8 @@
 ﻿// LibLande: a citation's card, in the reader: the pointer rested on a citation (or on an entry in the reference list), or a tap on one, shows the work cited, from your library or found online.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, citecard, tour, start.)
+// index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, inbox, trash, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/citecard.js'] = '2026-11-19.02';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/citecard.js'] = '2026-11-19.03';
 /* ------------------------------------------------------------ a citation's card */
 // Rest the pointer on a citation in the text, "Siegel (2010)" or "(Burge,
 // 2010; Siegel, 2010)" (each name and year its own), on a link to the
@@ -451,6 +451,7 @@ async function ccAbstract(c) {
 const CC_I = {
   read: '<path d="M2.5 6h6a3.5 3.5 0 0 1 3.5 3.5V20a2.5 2.5 0 0 0-2.5-2.5h-7zM21.5 6h-6A3.5 3.5 0 0 0 12 9.5V20a2.5 2.5 0 0 1 2.5-2.5h7z"/>',
   go: '<path d="M4 12h14"/><path d="M13 6l6 6-6 6"/>', peek: '<rect x="3.5" y="4" width="17" height="16" rx="2"/><path d="M3.5 13.5h17"/>',
+  inbox: '<path d="M4 13l2.5-7h11L20 13v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M4 13h4.5l1.5 2.5h4l1.5-2.5H20"/>',
   plus: '<path d="M12 5v14M5 12h14"/>', search: '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>',
   down: '<path d="M6 9l6 6 6-6"/>', up: '<path d="M6 15l6-6 6 6"/>', l: '<path d="M15 6l-6 6 6 6"/>', r: '<path d="M9 6l6 6-6 6"/>' };
 const ccIcon = k => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${CC_I[k]}</svg>`;
@@ -477,8 +478,10 @@ function ccDraw() {
     const e = c.e;
     const pager = CC.list.length > 1 ? `<span class="cc-pager"><button type="button" data-cc="prev" aria-label="Previous">${ccIcon('l')}</button>${CC.at + 1} of ${CC.list.length}<button type="button" data-cc="next" aria-label="Next">${ccIcon('r')}</button></span>` : '';
     const stars = e ? Math.max(0, Math.min(5, e.rating || 0)) : 0;
+    const inIb = !e && ibHas(c), passed = !e && !inIb && ibPassed(c);
     const kind = e ? `<span class="cc-dot"></span>In your library${stars ? ` <span class="cc-stars" aria-label="${stars} stars">${'\u2605'.repeat(stars)}${'\u2606'.repeat(5 - stars)}</span>` : ''}${e.f.read === '1' ? ' \u00b7 Read' : ''}`
-      : 'Not in your library' + (c.src ? ' \u00b7 found on ' + esc(c.src) : '');
+      : inIb ? `<span class="pill ib-pill">${ICON.inbox}Inbox</span> added ${esc(ago(Math.round(inIb.added / 1000)))}`
+      : 'Not in your library' + (c.src ? ' \u00b7 found on ' + esc(c.src) : '') + (passed ? ` \u00b7 <span class="cc-passed">you passed on it, ${esc(ago(Math.round((passed.passedAt || passed.at) / 1000)))}</span>` : '');
     const title = e ? String(e.f.title || '').replace(/[{}]/g, '') : c.title;
     const venue = e ? e.venue : c.venue, year = e ? e.f.year : c.year;
     const meta = [esc(ccNames(c)), venue ? '<i>' + esc(String(venue).replace(/[{}]/g, '')) + '</i>' : '', esc(year || '')].filter(Boolean).join(' \u00b7 ');
@@ -491,7 +494,9 @@ function ccDraw() {
       acts += ccGoButtons(t) + '<span class="cc-sp"></span>';
       if (!RL.has(e.k)) acts += `<button type="button" class="cc-ib" data-cc="rl" title="Add to reading list" aria-label="Add to reading list">${ICON.bookmarkAdd}</button>`;
       acts += `<button type="button" class="cc-ib" data-cc="copy" title="Copy the reference" aria-label="Copy the reference">${ICON.copy}</button>`;
-    } else acts += ccBtn('add', 'plus', 'Add\u2026', true) + ccGoButtons(t);
+    } else if (inIb) {
+      acts += (inIb.pdf ? ccBtn('ibread', 'read', 'Read', true) : '') + ccBtn('ibshow', 'inbox', 'Show in Inbox', !inIb.pdf) + ccGoButtons(t);
+    } else acts += ccBtn('add', 'plus', 'Add\u2026', true) + (gs ? ccBtn('ib', 'inbox', 'Add to Inbox') : '') + ccGoButtons(t);
     html = `<div class="cc-bd"><p class="cc-kind">${kind}${pager}</p><p class="cc-t">${esc(title)}</p><p class="cc-m">${meta}</p>${absHtml}</div><div class="cc-acts">${acts}</div>`;
   }
   CC.el.innerHTML = html;
@@ -622,6 +627,9 @@ function ccClick(ev) {
   else if (act === 'rl' && c && c.e) rlAdd(c.e.k);
   else if (act === 'copy' && c && c.e) { const r = citeRef(c.e); copy(r.text, 'Copied the ' + citeShort() + ' reference', r.html); }
   else if (act === 'add' && c) relAddFrom(c.from || c);
+  else if (act === 'ib' && c) ibAdd(Object.assign({}, c.from || c, { absText: c.absText || (c.from || c).absText }));
+  else if (act === 'ibshow' && c) { const x = ibHas(c); if (x) ibShow(x.id); }
+  else if (act === 'ibread' && c) { const x = ibHas(c), ie = x && ibByKey(IB_PRE + x.id); if (ie && ie.files) openPaper(ie, ie.files[0]); }
   else if (act === 'search') relAddFrom({ search: refQuery(t.entry ? t.entry.text : t.text || '') });
 }
 // To a citation's entry: its page, then the entry's first words there,

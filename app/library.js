@@ -1,8 +1,8 @@
 ﻿// LibLande: the library: data, the reading list, groups, search, the list and the details.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, citecard, tour, start.)
+// index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, inbox, trash, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-19.02';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-19.03';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -57,6 +57,7 @@ const ICON = {
   drive: '<svg class="i" viewBox="0 0 24 24"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>',
   clip: '<svg class="i" viewBox="0 0 24 24"><path d="M20 11.5l-8 8a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L9.7 17.2a1.7 1.7 0 0 1-2.4-2.4L15 7"/></svg>',
   x: '<svg class="i" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7L7 17"/></svg>',
+  trash: '<svg class="i" viewBox="0 0 24 24"><path d="M4 7h16M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13"/></svg>',
   bookmark: '<svg class="i" viewBox="0 0 24 24"><path d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1z"/></svg>',
   bookmarkAdd: '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1z"/><path d="M12 7.5v6M9 10.5h6"/></svg>',
   search: '<svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg>',
@@ -304,6 +305,8 @@ function init(data, again) {
   if (!groupItems(state.group)) state.group = 'all';
   sweepCovers();
   npAuto();
+  ibLoad();
+  trLoad();
   if (again) { renderGroups(); refresh(false); return; }
   $('#scope').value = state.scope;
   $('#sortSel').value = state.sort;
@@ -819,7 +822,7 @@ $('#rlBar').addEventListener('click', ev => {
 // list), take it off; or, off the list, add it, and mark it read or unread.
 function syncReaderRL() {
   const m = $('#vRLMenu'), b = $('#vRL');
-  m.hidden = !gs || !V.entry;
+  m.hidden = !gs || !V.entry || !!V.entry.inbox;
   if (m.hidden) { m.open = false; return; }
   const e = BYKEY.get(V.entry.k) || V.entry, x = RL.get(e.k), read = e.f.read === '1';
   b.classList.toggle('on', !!x);
@@ -940,7 +943,7 @@ function attachFile(e, file) {
     showSheet(`<h2>Attach a PDF</h2><p class="sheet-note">\u201c${esc(e.f.title || e.k)}\u201d already has ` +
       `${e.files.length === 1 ? 'a PDF' : e.files.length + ' files'}: ${esc(e.files[0].n)}.</p>` +
       `<div class="attach-choice"><label class="check"><input type="radio" name="attachMode" value="add" checked> Add ${esc(file.name)} as another file</label>` +
-      `<label class="check"><input type="radio" name="attachMode" value="replace"> Replace ${esc(e.files[0].n)} (it goes to the Google Drive trash)</label></div>`, 'Attach');
+      `<label class="check"><input type="radio" name="attachMode" value="replace"> Replace ${esc(e.files[0].n)} (it goes to the Trash, for ${TR_DAYS} days)</label></div>`, 'Attach');
     return;
   }
   runAttach(e, file, false);
@@ -956,9 +959,11 @@ async function runAttach(e, file, replace) {
     const now = bibdeskTime();
     const res = await callServer('attachPdf', {
       key: e.k, uploadId: up.id, replace: !!replace, replaceId: old && old.id ? old.id : null, avoid: unseenFolders(),
+      title: String(e.f.title || '').replace(/[{}]/g, '') + (old ? ' (' + old.n + ')' : ''), who: e.authorsShort || '', year: e.f.year || '',
       expectHash: e.h || null, prefix: papersPrefix(), modified: now, backupName: fileTime(),
     });
     e.h = res.hash;
+    if (res.trash) trSet(res.trash);
     e.files = res.replaced ? [res.file].concat(e.files.slice(1)) : (e.files || []).concat([res.file]);
     setFields(e, { 'date-modified': now });
     init(DATA, true);
@@ -988,8 +993,8 @@ function dropTarget(ev) {
   if (!$('#setup').hidden) return null;
   const r = t.closest('#rows [data-i]');
   if (r && state.view[+r.dataset.i]) return { kind: 'entry', el: r, e: state.view[+r.dataset.i] };
-  if (t.closest('#detail') && !state.picking && state.selKey && BYKEY.get(state.selKey)) {
-    return { kind: 'entry', el: detailEl, e: BYKEY.get(state.selKey) };
+  if (t.closest('#detail') && !state.picking && state.selKey && (BYKEY.get(state.selKey) || ibByKey(state.selKey))) {
+    return { kind: 'entry', el: detailEl, e: BYKEY.get(state.selKey) || ibByKey(state.selKey) };
   }
   if (t.closest('#listwrap')) return { kind: 'new', el: $('#listwrap') };
   return null;
@@ -1004,7 +1009,7 @@ function markDrop(t) {
   if (t) {
     hint.textContent = t.kind === 'new' ? 'Drop to add a new publication'
       : t.kind === 'form' ? 'Drop to use this PDF'
-      : 'Attach to \u201c' + (t.e.f.title || t.e.k) + '\u201d';
+      : (t.e.inbox && t.e.files ? 'Replace its PDF in your Inbox' : 'Attach to \u201c' + (t.e.f.title || t.e.k) + '\u201d');
   }
 }
 document.addEventListener('dragover', ev => {
@@ -1028,6 +1033,8 @@ document.addEventListener('drop', ev => {
   if (t.kind === 'form') { setAddPdf(file); return; }
   if (t.kind === 'new') { openAdd(file); return; }
   if (state.selKey !== t.e.k) { state.selKey = t.e.k; paint(); renderDetail(); }
+  // (One in the Inbox: its PDF, kept there.)
+  if (t.e.inbox) { ibAttach(t.e.inbox, file); return; }
   attachFile(t.e, file);
 });
 
@@ -1284,8 +1291,10 @@ function groupItems(id) {
   if (id === 'dups') return dupOrder();
   if (id === 'forth') return ENTRIES.filter(isForthcoming);
   if (id === 'recent') return RECENT.seen.map(x => BYKEY.get(x[0])).filter(Boolean).slice(0, recentShow());
-  if (id === 'inbox') return ENTRIES.filter(e => e.ib);
+  // (The Inbox: works not in the library yet, and any left in the old LibLande inbox.bib.)
+  if (id === 'inbox') return ENTRIES.filter(e => e.ib).concat(gs ? ibEntries() : []);
   if (id === 'toread') return readingOrder().map(x => BYKEY.get(x.key)).filter(Boolean);
+  if (id === 'trash') return gs ? trEntries() : [];
   const [kind, name] = [id.slice(0, 2), id.slice(2)];
   if (kind === 's:') { const g = GROUPS.find(g => g.name === name); return g && g.items; }
   if (kind === 'q:') { const x = SMART.list.find(x => x.name === name); const f = x && searchFilter(x.q, 'sAll'); return x ? (f ? ENTRIES.filter(f) : ENTRIES.slice()) : null; }
@@ -1300,6 +1309,7 @@ function groupName(id) {
   if (id === 'forth') return 'Forthcoming';
   if (id === 'recent') return 'Recently viewed';
   if (id === 'toread') return 'Reading list';
+  if (id === 'trash') return 'Trash';
   if (id.startsWith('t:')) return TYPE_NAMES[id.slice(2)] || id.slice(2);
   return id.slice(2);
 }
@@ -1385,9 +1395,9 @@ function librariesHTML() {
   };
   const sub = `<div class="lib-sub${LIBS.phase === 'folding' ? ' folded' : LIBS.phase === 'loading' ? ' lib-wait' : ''}">` +
     (RECENT.seen.length || state.group === 'recent' ? grpBtn('recent', 'Recently viewed', groupItems('recent').length, ICON.history) : '') +
-    (inboxCount || state.group === 'inbox' ? grpBtn('inbox', 'Inbox', inboxCount, ICON.inbox) : '') +
     (DUPS.size || state.group === 'dups' ? grpBtn('dups', 'Possible duplicates', DUPS.size, ICON.dups) : '') +
-    ((n => (n || state.group === 'forth' ? grpBtn('forth', 'Forthcoming', n, ICON.forth) : ''))(ENTRIES.filter(isForthcoming).length)) + `</div>`;
+    ((n => (n || state.group === 'forth' ? grpBtn('forth', 'Forthcoming', n, ICON.forth) : ''))(ENTRIES.filter(isForthcoming).length)) +
+    (gs && (Object.keys(TRASH.items).length || state.group === 'trash') ? grpBtn('trash', 'Trash', Object.keys(TRASH.items).length, ICON.trash) : '') + `</div>`;
   return `<div class="sec${secFold('libs')}" data-sec="libs"><div class="sec-row">${secHead('libs', 'Libraries')}` +
     `<button type="button" class="sec-add" data-new-lib title="New library" aria-label="New library"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button></div>` +
     LIBS.all.map(l => row(l) + (l.bibId === curId ? sub : '')).join('') + `</div>`;
@@ -1480,9 +1490,9 @@ function renderGroups() {
   const libs = librariesHTML();
   let h = (libs || `<div class="sec${secFold('lib')}" data-sec="lib">${secHead('lib', 'Library')}${grpBtn('all', 'Library', ENTRIES.length, ICON.lib)}` +
     (RECENT.seen.length || state.group === 'recent' ? grpBtn('recent', 'Recently viewed', groupItems('recent').length, ICON.history) : '') +
-    (inboxCount || state.group === 'inbox' ? grpBtn('inbox', 'Inbox', inboxCount, ICON.inbox) : '') +
     (DUPS.size || state.group === 'dups' ? grpBtn('dups', 'Possible duplicates', DUPS.size, ICON.dups) : '') +
     ((n => (n || state.group === 'forth' ? grpBtn('forth', 'Forthcoming', n, ICON.forth) : ''))(ENTRIES.filter(isForthcoming).length)) +
+    (gs && (Object.keys(TRASH.items).length || state.group === 'trash') ? grpBtn('trash', 'Trash', Object.keys(TRASH.items).length, ICON.trash) : '') +
     `</div>`) +
     // (Tools: not lists, so no count.)
     `<div class="sec${secFold('tools')}" data-sec="tools">${secHead('tools', 'Tools')}<button type="button" class="grp" data-tool="mscheck" aria-label="Cite Check"${msToolTitle()}>${ICON.citecheck}<span class="nm">Cite Check</span>${msToolCount()}</button>` +
@@ -1655,10 +1665,10 @@ const readingGroup = () => GROUPS.find(g => g.name === '\u2605 Reading List') ||
 // group, keyword or type opened from the sidebar (these can be closed).
 // The ones after Library scroll sideways when there are many.
 let TABS = store.get('tabs', []);
-const tabCloseable = id => id !== 'all' && id !== 'toread';
+const tabCloseable = id => id !== 'all' && id !== 'toread' && id !== 'inbox';
 function renderTabs() {
   if (!ENTRIES.length) return;
-  TABS = TABS.filter(id => id !== 'all' && id !== 'recent' && groupItems(id));
+  TABS = TABS.filter(id => id !== 'all' && id !== 'recent' && id !== 'inbox' && groupItems(id));
   const rb = $('#recentBtn');
   rb.classList.toggle('on', state.group === 'recent');
   rb.setAttribute('aria-pressed', String(state.group === 'recent'));
@@ -1673,7 +1683,7 @@ function renderTabs() {
   // are open, and a tap lists them (phoneLists).
   if (phoneMQ.matches) {
     const n = TABS.length + 1;
-    lib.innerHTML = listIcon(state.group) + `<span class="nm">${esc(state.group === 'toread' ? 'Reading list' : groupName(state.group))}</span><span class="ct"></span>` +
+    lib.innerHTML = listIcon(state.group) + `<span class="nm">${esc(groupName(state.group))}</span><span class="ct"></span>` +
       (n > 1 ? `<span class="tab-n" aria-hidden="true">${n}</span>` : '') + ICON.chev;
     lib.setAttribute('aria-selected', 'true');
     lib.setAttribute('aria-haspopup', 'menu');
@@ -1687,10 +1697,13 @@ function renderTabs() {
   const box = $('#tabScroll'), keep = box.scrollLeft;
   // On a phone the reading list's tab is "Reading", to save room.
   const short = id => (id === 'toread' && phoneMQ.matches ? 'Reading' : groupName(id));
-  box.innerHTML = TABS.map(id => `<button type="button" class="tab" role="tab" data-tab="${esc(id)}" aria-selected="${on(id)}" title="${esc(groupName(id))}">` +
-    (id === 'toread' ? ICON.bookmark : '') + `<span class="nm">${esc(short(id))}</span><span class="ct">${count(id)}</span>` +
+  // (The reading list's tab shows it or the Inbox: its arrow switches.)
+  const slot = id => (id === 'toread' ? rlWhich() : id);
+  box.innerHTML = TABS.map(id0 => { const id = slot(id0); return `<button type="button" class="tab${id0 === 'toread' ? ' rl-slot' : ''}" role="tab" data-tab="${esc(id)}" aria-selected="${on(id)}" title="${esc(groupName(id))}">` +
+    (id === 'toread' ? ICON.bookmark : id === 'inbox' ? ICON.inbox : '') + `<span class="nm">${esc(short(id))}</span><span class="ct">${count(id)}</span>` +
+    (id0 === 'toread' ? `<span class="tab-dd" data-tab-dd role="button" aria-haspopup="menu" aria-label="Reading list or Inbox" title="Reading list or Inbox">${ICON.chev}</span>` : '') +
     (tabCloseable(id) ? `<span class="tab-x" data-close="${esc(id)}" role="button" aria-label="Close ${esc(groupName(id))}" title="Close">${ICON.x}</span>` : '') +
-    `</button>`).join('');
+    `</button>`; }).join('');
   box.scrollLeft = keep;
   const cur = box.querySelector('.tab[aria-selected="true"]');
   if (cur) {
@@ -1766,14 +1779,14 @@ function fitToolbar() {
 }
 // A list's icon: the library's, the reading list's, Recently viewed's, or
 // a group's.
-const listIcon = id => id === 'all' ? ICON.lib : id === 'toread' ? ICON.bookmark : id === 'recent' ? ICON.history : ICON.folder;
+const listIcon = id => id === 'all' ? ICON.lib : id === 'toread' ? ICON.bookmark : id === 'inbox' ? ICON.inbox : id === 'trash' ? ICON.trash : id === 'recent' ? ICON.history : ICON.folder;
 // On a phone, the list button's menu: the library, each open list (with
 // its x, if it can be closed), and Recently viewed.
 function phoneLists() {
   const was = $('#tabsMenu');
   closeTabsMenu();
   if (was && was.dataset.side === 'phone') return;
-  const ids = ['all'].concat(TABS), btn = $('#tabs .tab.pinned');
+  const ids = ['all'].concat(...TABS.map(id => (id === 'toread' && gs ? ['toread', 'inbox'] : [id]))), btn = $('#tabs .tab.pinned');
   const row = id => `<div class="op-row"><button type="button" role="menuitem" class="mi" data-tl="${esc(id)}"${state.group === id ? ' aria-current="true"' : ''}>${listIcon(id)}` +
     `<span class="lm-nm">${esc(groupName(id))}</span><span class="lm-ct">${(groupItems(id) || []).length.toLocaleString()}</span></button>` +
     (id !== 'recent' && tabCloseable(id) ? `<button type="button" class="op-x" data-tl-x="${esc(id)}" aria-label="Close ${esc(groupName(id))}" title="Close">${ICON.x}</button>` : '') + `</div>`;
@@ -1811,7 +1824,10 @@ function closeTab(id) {
 $('#tabs').addEventListener('click', ev => {
   const x = ev.target.closest('[data-close]');
   if (x) { ev.stopPropagation(); closeTab(x.dataset.close); return; }
+  const dd = ev.target.closest('[data-tab-dd]');
+  if (dd) { ev.stopPropagation(); if (rlMenuOpen() && RLH.hov) { RLH.hov = false; return; } rlSwitchMenu(dd.closest('.tab'), id => setGroup(id)); return; }
   const t = ev.target.closest('[data-tab]');
+  if (t && rlMenuOpen()) rlMenuClose();
   if (!t) return;
   if (phoneMQ.matches && t.classList.contains('pinned')) { phoneLists(); return; }
   // The tab already showing: back to the top of its list.
@@ -1900,7 +1916,7 @@ function tabDrag(box, sel, moved) {
   box.addEventListener('pointerdown', ev => {
     dropped = 0;
     const el = ev.target.closest(sel);
-    if (d || !el || ev.button !== 0 || ev.target.closest('[data-close], [data-ptab-x]')) return;
+    if (d || !el || ev.button !== 0 || ev.target.closest('[data-close], [data-ptab-x], [data-tab-dd]')) return;
     const all = tabs();
     if (all.length < 2) return;
     d = { el, id: ev.pointerId, from: all.indexOf(el), x0: ev.clientX, y0: ev.clientY, x: ev.clientX, touch: ev.pointerType !== 'mouse' };
@@ -1923,8 +1939,10 @@ tabDrag($('#tabScroll'), '.tab', (from, to) => {
 });
 function setGroup(id) {
   state.group = id; store.set('group', id);
+  // (The reading list and the Inbox share a tab: the one shown, kept.)
+  if (id === 'toread' || id === 'inbox') store.set('rlWhich', id);
   // (Recently viewed has its own button, highlighted, instead of a tab.)
-  if (id !== 'all' && id !== 'recent' && TABS.indexOf(id) < 0) { TABS.push(id); store.set('tabs', TABS); }
+  if (id !== 'all' && id !== 'recent' && id !== 'inbox' && TABS.indexOf(id) < 0) { TABS.push(id); store.set('tabs', TABS); }
   document.querySelectorAll('.grp.on').forEach(b => b.classList.remove('on'));
   const b = document.querySelector(`.grp[data-g="${CSS.escape(id)}"]`);
   if (b) b.classList.add('on');
@@ -2093,11 +2111,15 @@ function refresh(resetSel) {
 
   // (Each publication once: not again as a chapter under its book.)
   const once = CHAPTER_ROWS.size ? v.filter((e, i) => !CHAPTER_ROWS.has(i)) : v;
+  // (The Inbox's: works to decide on, not publications in the library.)
+  const noun = state.group === 'inbox' ? 'to decide on' : state.group === 'trash' ? 'in the Trash' : 'publications';
   $('#statusL').textContent = toks.length
-    ? `${once.length.toLocaleString()} of ${base.length.toLocaleString()} publications match`
-    : `${base.length.toLocaleString()} publications`;
+    ? `${once.length.toLocaleString()} of ${base.length.toLocaleString()} ${state.group === 'inbox' || state.group === 'trash' ? 'match' : 'publications match'}`
+    : `${base.length.toLocaleString()} ${noun}`;
   const nf = once.filter(e => e.files).length;
   $('#statusR').textContent = state.scope === 'notes' ? mxStatus() : `${nf.toLocaleString()} with files`;
+  // (The Trash: Empty Trash here, as in the mockup.)
+  if (state.group === 'trash' && gs && v.length) $('#statusR').innerHTML = `<button type="button" class="linkish tr-empty" data-tr-empty>Empty Trash\u2026</button>`;
   renderSortUI();
   lengthsWanted();
 
@@ -2419,7 +2441,7 @@ function paint() {
     rowsEl.style.height = 'auto';
     // (A library with nothing in it yet: how to start.)
     rowsEl.innerHTML = !state.q && !ENTRIES.length ? `<div class="empty empty-lib"><b>No publications yet</b><p>Add one by its title, DOI or ISBN, from a PDF, or from a photo of its first page.</p>${gs ? `<button type="button" class="btn primary" data-empty-add>${ICON.plus}<span>Add a publication\u2026</span></button>` : ''}</div>`
-      : `<div class="empty">${state.q ? 'No publications match \u201c' + esc(state.q) + '\u201d.' : 'This group is empty.'}</div>`;
+      : `<div class="empty">${state.q ? 'No publications match \u201c' + esc(state.q) + '\u201d.' : state.group === 'inbox' ? 'Nothing in your Inbox. Put works here from a citation\u2019s card, or from Related and Cited here in the reader.' : state.group === 'trash' ? 'The Trash is empty.' : 'This group is empty.'}</div>`;
     return;
   }
   const top = Math.max(0, listEl.scrollTop - listOver), vh = listEl.clientHeight || 600;
@@ -2489,7 +2511,7 @@ function rowHTML(e, i, top, h) {
     : f ? `<a class="fileicon" href="${esc(driveUrl(f))}" target="_blank" rel="noopener" title="Open ${esc(f.n)}" aria-label="Open linked file">${ICON.doc}</a>`
     : '';
   const ch = CHAPTER_ROWS.has(i);
-  return `<div class="row${e.k === state.selKey ? ' sel' : ''}${state.picked.has(e.k) ? ' picked' : ''}${i % 2 ? ' odd' : ''}${NESTED.has(e.k) || ch ? ' child' : ''}${ch ? ' chap' : ''}" data-i="${i}"` +
+  return `<div class="row${e.k === state.selKey ? ' sel' : ''}${e.inbox && ibStale(e.inbox) ? ' ib-stale' : ''}${state.picked.has(e.k) ? ' picked' : ''}${i % 2 ? ' odd' : ''}${NESTED.has(e.k) || ch ? ' child' : ''}${ch ? ' chap' : ''}" data-i="${i}"` +
     `${rowDrag() ? ' draggable="true"' : ''} style="top:${top}px;height:${h}px">` +
     `<span class="c-file">${file}</span>` + COL_LIST.map(k => colCell(k, e, i)).join('') + (snipRows() ? `<span class="row-snip">${mxSnip(e, state.q)}</span>` : '') + `</div>`;
 }
@@ -2969,6 +2991,14 @@ function renderDetail() {
     loadThumbs();
     return;
   }
+  // (One in the Inbox: its own page; see inbox.js.)
+  const ib = ibByKey(state.selKey) || trByKey(state.selKey);
+  if (ib && !state.picking) {
+    watchSeen(null);
+    if (phoneMQ.matches) $('#backLabel').textContent = app.dataset.view === 'detail' ? groupName(state.group) : 'Groups';
+    detailEl.innerHTML = ib.trash ? trDetailHTML(ib) : ibDetailHTML(ib);
+    return;
+  }
   const e = state.selKey && BYKEY.get(state.selKey);
   watchSeen(e && !state.picking ? e.k : null);
   if (phoneMQ.matches) $('#backLabel').textContent = app.dataset.view === 'detail' ? groupName(state.group) : 'Groups';
@@ -3072,6 +3102,8 @@ function renderDetail() {
     // (Another style, for this copy: see cite.js.)
     citeOnceHTML() + `</div></details>`);
   if (gs && !e.ib && LIBS.list.length) more.push(`<button type="button" role="menuitem" data-copy-lib="${esc(e.k)}">${ICON.lib}<span>Copy to another library\u2026</span></button>`);
+  // (To the Trash: see trash.js.)
+  if (gs && !e.ib) more.push(`<button type="button" role="menuitem" class="mi-danger" data-trash-pub>${ICON.trash}<span>Move to Trash\u2026</span></button>`);
   if (more.length) btns.push(`<details class="menu act-more"><summary class="btn" title="More: ${more.length > 1 ? 'Google Drive, Attach, links' : 'more'}" aria-label="More">` +
     `<svg class="i dots" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="18" cy="12" r="1.4"/></svg>${wide ? '<span>More</span>' : ''}</summary>` +
     `<div class="menu-list" role="menu">${more.join('')}</div></details>`);
@@ -3355,6 +3387,9 @@ detailEl.addEventListener('click', ev => {
   if (ev.target.closest('[data-join]')) { openJoin(pickedEntries()); return; }
   if (ev.target.closest('[data-bulk]')) { openBulk(); return; }
   if (ev.target.closest('[data-bulk-rl]')) { bulkReading(); return; }
+  if (ev.target.closest('[data-trash-sel]')) { trAskPub(pickedEntries()); return; }
+  const tp = ev.target.closest('[data-trash-pub]');
+  if (tp) { const d = tp.closest('details'); if (d) d.open = false; const e = BYKEY.get(state.selKey); if (e) trAskPub([e]); return; }
   if (ev.target.closest('[data-copy-lib-sel]')) { openCopyTo(pickedEntries().filter(e => !e.ib).map(e => e.k)); return; }
   const cl = ev.target.closest('[data-copy-lib]');
   if (cl) { const d = cl.closest('details'); if (d) d.open = false; openCopyTo([cl.dataset.copyLib]); return; }

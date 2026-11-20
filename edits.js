@@ -19,7 +19,7 @@
  */
 (function (root) {
   'use strict';
-  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).edits = '2026-11-19.02';
+  if (root.document) (root.LIBLANDE_PARTS = root.LIBLANDE_PARTS || {}).edits = '2026-11-19.03';
   const READING_FILE = 'reading-list.json',
     INBOX_FOLDER = 'Inbox', INBOX_FILE = 'LibLande inbox.bib', BACKUP_FOLDER = 'Backups';
   const READING_GROUP = '★ Reading List';
@@ -221,6 +221,46 @@
       applied.forEach(a => { hashes[a.key] = hashOf(cur, a.key); });
       adds.forEach(a => { hashes[a.key] = hashOf(cur, a.key); });
       return { text: cur, hashes, skipped, gh: groupsHashOf(parseBib_(cur)) };
+    },
+    // A publication to the Trash: its entry taken out of the .bib (and out
+    // of its static groups), every other byte left as it was, and its text
+    // returned as it was written, with its groups, to put back on Restore.
+    trashEntry(text, key, expectHash) {
+      const before = parseBib_(text);
+      if (!before[0].some(e => e[1] === key)) throw new Error(key + ' isn\u2019t in the library any more. ' + CHANGED);
+      if (expectHash && hashOf(text, key) !== expectHash) throw new Error('This publication has been changed since LibLande last read it (perhaps in BibDesk). ' + CHANGED);
+      const groups = staticGroups_(before[1]).filter(g => g.keys.indexOf(key) >= 0).map(g => g.name);
+      const loc0 = locateEntry_(text, key), entry = text.slice(loc0.start, loc0.end);
+      let cur = groups.length ? editGroups_(text, key, [], groups) : text;
+      const loc = locateEntry_(cur, key);
+      let s = loc.start;
+      while (s > 0 && /\s/.test(cur[s - 1])) s--;
+      // (Only the entry, and the space before it, taken out.)
+      const cut = cur.slice(s, loc.end);
+      if (cut.trim() !== entry.trim()) throw new Error('LibLande couldn\u2019t find just ' + key + '\u2019s entry, so it didn\u2019t take it out.');
+      cur = cur.slice(0, s) + cur.slice(loc.end);
+      const after = parseBib_(cur);
+      if (after[0].length !== before[0].length - 1 || after[0].some(e => e[1] === key)) throw new Error('Taking out ' + key + ' didn\u2019t come out as expected, so LibLande didn\u2019t save it.');
+      if (staticGroups_(after[1]).some(g => g.keys.indexOf(key) >= 0)) throw new Error(key + ' is still in a group, so LibLande didn\u2019t save it.');
+      if (staticGroups_(after[1]).length !== staticGroups_(before[1]).length) throw new Error('The groups didn\u2019t come out as expected, so LibLande didn\u2019t save it.');
+      return { text: cur, entry, groups, gh: groupsHashOf(after) };
+    },
+    // Back from the Trash: its text at the end, as it was (with a new key,
+    // if its own has been used since), and into its groups again.
+    restoreEntry(text, entry, key, groups, newKey) {
+      const before = parseBib_(text), use = newKey || key;
+      if (before[0].some(e => e[1] === use)) { const e = new Error('Your library has a publication with the cite key ' + use + ' now.'); e.keyTaken = use; throw e; }
+      const body = newKey ? entry.replace(/^(\s*@\w+\s*[{(]\s*)[^,\s]+/, '$1' + newKey) : entry;
+      let cur = appendEntry_(text, body);
+      (groups || []).forEach(name => { cur = ensureStaticGroup_(cur, name); });
+      if ((groups || []).length) cur = editGroups_(cur, use, groups, []);
+      const after = parseBib_(cur);
+      if (after[0].length !== before[0].length + 1 || !after[0].some(e => e[1] === use)) throw new Error('Putting back ' + use + ' didn\u2019t come out as expected, so LibLande didn\u2019t save it.');
+      const loc = locateEntry_(cur, use);
+      if (cur.slice(loc.start, loc.end).trim() !== body.trim()) throw new Error('Putting back ' + use + ' changed its text, so LibLande didn\u2019t save it.');
+      const gs = staticGroups_(after[1]);
+      if ((groups || []).some(name => !gs.some(g => g.name === name && g.keys.indexOf(use) >= 0))) throw new Error('Putting ' + use + ' back in its groups didn\u2019t come out as expected, so LibLande didn\u2019t save it.');
+      return { text: cur, hash: hashOf(cur, use), key: use, gh: groupsHashOf(after) };
     },
     // A new cite key (renameKey_ and checkRename_ in Build.gs).
     renameKey(text, req) {
@@ -655,8 +695,144 @@
         }
       }, req.backupName);
       noteFiled(filed);
-      if (req.replace && req.replaceId) { try { await S.trash(req.replaceId); } catch (e) { /* already gone */ } }
-      return { hash: out.hash, file: filed.info, replaced: !!(req.replace && nums.length) };
+      let trash = null;
+      if (req.replace && req.replaceId) {
+        try {
+          const f = await toTrash(req.replaceId);
+          trash = await trashNote({ id: trashId(), kind: 'pdf', key: req.key, files: [f], title: req.title || f.n, who: req.who || '', year: req.year || '', deletedAt: Date.now() });
+        } catch (e) { try { await S.trash(req.replaceId); } catch (e2) { /* already gone */ } }
+      }
+      return { hash: out.hash, file: filed.info, replaced: !!(req.replace && nums.length), trash };
+    });
+
+    /* -------------------------------------------- the Trash */
+    // What's deleted in LibLande (a publication, an Inbox item, a PDF
+    // replaced by Attach) is kept 45 days: its files moved to
+    // LibLande/Trash, a note of it in LibLande/trash.json ({items: {id:
+    // {id, kind, deletedAt, title, who, year, ...}}}), so it can be put
+    // back. After 45 days (looked at when LibLande opens), its files go to
+    // Drive's own trash and the note goes.
+    const TRASH_FILE = 'trash.json', TRASH_FOLDER = 'Trash', TRASH_DAYS = 45;
+    const blankTrash = () => ({ v: 1, items: {} });
+    const trashFolder = async () => subFolder(await B.dataFolder(), TRASH_FOLDER, true);
+    const trashId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    // (A file into the Trash folder, its folder noted to put it back.)
+    async function toTrash(fileId) {
+      const f = await meta(fileId, 'id,name,parents');
+      const tf = await trashFolder(), from = (f.parents || [])[0] || null;
+      if (from !== tf.id) await S.move(fileId, tf.id, from, f.name);
+      return { id: fileId, n: f.name, from };
+    }
+    async function fromTrash(file, to) {
+      const tf = await trashFolder();
+      const dest = to || file.from;
+      if (!dest) throw new Error('LibLande doesn\u2019t know where ' + file.n + ' was.');
+      await S.move(file.id, dest, tf.id, file.n);
+    }
+    async function trashNote(item) {
+      const d = await changeJson(TRASH_FILE, blankTrash, d => { d.items = d.items || {}; d.items[item.id] = item; });
+      return d;
+    }
+    async function trashForget(ids) {
+      return changeJson(TRASH_FILE, blankTrash, d => { d.items = d.items || {}; let n = 0; ids.forEach(id => { if (d.items[id]) { delete d.items[id]; n++; } }); if (!n) return false; });
+    }
+    // The Trash, with what's been there 45 days let go first.
+    F.getTrash = () => serial(async () => {
+      const folder = await B.dataFolder();
+      const d = (folder && await B.readJson(folder, TRASH_FILE)) || blankTrash();
+      // (Not one with no time noted; and a day's margin, for a device's clock running ahead.)
+      const old = Object.values(d.items || {}).filter(x => x.deletedAt > 0 && Date.now() - x.deletedAt > (TRASH_DAYS + 1) * 86400000);
+      if (!old.length) return d;
+      for (const x of old) for (const f of x.files || []) { try { await S.trash(f.id); } catch (e) { /* gone already */ } }
+      return trashForget(old.map(x => x.id));
+    });
+    // A publication to the Trash: out of the .bib and the reading list, its
+    // PDFs into LibLande/Trash.
+    // (Its note, with the entry as written, goes into trash.json first: if
+    // anything after fails, it's still there to restore. Taken out again if
+    // the .bib isn't written.)
+    F.trashEntry = req => serial(async () => {
+      const bibId = await mainBibId();
+      const pre = await run('trashEntry', await B.text(bibId), req.key, req.expectHash || null);
+      const item = { id: trashId(), kind: 'pub', key: req.key, entry: pre.entry, groups: pre.groups || [], rl: null, files: [],
+        title: req.title || '', who: req.who || '', year: req.year || '', deletedAt: Date.now(), dev: req.dev || '' };
+      await trashNote(item);
+      let out;
+      try {
+        out = await changeFile(bibId, text => run('trashEntry', text, req.key, req.expectHash || null), req.backupName);
+      } catch (e) { try { await trashForget([item.id]); } catch (e2) { /* left: it can be deleted */ } throw e; }
+      // (As written now, in case it changed between the two reads.)
+      item.entry = out.entry; item.groups = out.groups || [];
+      let reading = null;
+      try {
+        reading = await changeJson(READING_FILE, blankReading, d => {
+          const i = d.items.findIndex(x => x.key === req.key);
+          if (i < 0) return false;
+          item.rl = d.items.splice(i, 1)[0];
+        });
+      } catch (e) { /* stays on the list: dropped there when it's not found */ }
+      for (const f of req.files || []) { if (!f.id) continue; try { item.files.push(Object.assign(await toTrash(f.id), { p: f.p || '' })); } catch (e) { /* left where it is */ } }
+      let trash = null;
+      try { trash = await trashNote(item); } catch (e) { /* the first note stands */ }
+      return { item, trash, stamp: out.stamp || null, gh: out.gh || null, reading: reading ? readingOut(reading) : null };
+    });
+    // Back from the Trash: the entry (with newKey, if its key's taken),
+    // its groups, its place on the reading list, its PDFs where they were.
+    F.restoreEntry = req => serial(async () => {
+      const d = (await B.readJson(await B.dataFolder(), TRASH_FILE)) || blankTrash();
+      const item = (d.items || {})[req.id];
+      if (!item || item.kind !== 'pub') throw new Error('That isn\u2019t in the Trash any more.');
+      const out = await changeFile(await mainBibId(), text => run('restoreEntry', text, item.entry, item.key, item.groups || [], req.newKey || null), req.backupName);
+      const stuck = [];
+      for (const f of item.files || []) { try { await fromTrash(f); } catch (e) { stuck.push(f); } }
+      let reading = null;
+      try {
+        if (item.rl) reading = await changeJson(READING_FILE, blankReading, r => { if (r.items.some(x => x.key === out.key)) return false; r.items.push(Object.assign({}, item.rl, { key: out.key })); });
+      } catch (e) { /* not back on the list */ }
+      let trash = null;
+      try {
+        trash = stuck.length
+          ? await trashNote(Object.assign({}, item, { kind: 'pdf', key: out.key, files: stuck, entry: undefined, groups: undefined, rl: undefined, title: (item.title || '') + ' (its PDF)' }))
+          : await trashForget([item.id]);
+      } catch (e) { trash = null; }
+      return { key: out.key, hash: out.hash, gh: out.gh || null, stamp: out.stamp || null, item, trash, stuck: stuck.length, reading: reading ? readingOut(reading) : null };
+    });
+    // Something else to the Trash (an Inbox item, with its PDF; a replaced
+    // PDF): its file moved, and noted.
+    F.trashThing = req => serial(async () => {
+      const files = [];
+      for (const f of req.files || []) { if (!f.id) continue; try { files.push(await toTrash(f.id)); } catch (e) { /* left */ } }
+      const item = Object.assign({}, req.item || {}, { id: trashId(), kind: req.kind, files, deletedAt: Date.now() });
+      return { item, trash: await trashNote(item) };
+    });
+    // Its files back (to where they were, or to `to`), and its note gone.
+    F.untrashThing = req => serial(async () => {
+      const d = (await B.readJson(await B.dataFolder(), TRASH_FILE)) || blankTrash();
+      const item = (d.items || {})[req.id];
+      if (!item) throw new Error('That isn\u2019t in the Trash any more.');
+      for (const f of item.files || []) await fromTrash(f, req.to || null);
+      return { item, trash: req.keepNote ? d : await trashForget([item.id]) };
+    });
+    F.forgetTrash = req => serial(async () => trashForget(req.ids || []));
+    // The Inbox (LibLande/inbox.json): each item kept at its latest change;
+    // written only if the file hasn't changed since it was read (else read
+    // again), so two devices adding at once both stay.
+    const INBOX_JSON = 'inbox.json', blankInbox = () => ({ v: 1, items: {} });
+    F.getInbox = async () => (await B.readJson(await B.dataFolder(), INBOX_JSON)) || blankInbox();
+    F.putInbox = req => serial(async () => changeJson(INBOX_JSON, blankInbox, d => {
+      d.items = d.items || {};
+      let n = 0;
+      Object.entries((req && req.items) || {}).forEach(([id, x]) => { if (x && (!d.items[id] || (d.items[id].at || 0) < (x.at || 0))) { d.items[id] = x; n++; } });
+      if (!n) return false;
+      d.at = Date.now();
+    }));
+    // Deleted for good: its files to Drive's trash, its note gone.
+    F.deleteFromTrash = req => serial(async () => {
+      const d = (await B.readJson(await B.dataFolder(), TRASH_FILE)) || blankTrash();
+      // (Only what was shown and asked about: not anything added since, elsewhere.)
+      const ids = (req.ids || []).filter(id => (d.items || {})[id]);
+      for (const id of ids) for (const f of ((d.items || {})[id] || {}).files || []) { try { await S.trash(f.id); } catch (e) { /* gone */ } }
+      return trashForget(ids);
     });
 
     // A new static group, made in the sidebar (as Code.gs's createGroup).

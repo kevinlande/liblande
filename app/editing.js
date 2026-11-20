@@ -1,8 +1,8 @@
 ﻿// LibLande: adding and editing, BibTeX pasted in, selecting several, updates, cite keys, versions, export, the keyboard.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, citecard, tour, start.)
+// index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, inbox, trash, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-19.02';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-19.03';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -224,6 +224,7 @@ function showSheet(html, saveLabel) {
   $('#sheet').classList.add('pop');
   sheetBodyHTML(html);
   $('#sheetSave').textContent = saveLabel;
+  $('#sheetSave').classList.remove('danger');
   $('#sheetSave').hidden = false;
   $('#sheetCancel').hidden = false;
   $('#sheetCancel').textContent = 'Cancel';
@@ -973,6 +974,8 @@ async function saveAdd() {
   if (bad) { sheetMsg('The ' + (FIELD_LABELS[bad] || bad) + ' field has unbalanced braces { }. Check it and try again.', true); return; }
   let key = makeCiteKey(vals);
   let pdf = $('#addPdf').files[0] || sheet.pdf;
+  // (From the Inbox: its PDF there, unless another was chosen.)
+  const inboxId = sheet.inboxId || null, inboxPdf = !pdf && sheet.inboxPdf && sheet.inboxPdf.id ? sheet.inboxPdf : null;
   const toRead = $('#addRL').checked;
   // (A chapter's pages from its book's PDF, unless a PDF was chosen.)
   if (!pdf && chPdfWanted()) {
@@ -986,10 +989,10 @@ async function saveAdd() {
   if (pdf && isOffline()) { sheetMsg('Adding a publication with its PDF needs a connection. Add it without the PDF now, and attach the PDF when you\u2019re back online.', true); return; }
   // The panel closes, and the adding goes on with a bar to say so; if it
   // fails, Try again opens the panel again as you left it.
-  const snap = { type, vals: Object.assign({}, vals), pdf, toRead, dup: sheet.dupWarned }, name = '\u201c' + shortTitle(vals.title) + '\u201d';
+  const snap = { type, vals: Object.assign({}, vals), pdf, toRead, dup: sheet.dupWarned, inboxId, inboxPdf: sheet.inboxPdf }, name = '\u201c' + shortTitle(vals.title) + '\u201d';
   closeSheet();
   try {
-    let upload = null, pdfName = null;
+    let upload = inboxPdf ? { id: inboxPdf.id } : null, pdfName = null;
     if (pdf) {
       toast('Uploading the PDF for ' + name + '\u2026', 0, null, true);
       const info = await callServer('getInboxUploadInfo');
@@ -1016,6 +1019,7 @@ async function saveAdd() {
       if (phoneMQ.matches) go('detail');
     }
     if (toRead) rlAdd(key);
+    if (inboxId) ibAdded(inboxId);
     if (res && res.queued) { showDone(vals.title, 'Added on this device; it goes to ' + DATA.source + ' when you\u2019re back online'); return; }
     showDone(vals.title, 'Added to ' + DATA.source + (res.file ? ', with its PDF in ' + res.file.p.replace(/[/][^/]*$/, '') : '') +
       (bookOf ? '; linked to its book, \u201c' + shortTitle(bookOf.f.title || bookOf.k) + '\u201d' : ''));
@@ -1044,13 +1048,14 @@ function reopenAdd(snap, why) {
   kws.forEach(addKeyword);
   $('#addRL').checked = snap.toRead;
   sheet.dupWarned = snap.dup;
+  if (snap.inboxId) { sheet.inboxId = snap.inboxId; sheet.inboxPdf = snap.inboxPdf; ibAddPdfNote(); }
   sheetMsg(why, true);
 }
 
 $('#sheetForm').addEventListener('submit', ev => {
   ev.preventDefault();
   if (!sheet || $('#sheetSave').disabled) return;
-  if (sheet.mode === 'edit') saveEdit(); else if (sheet.mode === 'forth') saveForth(); else if (sheet.mode === 'join') saveJoin(); else if (sheet.mode === 'export') runExport(); else if (sheet.mode === 'export-save') saveExport(); else if (sheet.mode === 'help' || sheet.mode === 'msreport' || sheet.mode === 'newpapers' || sheet.mode === 'qr') closeSheet(); else if (sheet.mode === 'npfollow') saveFollow(); else if (sheet.mode === 'mscheck') runMsCheck(); else if (sheet.mode === 'msfix') runMsFix(); else if (sheet.mode === 'smart') saveSmart(); else if (sheet.mode === 'bulk') saveBulk(); else if (sheet.mode === 'kwtidy') saveKwTidy(); else if (sheet.mode === 'linkch') saveLinkChapters(); else if (sheet.mode === 'attach') { const a = sheet, mode = ($('#sheetBody').querySelector('[name=attachMode]:checked') || {}).value; closeSheet(); runAttach(a.entry, a.file, mode === 'replace'); } else saveAdd();
+  if (sheet.mode === 'edit') saveEdit(); else if (sheet.mode === 'forth') saveForth(); else if (sheet.mode === 'join') saveJoin(); else if (sheet.mode === 'export') runExport(); else if (sheet.mode === 'export-save') saveExport(); else if (sheet.mode === 'help' || sheet.mode === 'msreport' || sheet.mode === 'newpapers' || sheet.mode === 'qr') closeSheet(); else if (sheet.mode === 'npfollow') saveFollow(); else if (sheet.mode === 'mscheck') runMsCheck(); else if (sheet.mode === 'msfix') runMsFix(); else if (sheet.mode === 'smart') saveSmart(); else if (sheet.mode === 'bulk') saveBulk(); else if (sheet.mode === 'kwtidy') saveKwTidy(); else if (sheet.mode === 'linkch') saveLinkChapters(); else if (sheet.mode === 'trash' || sheet.mode === 'trashdel' || sheet.mode === 'trashkey') trSheetSave(); else if (sheet.mode === 'attach') { const a = sheet, mode = ($('#sheetBody').querySelector('[name=attachMode]:checked') || {}).value; closeSheet(); runAttach(a.entry, a.file, mode === 'replace'); } else saveAdd();
 });
 $('#sheetCancel').addEventListener('click', closeSheet);
 $('#sheetBody').addEventListener('click', ev => { const x = ev.target.closest('[data-sheet-cancel]'); if (x && !x.disabled) closeSheet(); });
@@ -1346,6 +1351,8 @@ state.anchor = null;
 const pickedEntries = () => Array.from(state.picked).map(k => BYKEY.get(k)).filter(Boolean);
 
 function setPicking(on, seedKey) {
+  // (Not in the Inbox: its works aren't in the library, to be grouped.)
+  if (on && (state.group === 'inbox' || state.group === 'trash')) { toast('Here, choose one at a time.', 2600); return; }
   state.picking = on;
   if (!on) state.picked.clear();
   else if (seedKey) state.picked.add(seedKey);
@@ -1418,6 +1425,7 @@ function selectionHTML() {
     (gs && n >= 2 && list.every(x => !x.ib) ? `<button type="button" class="btn" data-join title="Join as versions of one" aria-label="Join as versions of one">${JOIN_ICON}<span>Join</span></button>` : '') +
     (gs ? `<button type="button" class="btn" data-bulk title="Keywords and groups" aria-label="Keywords and groups">${ICON.tag}<span>Keywords</span></button>` +
       `<button type="button" class="btn" data-bulk-rl title="Add to reading list" aria-label="Add to reading list">${ICON.bookmark}<span>Reading list</span></button>` : '') +
+    (gs && list.every(x => !x.ib) ? `<button type="button" class="btn" data-trash-sel title="Move the selected to the Trash" aria-label="Move to Trash">${ICON.trash}<span>Move to Trash\u2026</span></button>` : '') +
     (gs && LIBS.list.length && list.some(x => !x.ib) ? `<button type="button" class="btn" data-copy-lib-sel title="Copy to another library" aria-label="Copy to another library">${ICON.lib}<span>Library</span></button>` : '') +
     `<details class="menu"><summary class="btn" title="Copy the citations" aria-label="Copy the citations">${ICON.copy}<span>Copy</span>${ICON.chev}</summary>` +
     `<div class="menu-list" role="menu"><button type="button" role="menuitem" class="mi" data-copy-sel="bibtex">${ICON.bib}<span>BibTeX</span><kbd>${esc(keyHint('copyBib'))}</kbd></button>` +
@@ -1959,7 +1967,7 @@ function unjoin(x) {
   quickSet(x, Object.assign({ versionof: rest }, x.f.relatedtype ? {} : { related: '' }), 'Shown as a separate publication');
 }
 // On a computer: drag a row onto another to join it under that one.
-const rowDrag = () => !!gs && !coarseMQ.matches;
+const rowDrag = () => !!gs && !coarseMQ.matches && state.group !== 'inbox' && state.group !== 'trash';
 const KEY_TYPE = 'application/x-liblande-key';
 let dragKey = null;
 rowsEl.addEventListener('dragstart', ev => {

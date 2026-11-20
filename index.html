@@ -146,6 +146,7 @@ try {
 <div class="drop-hint" id="dropHint" hidden></div>
 <div class="done-pop" id="donePop" hidden role="status"><div class="done-card"><svg class="done-check" viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r="24"/><path d="M15 27l7 7 15-16"/></svg><b class="done-title">Done</b><span class="done-sub"></span><span class="done-where"></span></div></div>
 <input type="file" id="attachInput" accept="application/pdf,.pdf" hidden>
+<input type="file" id="ibAttachInput" accept="application/pdf,.pdf" hidden>
 <div class="viewer" id="viewer" hidden role="dialog" aria-modal="true" aria-labelledby="vTitle">
   <div class="v-top" id="vTop">
   <header class="v-bar">
@@ -167,6 +168,7 @@ try {
     </div>
   </header>
   <div class="v-tabs-wrap"><nav class="v-tabs" id="vTabs" role="tablist" aria-label="Open papers"></nav><button type="button" class="v-tabs-more left" id="vTabsLeft" aria-label="More papers left" hidden></button><button type="button" class="v-tabs-more right" id="vTabsRight" aria-label="More papers right" hidden></button></div>
+  <div class="v-ibbar" id="vIbBar" hidden role="status"></div>
   <div class="v-find" id="vFind" hidden role="search">
     <input type="search" id="vFindInput" placeholder="Search in this paper" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="Search in this paper">
     <span class="v-find-count" id="vFindCount" role="status"></span>
@@ -386,7 +388,7 @@ try {
     </div>
   </form>
 </div>
-<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-11-19.02</small></div>
+<div class="loading" id="loading"><b>LibLande</b><span>Starting up&#x2026;</span><small id="version">Version 2026-11-19.03</small></div>
 <script>
 // Show any error that stops the page on the loading screen, including
 // syntax errors in the main script below; once the library is showing, in
@@ -401,7 +403,7 @@ try {
     if (l && !l.hidden) {
       l.innerHTML = '<b>The page hit an error</b><span></span><small></small>';
       l.querySelector('span').textContent = msg;
-      l.querySelector('small').textContent = 'Version 2026-11-19.02';
+      l.querySelector('small').textContent = 'Version 2026-11-19.03';
       return;
     }
     var bar = document.getElementById('errBar');
@@ -414,14 +416,14 @@ try {
       bar.addEventListener('click', function () { bar.remove(); });
       document.body.appendChild(bar);
     }
-    bar.firstChild.textContent = 'LibLande hit an error (version 2026-11-19.02): ' + msg;
+    bar.firstChild.textContent = 'LibLande hit an error (version 2026-11-19.03): ' + msg;
   }
   window.addEventListener('error', function (e) { report((e.message || 'Unknown error') + (e.lineno ? ' [line ' + e.lineno + ':' + (e.colno || 0) + ']' : '')); });
   window.addEventListener('unhandledrejection', function (e) { report((e.reason && e.reason.message) || String(e.reason)); });
 })();
 </script>
 
-<script id="appLoader" data-parts="app/library.js app/apa.js app/csl.js app/marks.js app/reader.js app/save.js app/contents.js app/bookmarks.js app/pdflib.js app/editing.js app/cite.js app/notes.js app/citecheck.js app/newpapers.js app/ocr.js app/split.js app/outline.js app/findpdf.js app/titlesearch.js app/keywords.js app/chapters.js app/related.js app/marksindex.js app/citecard.js app/tour.js app/start.js">
+<script id="appLoader" data-parts="app/library.js app/apa.js app/csl.js app/marks.js app/reader.js app/save.js app/contents.js app/bookmarks.js app/pdflib.js app/editing.js app/cite.js app/notes.js app/citecheck.js app/newpapers.js app/ocr.js app/split.js app/outline.js app/findpdf.js app/titlesearch.js app/keywords.js app/chapters.js app/related.js app/marksindex.js app/inbox.js app/trash.js app/citecard.js app/tour.js app/start.js">
 // The app's scripts (app/), fetched together and run joined as one script,
 // in one go, inside one function: so nothing else runs between them (a
 // timer one sets can't find the next not yet there), and their names stay

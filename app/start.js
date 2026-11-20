@@ -1,8 +1,8 @@
 ﻿// LibLande: messages, navigation, and starting up.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, citecard, tour, start.)
+// index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, inbox, trash, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-11-19.02';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/start.js'] = '2026-11-19.03';
 // On GitHub Pages, every part of the app must be from the same version: a
 // part kept from an older one (the offline copy, served when the network
 // was slow) lacks what this page needs. Then the kept copies go, and the
@@ -211,7 +211,7 @@ document.addEventListener('keydown', ev => {
   if (tag === 'input' || tag === 'select' || tag === 'textarea' || ev.target.isContentEditable || NOTES.pop) return;
   if (!$('#sheet').hidden) return;
   if (ev.key === 'Escape' && state.picking) { setPicking(false); return; }
-  if (ev.key === 'a' && (ev.metaKey || ev.ctrlKey) && state.view.length) {
+  if (ev.key === 'a' && (ev.metaKey || ev.ctrlKey) && state.view.length && state.group !== 'inbox' && state.group !== 'trash') {
     ev.preventDefault();
     if (!state.picking) setPicking(true);
     state.view.forEach(e => state.picked.add(e.k));
@@ -242,6 +242,12 @@ document.addEventListener('keydown', ev => {
       /[\p{L}\p{N}'.\- ]/u.test(ev.key) && (ev.key !== ' ' || typeBuf)) {
     ev.preventDefault();
     typeToJump(ev.key);
+    return;
+  }
+  // Delete (or Cmd-Backspace): to the Trash, asked first.
+  if (inList && gs && (ev.key === 'Delete' || (ev.key === 'Backspace' && ev.metaKey)) && state.group !== 'inbox' && state.group !== 'trash') {
+    const list = state.picking && state.picked.size ? pickedEntries() : [BYKEY.get(state.selKey)].filter(Boolean);
+    if (list.length) { ev.preventDefault(); trAskPub(list); }
     return;
   }
   if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
@@ -1248,4 +1254,4 @@ if (RELOADING) {
 if (window.LIBLANDE_TEST) window.LL = { NOTES, mdToHtml, htmlToMd, notesSave, notesMarks, openNotesPop, setDetailView, nvInsertMark, nvMarksHTML, rnAddPassage, commentToNotes, apaCitation, renderDetail, state, CITE, citeRef, citeInText, citeInTextMany, citeList, citeChoose, citeLoad, citeShort, msFixes, quoteWith, addFromLink, addLinkTake, openFromLink, openLinkTake, pdfMetaQuery, webAddBookmark, webAddDescription, aiPrompt, aiCopyFor, aiCopyOpen, relateByDrag, apaCitation, origYear, chPdfPage, chPdfFile, CHP, lcFind, openLinkChapters, lcOffer, SIDE_FOLD, CHAPTERS: () => CHAPTERS, CHAPTER_ROWS: () => CHAPTER_ROWS, CHAPTER_OF: () => CHAPTER_OF, findChapters, toggleBook, OPEN_BOOKS, openAddChapter, fromPhoto, photoQuery, photoAsks, photoFind, photoDoi, photoLines, PHOTO, openQr, qrLink, LEN, countPdfPages, setSort, setCols, pageCount, setGroup, REACH, reachCheck, apaCitation, apaInText, loadPdfLib, entries: () => ENTRIES, KWS, kwsSuggest, kwsKey, kwsWithOA, ktFind, openKwTidy, TS, tsSearch, tsMerge, tsIsQuery, tsClose, PROGRESS, SOFT, RN, rnAddQuote, showQuote, toggleReaderNotes, progressMerge, progressReset, PROXIES, proxyPrefix, proxyLink, findPdf, renderProxies, TOUR, startTour, endTour, openFeatures, FEATURES, toggleBookmark, OLE, oleMake, headingOutline, pageRows, writeOutline, SPLIT, foldOf, splitStart, splitApply, printedContents, tocClean, tocDigits, checkPdf, uploadMarked, netError, REBUILD, rebuildNow, afterWrite, POS, shutReader, AWAY_SINCE, progressBoth, pullPrefs, saveProgress, pageLines, OCR, makeSearchable, ocrLayer, textlessPages, openMsCheck, runMsCheck, LIBS, renderGroups, SMART, NP, npCheck, openNewPapers, openFollow, sweepCovers, COVERS, V, BM, JOURNAL, LOCAL, AUTO, saveMarkup, setTool, setReading, renderRLBar, netBadge, placeToast, POS, MARK, PDFJS, pdfJsFix, pdfViewerFix, findEndPage, refHeading, combineMarks, makeZip, MARK_ERASER: () => MARK.eraserSize,
   lib: () => ({ ENTRIES, BYKEY, DATA, VERSION_OF, VERSIONS, NESTED, state, TABS, groupName }), init, refresh, openEdit, isForthcoming, forthChanges, parseBibtexEntry,
   oldLineMarks, convertOldLines, fetchAhead, PTABS, renderPaperTabs, openPdf, loadPdfJs, addStreamIteration, msCheck, msCites, msRef, msDocx, MS, msVisible,
-  refLike, REF, REL, RELP, relCites, relPassage, markRange, MX, mxSnip, mxStatus, SRCH, srchRun, showSideTab, toggleSide, openPapersMenu, CC, ccTargetAt, ccTapAt, ccClose, ccCiteAt, ccLines, ccNoteAt, ccShortOnly, pencilRecent, PEEK, ccSpanAt, srchMarks, srchSnip };
+  refLike, REF, REL, RELP, relCites, relPassage, markRange, MX, mxSnip, mxStatus, SRCH, srchRun, showSideTab, toggleSide, openPapersMenu, CC, ccTargetAt, ccTapAt, ccClose, ccCiteAt, ccLines, ccNoteAt, ccShortOnly, pencilRecent, PEEK, INBOX, ibAdd, ibByKey, ibEntries, ibRemove, ibAdded, ibHas, ibPassed, rlWhich, ibLoad, ibToLibrary, ibPut, IB_PRE, closeReader, get sheet() { return sheet; }, TRASH, trAskPub, trRestore, trByKey, trLoad, trSet, trEntries, ccSpanAt, srchMarks, srchSnip };

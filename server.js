@@ -17,7 +17,7 @@
   window.LIBLANDE_PAGES = true;
   // (Which version each part of the app is from: index.html checks they
   // match. build.py fills it in.)
-  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-11-19.02';
+  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-11-19.03';
   const CLIENT_ID = '789682218462-98mjugngb46ttd01ucp9dcj71ufspjgn.apps.googleusercontent.com';
   // Google Drive, in one of two ways (docs/drive-file-plan.md):
   // full: all of Drive (your .bib, papers and LibLande folder wherever
@@ -467,6 +467,19 @@
     async getPrefs() { prefsMemo = null; return loadPrefs(null); },
     // The PDFs' highlights, indexed for searching (LibLande/marks.json:
     // see marksindex.js): read whole; written as changes onto what's there.
+    // The Inbox (LibLande/inbox.json: see inbox.js): read whole; written as
+    // changes onto what's there, each item kept at its latest change.
+    getInbox() { return edits.getInbox(); },
+    putInbox(changes) { return edits.putInbox(changes); },
+    // An Inbox PDF let go: to Drive's trash (only one in LibLande/Inbox/Papers).
+    async trashInboxFile(req) {
+      const inbox = await subFolder(await dataFolder(), 'Inbox', true);
+      const papers = await subFolder(inbox.id, 'Papers', true);
+      const f = await storage().meta(req.id, 'parents');
+      if (!(f.parents || []).includes(papers.id)) throw new Error('That file isn\u2019t in your Inbox.');
+      await storage().trash(req.id);
+      return { ok: true };
+    },
     async getMarksIndex() { const folder = await dataFolder(); marksMemo = (folder && await builder.readJson(folder, MARKS_FILE)) || null; return marksMemo; },
     async putMarksIndex(changes) {
       const folder = await dataFolder();
@@ -523,6 +536,14 @@
       return Object.assign(await SERVER.getStatus(), { imported: made });
     },
     copyToLibrary(req) { return edits.copyToLibrary(req); },
+    // The Trash (edits.js): LibLande/trash.json and LibLande/Trash.
+    getTrash() { return edits.getTrash(); },
+    trashEntry(req) { return edits.trashEntry(req); },
+    restoreEntry(req) { return edits.restoreEntry(req); },
+    trashThing(req) { return edits.trashThing(req); },
+    untrashThing(req) { return edits.untrashThing(req); },
+    forgetTrash(req) { return edits.forgetTrash(req); },
+    deleteFromTrash(req) { return edits.deleteFromTrash(req); },
     // Sign out of this device: changes kept here for Drive go first (or
     // it stops, saying so); then Google's permission is given back and
     // what this file keeps on the device (sign-in, access, kept lists) is

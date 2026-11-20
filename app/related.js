@@ -1,8 +1,8 @@
 ﻿// LibLande: Related, in the reader: a reference selected in a paper looked up, to add it; and the sidebar's list of the works a paper cites, and of works like it, in your library and not.
 // (One of the app's scripts, which share one scope, loaded in order by
-// index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, citecard, tour, start.)
+// index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, inbox, trash, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/related.js'] = '2026-11-19.02';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/related.js'] = '2026-11-19.03';
 /* ------------------------------------------------------------ a reference selected */
 // Words selected in a paper that look like a reference (a year, or a DOI,
 // with a name as "Fodor, J." or the like, pages or a journal's volume;
@@ -269,10 +269,11 @@ function relRow(c, why, mine) {
   const meta = [names, have ? f.year : c.year, have ? tsClean(f.journal || f.booktitle || f.publisher || '') : c.venue].filter(Boolean).map(esc).join(' \u00b7 ');
   const link = !have && (c.doi ? 'https:\/\/doi.org/' + c.doi : c.url || '');
   const title = esc(have ? tsClean(f.title || have.k) : c.title);
-  return `<div class="rel-it${have ? ' have' : ''}"${have ? ` data-rel-open="${esc(have.k)}"` : ''}>` +
+  return `<div class="rel-it${have ? ' have' : ''}${!have && ibPassed(c) ? ' passed' : ''}"${have ? ` data-rel-open="${esc(have.k)}"` : ''}>` +
     `<span class="rel-t">${have ? `<button type="button" class="rel-title">${title}</button>` : link ? `<a class="rel-title" href="${esc(link)}" target="_blank" rel="noopener">${title}</a>` : `<span class="rel-title">${title}</span>`}` +
     `<span class="rel-m">${meta}</span>${why ? `<span class="rel-why">${esc(why)}</span>` : ''}</span>` +
-    (have ? (mine ? '' : `<span class="rel-have">In library</span>`) : gs && !$('#addBtn').hidden ? `<button type="button" class="rel-add" data-rel-add="${esc(c.relId)}" aria-label="Add \u201c${esc(c.title)}\u201d to your library" title="Add to your library">${ICON.plus}</button>` : '') +
+    (have ? (mine ? '' : `<span class="rel-have">In library</span>`) : gs && !$('#addBtn').hidden ? (ibHas(c) ? `<span class="rel-have ib">Inbox</span>` : `<button type="button" class="rel-ib" data-rel-ib="${esc(c.relId)}" aria-label="Add \u201c${esc(c.title)}\u201d to your Inbox" title="Add to your Inbox, to decide on later">${ICON.inbox}</button>`) +
+      `<button type="button" class="rel-add" data-rel-add="${esc(c.relId)}" aria-label="Add \u201c${esc(c.title)}\u201d to your library" title="Add to your library">${ICON.plus}</button>` : '') +
     `</div>`;
 }
 function relWait(st, what) {
