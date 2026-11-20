@@ -5,7 +5,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, inbox, trash, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/titlesearch.js'] = '2026-11-19.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/titlesearch.js'] = '2026-11-20.01';
 /* ------------------------------------------------------------ title search */
 // A title (with an author or a year, if you like) typed in Add's lookup
 // box, instead of a DOI: candidates from Crossref (articles, chapters, and
@@ -245,7 +245,7 @@ function tsRender(more, failed) {
     return s && c.eds ? s + (n.length > 1 ? ' (Eds.)' : ' (Ed.)') : s;
   };
   const note = more ? (TS.list.length ? 'Searching for more\u2026' : 'Searching\u2026')
-    : !TS.list.length ? (failed.length === TS_SOURCES.length ? 'The search didn\u2019t work just now (' + (navigator.onLine ? 'no answer from ' + failed.join(', ') : 'you\u2019re offline') + '). Try again, or paste a DOI.'
+    : !TS.list.length ? (failed.length === TS_SOURCES.length ? 'The search didn\u2019t work just now (' + (!(typeof isOffline === 'function' ? isOffline() : !navigator.onLine) ? 'no answer from ' + failed.join(', ') : 'you\u2019re offline') + '). Try again, or paste a DOI.'
       : 'Nothing found. Try fewer words, or add an author\u2019s name.')
     : failed.length ? 'Not searched just now: ' + failed.join(', ') + '.' : '';
   box.innerHTML = TS.list.map((c, i) => `<button type="button" class="ts-item" data-ts="${i}">` +

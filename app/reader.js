@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, inbox, trash, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-19.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-20.01';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -172,7 +172,7 @@ async function startPdfJs() {
 // with), and not its fonts and character maps. Said whether there were any.
 const PDFJS_CORE = /\/vendor\/pdf\.js\/[^/]+\/(pdf\.min\.mjs|pdf\.worker\.min\.mjs|pdf_viewer\.mjs|pdf_viewer\.css)$/;
 async function dropPdfJsCopies() {
-  if (!('caches' in window) || !navigator.onLine) return false;
+  if (!('caches' in window) || isOffline()) return false;
   let n = 0;
   for (const k of await caches.keys()) {
     if (!k.startsWith('liblande-libs')) continue;
@@ -260,7 +260,7 @@ function fetchAhead() {
   return aheadRun;
 }
 async function fetchAheadNow() {
-  if (!window.LIBLANDE_PAGES || !window.caches || !navigator.onLine || !ENTRIES.length) return;
+  if (!window.LIBLANDE_PAGES || !window.caches || isOffline() || !ENTRIES.length) return;
   const next = readingOrder().filter(x => x.list === 'next').map(x => BYKEY.get(x.key));
   const newest = ENTRIES.slice().sort((a, b) => cmpStr(b.added || '', a.added || '')).filter(e => readablePdfs(e).length).slice(0, AHEAD);
   const list = [...new Set(next.concat(newest))].filter(e => e && readablePdfs(e).length).slice(0, AHEAD_MOST);
@@ -268,7 +268,7 @@ async function fetchAheadNow() {
   for (const e of list) {
     const f = readablePdfs(e)[0], url = 'https:\/\/www.googleapis.com/drive/v3/files/' + encodeURIComponent(f.id) + '?alt=media';
     if (await kept.match(url)) continue;
-    if (!navigator.onLine || document.hidden || !tokenCache || Date.now() - tokenCache.at > 50 * 60 * 1000) return;
+    if (isOffline() || document.hidden || !tokenCache || Date.now() - tokenCache.at > 50 * 60 * 1000) return;
     const r = await fetch(url, { headers: { Authorization: 'Bearer ' + tokenCache.token } });
     if (!r.ok) return;
     const bytes = await r.arrayBuffer();
@@ -290,6 +290,11 @@ async function googleFetch(url, opts = {}, ms) {
   };
   let r = await go(await driveToken());
   if (r.status === 401) r = await go(await driveToken(true));
+  // (An answer from Drive (not the copy kept here): it can be reached.)
+  if (!r.headers.get('X-LibLande-Kept')) {   // keep-name
+    window.LIBLANDE_NET_OK_AT = Date.now();
+    if (window.LIBLANDE_REACHABLE === false) window.dispatchEvent(new CustomEvent('liblande-net-ok'));
+  }
   return r;
 }
 async function driveToken(fresh) {
@@ -381,7 +386,7 @@ async function getPdfBytesFrom(url, file, onProgress) {
       : 'Google Drive didn\u2019t send the file (error ' + r.status + ').');
   }
   let bytes;
-  const total = Number(r.headers.get('Content-Length')) || 0;
+  const total = Number(r.headers.get('Content-Length')) || 0, keptCopy = !!r.headers.get('X-LibLande-Kept');   // keep-name
   try {
     if (r.body && r.body.getReader) {
       // (Each piece that comes puts the stall off again.)
@@ -404,6 +409,11 @@ async function getPdfBytesFrom(url, file, onProgress) {
       bytes = new Uint8Array(await r.arrayBuffer());
     }
   } catch (err) { throw stop && stop.signal.aborted ? noAnswer() : err; } finally { clearTimeout(timer); }
+  if (keptCopy) {
+    const sum = await caches.match('https:\/\/www.googleapis.com/drive/v3/files/' + encodeURIComponent(file.id) + '?fields=md5Checksum').then(x => (x ? x.json() : null)).catch(() => null);
+    bytes.keptMd5 = (sum && sum.md5Checksum) || 'kept-copy';
+    return bytes;
+  }
   recentPdfs.set(file.id, bytes);
   refreshSavedSoon();
   trimRecentPdfs();
@@ -882,7 +892,7 @@ async function openReader(entry, file, pos) {
         autoSaveSoon(5000);
       });
       toast('Your marks from ' + new Date(kept.at).toLocaleString() + ' that hadn\u2019t reached Google Drive are back' +
-        (navigator.onLine ? ', and are being saved to it.' : ' (kept on this device until you\u2019re online).'), 6000);
+        (!isOffline() ? ', and are being saved to it.' : ' (kept on this device until you\u2019re online).'), 6000);
     } else if (oldLines) {
       // (To be saved: the paper as it now is, with the real ones.)
       bmLoaded.then(() => {

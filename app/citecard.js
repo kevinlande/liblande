@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, inbox, trash, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/citecard.js'] = '2026-11-19.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/citecard.js'] = '2026-11-20.01';
 /* ------------------------------------------------------------ a citation's card */
 // Rest the pointer on a citation in the text, "Siegel (2010)" or "(Burge,
 // 2010; Siegel, 2010)" (each name and year its own), on a link to the
@@ -282,7 +282,7 @@ async function ccRefs() {
   const e = infoEntry();
   if (!e) return null;
   const st = relState(e);
-  if (!st.refs && !st.errs.refs && navigator.onLine) {
+  if (!st.refs && !st.errs.refs && !isOffline()) {
     if (!st.busy) relFetch(e, st).catch(() => {});
     for (let i = 0; i < 60 && (st.busy || st.work === undefined) && !st.refs && !st.errs.work; i++) await ccSleep(250);
   }
@@ -355,7 +355,7 @@ async function ccForText(text) {
   // (Yours at once, if the paper's list isn't here yet.)
   const refs = ccRefsNow() || (mine.length ? null : await ccRefs());
   let list = (refs || []).map(c => Object.assign({}, c, { fit: refFit(c, q) })).filter(c => c.fit > 0).concat(mine);
-  if (!list.length && navigator.onLine) {
+  if (!list.length && !isOffline()) {
     try {
       const doi = npDoi((/\b(10\.\d{4,9}\/[^\s"<>]+)/.exec(q) || [])[1] || '').replace(/[.,;)\]]+$/, '');
       const found = doi ? await refByDoi(doi).then(c => ({ list: c ? [c] : [] })) : await tsFind(q);
@@ -470,7 +470,7 @@ function ccDraw() {
   if (CC.list.loading) {
     html = `<div class="cc-bd"><p class="cc-wait"><span class="cc-spin"></span>Looking up${t.fam ? ' ' + esc(t.who) + ' (' + esc(t.year) + ')' : ''}\u2026</p></div>`;
   } else if (!c) {
-    const why = !navigator.onLine ? 'Offline, and not in your library.' : t.kind === 'cite' ? 'Not in your library or the paper\u2019s reference list.' : 'Not in your library or online.';
+    const why = isOffline() ? 'Offline, and not in your library.' : t.kind === 'cite' ? 'Not in your library or the paper\u2019s reference list.' : 'Not in your library or online.';
     const text = t.entry ? t.entry.text : t.text;
     html = `<div class="cc-bd"><p class="cc-kind">Not found</p><p class="cc-m">${why}</p></div>` +
       `<div class="cc-acts">${ccGoButtons(t)}${text ? ccBtn('search', 'search', 'Find\u2026') : ''}</div>`;

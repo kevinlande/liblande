@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, inbox, trash, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/newpapers.js'] = '2026-11-19.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/newpapers.js'] = '2026-11-20.01';
 /* ------------------------------------------------------------ new papers */
 // Found with OpenAlex (citations, authors, journals) and Semantic Scholar
 // (papers like your examples), asked from this page: no key, and no email
@@ -271,7 +271,7 @@ function npAuto() {
   if (npAutoSet) return;
   npAutoSet = true;
   setTimeout(() => {
-    if (!gs || !navigator.onLine || (window.LIBLANDE_TEST && !window.LIBLANDE_NP_FETCH)) return;
+    if (!gs || isOffline() || (window.LIBLANDE_TEST && !window.LIBLANDE_NP_FETCH)) return;
     if (Date.now() - NP.checked > 20 * 3600000) npCheck().catch(() => {});
   }, window.LIBLANDE_TEST ? 0 : 20000);
 }

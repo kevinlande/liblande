@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, inbox, trash, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/marksindex.js'] = '2026-11-19.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/marksindex.js'] = '2026-11-20.01';
 /* ------------------------------------------------------------ the index */
 // Each PDF's highlights (their words, page and note), read from the PDF
 // once and kept in LibLande/marks.json in Drive, so every device can
@@ -91,7 +91,7 @@ async function mxRun() {
     for (const [id, x] of all) {
       if (d.files[id]) continue;
       // (Not while a paper is being read, nor offline: later.)
-      while ((!$('#viewer').hidden || !navigator.onLine) && MX.running) await mxSleep(20000);
+      while ((!$('#viewer').hidden || isOffline()) && MX.running) await mxSleep(20000);
       if (!ENTRIES.length) break;
       try { d.files[id] = MX.pending[id] = await mxRead(x); }
       catch (err) { break; }

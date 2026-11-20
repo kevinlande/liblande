@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, inbox, trash, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/cite.js'] = '2026-11-19.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/cite.js'] = '2026-11-20.01';
 /* ------------------------------------------------------------ citation styles */
 // Your citation style, chosen in Settings > Citing, kept with your account:
 // APA by default, which LibLande formats itself (apaCitation, apaInText:
@@ -114,7 +114,7 @@ function citeEngine(id = CITE.id) {
   citeLoad(id).catch(() => {});
   if (!CITE.said) {
     CITE.said = true;
-    toast(citeTitle(id) + ' hasn\u2019t downloaded yet' + (navigator.onLine ? '' : ' (you\u2019re offline)') + ': APA meanwhile.', 5000);
+    toast(citeTitle(id) + ' hasn\u2019t downloaded yet' + (!isOffline() ? '' : ' (you\u2019re offline)') + ': APA meanwhile.', 5000);
     setTimeout(() => { CITE.said = false; }, 10000);
   }
   return null;

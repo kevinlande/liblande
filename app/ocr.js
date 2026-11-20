@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, inbox, trash, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/ocr.js'] = '2026-11-19.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/ocr.js'] = '2026-11-20.01';
 /* ------------------------------------------------------------------ OCR */
 // A scan's pages are pictures, with no text to search, select or mark.
 // Make searchable reads each page without text with Tesseract (in this
@@ -153,7 +153,7 @@ async function makeSearchable() {
   if (!V.doc || !V.file) return;
   if (!V.bytes) { toast('The paper is still downloading. Make it searchable once it\u2019s open.', 4000); return; }
   if (!gs) { toast('Sign in to Google Drive to make it searchable.', 4000); return; }
-  if (!navigator.onLine) { toast('Making it searchable needs a connection.', 4000); return; }
+  if (isOffline()) { toast('Making it searchable needs a connection.', 4000); return; }
   const file = V.file, entry = V.entry;
   Object.assign(OCR, { file, entry, pages: [], at: 0, phase: 'find', load: 0, stop: false, found: new Map() });
   ocrBar();

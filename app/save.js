@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, inbox, trash, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/save.js'] = '2026-11-19.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/save.js'] = '2026-11-20.01';
 /* ---- saving markup */
 // A new mark isn't in the PDF's annotations until PDF.js commits it (on a
 // change of tool), so anything done with a tool counts as possibly
@@ -136,7 +136,7 @@ async function saveMarkup(force, auto, now) {
       if (V.tool !== 'read' && doc === V.doc) setTool(V.tool);
     }
     if (!V.dirty && !V.bmDirty) { saveUI(); return true; }
-    if (!navigator.onLine) { offline = true; saveUI(); return false; }
+    if (isOffline()) { offline = true; saveUI(); return false; }
     try {
       const md5 = await pdfMd5(file).catch(() => null);
       if (!force && V.md5 && md5 && md5 !== V.md5) {
@@ -243,10 +243,13 @@ const keptNote = r => { if (r === 'kept') toast(KEPT_NOTE, 4500); return r; };
 // still the one the changes were made to; otherwise it's left, and
 // opening it offers Combine.
 const KEPT_UP = { busy: false, again: false };
+// (Also when the page's check finds Google answering again: Safari often
+// doesn't say it's back online.)
+window.addEventListener('liblande-reach', ev => { if (ev.detail && ev.detail.ok) setTimeout(() => uploadKept(true), 800); });
 // A message floats while they go ("Back online: saving...") and says how
 // it went.
 async function uploadKept(back) {
-  if (!gs || !navigator.onLine) return;
+  if (!gs || isOffline()) return;
   // (Asked again while under way: once more when it's done.)
   if (KEPT_UP.busy) { KEPT_UP.again = true; return; }
   KEPT_UP.busy = true;
@@ -399,7 +402,7 @@ const ROT = { file: null, want: new Map(), timer: 0, busy: false };
 const rotatePage = (n, by) => rotatePages([n], by);
 function rotatePages(list, by) {
   if (!V.doc || !V.file || !V.viewer) return;
-  if (!gs || !navigator.onLine) { toast('Turning pages needs a connection.', 3500); return; }
+  if (!gs || isOffline()) { toast('Turning pages needs a connection.', 3500); return; }
   if (ROT.file && ROT.file.id !== V.file.id) ROT.want.clear();
   ROT.file = V.file;
   for (const n of list) {

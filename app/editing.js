@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, inbox, trash, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-19.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-20.01';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -1331,7 +1331,7 @@ document.addEventListener('click', ev => {
   const b = ev.target.closest('[data-net]');
   if (!b) return;
   // (The viewer's, with changes to save and Drive there: save them now.)
-  if (b.id === 'vNetBadge' && NET.save === 'unsaved' && navigator.onLine) { saveMarkup().then(keptNote); return; }
+  if (b.id === 'vNetBadge' && NET.save === 'unsaved' && !isOffline()) { saveMarkup().then(keptNote); return; }
   toast(b.classList.contains('unsaved') || NET.save === 'saving' ? saveText(NET.save) : netText(), 6000);
 });
 window.addEventListener('liblande-waiting', netBadge);

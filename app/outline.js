@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, inbox, trash, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/outline.js'] = '2026-11-19.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/outline.js'] = '2026-11-20.01';
 /* -------------------------------------------------------- outline editor */
 // In the sidebar's Outline tab: Edit the outline (the PDF's own, or the one
 // made from its printed Contents), or Make one afresh: from the Contents
@@ -490,7 +490,7 @@ async function oleMake(kind) {
 // bookmarks kept, after it), then the paper opened again with it.
 async function oleSave() {
   if (!V.doc || !V.file || OLE.busy) return;
-  if (!gs || !navigator.onLine) { toast('Saving the outline needs a connection.', 3500); return; }
+  if (!gs || isOffline()) { toast('Saving the outline needs a connection.', 3500); return; }
   const items = OLE.items.map(it => Object.assign({}, it, { title: it.title.trim() || 'Untitled' })), file = V.file;
   OLE.busy = true;
   const bar = $('#vSideBody .v-ole-bar [data-ole="save"]');

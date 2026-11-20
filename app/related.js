@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, inbox, trash, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/related.js'] = '2026-11-19.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/related.js'] = '2026-11-20.01';
 /* ------------------------------------------------------------ a reference selected */
 // Words selected in a paper that look like a reference (a year, or a DOI,
 // with a name as "Fodor, J." or the like, pages or a journal's volume;
@@ -75,7 +75,7 @@ async function refFind(sel) {
 function refShow(offline) {
   const c = REF.list[REF.at];
   if (!c) {
-    refCard(`<p class="ref-none">${esc(offline ? (navigator.onLine ? 'The search didn\u2019t answer just now.' : 'You\u2019re offline.') : REF.list.length ? 'Nothing else found.' : 'Not found.')}</p>` +
+    refCard(`<p class="ref-none">${esc(offline ? (!isOffline() ? 'The search didn\u2019t answer just now.' : 'You\u2019re offline.') : REF.list.length ? 'Nothing else found.' : 'Not found.')}</p>` +
       `<div class="ref-row"><button type="button" class="btn" data-ref-x>Close</button><button type="button" class="btn primary" data-ref-search>Search in Add\u2026</button></div>`);
     return;
   }
@@ -199,7 +199,7 @@ const relLive = e => SIDE.tab === 'related' && sideOpen() && !$('#viewer').hidde
 // recommendations), drawn once it's come. (Not asked again after it
 // failed, until Try again.)
 async function relFetch(e, st) {
-  if (st.busy || !navigator.onLine) return;
+  if (st.busy || isOffline()) return;
   const jobs = [];
   st.busy = true;
   try {
@@ -277,9 +277,9 @@ function relRow(c, why, mine) {
     `</div>`;
 }
 function relWait(st, what) {
-  if (!navigator.onLine && !st.work) return `<p class="v-side-note">Online only: you\u2019re offline.</p>`;
+  if (isOffline() && !st.work) return `<p class="v-side-note">Online only: you\u2019re offline.</p>`;
   if (st.errs[what] || st.errs.work) return `<p class="v-side-note">Couldn\u2019t ask just now: ${esc(st.errs[what] || st.errs.work)}. <button type="button" class="link-btn" data-rel-retry>Try again</button></p>`;
-  return `<p class="v-side-note">${navigator.onLine ? 'Looking\u2026' : 'Online only: you\u2019re offline.'}</p>`;
+  return `<p class="v-side-note">${!isOffline() ? 'Looking\u2026' : 'Online only: you\u2019re offline.'}</p>`;
 }
 // (Each candidate given an id, to add it by.)
 const REL_IDS = new Map();
@@ -456,7 +456,7 @@ async function relPassage(text, colour, again) {
       `<p class="rel-sec">In your library</p>${mine || '<p class="v-side-note">Nothing in your library is much like it.</p>'}` +
       `<p class="rel-sec">Not in your library</p>${recs}`;
   };
-  const wait = `<p class="v-side-note">${navigator.onLine ? 'Asking OpenAlex\u2026' : 'Online only: you\u2019re offline.'}</p>`;
+  const wait = `<p class="v-side-note">${!isOffline() ? 'Asking OpenAlex\u2026' : 'Online only: you\u2019re offline.'}</p>`;
   draw(relCitedIn(text, st), wait);
   // (Let down, unless it's down already: then just its contents change,
   // not to drop again at each passage. One going up comes down again.)
@@ -472,7 +472,7 @@ async function relPassage(text, colour, again) {
   // (The references, if not asked for yet; then the citations again.)
   if (!st.refs && !st.busy) relFetch(e, st).then(() => { if (my === RELP.seq) draw(relCitedIn(text, st), RELP.recs || wait); });
   RELP.recs = null;
-  if (!navigator.onLine) return;
+  if (isOffline()) return;
   let recs;
   try {
     const terms = relTerms(m, idx), own = plainTitle(e.f.title);

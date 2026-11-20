@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, inbox, trash, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/inbox.js'] = '2026-11-19.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/inbox.js'] = '2026-11-20.01';
 /* ------------------------------------------------------------ the Inbox */
 // Works you came across (cited in a paper you're reading, say) and want to
 // look at before deciding to keep them: their details, where you found
@@ -54,7 +54,7 @@ function ibPut(x) {
 }
 function ibSendSoon() { clearTimeout(INBOX.timer); INBOX.timer = setTimeout(ibSend, 600); }
 async function ibSend() {
-  if (!gs || INBOX.busy) return;
+  if (!gs || INBOX.busy || isOffline()) return;
   const items = INBOX.pending;
   if (!Object.keys(items).length) return;
   INBOX.pending = {};
@@ -67,6 +67,7 @@ async function ibSend() {
   await INBOX.busy;
 }
 window.addEventListener('online', ibSendSoon);
+window.addEventListener('liblande-reach', ev => { if (ev.detail && ev.detail.ok) ibSendSoon(); });
 // What Drive has, merged in: each item kept at its latest change.
 function ibMerge(r) {
   let changed = false;
@@ -282,7 +283,7 @@ function ibRemove(x, quiet) {
   if (!$('#viewer').hidden && V.entry && V.entry.k === IB_PRE + x.id) ibBar();
   // (Into the Trash, with its PDF, to put back for 45 days. Offline: let
   // go here, its PDF left in LibLande/Inbox/Papers.)
-  const sent = navigator.onLine ? callServer('trashThing', { kind: 'inbox', item: { title: x.title || '', who: (x.people || []).map(tsFamily).slice(0, 2).join(' & ') + ((x.people || []).length > 2 ? ' et al.' : ''), year: x.year || '', inbox: before },
+  const sent = !isOffline() ? callServer('trashThing', { kind: 'inbox', item: { title: x.title || '', who: (x.people || []).map(tsFamily).slice(0, 2).join(' & ') + ((x.people || []).length > 2 ? ' et al.' : ''), year: x.year || '', inbox: before },
     files: x.pdf && x.pdf.id ? [x.pdf] : [] }).then(r => { trSet(r.trash); return r.item; }, () => null) : Promise.resolve(null);
   if (quiet) return;
   toast('Removed \u201c' + shortTitle(x.title || '') + '\u201d from your Inbox (in the Trash for 45 days)', 6000, { label: 'Undo', run: async () => {

@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, inbox, trash, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-19.04';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-20.01';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -2494,16 +2494,50 @@ const REACH = { ok: true, t: 0 };
 const isOffline = () => !navigator.onLine || !REACH.ok;
 async function reachCheck() {
   clearTimeout(REACH.t);
+  REACH.at = Date.now();
+  const my = REACH.seq = (REACH.seq || 0) + 1;
   let ok = navigator.onLine;
   if (ok && !(window.LIBLANDE_TEST && !window.LIBLANDE_REACH)) {
-    const ctl = new AbortController(), give = setTimeout(() => ctl.abort(), 6000);
-    try { await (window.LIBLANDE_REACH || fetch)('https:\/\/www.gstatic.com/generate_204', { mode: 'no-cors', cache: 'no-store', signal: ctl.signal }); }
-    catch (err) { ok = false; }
+    const ctl = new AbortController(), give = setTimeout(() => ctl.abort(), 12000);
+    // (Google Drive's own address, which LibLande needs: any answer will do,
+    // as it isn't signed. Wi-Fi asking you to sign in to it can't answer
+    // for Google over a secure connection, so that counts as offline.)
+    try { await (window.LIBLANDE_REACH || fetch)('https:\/\/www.googleapis.com/drive/v3/about?fields=kind', { mode: 'no-cors', cache: 'no-store', credentials: 'omit', signal: ctl.signal }); }
+    // (Not answered, but Drive itself answered a moment ago: online.)
+    catch (err) { ok = Date.now() - (window.LIBLANDE_NET_OK_AT || 0) < 20000; }
     clearTimeout(give);
   }
-  if (ok !== REACH.ok) { REACH.ok = ok; showOnline(); }
+  // (Only the latest check counts: one started earlier, on the network
+  // before, finishing after it, is let go.)
+  if (my !== REACH.seq) return;
+  reachSet(ok);
   if (!document.hidden) REACH.t = setTimeout(reachCheck, ok ? 120000 : 15000);
 }
+// Said to every part: the Drive layer (server.js), what waits to be sent
+// (when it can be), and the service worker (a paper kept here served at
+// once, not after the network's tried): it's told after every check, as a
+// worker started anew doesn't know.
+function reachSet(ok) {
+  const was = REACH.ok;
+  REACH.ok = ok;
+  window.LIBLANDE_REACHABLE = ok;
+  reachTellWorker();
+  if (ok === was) return;
+  showOnline();
+  window.dispatchEvent(new CustomEvent('liblande-reach', { detail: { ok } }));
+}
+function reachTellWorker() {
+  try { const c = navigator.serviceWorker && navigator.serviceWorker.controller; if (c) c.postMessage({ type: 'reach', ok: REACH.ok }); } catch (err) { /* none */ }
+}
+try { if (navigator.serviceWorker) navigator.serviceWorker.addEventListener('controllerchange', reachTellWorker); } catch (err) { /* none */ }
+// (A request that failed for the network: looked at again soon, rather
+// than in two minutes. A few at once count as one.)
+let reachSoon = 0;
+window.addEventListener('liblande-net-failed', () => { if (!reachSoon && !document.hidden) reachSoon = setTimeout(() => { reachSoon = 0; if (!document.hidden) reachCheck(); }, 1500); });
+// (And an answer from Drive, while it seemed out of reach: online, at once.)
+window.addEventListener('liblande-net-ok', () => { if (!REACH.ok && navigator.onLine) { REACH.seq = (REACH.seq || 0) + 1; reachSet(true); clearTimeout(REACH.t); REACH.t = setTimeout(reachCheck, 120000); } });
+window.addEventListener('pageshow', () => reachCheck());
+window.addEventListener('focus', () => { if (Date.now() - (REACH.at || 0) > 20000) reachCheck(); });
 const showOnline = () => { document.body.classList.toggle('is-offline', isOffline()); setTimeout(() => netBadge(), 0); };
 window.addEventListener('online', () => { showOnline(); reachCheck(); });
 window.addEventListener('offline', showOnline);
@@ -3236,7 +3270,7 @@ function coverFor(e) {
 }
 // (True once Open Library has answered; false if it couldn't be asked.)
 async function findCover(q) {
-  if (COVER_WAIT.has(q.key) || !navigator.onLine || (window.LIBLANDE_TEST && !window.LIBLANDE_COVERS_LIVE)) return false;
+  if (COVER_WAIT.has(q.key) || isOffline() || (window.LIBLANDE_TEST && !window.LIBLANDE_COVERS_LIVE)) return false;
   COVER_WAIT.add(q.key);
   try {
     const ask = async p => {
@@ -3278,7 +3312,7 @@ function sweepCovers() {
   coverSweep = true;
   const next = async () => {
     if (!todo.length || !coversOn()) { coverSweep = false; return; }
-    if (document.hidden || !navigator.onLine) { setTimeout(next, 30000); return; }
+    if (document.hidden || isOffline()) { setTimeout(next, 30000); return; }
     const q = todo.shift(), c = COVERS[q.key];
     if (c && (c.id || Date.now() - c.at < 30 * 86400000)) { next(); return; }
     if (await findCover(q)) setTimeout(next, 1500);

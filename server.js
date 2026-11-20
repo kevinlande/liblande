@@ -17,7 +17,7 @@
   window.LIBLANDE_PAGES = true;
   // (Which version each part of the app is from: index.html checks they
   // match. build.py fills it in.)
-  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-11-19.04';
+  (window.LIBLANDE_PARTS = window.LIBLANDE_PARTS || {}).server = '2026-11-20.01';
   const CLIENT_ID = '789682218462-98mjugngb46ttd01ucp9dcj71ufspjgn.apps.googleusercontent.com';
   // Google Drive, in one of two ways (docs/drive-file-plan.md):
   // full: all of Drive (your .bib, papers and LibLande folder wherever
@@ -33,6 +33,10 @@
   // As in Code.gs.
   const DATA_FOLDER = 'LibLande', LIBRARY_FILE = 'library.json.gz',   // keep-name: the folder in Drive
     READING_FILE = 'reading-list.json', BACKUP_FOLDER = 'Backups', PDF_BACKUP_DAYS = 60;
+  // Online: as the browser says, and as the page's check finds (a request
+  // to Google answering: see REACH in library.js). The browser says it's
+  // online on Wi-Fi with no internet.
+  const online = () => navigator.onLine && window.LIBLANDE_REACHABLE !== false;
   // A token is renewed on a tap after 50 minutes (it lasts an hour).
   const RENEW_AFTER = 50 * 60 * 1000;
 
@@ -118,7 +122,7 @@
     if (valid()) { window.LIBLANDE_SIGNIN_WAIT = 0; return Promise.resolve(token.value); }
     // Offline, Google can't be asked: the old token goes along (Drive won't
     // be reached, and papers kept on this device answer instead).
-    if (!navigator.onLine) {
+    if (!online()) {
       if (token || store.get('token', null)) return Promise.resolve((token || store.get('token', null)).value);
       return Promise.reject(new Error('You\u2019re offline, and LibLande hasn\u2019t signed in to Google on this device yet.'));
     }
@@ -318,9 +322,12 @@
           stop ? { signal: stop.signal } : {}));
         // (Then a while longer for what it sends.)
         if (stop) { clearTimeout(timer); timer = setTimeout(() => stop.abort(), STALL_READING); }
+        window.LIBLANDE_NET_OK_AT = Date.now();
+        if (window.LIBLANDE_REACHABLE === false) { try { window.dispatchEvent(new CustomEvent('liblande-net-ok')); } catch (e2) { /* old browsers */ } }
         return r;
       } catch (e) {
         if (timer) clearTimeout(timer);
+        try { window.dispatchEvent(new CustomEvent('liblande-net-failed')); } catch (e2) { /* old browsers */ }
         const err = new Error(!navigator.onLine ? 'You\u2019re offline.' : stop && stop.signal.aborted
           ? 'Google Drive didn\u2019t answer. Try again.' : 'Google Drive can\u2019t be reached just now.');
         err.offline = true;
@@ -386,7 +393,7 @@
       // few seconds: answered as soon as it's done.)
       const running = buildRun;
       // (Changes kept from a time offline go to Drive first.)
-      if (freshOutbox().length && navigator.onLine) { try { await flushOutbox(); } catch (e) { /* tried */ } }
+      if (freshOutbox().length && online()) { try { await flushOutbox(); } catch (e) { /* tried */ } }
       const w = await builder.look({ daily: true });
       if (!w.configured) return { configured: false };
       const started = startBuild(w);
@@ -714,7 +721,7 @@
   window.liblandeOutbox = () => freshOutbox().slice();
   // (A 401 after asking for a new token: not signed in just now. Kept for
   // later, as offline.)
-  const isOffline = e => !navigator.onLine || !!(e && (e.offline || e.status === 401));
+  const isOffline = e => !online() || !!(e && (e.offline || e.status === 401));
   // Troubles that pass (Drive busy or asked too fast, its server's errors,
   // the library being changed just then): the change waits, to be tried
   // again, rather than dropped.
@@ -740,7 +747,7 @@
   const signInWanted = () => !!window.LIBLANDE_SIGNIN_WAIT;
   function later(name, offline) {
     return async (...args) => {
-      if (navigator.onLine && !signInWanted() && freshOutbox().length) { try { await flushOutbox(); } catch (e) { /* tried */ } }
+      if (online() && !signInWanted() && freshOutbox().length) { try { await flushOutbox(); } catch (e) { /* tried */ } }
       // (The answer first: a change that can't be kept offline says so,
       // and isn't kept.)
       const keep = () => {
@@ -748,7 +755,7 @@
         try { keepForLater(name, args); } catch (e) { offlineLists.known = JSON.parse(was); store.set('lists', offlineLists.known); throw e; }
         return res;
       };
-      if (!navigator.onLine || signInWanted() || freshOutbox().length) return keep();
+      if (!online() || signInWanted() || freshOutbox().length) return keep();
       try {
         const res = await edits[name](...args);
         offlineLists.update(res);
@@ -800,7 +807,7 @@
   let flushing = null;
   function flushOutbox() {
     if (flushing) return flushing;
-    if (!freshOutbox().length || !navigator.onLine || signInWanted()) return Promise.resolve();
+    if (!freshOutbox().length || !online() || signInWanted()) return Promise.resolve();
     const work = async () => {
       let saved = 0;
       const failed = [], hashes = {};
@@ -845,7 +852,9 @@
   // (Safari often doesn't say it's back online, as when LibLande comes
   // back to the screen with a connection already: so also then, and every
   // half minute while changes wait, with the page on screen.)
-  const flushSoon = () => { if (freshOutbox().length && navigator.onLine && !document.hidden && Date.now() >= laterAt) flushOutbox().catch(() => {}); };
+  const flushSoon = () => { if (freshOutbox().length && online() && !document.hidden && Date.now() >= laterAt) flushOutbox().catch(() => {}); };
+  // (Google answering again: what waits goes now.)
+  window.addEventListener('liblande-reach', ev => { if (ev.detail && ev.detail.ok) { laterAt = 0; setTimeout(flushSoon, 500); } });
   document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(flushSoon, 1500); });
   setInterval(flushSoon, 30 * 1000);
 
@@ -961,7 +970,7 @@
   // w: what builder.look found. True if a build is under way.
   function startBuild(w, o) {
     if (buildRun) return true;
-    if (!w.configured || !w.needed || !navigator.onLine) return false;
+    if (!w.configured || !w.needed || !online()) return false;
     buildErr = null;
     buildRun = builder.build(Object.assign({ daily: true }, o), w)
       .then(r => {
