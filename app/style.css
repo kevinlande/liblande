@@ -714,6 +714,8 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .doi-row input { flex: 1; min-width: 0; }
 .doi-row .photo-go { padding: 0 9px; }
 .doi-row .photo-go .i { width: 18px; height: 18px; }
+/* (On a phone, Search and Paste as their icons, so the box keeps its room; named by their titles and aria-labels.) */
+@media (max-width: 699px) { .doi-row #doiGo span, .doi-row #bibPaste span { display: none; } .doi-row #doiGo, .doi-row #bibPaste { padding: 0 11px; } .doi-row .btn .i { width: 18px; height: 18px; } }
 /* Fields Edit's Fill in has just filled. */
 .setup-card .just-filled { border-color: var(--accent); background: var(--accent-soft); }
 .d-edit { margin-left: auto; min-height: 28px; padding: 3px 10px; font-size: 12.5px; }

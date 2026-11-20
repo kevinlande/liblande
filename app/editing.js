@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, inbox, trash, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-20.05';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/editing.js'] = '2026-11-20.06';
 /* ------------------------------------------------------------ add and edit */
 const TYPE_FIELDS = {
   article: ['journal', 'volume', 'number', 'pages'],
@@ -417,8 +417,8 @@ function openAdd(pdf, inbox) {
   const h = sheetHead(inbox ? 'Add to your Inbox' : 'Add a publication', save) +
     `<div class="fld"><label for="doiLookup">Find</label><div class="doi-row">` +
     `<input id="doiLookup" type="text" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Title, DOI, ISBN, arXiv ID or BibTeX" aria-controls="tsList">` +
-    `<button type="button" class="btn" id="doiGo">Fill in</button>` +
-    (navigator.clipboard && navigator.clipboard.readText ? `<button type="button" class="btn" id="bibPaste" title="Fill in from the DOI or BibTeX entry you copied">Paste</button>` : '') +
+    `<button type="button" class="btn" id="doiGo" title="Look it up and fill in the form" aria-label="Search">${ICON.search}<span>Search</span></button>` +
+    (navigator.clipboard && navigator.clipboard.readText ? `<button type="button" class="btn" id="bibPaste" title="Fill in from the DOI or BibTeX entry you copied" aria-label="Paste">${ICON.paste}<span>Paste</span></button>` : '') +
     // (A photo of the paper or book: see titlesearch.js.)
     `<button type="button" class="btn photo-go" id="photoGo" title="From a photo of the paper or book" aria-label="From a photo">${ICON.camera}</button>` +
     `<input type="file" id="photoIn" accept="image/*" hidden>` +
