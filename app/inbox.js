@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, inbox, trash, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/inbox.js'] = '2026-11-20.07';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/inbox.js'] = '2026-11-20.08';
 /* ------------------------------------------------------------ the Inbox */
 // Works you came across (cited in a paper you're reading, say) and want to
 // look at before deciding to keep them: their details, where you found
@@ -200,7 +200,8 @@ function homeMenu(btn) {
   const cur = btn.dataset.tab;
   const item = (id, sub) => `<button type="button" role="menuitemradio" aria-checked="${cur === id}" data-home="${id}">${listIcon(id)}` +
     `<span class="op-text"><span class="rc-title">${esc(homeName(id))}</span><span class="rc-sub">${sub}</span></span><span class="lm-ct">${(groupItems(id) || []).length.toLocaleString()}</span></button>`;
-  m.innerHTML = item('all', 'Your whole library') + '<div class="menu-sep"></div>' + item('toread', 'In your library, to read') + item('inbox', 'Not in your library yet, to decide on');
+  m.innerHTML = item('all', 'Your whole library') + (gs ? '<div class="menu-sep"></div>' + item('toread', 'In your library, to read') + item('inbox', 'Not in your library yet, to decide on') : '') +
+    (RECENT.seen.length || cur === 'recent' ? item('recent', 'The publications you looked at lately') : '');
   m.querySelectorAll('[aria-checked="true"] .lm-ct').forEach(c => c.insertAdjacentHTML('beforebegin', '<span class="rlw-tick" aria-hidden="true">\u2713</span>'));
   document.body.appendChild(m);
   const r = btn.getBoundingClientRect();
@@ -212,12 +213,15 @@ function homeMenu(btn) {
     const b = ev.target.closest('[data-home]');
     if (!b) return;
     closeTabsMenu();
-    if (b.dataset.home !== 'all') store.set('rlWhich', b.dataset.home);
-    if (b.dataset.home === state.group) listEl.scrollTo({ top: 0, behavior: 'smooth' }); else setGroup(b.dataset.home);
+    if (b.dataset.home === 'toread' || b.dataset.home === 'inbox') store.set('rlWhich', b.dataset.home);
+    if (b.dataset.home === state.group) { listEl.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+    // (Recently viewed: Back goes to the list you were on.)
+    if (b.dataset.home === 'recent') RECENT.back = state.group;
+    setGroup(b.dataset.home);
   });
 }
 function rlMenuClose() { RLH.hov = false; if (rlMenuOpen()) closeTabsMenu(); }
-const homeTab = () => (phoneMQ.matches || !gs ? null : $('#tabs .tab.pinned'));
+const homeTab = () => (phoneMQ.matches || !$('#tabs .tab.pinned [data-home-dd]') ? null : $('#tabs .tab.pinned'));
 $('#tabs').addEventListener('pointerover', ev => {
   if (ev.pointerType !== 'mouse') return;
   const tab = ev.target.closest('.tab.pinned');

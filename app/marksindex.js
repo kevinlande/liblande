@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, inbox, trash, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/marksindex.js'] = '2026-11-20.07';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/marksindex.js'] = '2026-11-20.08';
 /* ------------------------------------------------------------ the index */
 // Each PDF's highlights (their words, page and note), read from the PDF
 // once and kept in LibLande/marks.json in Drive, so every device can

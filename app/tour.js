@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, inbox, trash, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-11-20.07';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/tour.js'] = '2026-11-20.08';
 /* -------------------------------------------------------------- features */
 // What LibLande does, by area: each feature, what it's for, where to find
 // it, its icon (see featIcon), and other words it's found by (as "tag"
@@ -29,7 +29,7 @@ const FEATURES = [
     ['Search', 'Find publications by any words in them; choose which fields to search; save a search as a group.', '\u2318F or /, or the magnifier', '#searchBtn', 'find filter smart group saved search'],
     ['Sort and columns', 'Sort by any column, either way; choose the columns; drag the line between the list and the details to make room. The reading list keeps its own sort and columns.', 'The sort menu at the foot of the list; the column headings', 'path:M7 4v16M4 17l3 3 3-3M17 20V4M14 7l3-3 3 3', 'order columns'],
     ['Groups in the sidebar', 'Library, Recently viewed, Inbox (works you\u2019re considering, not in your library yet), Possible duplicates, Forthcoming; your saved searches, static groups, keywords and publication types. Drag to reorder; fold a section by its heading.', 'The sidebar (the button at the top left)', '#sideToggle', 'lists collections smart groups inbox fold arrange'],
-    ['Groups as tabs', 'The first tab is your library, by its name; its arrow (or resting the pointer on it) switches it to the Reading list or the Inbox. Each group you open stays as a tab after it; close one with its \u00d7. The open one is green. On an iPhone, one button lists them.', 'The tabs in the toolbar', '#tabs', 'tabs lists bibliography home'],
+    ['Groups as tabs', 'The first tab is your library, by its name; its arrow (or resting the pointer on it) switches it to the Reading list, the Inbox or Recently viewed. Each group you open stays as a tab after it; close one with its \u00d7. The open one is green. On an iPhone, one button lists them.', 'The tabs in the toolbar', '#tabs', 'tabs lists bibliography home recently viewed history'],
     ['Reader and Library', 'The switch at the top left says which side of LibLande you\u2019re on: the reader, with your open papers (its count lists them), or the library, back at the list you were on.', 'Reader | Library, at the top left', '#readerPair', 'switch mode reader library'],
     ['Static groups', 'Make a group with +, and drag publications onto it (on an iPad, hold one and drag).', 'Static groups in the sidebar', 'ICON:folder', 'collection folder group'],
     ['Several libraries', 'Add an existing library (a BibDesk .bib or a Zotero export) or make a new one, switch between them, and drag publications onto another to copy them with their PDFs.', 'Libraries in the sidebar; + beside it; Settings \u203a Library', 'ICON:lib', 'library switch copy add'],

@@ -1020,6 +1020,14 @@ body:has(#sheet:not([hidden])) .pick-bar { visibility: hidden; }
 .tab-scroll-wrap { position: relative; flex: 1 1 auto; min-width: 0; display: flex; align-items: center; }
 .tab-scroll-wrap .v-tabs-more.left { padding-left: 4px; }
 .tab-scroll-wrap .v-tabs-more.right { padding-right: 4px; }
+/* (Little room: the tabs without counts, and the counts of those out of
+   sight narrower, so the open tab fits beside them.) */
+#tabs.tight .tab .ct { display: none; }
+/* (Recently viewed: in the first tab's menu, not a button of its own.) */
+.tb-tabs #recentBtn { display: none; }
+#tabs.tighter .tab.pinned[aria-selected="false"] .nm { display: none; }
+#tabs.tight .tab-scroll-wrap .v-tabs-more.left { padding-right: 10px; }
+#tabs.tight .tab-scroll-wrap .v-tabs-more.right { padding-left: 10px; }
 .tab-scroll:not(:empty) { border-left: 1px solid var(--line); padding-left: 4px; margin-left: 2px; }
 @media (max-width: 699px) {
   .tab { font-size: 13.5px; padding: 5px 6px; max-width: 150px; }

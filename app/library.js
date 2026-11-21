@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, inbox, trash, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-20.07';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/library.js'] = '2026-11-20.08';
 const $ = s => document.querySelector(s);
 // The version, as the page gives it (index.html, the loading screen): the
 // one place the app's scripts take it from.
@@ -25,6 +25,9 @@ const ICON = {
   check: '<svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
   pencil: '<svg class="i" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>',
   inbox: '<svg class="i" viewBox="0 0 24 24"><path d="M4 13l2.5-7h11L20 13v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M4 13h4.5l1.5 2.5h4l1.5-2.5H20"/></svg>',
+  // (One book drawn down from the library: the .bib itself, as against
+  // Library's shelf of books.)
+  bibFile: '<svg class="i" viewBox="0 0 24 24"><path d="M5.5 4.5h11a1.5 1.5 0 0 1 1.5 1.5v14H7a1.5 1.5 0 0 1-1.5-1.5z"/><path d="M5.5 18.5A1.5 1.5 0 0 1 7 17h11"/><path d="M9.5 10.5c0-1.2.6-2 1.6-2.3M12.8 10.5c0-1.2.6-2 1.6-2.3"/><path d="M9.6 10.5h1.5v1.6H9.6zM12.9 10.5h1.5v1.6h-1.5z"/></svg>',
   lib: '<svg class="i" viewBox="0 0 24 24"><path d="M4 4h4v16H4zM10 4h4v16h-4z"/><path d="M16.5 4.8l3.8-1 3 15.4-3.8 1z" transform="translate(-2.5 0.4)"/></svg>',
   folder: '<svg class="i" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
   tag: '<svg class="i" viewBox="0 0 24 24"><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.3"/></svg>',
@@ -1401,7 +1404,7 @@ function librariesHTML() {
     const cur = l.bibId === curId, n = cur && !LIBS.phase ? ENTRIES.length : (LIB_COUNTS[l.bibId] || {}).n;
     return `<button type="button" class="grp lib-row${cur ? ' cur' : ''}${cur && state.group === 'all' ? ' on' : ''}" data-lib="${esc(l.bibId)}" data-papers="${esc(l.papersId || '')}"${cur ? ' data-g="all"' : ''}` +
       ` title="${cur ? esc(libName(l)) + ': the library open now' : 'Switch to ' + esc(libName(l))}">` +
-      `${ICON.lib}<span class="nm">${esc(libName(l))}</span><span class="ct">${n != null ? n.toLocaleString() : ''}</span></button>`;
+      `${ICON.bibFile}<span class="nm">${esc(libName(l))}</span><span class="ct">${n != null ? n.toLocaleString() : ''}</span></button>`;
   };
   const sub = `<div class="lib-sub${LIBS.phase === 'folding' ? ' folded' : LIBS.phase === 'loading' ? ' lib-wait' : ''}">` +
     (RECENT.seen.length || state.group === 'recent' ? grpBtn('recent', 'Recently viewed', groupItems('recent').length, ICON.history) : '') +
@@ -1498,7 +1501,7 @@ function renderGroups() {
   // (Signed in: the Libraries section, the open one's lists under it.
   // Otherwise, the one library as before.)
   const libs = librariesHTML();
-  let h = (libs || `<div class="sec${secFold('lib')}" data-sec="lib">${secHead('lib', 'Library')}${grpBtn('all', 'Library', ENTRIES.length, ICON.lib)}` +
+  let h = (libs || `<div class="sec${secFold('lib')}" data-sec="lib">${secHead('lib', 'Library')}${grpBtn('all', 'Library', ENTRIES.length, ICON.bibFile)}` +
     (RECENT.seen.length || state.group === 'recent' ? grpBtn('recent', 'Recently viewed', groupItems('recent').length, ICON.history) : '') +
     (DUPS.size || state.group === 'dups' ? grpBtn('dups', 'Possible duplicates', DUPS.size, ICON.dups) : '') +
     ((n => (n || state.group === 'forth' ? grpBtn('forth', 'Forthcoming', n, ICON.forth) : ''))(ENTRIES.filter(isForthcoming).length)) +
@@ -1702,7 +1705,7 @@ function renderTabs() {
     // The first tab: the library's list chosen (the library, the reading
     // list or the Inbox), its v a menu of the three.
     lib.innerHTML = listIcon(home) + `<span class="nm">${esc(homeName(home))}</span><span class="ct"></span>` +
-      (gs ? `<span class="tab-dd" data-home-dd role="button" aria-haspopup="menu" aria-label="Your library, reading list or Inbox" title="Your library, reading list or Inbox">${ICON.chev}</span>` : '');
+      (gs || RECENT.seen.length ? `<span class="tab-dd" data-home-dd role="button" aria-haspopup="menu" aria-label="Your library, reading list, Inbox or Recently viewed" title="Your library, reading list, Inbox or Recently viewed">${ICON.chev}</span>` : '');
     lib.dataset.tab = home;
     lib.title = homeName(home);
     lib.removeAttribute('aria-haspopup'); lib.removeAttribute('aria-label');
@@ -1715,19 +1718,54 @@ function renderTabs() {
     (tabCloseable(id) ? `<span class="tab-x" data-close="${esc(id)}" role="button" aria-label="Close ${esc(groupName(id))}" title="Close">${ICON.x}</span>` : '') +
     `</button>`).join('');
   box.scrollLeft = keep;
+  fitToolbar();
+  fitTabs();
   const cur = box.querySelector('.tab[aria-selected="true"]');
   if (cur) {
     const b = box.getBoundingClientRect(), r = cur.getBoundingClientRect();
     if (r.left < b.left) box.scrollLeft -= b.left - r.left + 8;
     else if (r.right > b.right) box.scrollLeft += r.right - b.right + 8;
   }
-  fitToolbar();
   foldTabs();
+  openTabClear();
+}
+// Little room for the strip (an iPad held upright): the tabs without their
+// counts (the open list's shows in the list's foot); then, if that's not
+// enough, the first tab (not open) as its icon and v; so the open one fits
+// beside the count of those out of sight.
+function fitTabs() {
+  const tabs = $('#tabs'), box = $('#tabScroll');
+  tabs.classList.remove('tight', 'tighter');
+  if (phoneMQ.matches) return;
+  const cur = box.querySelector('.tab[aria-selected="true"]');
+  if (!cur) return;
+  const need = () => cur.offsetWidth + (box.scrollWidth > box.clientWidth + 1 ? 2 * TAB_MORE_W : 0);
+  if (box.clientWidth >= need()) return;
+  tabs.classList.add('tight');
+  if (box.clientWidth < need()) tabs.classList.add('tighter');
+}
+const TAB_MORE_W = 40;
+// The open tab never under the count of those out of sight at either end:
+// scrolled clear of it.
+function openTabClear() {
+  const box = $('#tabScroll'), cur = box.querySelector('.tab[aria-selected="true"]');
+  if (!cur) return;
+  for (let k = 0; k < 3; k++) {
+    const r = cur.getBoundingClientRect(), L = $('#tabLeft'), Rb = $('#tabRight');
+    let d = 0;
+    if (!L.hidden && r.left < L.getBoundingClientRect().right) d = r.left - L.getBoundingClientRect().right - 2;
+    else if (!Rb.hidden && r.right > Rb.getBoundingClientRect().left) d = r.right - Rb.getBoundingClientRect().left + 2;
+    if (Math.abs(d) < 1) return;
+    box.scrollLeft += d;
+    foldTabs();
+  }
 }
 // The first tab's lists: the library (by its own name), the reading list
 // and the Inbox; the one it shows is the last of them open.
+// (Recently viewed is one of them too, at the foot of the menu.)
 const HOME_IDS = ['all', 'toread', 'inbox'];
 function homeList() {
+  if (state.group === 'recent') return 'recent';
   if (!gs) return 'all';
   if (HOME_IDS.includes(state.group)) { store.set('homeList', state.group); return state.group; }
   const h = store.get('homeList', 'all');
@@ -1799,7 +1837,7 @@ function fitToolbar() {
 }
 // A list's icon: the library's, the reading list's, Recently viewed's, or
 // a group's.
-const listIcon = id => id === 'all' ? ICON.lib : id === 'toread' ? ICON.bookmark : id === 'inbox' ? ICON.inbox : id === 'trash' ? ICON.trash : id === 'recent' ? ICON.history : ICON.folder;
+const listIcon = id => id === 'all' ? ICON.bibFile : id === 'toread' ? ICON.bookmark : id === 'inbox' ? ICON.inbox : id === 'trash' ? ICON.trash : id === 'recent' ? ICON.history : ICON.folder;
 // On a phone, the list button's menu: the library, each open list (with
 // its x, if it can be closed), and Recently viewed.
 function phoneLists() {
