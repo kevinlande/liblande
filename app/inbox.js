@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, inbox, trash, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/inbox.js'] = '2026-11-20.08';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/inbox.js'] = '2026-11-21.01';
 /* ------------------------------------------------------------ the Inbox */
 // Works you came across (cited in a paper you're reading, say) and want to
 // look at before deciding to keep them: their details, where you found

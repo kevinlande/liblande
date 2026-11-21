@@ -2,7 +2,7 @@
 // (One of the app's scripts, which share one scope, loaded in order by
 // index.html: library, apa, csl, marks, reader, save, contents, bookmarks, pdflib, editing, cite, notes, citecheck, newpapers, ocr, split, outline, findpdf, titlesearch, keywords, chapters, related, marksindex, inbox, trash, citecard, tour, start.)
 'use strict';
-(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-20.08';
+(self.LIBLANDE_PARTS = self.LIBLANDE_PARTS || {})['app/reader.js'] = '2026-11-21.01';
 /* ------------------------------------------------------------ PDF reader */
 // The reader downloads a paper straight from Google Drive and shows it with
 // PDF.js 5 (the viewer inside Firefox), which draws highlights, pen marks and
@@ -984,31 +984,25 @@ function sideColumnWidth() {
 }
 const motionOK = () => !phoneMQ.matches && !LESS_MOTION.matches && !!app.animate;
 const EASE = 'cubic-bezier(.2, .7, .3, 1)';
-// The library's switch between its halves: its highlight sliding from
-// Library to Reader (or back), and Library's count folding away (or
-// opening) as it goes. Drawn as a shape under the two, in the toolbar,
-// moving with it as the column folds. Returns a tidying-up, for when
-// the reader covers it.
+// The library's switch between its halves: its white thumb sliding from
+// Library to Reader (or back), the words taking the thumb's colour as it
+// arrives. Drawn inside the switch, over its track and under its words.
+// Returns a tidying-up, for when the reader covers it.
 function switchSlide(toReader, ms) {
-  const pair = $('#readerBtn'), libTab = $('#modeLib');
-  const tb = pair && pair.closest('.toolbar');
-  if (!tb || !libTab || pair.offsetParent === null || libTab.offsetParent === null) return Promise.resolve(() => {});
-  const ct = null, full = 0;
-  const box = () => tb.getBoundingClientRect();
-  const at = el => { const r = el.getBoundingClientRect(), b = box(); return { left: r.left - b.left, top: r.top - b.top, width: r.width, height: r.height }; };
-  // (Where it starts: under Library as it is, or under Reader with the count folded.)
-  if (!toReader && ct) { ct.style.maxWidth = '0px'; ct.style.opacity = '0'; }
-  const from = toReader ? at(libTab) : at(pair);
-  if (ct) { ct.style.maxWidth = toReader ? '0px' : full + 'px'; ct.style.opacity = toReader ? '0' : '1'; }
-  const to = toReader ? at(pair) : at(libTab);
+  const pair = $('#readerBtn'), libTab = $('#modeLib'), sw = $('#readerPair');
+  if (!sw || !libTab || pair.offsetParent === null || libTab.offsetParent === null) return Promise.resolve(() => {});
+  const box = sw.getBoundingClientRect();
+  const at = el => { const r = el.getBoundingClientRect(); return { left: r.left - box.left, top: r.top - box.top, width: r.width, height: r.height }; };
+  const from = toReader ? at(libTab) : at(pair), to = toReader ? at(pair) : at(libTab);
   const hl = document.createElement('div');
   hl.className = 'sw-slide';
   Object.assign(hl.style, { top: from.top + 'px', height: from.height + 'px', left: from.left + 'px', width: from.width + 'px' });
-  tb.classList.add('sliding');
-  tb.prepend(hl);
-  const a = hl.animate({ left: [from.left + 'px', to.left + 'px'], width: [from.width + 'px', to.width + 'px'] }, { duration: ms, easing: EASE, fill: 'forwards' });
-  if (ct) ct.animate({ maxWidth: toReader ? [full + 'px', '0px'] : ['0px', full + 'px'], opacity: toReader ? [1, 0] : [0, 1] }, { duration: ms, easing: EASE });
-  const tidy = () => { hl.remove(); tb.classList.remove('sliding'); if (ct) { ct.style.maxWidth = ''; ct.style.opacity = ''; } };
+  sw.classList.add('sliding');
+  sw.classList.toggle('to-reader', toReader);
+  sw.prepend(hl);
+  // (Eased in and out, so it's seen to travel, not jump.)
+  const a = hl.animate({ left: [from.left + 'px', to.left + 'px'], width: [from.width + 'px', to.width + 'px'] }, { duration: ms, easing: 'cubic-bezier(.45, 0, .25, 1)', fill: 'forwards' });
+  const tidy = () => { hl.remove(); sw.classList.remove('sliding', 'to-reader'); };
   return new Promise(done => { let over = false; const end = () => { if (over) return; over = true; done(tidy); }; a.finished.then(end, end); setTimeout(end, ms + 250); });
 }
 // Going to the reader: the switch first, then the column folds, then the
@@ -1022,7 +1016,7 @@ async function sideSweep(opening) {
     v.style.visibility = 'hidden';
     let tidy = () => {}, fold = null;
     try {
-      tidy = await switchSlide(true, 160);
+      tidy = await switchSlide(true, 240);
       if (w) { fold = app.animate({ gridTemplateColumns: [full, none] }, { duration: 200, easing: EASE, fill: 'forwards' }); await Promise.race([fold.finished.catch(() => {}), new Promise(r => setTimeout(r, 450))]); }
     } finally {
       v.style.visibility = '';
@@ -1031,7 +1025,7 @@ async function sideSweep(opening) {
     return;
   }
   const hold = w ? app.animate({ gridTemplateColumns: [none, none] }, { duration: 1, fill: 'forwards' }) : null;
-  const tidy = await switchSlide(false, 160);
+  const tidy = await switchSlide(false, 240);
   tidy();
   if (hold) { hold.cancel(); app.animate({ gridTemplateColumns: [none, full] }, { duration: 200, easing: EASE }); }
 }
